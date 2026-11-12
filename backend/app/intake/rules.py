@@ -22,6 +22,9 @@ code constants. The trial behaves as the MVP items (T-B11); it differs only wher
 - **The triage target**: 24 clock hours from availability in MDARIX (or the reopening), beside the regulatory clocks.
 - **Possible duplicates** (``duplicate_reasons``): the same product and lot or serial number; an event within
   ``DUPLICATE_DAYS``; and the same site (or country). Starter values, fixed in the trial.
+- **Similar wording** (``wording_reason``, B6a P1, D8): beside that rule, two descriptions sharing at least
+  ``SIMILAR_WORDING`` of their words (shared words / all words, after ``normalize`` and ``STOP_WORDS``), for records of
+  the same product (or none) with events within ``SIMILAR_DAYS``. A suggestion only: a person links or dismisses it.
 
 MDARIX never answers a question, never signs and never submits a report.
 """
@@ -47,6 +50,15 @@ TEXT_MAX = 2000
 WORDS_MAX = 4000
 TRIAGE_TARGET_HOURS = 24
 DUPLICATE_DAYS = 2
+# B6a P1 (D8): word overlap, no database extension. shortcut: word overlap misses typos and synonyms; upgrade to
+# pg_trgm (an extension and a migration) if precision on real pilot data is low.
+SIMILAR_WORDING = 0.5
+SIMILAR_DAYS = 90
+SIMILAR_SCAN = 500  # the newest records compared for similar wording, never every record of the organization
+STOP_WORDS = frozenset(
+    "a an and are as at be by during for from had has have he her his in is it its of on or our she that the their "
+    "they this to was were when which while with".split()
+)
 # B6a-D2 (owner, 11 Nov): a Case entered more than this many hours after awareness needs a late-entry reason.
 LATE_ENTRY_HOURS = 24
 
@@ -728,6 +740,35 @@ def delay_text(aware: datetime, available: datetime) -> dict:
 
 
 # --------------------------------------------------------------------------------------------- possible duplicates
+
+
+def words(text: object) -> frozenset[str]:
+    """A description's words for P1: ``normalize``, then without punctuation and STOP_WORDS."""
+    return frozenset(word for word in re.findall(r"[a-z0-9]+", normalize(text)) if word not in STOP_WORDS)
+
+
+def word_overlap(left: frozenset[str], right: frozenset[str]) -> float:
+    """Shared words / all words of the two descriptions (0 when either has none)."""
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
+def wording_reason(left: dict, right: dict) -> str | None:
+    """B6a P1: "similar description (62 % words in common)" when two records of the same product (or one without a
+    product) with events within SIMILAR_DAYS (or no event date on one) share at least SIMILAR_WORDING of their words;
+    None otherwise and while MDARIX_B6_SIMILAR_WORDING is off. ``left``/``right`` carry ``product_id``, ``event_on``
+    and ``words`` (from ``words``)."""
+    if not feature_set.switched_on("MDARIX_B6_SIMILAR_WORDING"):
+        return None
+    products = (left.get("product_id"), right.get("product_id"))
+    if all(products) and products[0] != products[1]:
+        return None
+    dates = (left.get("event_on"), right.get("event_on"))
+    if all(dates) and abs((dates[0] - dates[1]).days) > SIMILAR_DAYS:
+        return None
+    score = word_overlap(left.get("words") or frozenset(), right.get("words") or frozenset())
+    return f"similar description ({round(score * 100)} % words in common)" if score >= SIMILAR_WORDING else None
 
 
 def duplicate_reasons(left: dict, right: dict) -> list[str]:

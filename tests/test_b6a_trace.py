@@ -71,9 +71,10 @@ def test_a_value_is_traced_to_its_field_its_change_its_import_row_and_its_snapsh
     snapshot = found["snapshot"]
     assert snapshot["state"] == "APPROVED" and snapshot["approved_by"] == "Rahul Colleague"
     assert len(snapshot["sha256"]) == 64 and snapshot["approved_at"]
-    assert snapshot["sha256"] == next(item for item in detail["snapshots"] if item["state"] == "APPROVED")[
-        "content_fingerprint"
-    ]
+    assert (
+        snapshot["sha256"]
+        == next(item for item in detail["snapshots"] if item["state"] == "APPROVED")["content_fingerprint"]
+    )
     assert snapshot["frozen_value"] == found["field"]["value"]
 
     # The awareness date (G3): the change with its reason, its values (that field's only) and who made it.

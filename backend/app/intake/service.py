@@ -25,6 +25,7 @@ from types import SimpleNamespace
 from sqlalchemy import event as sa_event, exists, func, or_
 from sqlalchemy.orm import Session, load_only
 
+from backend.app import feature_set
 from backend.app.trial.sample_source import is_sample
 from backend.app.complaint_review import rules as review_rules
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
@@ -1288,6 +1289,7 @@ def _duplicate_fields(kind: str, row, lots: dict) -> dict:
             "site": row.reporter_site,
             "country": row.country,
             "event_on": rules.utc(moment).date() if moment else None,
+            "words": rules.words(row.reporter_words),
         }
     moment = row.event_timestamp or row.complaint_timestamp
     return {
@@ -1297,6 +1299,7 @@ def _duplicate_fields(kind: str, row, lots: dict) -> dict:
         "site": None,
         "country": row.country,
         "event_on": rules.utc(moment).date() if moment else None,
+        "words": rules.words(row.description),
     }
 
 
@@ -1313,6 +1316,25 @@ def candidate_pairs(fields: list[dict]) -> list[tuple[int, int]]:
             if value:
                 groups.setdefault((item["product_id"], key, value), []).append(index)
     pairs = {(a, b) for members in groups.values() for i, a in enumerate(members) for b in members[i + 1 :]}
+    return sorted(pairs)
+
+
+def similar_pairs(fields: list[dict]) -> list[tuple[int, int]]:
+    """B6a P1: the pairs (``i < j``) to compare for similar wording, bounded: the SIMILAR_SCAN records with the newest
+    events, and of those only records of one product (or one without a product); none while the switch is off."""
+    if not feature_set.switched_on("MDARIX_B6_SIMILAR_WORDING"):
+        return []
+    newest = sorted(
+        (index for index, item in enumerate(fields) if item.get("words")),
+        key=lambda index: fields[index].get("event_on") or date.min,
+        reverse=True,
+    )[: rules.SIMILAR_SCAN]
+    pairs = set()
+    for n, a in enumerate(newest):
+        for b in newest[n + 1 :]:
+            left, right = fields[a].get("product_id"), fields[b].get("product_id")
+            if not left or not right or left == right:
+                pairs.add((min(a, b), max(a, b)))
     return sorted(pairs)
 
 
@@ -1350,27 +1372,38 @@ def duplicates(db: Session, tenant_id: uuid.UUID) -> list[dict]:
         if complaint.product_id in product_ids or complaint.source_system != "MDARIX_SAMPLE":
             records.append((COMPLAINT, complaint, _duplicate_fields(COMPLAINT, complaint, lots)))
             sources[complaint.id] = complaint.source_system
-    found = []
-    for index, other in candidate_pairs([fields for _, _, fields in records]):
-        (left_kind, left, left_fields), (right_kind, right, right_fields) = records[index], records[other]
+
+    def undecided(index: int, other: int):
+        (left_kind, left, _), (right_kind, right, _) = records[index], records[other]
         if left_kind == COMPLAINT and right_kind == COMPLAINT and sources[left.id] == sources[right.id]:
-            continue
+            return None
         pair = frozenset({(left_kind, left.id), (right_kind, right.id)})
         if pair in decided:
-            continue
+            return None
         a, b = group.get((left_kind, left.id)), group.get((right_kind, right.id))
-        if a is not None and a == b:
-            continue
-        reasons = rules.duplicate_reasons(left_fields, right_fields)
+        return None if a is not None and a == b else pair
+
+    fields = [item for _, _, item in records]
+    found: dict[frozenset, tuple[int, int, list[str]]] = {}
+    for index, other in candidate_pairs(fields):
+        pair = undecided(index, other)
+        reasons = rules.duplicate_reasons(fields[index], fields[other]) if pair else []
         if reasons:
-            found.append(
-                {
-                    "left": _side(left_kind, left, products),
-                    "right": _side(right_kind, right, products),
-                    "reasons": reasons,
-                }
-            )
-    return found[:100]
+            found[pair] = (index, other, reasons)
+    # B6a P1: similar wording, beside the rule's reasons (or alone); the same linked and dismissed pairs are skipped.
+    for index, other in similar_pairs(fields):
+        pair = undecided(index, other)
+        reason = rules.wording_reason(fields[index], fields[other]) if pair else None
+        if reason:
+            found.setdefault(pair, (index, other, []))[2].append(reason)
+    return [
+        {
+            "left": _side(records[index][0], records[index][1], products),
+            "right": _side(records[other][0], records[other][1], products),
+            "reasons": reasons,
+        }
+        for index, other, reasons in found.values()
+    ][:100]
 
 
 DUPLICATE_SCAN = 200  # one product's newest complaints compared with a Case at escalation
@@ -1414,8 +1447,10 @@ def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> 
             continue
         theirs = _duplicate_fields(COMPLAINT, complaint, lots)
         reasons = rules.duplicate_reasons(mine, theirs)
+        wording = rules.wording_reason(mine, theirs)  # B6a P1: beside the rule's reasons, never pre-selected alone
+        same_day = bool(reasons) and mine["event_on"] is not None and mine["event_on"] == theirs["event_on"]
+        reasons = [*reasons, wording] if wording else reasons
         if reasons:
-            same_day = mine["event_on"] is not None and mine["event_on"] == theirs["event_on"]
             found.append(
                 {"id": str(complaint.id), "ref": complaint_ref(complaint), "reasons": reasons, "same_day": same_day}
             )
