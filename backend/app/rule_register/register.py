@@ -103,6 +103,10 @@ def _problems(entries: list[tuple[str, dict]]) -> list[str]:
             problems.append(f"{name}: unknown kind {entry['kind']}")
         if entry["change"].get("kind") not in CHANGE_KINDS:
             problems.append(f"{name}: change.kind is one of {', '.join(CHANGE_KINDS)}")
+        approval = entry["approval"]
+        built, approved = (" ".join(str(approval.get(k) or "").split()).casefold() for k in ("built_by", "approved_by"))
+        if not approved or approved == built:  # B6b owner decision O3 (RSK-065): a second person approves
+            problems.append(f"{name}: approval.approved_by must name a person other than approval.built_by")
         if standards.STARTER_MARK not in str(entry["review"].get("note")):
             problems.append(f"{name}: review.note keeps the starter mark")
         for source in entry["source"]:

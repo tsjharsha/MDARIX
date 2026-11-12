@@ -88,6 +88,23 @@ def test_the_loader_refuses_an_unknown_catalog_id_a_duplicate_and_a_missing_fiel
         register.load()
 
 
+@pytest.mark.parametrize("approver", ["MDARIX engineering", "  mdarix   ENGINEERING ", "", None])
+def test_a_version_approved_by_its_own_builder_or_by_nobody_is_refused(use, us1, approver):
+    """B6b owner decision O3 (MDX-VAL-002 RSK-065): the register refuses the same person as builder and approver."""
+    same = copy.deepcopy(us1)
+    same["approval"].update(built_by="MDARIX engineering", approved_by=approver)
+    use([same])
+    with pytest.raises(register.RegisterError, match=r"US-floor-1.json: approval.approved_by must name a person other"):
+        register.load()
+
+
+def test_a_version_approved_by_a_second_person_is_allowed(use, us1):
+    other = copy.deepcopy(us1)
+    other["approval"].update(built_by="MDARIX engineering", approved_by="Owner")
+    use([other])
+    assert register.load()["US-floor-1"]["approval"]["approved_by"] == "Owner"
+
+
 def test_content_changed_without_a_new_version_fails_naming_the_file(use, us1):
     """DT-33, RR-06: one byte of a floor's content changed, the hash left as it was."""
     changed = copy.deepcopy(us1)

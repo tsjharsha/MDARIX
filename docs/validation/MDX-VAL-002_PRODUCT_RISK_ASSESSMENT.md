@@ -18,7 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after a software-assisted review, findings dispositioned by the author: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
-| 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -217,7 +217,7 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-062 | QMS documents | A signed PMS document version changes after signing | Signed record altered | 4 | 2 | 2 | 16 | A | No | A signed version is never edited; a new version supersedes it | `tests/test_qms_documents_rules.py`, `tests/test_qms_documents_api.py` | PT-04 | (B6b B1) | Acceptable after verification |
 | RSK-063 | Notifications and outbox | A notification is lost or stays dead-lettered unseen | Late action | 3 | 2 | 2 | 12 | B | No | Dead-letter with reason; operations alerts; audited replay of one event (`scripts/replay_outbox.py`) | `tests/test_outbox_resilience.py`, `tests/test_replay_outbox_script.py` | PT-15 | (B6b B1) | Acceptable after verification |
 | RSK-064 | Value Centre and dashboards | A figure on the Value Centre or a dashboard is wrong | Wrong management information; no record or decision effect | 2 | 3 | 4 | 24 | C | No | Medians on known data; sample records excluded; no per-person numbers | B6-43, B6-44; `tests/test_b6a_value_centre.py` | - | (B6b B1) | Acceptable |
-| RSK-065 | Rule register | The same person writes and approves a rule version | No independent check of rule content | 4 | 3 | 3 | 36 | A | No | The rule file records writer and approver; the register does not refuse the same person (`backend/app/rule_register/register.py`) | DT-12 (refused), DT-14 (one-person trial allowed); NOT RUN, code fix pending | - | (B6b B1) | **Open:** owner decision O3: the register will refuse the same person (B6b Part B, with a refused-case and an allowed-case test). No interim control exists until then |
+| RSK-065 | Rule register | The same person builds and approves a rule version | No independent check of rule content | 4 | 2 | 1 | 8 | A | No | The register refuses a version whose `approval.approved_by` is empty or names the same person as `approval.built_by` (`backend/app/rule_register/register.py`; owner decision O3) | `tests/test_rule_register_unit.py` (refused and allowed cases); DT-12 and DT-14 cover the organisation layer | - | (B6b B1) | Acceptable after verification |
 | RSK-066 | Purge and retention | The wrong organisation's records are purged, or records are purged before their retention date or while under legal hold | Regulated records lost | 4 | 2 | 3 | 24 | A | No | Purge needs MFA and a completion job; legal hold blocks erasure (`backend/app/tenant_purge.py`, `backend/app/legal_hold_api.py`); the database refuses early deletion of audit events (trigger `audit_events_retention`, migration `md23_pilot_readiness.py`) | `tests/test_export_purge_mfa.py`, `tests/test_purge_completion_job.py`, `tests/test_customer_admin_erasure_hold.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-067 | Sign-in and sessions | A deactivated account, an expired session or a reset second factor still allows an action on a record | Unauthorised change or signature | 4 | 2 | 3 | 24 | A | No | Session lifecycle and permissions checked on each request (`backend/app/access/session.py`, `backend/app/auth_router.py`); lockout after wrong codes | `tests/test_auth_session_lifecycle.py`, `tests/test_session_permissions.py` | PT-05 | (B6b B1) | Acceptable after verification |
 
@@ -238,10 +238,9 @@ give the evidence. It does not claim they have passed in a validation run: most 
   - RSK-040: a second holder of the backup key (threat model G-7).
   - RSK-038: RPO 24 hours today; target 15 minutes with point-in-time recovery on pilot hosting.
   - RSK-056: outbox events held after a restore (recovery check, B6b Part D).
-  - RSK-065: the rule register does not refuse the same person as writer and approver yet (owner decision O3).
 - **Verification gaps** (a test or check missing): RSK-024 (no scenario or test), RSK-026 (outbox test covers part
   only), RSK-023 (missing-block scenario and test), RSK-030 (job never runs in a pilot organisation), RSK-035 (readable export), RSK-036 (download by another
-  person: threat-model test PT-13 to add), RSK-065 (refused-case and allowed-case tests with the code fix).
+  person: threat-model test PT-13 to add).
 - Each Open class-A row a release relies on needs the signed acceptance of RA-R07 until it is closed.
 
 ## 7. Open points

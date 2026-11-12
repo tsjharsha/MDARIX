@@ -210,7 +210,7 @@ also questions in MDX-VAL-013.
 | B6b-D21 | The test marker is `requirement(<scenario ID>)`, as registered in `pytest.ini`; `requirements.csv` maps REQ IDs to scenarios |
 | O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
 | O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (B6b Part B) |
-| O3 | The rule register shall refuse the same person as author and approver of a rule version (MDX-VAL-002 RSK-065); the refusal is added in B6b Part B |
+| O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added in B6b Part B) |
 | O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5; RSK-029 and RSK-039 by the privacy line of severity 4 |
 | O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
 

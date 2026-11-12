@@ -66,8 +66,7 @@ approved (MDX-VAL-001 section 9.4). The following facts support Category 4 for M
    `backend/app/rule_register/data/`. `backend/app/rule_register/register.py` refuses the register when a version's
    content does not match its content hash, when versions overlap, or when coverage has a gap. A change of rule is a
    new version file; the file records who wrote it and who approved it (the owner or a named regulatory approver).
-   The register does not yet check that the two are different people; owner decision O3 adds that refusal in
-   B6b Part B (open point OP-3 and MDX-VAL-002 RSK-065). Signed records name the version they used.
+   The register refuses a version approved by the person who built it (owner decision O3, MDX-VAL-002 RSK-065). Signed records name the version they used.
 4. **Roles and permissions are fixed data.** Personas and their permissions are defined in
    `access_control/personas.py` and `backend/app/access/permissions.py`; the customer assigns them, it does not
    define new permission logic.
@@ -124,7 +123,7 @@ The cloud provider's infrastructure is assessed as a supplier in the hosting ass
 |---|---|---|
 | OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (MDX-VAL-013, question 2). Version 1.0 is signed only after the consultant's written answer to question 2 (owner decision B6b-D20) | Srinivas |
 | OP-2 | Whether customer-written organisation rules (rules that can only raise an outcome) need any extra customer test beyond the UAT/PQ template | Srinivas |
-| OP-3 | The rule register records who wrote and who approved each rule version but does not yet refuse the same person in both; owner decision O3: `register.py` refuses it (B6b Part B) | Sriharsha |
+| OP-3 | Closed 12 Nov 2026: `register.py` refuses the same person as builder and approver (owner decision O3) | Sriharsha |
 
 ## Signatures
 
