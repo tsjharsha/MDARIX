@@ -176,7 +176,8 @@ export type IntakeItem = {
   addenda?: Addendum[];
   choices?: Choice[] | null;
   clock?: Deadline | null;
-  likely_complaints?: { id: string; ref: string; reasons: string[]; same_day?: boolean }[];
+  /** B6a P1: ``wording_only``, found by similar wording alone: offered, never pre-selected. */
+  likely_complaints?: { id: string; ref: string; reasons: string[]; same_day?: boolean; wording_only?: boolean }[];
   /** Spec 9.3: signed a complaint before 0.10.93 and never escalated: "Signed before 0.10.93: escalate". */
   escalate_signed?: boolean;
   complaint_id?: string | null;

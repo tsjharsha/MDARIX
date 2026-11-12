@@ -75,7 +75,7 @@ def _hours(start: datetime | None, end: datetime | None) -> float | None:
 
 def _triage(db: Session, tenant_id) -> tuple[list, list]:
     from backend.app.db.models.foundation import Complaint
-    from backend.app.db.models.intake import TriageRecord
+    from backend.app.db.models.intake import IntakeEvent, TriageRecord
 
     rows = (
         db.query(
@@ -84,6 +84,8 @@ def _triage(db: Session, tenant_id) -> tuple[list, list]:
             TriageRecord.qms_triaged_at,
             TriageRecord.source_system,
             Complaint.complaint_timestamp,
+            Complaint.source_system,
+            IntakeEvent.source_system,
         )
         .outerjoin(
             Complaint,
@@ -91,12 +93,19 @@ def _triage(db: Session, tenant_id) -> tuple[list, list]:
             & (Complaint.id == TriageRecord.subject_id)
             & (TriageRecord.subject_kind == "COMPLAINT"),
         )
+        .outerjoin(
+            IntakeEvent,
+            (IntakeEvent.tenant_id == TriageRecord.tenant_id)
+            & (IntakeEvent.id == TriageRecord.subject_id)
+            & (TriageRecord.subject_kind == "INTAKE"),
+        )
         .filter(TriageRecord.tenant_id == tenant_id)
         .all()
     )
     mine, imported = [], []
-    for opened, completed, qms_at, source, received in rows:
-        if is_sample(source):
+    for opened, completed, qms_at, source, received, complaint_source, intake_source in rows:
+        # A triage done here on a sample record carries no source of its own: its subject tells (review finding 3).
+        if is_sample(source) or is_sample(complaint_source) or is_sample(intake_source):
             continue
         if source == QMS_SOURCE:  # completed at import time: only the QMS's own dates count, apart
             hours = _hours(received, qms_at)
@@ -110,7 +119,10 @@ def _triage(db: Session, tenant_id) -> tuple[list, list]:
 def _decisions(db: Session, tenant_id) -> list:
     from backend.app.db.models.foundation import Complaint
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment as Conclusion
+    from backend.app.intake.service import enabled_markets
+    from backend.app.reportability.assessments import required_markets
 
+    enabled = enabled_markets(db, tenant_id)
     rows = (
         db.query(
             Conclusion.complaint_id,
@@ -119,6 +131,7 @@ def _decisions(db: Session, tenant_id) -> list:
             Complaint.awareness_timestamp,
             Complaint.complaint_timestamp,
             Complaint.source_system,
+            Complaint.country,
         )
         .join(Complaint, (Complaint.tenant_id == Conclusion.tenant_id) & (Complaint.id == Conclusion.complaint_id))
         .filter(Conclusion.tenant_id == tenant_id)
@@ -126,10 +139,11 @@ def _decisions(db: Session, tenant_id) -> list:
     )
     first: dict = {}  # complaint -> market -> first signed (None while only a draft)
     aware: dict = {}
-    for complaint_id, market, signed_at, awareness, received, source in rows:
+    country: dict = {}
+    for complaint_id, market, signed_at, awareness, received, source, where in rows:
         if is_sample(source):
             continue
-        aware[complaint_id] = awareness or received
+        aware[complaint_id], country[complaint_id] = awareness or received, where
         markets = first.setdefault(complaint_id, {})
         if signed_at is not None:
             markets[market] = min(signed_at, markets.get(market) or signed_at)
@@ -137,7 +151,10 @@ def _decisions(db: Session, tenant_id) -> list:
             markets.setdefault(market, None)
     points = []
     for complaint_id, markets in first.items():
-        if markets and all(markets.values()):
+        # Every market the complaint must be assessed for (its event's enabled markets and every one assessed), as the
+        # watch counts them (review finding 4): one not started yet means not decided.
+        wanted = required_markets(country[complaint_id], enabled, markets)
+        if wanted and all(markets.get(market) for market in wanted):
             last = max(markets.values())
             hours = _hours(aware[complaint_id], last)
             if hours is not None:
@@ -148,14 +165,27 @@ def _decisions(db: Session, tenant_id) -> list:
 def _reports(db: Session, tenant_id) -> tuple[list, list]:
     from backend.app.authority_reports import worksheet
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
+    from backend.app.db.models.foundation import Complaint
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment as Conclusion
 
+    # The first approval of each initial report (a follow-up keeps the initial conclusion: review finding 5), with
+    # only its frozen sections, never the frozen files (finding 6).
     rows = (
-        db.query(ReportSnapshot.obligation_id, ReportSnapshot.approved_at, ReportSnapshot.fields, Conclusion.signed_at)
+        db.query(
+            ReportSnapshot.obligation_id,
+            ReportSnapshot.approved_at,
+            ReportSnapshot.fields["sections"],
+            Conclusion.signed_at,
+        )
+        .distinct(ReportSnapshot.obligation_id)
         .join(
             ReportObligation,
             (ReportObligation.tenant_id == ReportSnapshot.tenant_id)
             & (ReportObligation.id == ReportSnapshot.obligation_id),
+        )
+        .join(
+            Complaint,
+            (Complaint.tenant_id == ReportObligation.tenant_id) & (Complaint.id == ReportObligation.complaint_id),
         )
         .outerjoin(
             Conclusion,
@@ -164,20 +194,18 @@ def _reports(db: Session, tenant_id) -> tuple[list, list]:
         .filter(
             ReportSnapshot.tenant_id == tenant_id,
             ReportSnapshot.approved_at.isnot(None),
-            ReportObligation.source_system.is_distinct_from(SAMPLE_SOURCE),
+            ReportObligation.kind == "INITIAL",
+            Complaint.source_system.is_distinct_from(SAMPLE_SOURCE),
         )
-        .order_by(ReportSnapshot.approved_at)
+        .order_by(ReportSnapshot.obligation_id, ReportSnapshot.approved_at)
         .all()
     )
-    times, completeness, seen = [], [], set()
-    for obligation_id, approved_at, fields, signed_at in rows:
-        if obligation_id in seen:  # the first approval of each report
-            continue
-        seen.add(obligation_id)
+    times, completeness = [], []
+    for _, approved_at, sections, signed_at in rows:
         hours = _hours(signed_at, approved_at)
         if hours is not None:
             times.append((approved_at, hours / 24))
-        meter = worksheet.mandatory((fields or {}).get("sections") or [])
+        meter = worksheet.mandatory(sections or [])
         if meter["total"]:
             completeness.append((approved_at, 100 * meter["filled"] / meter["total"]))
     return times, completeness

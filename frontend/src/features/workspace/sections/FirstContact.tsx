@@ -1715,10 +1715,11 @@ function SignForm({
 const NEW = "new";
 
 /** Spec 3.3 step 2: one strong match (the only one, or the only one on the case's event day) is pre-selected
- * "Attach to …"; otherwise the signer chooses. */
-function preselected(likely: NonNullable<IntakeItem["likely_complaints"]>): string {
+ * "Attach to …"; otherwise the signer chooses. A match by similar wording alone (B6a P1) is never pre-selected. */
+export function preselected(likely: NonNullable<IntakeItem["likely_complaints"]>): string {
   const sameDay = likely.filter((candidate) => candidate.same_day);
-  return likely.length === 1 ? likely[0].id : sameDay.length === 1 ? sameDay[0].id : "";
+  if (likely.length === 1) return likely[0].wording_only ? "" : likely[0].id;
+  return sameDay.length === 1 ? sameDay[0].id : "";
 }
 
 /** "Signed before 0.10.93: escalate" (spec 9.3): a Case signed a complaint before signing escalated, never linked.

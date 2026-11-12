@@ -15,7 +15,7 @@ from backend.app.db.models.intake import TriageRecord
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from tests.test_free_trial import _approved_trial_client
-from tests.test_reporting_capa_api import _client
+from tests.test_reporting_capa_api import _client, _complaint
 
 pytestmark = pytest.mark.db
 URL = "/api/v1/oversight/value-centre"
@@ -61,19 +61,26 @@ def test_the_baseline_the_qms_history_and_who_reads_it(monkeypatch):
     with SessionLocal() as db:
         bind_system(db, "test: value centre records")
         triaged = db.query(TriageRecord.subject_id).filter(TriageRecord.tenant_id == tenant_id)
-        complaint = (
+        sample = (
             db.query(Complaint)
-            .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_timestamp.isnot(None))
+            .filter(Complaint.tenant_id == tenant_id, Complaint.source_system == "MDARIX_SAMPLE")
             .filter(~Complaint.id.in_(triaged))
             .first()
         )
-        received = complaint.complaint_timestamp
+        product = str(sample.product_id)
+    # An imported (non-sample) complaint for the QMS's own triage dates.
+    complaint = _complaint(tenant_id, product, source_system="TRIAL_UPLOAD")
+    with SessionLocal() as db:
+        bind_system(db, "test: value centre records")
+        received = db.get(Complaint, uuid.UUID(complaint)).complaint_timestamp
+        # A triage done here on a sample complaint: no source of its own, never counted (review finding 3).
+        _triage(db, tenant_id, go_live + timedelta(days=4), 700, subject=sample.id)
         _triage(db, tenant_id, go_live + timedelta(days=1), 6)  # in the baseline
         _triage(db, tenant_id, go_live + timedelta(days=2), 10)  # in the baseline
         _triage(db, tenant_id, go_live + timedelta(days=40), 30)  # after it: its month only
         _triage(db, tenant_id, go_live + timedelta(days=3), 500, source="MDARIX_SAMPLE")  # never counted
         # The QMS's own dates: received -> triaged in the QMS, 48 h (completed at import time is not counted).
-        _triage(db, tenant_id, now, 0, source="QMS", subject=complaint.id, qms_at=received + timedelta(hours=48))
+        _triage(db, tenant_id, now, 0, source="QMS", subject=uuid.UUID(complaint), qms_at=received + timedelta(hours=48))
         db.commit()
 
     found = leader.get(URL)

@@ -105,9 +105,9 @@ def build(
         query = db.query(RecordFieldChange).filter(
             RecordFieldChange.tenant_id == tenant_id, RecordFieldChange.record_id == record_id
         )
-        if keys:
-            query = query.filter(RecordFieldChange.field.in_(keys))
-        changes = query.order_by(RecordFieldChange.changed_at.desc()).limit(LIMIT).all()
+        # Only the traced field's own changes; a source not mapped to columns lists none (review finding 7).
+        query = query.filter(RecordFieldChange.field.in_(keys))
+        changes = query.order_by(RecordFieldChange.changed_at.desc()).limit(LIMIT).all() if keys else []
         if source.get("type") in LINEAGE:
             imports = origin(db, control_db, tenant_id, LINEAGE[source["type"]], record_id)
 
@@ -122,7 +122,7 @@ def build(
             "status_label": row.get("status_label"),
         },
         "origin": source,
-        "entered_on_report": [_event(event, people, ("value", "confirmed", "code_state")) for event in entered],
+        "entered_on_report": [_entered(event, people, form_field.id) for event in entered],
         "field_changes": [
             {
                 "field": item.field,
@@ -164,6 +164,19 @@ def _event(event: AuditEvent, people: dict, keys) -> dict:
         "reason": event.reason,
         "values": _values(event, tuple(keys)) if keys else None,
     }
+
+
+def _entered(event: AuditEvent, people: dict, field_id: str) -> dict:
+    """A REPORT_FIELD_SET event keeps the field's entry under its id (``{field_id: {value, ...}}``): its value before
+    and after (review finding 2)."""
+    keys = ("value", "confirmed", "code_state")
+
+    def entry(values) -> dict:
+        found = (values or {}).get(field_id) or {}
+        return {key: found[key] for key in keys if isinstance(found, dict) and key in found}
+
+    before, after = entry(event.old_values), entry(event.new_values)
+    return {**_event(event, people, ()), "values": {"before": before, "after": after} if before or after else None}
 
 
 def origin(db: Session, control_db: Session, tenant_id, entity: str, record_id: uuid.UUID) -> list[dict]:

@@ -1449,10 +1449,18 @@ def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> 
         reasons = rules.duplicate_reasons(mine, theirs)
         wording = rules.wording_reason(mine, theirs)  # B6a P1: beside the rule's reasons, never pre-selected alone
         same_day = bool(reasons) and mine["event_on"] is not None and mine["event_on"] == theirs["event_on"]
+        # Found by the words alone: offered, never pre-selected (review finding 1).
+        wording_only = bool(wording) and not reasons
         reasons = [*reasons, wording] if wording else reasons
         if reasons:
             found.append(
-                {"id": str(complaint.id), "ref": complaint_ref(complaint), "reasons": reasons, "same_day": same_day}
+                {
+                    "id": str(complaint.id),
+                    "ref": complaint_ref(complaint),
+                    "reasons": reasons,
+                    "same_day": same_day,
+                    "wording_only": wording_only,
+                }
             )
     return sorted(found, key=lambda item: not item["same_day"])
 

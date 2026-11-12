@@ -91,3 +91,4 @@ def test_the_escalation_check_adds_similar_wording_without_preselecting(trial):
         found = {item["id"]: item for item in service.likely_complaints(db, trial["tenant_id"], case)}
         item = found[str(complaint.id)]
         assert item["reasons"] == ["similar description (100 % words in common)"] and item["same_day"] is False
+        assert item["wording_only"] is True  # offered, never pre-selected (preselected() in FirstContact.tsx)

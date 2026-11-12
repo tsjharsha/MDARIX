@@ -89,7 +89,10 @@ def test_a_value_is_traced_to_its_field_its_change_its_import_row_and_its_snapsh
     # A value typed on the report: who entered it and when, from the report's own audit trail.
     typed = _ok(user.get(f"{REPORTS}/{report}/trace/MFR_REPORT"))
     assert typed["origin"] is None or typed["origin"]["type"] != "Complaint"
-    assert any(item["action"] == "REPORT_FIELD_SET" for item in typed["entered_on_report"])
+    entry = next(item for item in typed["entered_on_report"] if item["action"] == "REPORT_FIELD_SET")
+    assert entry["values"]["after"] == {"value": typed["field"]["value"]} and entry["by"] != "MDARIX"
+    # A complaint source not mapped to columns lists no field changes as this value's history.
+    assert typed["field_changes"] == []
 
 
 def test_trace_is_read_only_and_refused_elsewhere(trial, monkeypatch):  # B6-40, B6-45
