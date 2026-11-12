@@ -68,6 +68,12 @@ not built yet, and the chain is re-ordered at the release join). The API and web
 - Sample: once the sample decision is signed, Did it work? on SAMPLE-CAPA-02 reads "Too early" with no later
   complaints; no after-action complaints are seeded (B5-D10).
 
+### Tests
+
+- The decision brief and human decision tests (`tests/test_decision_brief.py`, `tests/test_human_decision.py`) give
+  their ready case's complaint a lot. Without one, B5's material question C-4 ("complaints with no version or no
+  lot") blocked submit with 409 `BRIEF_NOT_READY`, as B5-D3 intends; the tests predated that rule. No product change.
+
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
 B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto
