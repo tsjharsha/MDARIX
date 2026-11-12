@@ -211,7 +211,7 @@ export function FollowUpDrawer({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { notify } = useWorkspace();
+  const { notify, open, session } = useWorkspace();
   const [mode, setMode] = useState<FollowUpActionKey | null>(null);
   const [text, setText] = useState("");
   const [dueDay, setDueDay] = useState("");
@@ -242,6 +242,7 @@ export function FollowUpDrawer({
   const copy = mode && mode !== "start" ? FOLLOW_UP_COPY[mode] : null;
   const problem = mode && mode !== "start" ? followUpActionProblem(mode, { text, dueDay }) : null;
   const capa = followUpCapaText(followUp);
+  const capaId = followUp.capa?.id;
   return (
     <Drawer title={`${name}: ${followUpTypeLabel(followUp)}`} onClose={onClose}>
       <dl className="ca-facts">
@@ -271,7 +272,23 @@ export function FollowUpDrawer({
         </div>
         <div>
           <dt>CAPA</dt>
-          <dd>{capa ?? "None recorded"}</dd>
+          <dd>
+            {capa ?? "None recorded"}
+            {/* Navigation polish (B6a D4 #14): the CAPA's effectiveness check, by the id the server sends. */}
+            {capaId &&
+              sectionAllowed("Records", session?.allowed_menu, session?.business_permissions, session?.sample_only) && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="ac-link"
+                    onClick={() => open("Records", `Effectiveness checks?${new URLSearchParams({ capa: capaId })}`)}
+                  >
+                    Open its effectiveness check
+                  </button>
+                </>
+              )}
+          </dd>
         </div>
       </dl>
       {followUp.capa && followUp.actions?.can_set_qms_reference && !copy && (

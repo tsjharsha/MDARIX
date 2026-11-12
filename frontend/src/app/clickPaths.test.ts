@@ -218,6 +218,18 @@ export const PATHS: Array<{
     ],
     note: "the record's reference in the same panel opens its page (originPlace); today: the menu and a search",
   },
+  {
+    key: "r",
+    task: "From a CAPA follow-up to its effectiveness check",
+    today: 4,
+    proposed: 3,
+    steps: [
+      { go: ["Investigations", "Decisions & actions?part=decision"] },
+      { press: "Details", in: "AfterDecision" },
+      { press: "Open its effectiveness check", in: "AfterDecision" },
+    ],
+    note: "today: Records › Effectiveness checks and a search for the CAPA",
+  },
 ];
 
 describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {

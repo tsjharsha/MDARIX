@@ -43,7 +43,12 @@ export type FollowUp = {
   overdue?: boolean | null;
   decision?: { id?: string | null; business_id?: string | null; outcome?: string | null } | null;
   investigation?: { id?: string | null; business_id?: string | null; product_id?: string | null } | null;
-  capa?: { business_id?: string | null; capa_identifier?: string | null; qms_reference?: string | null } | null;
+  capa?: {
+    id?: string | null;
+    business_id?: string | null;
+    capa_identifier?: string | null;
+    qms_reference?: string | null;
+  } | null;
   completion_note?: string | null;
   completed_by_name?: string | null;
   completed_at?: string | null;
