@@ -1578,6 +1578,48 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           },
         ],
       },
+      {
+        id: "trace-duplicates-outcomes",
+        title: "Trace a value, similar wording and the outcome numbers",
+        where:
+          "A report's page (Trace beside each value); Possible duplicates and the escalation; Readiness › Oversight (Team overview on the new navigation)",
+        purpose:
+          "Show an inspector where a submitted value came from, find complaints that describe the same event in other words, and see how long the work takes, measured from your own records.",
+        tasks: [
+          {
+            title: "Trace a value on a report",
+            who: "Anyone who reads the report.",
+            steps: [
+              "On the report, choose Trace beside a value (also under What you are approving).",
+              "1. Where it comes from: the record behind the value and, when a file brought it, the file, its row and the mapping version.",
+              "2. Who entered or changed it, and when: a value typed on the report, the record's changes by a re-upload, and its audit events with the reason given.",
+              "3. Frozen in: the snapshot version, who approved it and when, the value as frozen and its SHA-256.",
+            ],
+            result: "Nothing changes when you trace: it only reads.",
+          },
+          {
+            title: "Check possible duplicates by similar wording",
+            who: "Whoever links Cases and complaints today.",
+            steps: [
+              "Possible duplicates now also lists two records whose descriptions share at least half their words: similar description (N % words in common). They are of the same product (or one has none), with events within 90 days.",
+              "Choose Link into one event or Not the same: dismiss, with a reason, as for any other pair. A dismissed pair is not shown again; nothing is ever merged by itself.",
+              "At escalation such a complaint is offered but never chosen for you.",
+            ],
+            result: "Word overlap misses typos and synonyms: it is a hint for a person, not a decision.",
+          },
+          {
+            title: "Read the outcome numbers (Value Centre)",
+            who: "Leaders, Quality Reviewers and Approvers; the CSV needs export rights.",
+            steps: [
+              "Open Readiness › Oversight and find Outcome numbers: time to triage, time to the reportability decision, time to an approved report and the completeness of report fields.",
+              "Each number is a median, the time within which 90 % fall, and how many records it counts. Your baseline is the first 30 days after go-live; From your QMS export, before MDARIX shows the triage dates your QMS file brought.",
+              "Choose CSV to keep a copy.",
+            ],
+            result:
+              "Measured from the timestamps your records already hold: no one's working time is tracked, and nothing is shared outside your organization.",
+          },
+        ],
+      },
     ],
   },
   {

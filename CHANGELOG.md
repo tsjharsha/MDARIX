@@ -178,6 +178,33 @@ No migration. Switches `MDARIX_B6_REVIEWS` and `MDARIX_B6_CHANGE_REASON` (both o
   and compares snapshots, and signing is refused (403 `REVIEW_SIGNER_REQUIRED`); Leaders still sign the audit trail
   review. MDARIX staff never read a customer's signed reviews (403, unchanged).
 
+### Trace, similar wording, outcome numbers, navigation (Part D, G20, P1, P2)
+No migration. Switches `MDARIX_B6_TRACE`, `MDARIX_B6_SIMILAR_WORDING`, `MDARIX_B6_VALUE_CENTRE` (all on).
+- **Trace this value (G20).** `GET /api/v1/reports/{id}/trace/{field}` (every member who reads the report; read only):
+  the record behind a report value and the import row that brought it (file, row, mapping version), the value typed on
+  the report (before and after), the record's field changes and audit events with their reasons (the traced field's
+  values only; both databases on a dedicated plane), and the snapshot it is frozen in (version, approver, time,
+  SHA-256). "Trace" beside each value on the report and under "What you are approving". The audit read by record took
+  32.7 ms (median; 64.7 ms max) at 100,000 audit events of one organization, so no index migration (B6a-D12).
+- **Possible duplicates by similar wording (P1).** Beside today's rule, two descriptions sharing at least half their
+  words (shared / all words, after normalising and a short stop-word list) are suggested: "similar description (N %
+  words in common)". Same product (or none), events within 90 days, the 500 records with the newest events; linked and
+  dismissed pairs are never shown again. In Possible duplicates and at escalation, where a match by wording alone is
+  offered but never pre-selected. A person links or dismisses with the existing audited decision; nothing is merged.
+- **Value Centre v0 (P2).** `GET /api/v1/oversight/value-centre` (Leaders, Quality Reviewers, Approvers) and `.csv`
+  (`data.export`, audited `VALUE_CENTRE_EXPORTED`): time to triage, to the reportability decision (every market the
+  complaint must be assessed for concluded), to an approved initial report, and report-field completeness at approval;
+  median, 90th percentile and count, per month and for the baseline (the first 30 days after go-live, fixed once they
+  pass). Triage dates from a QMS export are shown apart. Sample records never count; no figure per person. One flat
+  panel on Oversight and on Team overview.
+- **Navigation review (D4).** Small next-step fixes: the triage list from an urgent Case and from Cases for everyone who
+  triages; "Open Reporting windows" when no market is enabled; "Record the acknowledgement" on a submitted report's
+  rail; the complaint's next step on a finished report page; the Oversight empty state names its control; "Open Users"
+  on the access review; the configuration comparison names its snapshot and can be hidden. Click paths n (Trace) and
+  o (Value Centre) added. Larger items went to the owner's backlog (B6a spec, build status run 7).
+- **Independent review of Part D (8 findings, 7 fixed).** See the B6a spec, build status run 7.
+- **User guide:** "Trace a value, similar wording and the outcome numbers".
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern

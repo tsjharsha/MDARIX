@@ -80,7 +80,9 @@ def test_the_baseline_the_qms_history_and_who_reads_it(monkeypatch):
         _triage(db, tenant_id, go_live + timedelta(days=40), 30)  # after it: its month only
         _triage(db, tenant_id, go_live + timedelta(days=3), 500, source="MDARIX_SAMPLE")  # never counted
         # The QMS's own dates: received -> triaged in the QMS, 48 h (completed at import time is not counted).
-        _triage(db, tenant_id, now, 0, source="QMS", subject=uuid.UUID(complaint), qms_at=received + timedelta(hours=48))
+        _triage(
+            db, tenant_id, now, 0, source="QMS", subject=uuid.UUID(complaint), qms_at=received + timedelta(hours=48)
+        )
         db.commit()
 
     found = leader.get(URL)
