@@ -155,7 +155,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 |---|---|---|---|---|
 | MDX-VAL-000 | Validation document control and index | this file | 0.6 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.6 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.6 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.7 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.5 | DRAFT |
