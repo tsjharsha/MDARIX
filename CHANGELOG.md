@@ -174,6 +174,9 @@ No migration. Switches `MDARIX_B6_REVIEWS` and `MDARIX_B6_CHANGE_REASON` (both o
   reason (`PUT /api/v1/reviews/audit-trail/frequency`), kept as an audit event `AUDIT_TRAIL_REVIEW_FREQUENCY_SET` with
   the months before and after (no migration).
 - **User guide:** "Reviews you sign: audit trail, access and configuration" (with the reason for change).
+- **Owner decisions, 12 Nov.** The configuration snapshot is signed by a customer administrator only: a Leader reads
+  and compares snapshots, and signing is refused (403 `REVIEW_SIGNER_REQUIRED`); Leaders still sign the audit trail
+  review. MDARIX staff never read a customer's signed reviews (403, unchanged).
 
 ## [0.11.02] - not released yet
 

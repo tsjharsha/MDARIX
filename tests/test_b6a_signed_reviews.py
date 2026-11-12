@@ -460,7 +460,10 @@ def test_the_configuration_snapshot_and_comparison(org):  # B6-34, B6-35
     assert why and why[0]["why"] == REASON and why[0]["who"] == org["regulatory"][1]
     # The signed snapshot is unchanged by the later edit.
     assert admin.get(f"{URL}/signed/{first}").json() == kept
-    second = _sign(leader, "configuration/sign")
+    # Owner, 12 Nov: a customer administrator signs the snapshot; a Leader is refused (reads and compares only).
+    refused = _sign(leader, "configuration/sign")
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "REVIEW_SIGNER_REQUIRED"
+    second = _sign(admin, "configuration/sign")
     assert second.status_code == 200, second.text
     between = admin.get(f"{URL}/configuration/compare", params={"before": first, "after": second.json()["review_id"]})
     assert "reporting.lookback_days" in {change["item"] for change in between.json()["changes"]}
@@ -472,17 +475,17 @@ def test_a_review_signature_needs_the_authenticator_code_when_signatures_need_mf
 
     from auth import totp
 
-    leader = org["leader"][0]
+    admin = org["admin"][0]
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
-    not_set_up = _sign(leader, "configuration/sign")
+    not_set_up = _sign(admin, "configuration/sign")
     assert not_set_up.status_code == 403 and not_set_up.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
-    secret = leader.post("/api/v1/auth/mfa/enroll").json()["secret"]
-    enrolled = leader.post("/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
+    secret = admin.post("/api/v1/auth/mfa/enroll").json()["secret"]
+    enrolled = admin.post("/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
     assert enrolled.status_code == 200, enrolled.text
-    wrong = _sign(leader, "configuration/sign", mfa_code="000000")
+    wrong = _sign(admin, "configuration/sign", mfa_code="000000")
     assert wrong.status_code == 403 and wrong.json()["detail"]["code"] == "SIGNATURE_CODE_INVALID"
     code = totp.code_at(secret, int(time.time() // 30) + 1)
-    assert _sign(leader, "configuration/sign", mfa_code=code).status_code == 200
+    assert _sign(admin, "configuration/sign", mfa_code=code).status_code == 200
 
 
 def test_the_switch_off_on_off(org, monkeypatch):  # B6-46
@@ -506,6 +509,10 @@ def test_review_due_dates_and_the_audit_trail_review_frequency(org, monkeypatch)
     assert audit_review.add_months(date(2026, 1, 31), 1) == date(2026, 2, 28)
     assert audit_review.add_months(date(2026, 11, 15), 2) == date(2027, 1, 15)
     assert audit_review.add_months(date(2026, 3, 10), 12) == date(2027, 3, 10)
+    # Never signed: due from the organization's start; with neither, today.
+    start = datetime(2026, 10, 20, 9, tzinfo=timezone.utc)
+    assert audit_review.next_due(start, 1, date(2026, 11, 12)) == date(2026, 11, 20)
+    assert audit_review.next_due(None, 1, date(2026, 11, 12)) == date(2026, 11, 12)
     leader, reviewer, admin, other = (org[key][0] for key in ("leader", "reviewer", "admin", "other"))
     body = leader.get(f"{URL}/audit-trail").json()
     assert body["frequency_months"] == 1 and body["may_set_frequency"] is True

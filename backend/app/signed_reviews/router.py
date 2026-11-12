@@ -5,7 +5,7 @@ Who (owner D4, D5): the audit trail review is read by a Leader, a Quality Review
 signed by a Leader or Quality Reviewer only (an administrator account never holds quality review); a signer whose own
 actions are among the flags needs a second reviewer's confirmation. The access review and the configuration snapshot
 are read by a customer administrator or a Leader; the access review is signed by a customer administrator, the
-configuration snapshot by a customer administrator or a Leader. The tenant and the person come only from the request
+configuration snapshot by a customer administrator only (owner, 12 Nov). The tenant and the person come only from the request
 context; another organization's review is 404.
 """
 
@@ -406,12 +406,14 @@ def sign_configuration(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Sign the snapshot of the configuration in force (built on the server at signing)."""
+    """Sign the snapshot of the configuration in force (built on the server at signing): a customer administrator
+    only (owner, 12 Nov); a Leader reads and compares snapshots but does not sign them."""
     me = _require_read("configuration", control_db, ctx)
+    if not is_customer_admin_role(me.role):
+        raise error(403, "REVIEW_SIGNER_REQUIRED", "A customer administrator signs the configuration snapshot")
     content = configuration.snapshot(control_db, db, me, _now())
     if db is not control_db:
         db.rollback()
-    role = "CUSTOMER_ADMIN" if is_customer_admin_role(me.role) else "LEADER"
     return sign(
         control_db,
         ctx,
@@ -420,7 +422,7 @@ def sign_configuration(
         findings=payload.findings,
         password=payload.password,
         mfa_code=payload.mfa_code,
-        signer_role=role,
+        signer_role="CUSTOMER_ADMIN",
         request=request,
     )
 
