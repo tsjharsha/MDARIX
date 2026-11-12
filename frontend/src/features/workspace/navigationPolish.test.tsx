@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { FollowUpDrawer } from "./sections/AfterDecision";
 import type { FollowUp } from "./afterDecision";
+import { routeFor } from "../../app/linkTable";
+import recordsSource from "./sections/Records.tsx?raw";
 
 // B6a navigation polish (D4 backlog items 14, 15, 2 and the audit trail review on the new navigation).
 const inWorkspace = (node: ReactNode, menu: string[] = ["home", "products"]) =>
@@ -45,5 +47,20 @@ describe("a CAPA follow-up opens its effectiveness check (D4 #14)", () => {
     expect(
       inWorkspace(<FollowUpDrawer followUp={FOLLOW_UP} onClose={vi.fn()} onDone={vi.fn()} />, ["products"]),
     ).not.toContain("Open its effectiveness check");
+  });
+});
+
+describe('"Not effective" opens the investigation\'s decision (D4 #15)', () => {
+  it("opens Decisions & actions on the new navigation and the Decision step on the classic one", () => {
+    expect(recordsSource).toContain('open("Investigations", "Decision")');
+    expect(recordsSource).not.toContain('open("Investigations", "Workspace")');
+    expect(routeFor("Investigations", "Decision", "mvp", "new")).toEqual({
+      section: "Investigations",
+      tab: "Decisions & actions?part=decision",
+    });
+    expect(routeFor("Investigations", "Decision", "mvp", "classic")).toEqual({
+      section: "Investigations",
+      tab: "Decision",
+    });
   });
 });

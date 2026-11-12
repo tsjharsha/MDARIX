@@ -230,6 +230,18 @@ export const PATHS: Array<{
     ],
     note: "today: Records › Effectiveness checks and a search for the CAPA",
   },
+  {
+    key: "s",
+    task: "A check signed not effective: plan the further action on the decision",
+    today: 4,
+    proposed: 3,
+    steps: [
+      { go: ["Records", "Effectiveness checks?capa=p1"] },
+      { press: "Go to the investigation's decision", in: "Records" },
+      { go: ["Investigations", "Decision"] },
+    ],
+    note: "today the button opened the Summary (Workspace) and the person chose Decisions & actions",
+  },
 ];
 
 describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {

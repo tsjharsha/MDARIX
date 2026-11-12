@@ -910,10 +910,11 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
             onClick={() => {
               const investigation = detail.capa.investigation;
               if (investigation) work.setInvestigationId(investigation.id, detail.capa.product_id);
-              open("Investigations", "Workspace");
+              // The further action is a follow-up of the decision: classic Decision, new Decisions & actions (D4 #15).
+              open("Investigations", "Decision");
             }}
           >
-            <FileSearch size={15} aria-hidden="true" /> Go to the investigation
+            <FileSearch size={15} aria-hidden="true" /> Go to the investigation's decision
           </button>
         </div>
       )}
