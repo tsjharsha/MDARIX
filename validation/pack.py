@@ -746,7 +746,7 @@ def signed(out: Path, release: str, signatures: Path) -> bool:
     if out.exists() and any(out.glob("MDX-VAL-012*-signed.pdf")):  # a signed OQ protocol alone does not lock it
         return True
     if signatures.exists():
-        for row in csv.DictReader(signatures.read_text(encoding="utf-8").splitlines()):
+        for row in csv.DictReader(signatures.read_text(encoding="utf-8-sig").splitlines()):
             if row.get("document_id") == record_id(release):
                 return True
     return False

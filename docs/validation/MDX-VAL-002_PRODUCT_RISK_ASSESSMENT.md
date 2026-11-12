@@ -248,8 +248,8 @@ give the evidence. It does not claim they have passed in a validation run: most 
 - 67 failure modes: 57 class A, 9 class B, 1 class C. Three AI rows (RSK-041 to -043) are not rated while AI is off.
 - Every rated row names its REQ IDs in `requirements.csv` (69 requirements: 59 class A, 9 class B, 1 class C); the 34
   rows without a seed got their IDs on 12 Nov 2026 (OP-3 closed). The three AI rows get theirs at switch-on.
-- 33 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -029 to -031, -033, -034, -036,
-  -037 to -040, -044, -050, -052 to -056, -066 (RSK-029, -039 and -040 added on 12 Nov 2026 by owner decisions O7 to
+- 33 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -029 to -031, -033, -034,
+  -036 to -040, -044, -050, -052 to -056, -066 (RSK-029, -039 and -040 added on 12 Nov 2026 by owner decisions O7 to
   O9; RSK-037 by O21). For most of them the action is to execute their class-A scenarios.
 - **Open control gaps** (action named in "Residual risk"):
   - RSK-002: GB, India day-1 and Canada counting rules to be confirmed with the consultant.
