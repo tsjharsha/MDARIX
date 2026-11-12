@@ -1,60 +1,62 @@
 req_id,revision,text,class,spec_ref,risk_ids,scenario_ids,negative_scenarios,tests
-REQ-RPT-001,A,"An Unknown answer shall never be treated as No: ""not reportable"" shall be refused while an Unknown could make the event reportable.",A,MDX-B10-005 section 7,RSK-001,RG-05 DT-06 DT-07 DT-08 RR-02,DT-06 DT-08 RR-02,tests/test_market_assessment_rules.py
+REQ-RPT-001,A,"The system shall refuse ""not reportable"" while an Unknown answer could make the event reportable.",A,MDX-B10-005 section 7,RSK-001,RG-05 DT-06 DT-07 DT-08 RR-02,DT-06 DT-08 RR-02,tests/test_market_assessment_rules.py
 REQ-RPT-002,A,Each market an event touches shall get its own assessment and its own signed conclusion.,A,MDX-B10-005 section 7,RSK-005,RG-06 RG-07 RG-08 RG-13 TR-12 DT-21,RG-06,tests/test_market_assessment_api.py
 REQ-RPT-003,A,"An organisation rule shall not remove, reword or lower a floor question.",A,MDX-B10-005 section 7,RSK-003 RSK-006,DT-01 DT-02 DT-03 DT-36,DT-01 DT-02 DT-03,
-REQ-RPT-004,A,"A signed conclusion shall name the rule version it used, and a later rule version shall never change it.",A,MDX-B10-005 section 7,RSK-004,RG-12 DT-17 DT-18 DT-20,DT-18,tests/test_release_0_10_88_resign.py
-REQ-RPT-005,A,The floor rules shall give the same outcome and report type as release 0.10.92 for every Yes/No/Unknown combination.,A,MDX-B10-005 section 7,RSK-003 RSK-050,DT-33 DT-37 RR-01 RR-03,DT-33,tests/test_b4_equivalence.py tests/test_b4_effective_dating.py tests/test_b4_window_floor.py tests/test_b4_register_api.py
+REQ-RPT-004,A,"A later rule version shall never change a signed conclusion, which names the rule version it used.",A,MDX-B10-005 section 7,RSK-004,RG-12 DT-17 DT-18 DT-20,DT-18,tests/test_release_0_10_88_resign.py
+REQ-RPT-005,A,The floor rules shall give the same outcome and report type as release 0.10.92 for every Yes/No/Unknown combination.,A,MDX-B10-005 section 7,RSK-003 RSK-050,DT-37 RR-01 RR-02 RR-03,RR-02,tests/test_b4_equivalence.py tests/test_b4_effective_dating.py tests/test_b4_window_floor.py tests/test_b4_register_api.py
 REQ-RPT-006,A,"Each market shall use the reporting role, form and clock that match the organisation's role in that market.",A,b9-markets/spec.md,RSK-054,B9-13 B9-17 B9-18 B9-19 B9-20 B9-23 B9-33,B9-13 B9-17 B9-33,tests/test_b9_rule_book.py tests/test_b9_india_chain.py tests/test_b9_canada_chain.py tests/test_b9_us_role_floors.py
 REQ-RPT-007,A,"For a country outside the five markets, an answer set with an Unknown shall never give ""not reportable"".",A,other-country-reports/spec.md section 4,RSK-055,OC-03 OC-04 OC-09 OC-12 OC-19,OC-03 OC-09 OC-19,tests/test_b9b_other_countries.py tests/test_b9b_other_floor.py
-REQ-CLK-001,A,"A deadline shall be counted in the authority's time zone and in the organisation's, and the earlier shall apply.",A,MDX-B10-005 section 7,RSK-002,RG-10 RG-11 DT-16,DT-16,tests/test_legal_deadlines.py
+REQ-CLK-001,A,A deadline shall be the earlier of the deadlines counted in the authority's time zone and in the organisation's.,A,MDX-B10-005 section 7,RSK-002,RG-10 RG-11 DT-16,DT-16,tests/test_legal_deadlines.py
 REQ-CLK-002,A,"Every screen, export and reminder shall show the same deadline for the same market.",A,MDX-B10-005 section 7,RSK-002,TR-12 RG-10,,tests/test_one_deadline_api.py
 REQ-CLK-003,A,"When no country is known, the shortest clock of every market shall apply.",A,MDX-B10-005 section 7,RSK-005,RG-06 TR-40,RG-06,tests/test_intake_triage_api.py
 REQ-CLK-004,A,"The clock of a back-entered Case shall count from awareness, never from the entry time.",A,B6a-spec.md section 10,RSK-045,B6-07 B6-08 B6-09,B6-07,tests/test_b6a_back_entry.py
 REQ-CLK-005,A,"The daily deadline list shall be sent once per organisation per local day, also when nothing is due.",A,B6a-spec.md section 10,RSK-046,B6-01 B6-02 B6-03 B6-04 B6-05 B6-06,B6-05,tests/test_b6a_deadline_list.py
-REQ-AWR-001,A,"Awareness shall be the earliest known first knowledge, and linking two records shall keep the earliest.",A,MDX-B10-005 section 7,RSK-007,RG-09 CI-06 TR-04,,tests/test_intake_rules.py
+REQ-AWR-001,A,"Awareness shall be the earliest known first knowledge, also after two records are linked.",A,MDX-B10-005 section 7,RSK-007,RG-09 CI-06 TR-04,,tests/test_intake_rules.py
 REQ-AWR-002,A,A Case without an awareness date shall get a provisional clock and a clarification task.,A,MDX-B10-005 section 7,RSK-008,IN-08 TR-32,,tests/test_intake_rules.py
 REQ-AWR-003,A,"An awareness later than the earliest known shall need a signature and, outside a trial, a second person.",A,MDX-B10-005 section 7,RSK-007,TR-05 CI-08,,tests/test_intake_triage_api.py
 REQ-TRG-001,A,"A report of death, serious injury, a threat or a harm word shall put the Case on the fast track.",A,MDX-B10-005 section 7,RSK-031,IN-05 CI-13 TR-27 TR-28 TR-29 TR-30 TR-31,,tests/test_intake_triage_api.py tests/test_signals_triage.py
 REQ-TRG-002,A,New information that raises the severity shall reopen triage with an alert.,A,MDX-B10-005 section 7,RSK-031,TR-02 TR-11 TR-19,,tests/test_intake_triage_api.py
 REQ-TRG-003,A,A Case whose triage target is missed shall raise an overdue alert to the backup and the escalation role.,B,MDX-VAL-002 RSK-032,RSK-032,TR-08 TR-09 CI-16,,
-REQ-CLS-001,A,"""Service only"" shall be reachable only from row 2 of the outcomes table, and no override shall reach it.",A,MDX-B10-005 section 7,RSK-033,IN-03 IN-21 CI-19,,tests/test_intake_rules.py
-REQ-CLS-002,A,A complaint shall not be down-graded to service; a service record raised to a complaint shall keep its awareness.,A,MDX-B10-005 section 7,RSK-033,CI-24 CI-25,CI-25,tests/test_intake_rules.py
+REQ-CLS-001,A,"No path other than row 2 of the outcomes table, an override included, shall set ""Service only"".",A,MDX-B10-005 section 7,RSK-033,IN-03 IN-21 CI-19,,tests/test_intake_rules.py
+REQ-CLS-002,A,A complaint shall not be down-graded to service.,A,MDX-B10-005 section 7,RSK-033,CI-25,CI-25,tests/test_intake_rules.py
 REQ-CLS-003,A,"A classification code shall never set a deadline, a trigger or a conclusion.",A,MDX-B10-005 section 7,RSK-034,IN-22,IN-22,tests/test_complaint_disposition_rules.py
 REQ-CLS-004,A,The routine path shall never close a complaint that needs a reportability assessment.,A,b7-routine-path/spec.md section 2.3,RSK-052,RT-13 RT-14 RT-18 RT-19 RT-22 RT-24,RT-18 RT-19 RT-22,tests/test_routine_rules_b7.py tests/test_routine_path_switch.py tests/test_urgent_alert_b7.py
-REQ-SIG-001,A,Every signing shall need the password session plus a fresh authenticator code.,A,MDX-B10-005 section 7,RSK-009,DT-12 B6-20 B6-21 B6-30,DT-12,tests/test_signing_code_refusals.py tests/test_mfa_mvp.py
-REQ-SIG-002,A,"A signature shall bind the exact record version and its snapshot hash, and verification shall recompute both.",A,MDX-B10-005 section 7,RSK-012,DT-15 IV-16,DT-15,tests/test_human_decision_unit.py
+REQ-CLS-005,A,A service record raised to a complaint shall keep its original awareness.,A,MDX-B10-005 section 7,RSK-033,CI-24,,tests/test_intake_rules.py
+REQ-SIG-001,A,Every signing shall need the password session plus a fresh authenticator code.,A,MDX-B10-005 section 7,RSK-009,B6-20 B6-21 B6-30,B6-20 B6-21,tests/test_signing_code_refusals.py tests/test_mfa_mvp.py
+REQ-SIG-002,A,Signature verification shall recompute the hash of the exact record version and snapshot the signature binds.,A,MDX-B10-005 section 7,RSK-012,IV-16,,tests/test_human_decision_unit.py
 REQ-SIG-003,A,"When two people sign the same record at once, the second signature shall be refused.",A,MDX-B10-005 section 7,RSK-012,CI-26 TR-24,CI-26 TR-24,tests/test_human_decision.py
 REQ-SIG-004,A,A signature shall be valid only when both the record and the signature are saved.,A,MDX-B10-005 section 7,RSK-010,,,tests/test_signing_recovery.py
-REQ-SIG-005,A,Only a user with signing authority and recorded signer training shall sign a regulated decision.,A,MDX-VAL-002 RSK-011,RSK-011,DT-13,DT-13,tests/test_authorization_matrix.py tests/test_business_permissions.py
-REQ-SOD-001,A,"Outside a trial, the maker of a record shall not approve the same record.",A,MDX-B10-005 section 7,RSK-013,CI-17 CI-34 CI-35 DT-12,CI-17 DT-12,tests/test_case_reviews.py
+REQ-SIG-005,A,Only a user with signing authority and recorded signer training shall sign a regulated decision.,A,MDX-VAL-002 RSK-011,RSK-011,,,tests/test_authorization_matrix.py tests/test_business_permissions.py
+REQ-SOD-001,A,"Outside a trial, the maker of a record shall not approve the same record.",A,MDX-B10-005 section 7,RSK-013,CI-17 CI-34 CI-35,CI-17,tests/test_case_reviews.py
 REQ-SOD-002,A,An administrator shall never approve a regulated decision.,A,MDX-B10-005 section 7,RSK-014,DT-13,DT-13,tests/test_authorization_matrix.py
 REQ-SOD-003,A,The rule register shall refuse a rule version approved by the person who built it.,A,"MDX-VAL-000 section 4, O3",RSK-065,,,tests/test_rule_register_unit.py
 REQ-AUD-001,A,An audit row shall not be updated or deleted.,A,MDX-B10-005 section 7,RSK-016,,,tests/test_day35_audit_immutability.py
-REQ-AUD-002,A,"The audit hash chain shall be verified daily and on demand, and a break shall be reported.",A,MDX-B10-005 section 7,RSK-017,,,tests/test_audit_hash_chain.py
+REQ-AUD-002,A,"The audit hash chain shall be verified daily and on demand, reporting any break.",A,MDX-B10-005 section 7,RSK-017,,,tests/test_audit_hash_chain.py
 REQ-AUD-003,A,"Every change to a regulated value shall be audited with the old value, the new value, the actor and the reason.",A,MDX-VAL-002 RSK-018,RSK-018,CI-33 B6-36,B6-36,tests/test_b6a_change_reason.py
 REQ-AUD-004,A,"A change to a reporting fact, or a re-upload behind a signed decision, shall be refused without a reason.",A,B6a-spec.md section 10,RSK-048,B6-36 B6-37 B6-38,B6-36 B6-38,tests/test_b6a_change_reason.py tests/test_b6a_reupload_reason.py
 REQ-AUD-005,A,"A signed review of the audit trail, of access or of the configuration shall not change after signing.",A,B6a-spec.md section 10,RSK-049,B6-28 B6-29 B6-30 B6-31 B6-32 B6-33 B6-34 B6-35,B6-29 B6-33,tests/test_b6a_signed_reviews.py
-REQ-REC-001,A,A signed record shall never be edited; a correction shall supersede it.,A,MDX-B10-005 section 7,RSK-019,IV-16 CI-07 TR-02,IV-16,tests/test_human_decision_unit.py
+REQ-REC-001,A,"A correction to a signed record shall supersede it, never edit it.",A,MDX-B10-005 section 7,RSK-019,IV-16 CI-07 TR-02,IV-16,tests/test_human_decision_unit.py
 REQ-REC-002,A,A submitted report shall never be overwritten.,A,MDX-B10-005 section 7,RSK-020,RG-15 RG-16 RG-17,RG-15,tests/test_authority_reports_rules.py
 REQ-REC-003,A,An upgrade step shall never change the content of a signed record.,A,MDX-VAL-002 RSK-021,RSK-021,CI-44,CI-44,tests/test_release_0_10_88_resign.py
 REQ-REC-004,A,"""Trace this value"" shall show the field's real origin: its change, its import line and its snapshot.",B,B6a-spec.md section 10,RSK-057,B6-39 B6-40,,tests/test_b6a_trace.py
 REQ-REC-005,A,A signed PMS document version shall never change after signing.,A,MDX-VAL-002 RSK-062,RSK-062,,,tests/test_qms_documents_rules.py tests/test_qms_documents_api.py
 REQ-REC-006,A,"Records under legal hold, or before their retention date, shall not be purged.",A,MDX-VAL-002 RSK-066,RSK-066,,,tests/test_export_purge_mfa.py tests/test_purge_completion_job.py tests/test_customer_admin_erasure_hold.py
-REQ-ARD-001,A,"3500A and eMDR values shall come only from the approved snapshot, and no value shall be guessed.",A,MDX-B10-005 section 7,RSK-022 RSK-024,RG-19,,tests/test_fda_3500a_emdr.py
+REQ-ARD-001,A,"3500A and eMDR values shall come only from the approved snapshot, never from a guess.",A,MDX-B10-005 section 7,RSK-022 RSK-024,RG-19,,tests/test_fda_3500a_emdr.py
 REQ-ARD-002,A,An authority report with a required block missing shall be refused by the report check before approval.,A,MDX-VAL-002 RSK-023,RSK-023,,,tests/test_fda_3500a_emdr.py
 REQ-ARD-003,A,"An EU or GB MIR XML file shall be served only from an approved, current snapshot.",A,B8-execution-plan.md section 6.5,RSK-053,B8-05 B8-15 B8-24 B8-26,B8-05 B8-15 B8-24,tests/test_b8_mir_xml.py tests/test_b8_gb_mir_xml.py tests/test_b8_mir_freeze.py
 REQ-TEN-001,A,No organisation shall read or change another organisation's data through any surface.,A,MDX-B10-005 section 7,RSK-025,P360-11 S360-14 B6-45 B8-30 B9-27 OC-14,P360-11 S360-14 B6-45 B8-30 B9-27 OC-14,tests/test_rls_coverage.py tests/test_cross_tenant_routes.py tests/test_tenant_security.py
 REQ-TEN-002,A,A background job shall run only in the scope of its event's organisation.,A,MDX-B10-005 section 7,RSK-026,,,tests/test_outbox_resilience.py
-REQ-IMP-001,A,"An imported row that fails a check shall go to quarantine with its reasons, and a row that suggests harm shall still reach triage.",A,MDX-B10-005 section 7,RSK-027,IN-13 TR-21 TR-36,,tests/test_import_quarantine_unit.py tests/test_import_lineage_unit.py
+REQ-IMP-001,A,An imported row that fails a check shall go to quarantine with its reasons.,A,MDX-B10-005 section 7,RSK-027,IN-13 TR-21,,tests/test_import_quarantine_unit.py tests/test_import_lineage_unit.py
 REQ-IMP-002,A,A repeated import of the same external identifier shall not create a second complaint.,B,MDX-VAL-002 RSK-028,RSK-028,IN-12 IN-14 CI-15 CI-31,,tests/test_import_reupload.py
+REQ-IMP-003,A,"An imported row that suggests harm shall reach triage, also when it is quarantined.",A,MDX-B10-005 section 7,RSK-027,TR-36,,tests/test_import_quarantine_unit.py
 REQ-INT-001,A,An e-mail accepted by the intake address shall become a draft Case stamped with the time the mail server received it.,A,b7-routine-path/spec.md section 6.5,RSK-044,EM-01 EM-02 EM-05 EM-07 EM-08 EM-17 EM-18,EM-01 EM-07 EM-08 EM-18,tests/test_mail_in.py tests/test_email_intake_api.py tests/test_mail_processing.py
-REQ-INT-002,A,Similar wording shall suggest possible duplicate pairs and shall never merge records by itself.,B,B6a-spec.md section 10,RSK-058,B6-09 B6-41 B6-42,,tests/test_b6a_similar_wording.py
+REQ-INT-002,A,Similar wording shall suggest possible duplicate pairs without merging records.,B,B6a-spec.md section 10,RSK-058,B6-09 B6-41 B6-42,,tests/test_b6a_similar_wording.py
 REQ-SMP-001,A,"The sample clock shall move sample records only, never customer records.",A,MDX-B10-005 section 7,RSK-030,CI-18 TR-16 P360-13,CI-18 TR-16,tests/test_sample_story_days.py
 REQ-EXP-001,A,"The organisation export shall hold every record, file and the verified audit head, with a SHA-256 per entry.",A,MDX-B10-005 section 7,RSK-035,,,tests/test_day25_retention_export.py
 REQ-EXP-002,A,An exported CSV cell that starts with a formula character shall be written as text.,A,MDX-VAL-002 RSK-029,RSK-029,,,tests/test_csv_safe.py
 REQ-EXP-003,A,An export download link shall be refused after its expiry and to any person other than the requester.,A,MDX-VAL-002 RSK-036,RSK-036,,,tests/test_tenant_data.py
 REQ-BAK-001,A,"A backup shall restore into an empty database, with the audit chain verified and erasures re-applied.",A,MDX-B10-005 section 7,RSK-037 RSK-039,,,tests/test_backup_retention.py
-REQ-BAK-002,A,"A production backup shall run at least daily, and a backup older than 26 hours shall raise an alert.",A,MDX-VAL-002 RSK-038,RSK-038,,,tests/test_backup_retention.py tests/test_infra_backup_role.py
+REQ-BAK-002,A,A production backup older than 26 hours shall raise an alert.,A,MDX-VAL-002 RSK-038,RSK-038,,,tests/test_backup_retention.py tests/test_infra_backup_role.py
 REQ-BAK-003,A,"A quarterly restore drill shall restore the latest backup, with its key, into an empty database.",A,MDX-VAL-002 RSK-040,RSK-040,,,
 REQ-BAK-004,A,"After a restore, outbox events that occurred before the restore point shall be held and never sent again automatically.",B,"B6b-spec.md Part D, D1",RSK-056,B6-55,B6-55,
 REQ-OPS-001,A,"A server clock offset over 1 second, or an unknown offset, shall be reported as not ok.",A,B6a-spec.md section 10,RSK-047,B6-10 B6-11,B6-11,tests/test_b6a_clock_unit.py

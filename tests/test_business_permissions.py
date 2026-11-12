@@ -185,10 +185,6 @@ EXEMPT_BUT_SIGNED_IN = {
 }
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("DT-13")
-
-
 def _is_guarded(route) -> bool:
     # require_permission(one) or require_any_permission(several): both refuse without the permission.
     return any(

@@ -158,7 +158,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.1 | DRAFT |
 | MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.1 | DRAFT; log empty |
 | MDX-VAL-004, -005, -006, -007, -009, -011, -012 | URS, FS/DS, IQ record, OQ protocol and results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
-| (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 67 requirements |
+| (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 69 requirements |
 | MDX-SUP, MDX-SOP, MDX-OPS, MDX-CUS | Planned (B6b Parts C to E, section 5) | | | Not written |
 
 Other files in this folder: [AI_GOLDEN_DATASET_QUALIFICATION.md](AI_GOLDEN_DATASET_QUALIFICATION.md) and

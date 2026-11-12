@@ -18,7 +18,7 @@ import json
 import re
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -45,6 +45,7 @@ class Sources:
     scenarios: dict[str, dict]  # id -> {"title", "expected", "status", "notes"}
     tests: list[dict] = field(default_factory=list)  # {"id", "result", "seconds", "scenarios"}
     release_checks: dict | None = None
+    release_checks_raw: bytes | None = None  # hashed as written, never re-serialised
     deviations: list[dict] = field(default_factory=list)
     clock_check: dict | None = None
 
@@ -53,7 +54,7 @@ class Sources:
 
 
 def read_requirements(path: Path) -> list[dict]:
-    rows = list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    rows = list(csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines()))
     for row in rows:
         for key in ("risk_ids", "scenario_ids", "negative_scenarios", "tests"):
             row[key] = (row.get(key) or "").split()
@@ -95,9 +96,14 @@ def read_junit(path: Path) -> list[dict]:
 
 
 def read_deviations(path: Path) -> list[dict]:
+    """The deviation log; its header must be exactly DEVIATION_COLUMNS (a file saved by Excel with a byte-order mark
+    still reads; any other header is refused, so no row is silently dropped)."""
     if not path.exists():
         return []
-    return list(csv.DictReader(path.read_text(encoding="utf-8").splitlines()))
+    reader = csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())
+    if reader.fieldnames != DEVIATION_COLUMNS:
+        raise ValueError(f"{path.name}: the header is not the MDX-VAL-010 column list")
+    return list(reader)
 
 
 def migration_head(versions: Path) -> str:
@@ -116,11 +122,34 @@ def migration_head(versions: Path) -> str:
 
 # ---- checks and computation ----------------------------------------------------------------------------------------
 
+DEV_STATUSES = ("open", "corrected", "retested", "closed")
+DEV_CLASSES = ("critical", "major", "minor")
+
+
+def _utc(text: str) -> datetime:
+    moment = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _ran(sources: Sources) -> list[dict]:
+    return [t for t in sources.tests if t["result"] != "skipped"]
+
+
+def scenario_outcome(sources: Sources, sid: str) -> str:
+    """This release's outcome of one scenario: FAIL (a tagged test failed, or the register says FAIL), BLOCKED,
+    PASS (a tagged test ran and passed), else NOT RUN. A register PASS alone is a development result (VMP-R31)."""
+    results = {t["result"] for t in _ran(sources) if sid in t["scenarios"]}
+    status = sources.scenarios.get(sid, {}).get("status", "")
+    if "fail" in results or status == "FAIL":
+        return "FAIL"
+    if status == "BLOCKED":
+        return "BLOCKED"
+    return "PASS" if "pass" in results else "NOT RUN"
+
 
 def check(sources: Sources, release: str) -> list[str]:
     """Every failing case, listed (B6-49, B6-57, B6-58): never stops at the first."""
     problems = []
-    tagged_pass = {s for t in sources.tests if t["result"] == "pass" for s in t["scenarios"]}
     for req in sources.requirements:
         rid = req["req_id"]
         if not req["scenario_ids"]:
@@ -135,18 +164,30 @@ def check(sources: Sources, release: str) -> list[str]:
         row = sources.scenarios[sid]
         if row["status"] not in FIVE:
             problems.append(f"{sid}: status '{row['status']}' is not one of the five values")
-        if row["status"] == "PASS" and not row["notes"] and sid not in tagged_pass:
-            problems.append(f"{sid}: PASS without evidence (no passing tagged test, no evidence note)")
+        # Evidence for a PASS: a passing tagged test in this release's JUnit, or an evidence ID (EVD-...) in Notes.
+        if row["status"] == "PASS" and scenario_outcome(sources, sid) != "PASS" and "EVD-" not in row["notes"]:
+            problems.append(f"{sid}: PASS without evidence (no passing tagged test in this JUnit, no EVD- record)")
     for test in sources.tests:
         for sid in test["scenarios"]:
             if sid not in sources.scenarios:
                 problems.append(f"{test['id']}: marker names unknown scenario {sid}")
     for dev in release_deviations(sources, release):
-        if dev.get("status", "").strip().lower() == "closed":
+        dev_id, status = dev["dev_id"], dev.get("status", "").strip().lower()
+        if status not in DEV_STATUSES:
+            problems.append(f"{dev_id}: status '{dev.get('status')}' is not one of {', '.join(DEV_STATUSES)}")
+        if dev.get("classification", "").strip().lower() not in DEV_CLASSES:
+            problems.append(f"{dev_id}: classification '{dev.get('classification')}' is not critical, major or minor")
+        for key in ("raised_utc", "documented_first_utc", "closed_utc"):
+            if dev.get(key, "").strip():
+                try:
+                    _utc(dev[key])
+                except ValueError:
+                    problems.append(f"{dev_id}: {key} '{dev[key]}' is not a date and time")
+        if status == "closed":
             if not dev.get("retest_result", "").strip():
-                problems.append(f"{dev['dev_id']}: closed without a retest result")
+                problems.append(f"{dev_id}: closed without a retest result")
             if not dev.get("approved_by", "").strip():
-                problems.append(f"{dev['dev_id']}: closed without an approver")
+                problems.append(f"{dev_id}: closed without an approver")
     for dev in open_critical(sources, release):
         problems.append(f"{dev['dev_id']}: critical deviation open; no release approval record can be produced")
     return problems
@@ -157,10 +198,12 @@ def release_deviations(sources: Sources, release: str) -> list[dict]:
 
 
 def open_critical(sources: Sources, release: str) -> list[dict]:
+    """Not closed and classified critical, or with an unreadable class (it never lets a release through)."""
     return [
         d
         for d in release_deviations(sources, release)
-        if d.get("classification", "").strip().lower() == "critical" and d.get("status", "").strip().lower() != "closed"
+        if d.get("classification", "").strip().lower() not in ("major", "minor")
+        and d.get("status", "").strip().lower() != "closed"
     ]
 
 
@@ -168,16 +211,16 @@ def rtm(sources: Sources) -> list[dict]:
     rows = []
     for req in sources.requirements:
         scenarios = req["scenario_ids"]
-        linked = [t for t in sources.tests if set(t["scenarios"]) & set(scenarios)]
+        linked = [t for t in _ran(sources) if set(t["scenarios"]) & set(scenarios)]
+        outcomes = {s: scenario_outcome(sources, s) for s in scenarios}
         statuses = {sources.scenarios.get(s, {}).get("status", "") for s in scenarios}
-        results = {t["result"] for t in linked}
-        if "fail" in results:
+        if "FAIL" in outcomes.values():
             status = "Failed"
-        elif "BLOCKED" in statuses:
+        elif "BLOCKED" in outcomes.values():
             status = "Blocked"
         elif "REQUIRES HUMAN DECISION" in statuses:
             status = "Requires human decision"
-        elif "pass" in results:
+        elif scenarios and all(o == "PASS" for o in outcomes.values()):
             status = "Verified"
         else:
             status = "Not verified"
@@ -187,6 +230,7 @@ def rtm(sources: Sources) -> list[dict]:
             "negative_scenarios": " ".join(req["negative_scenarios"]) or "(none)",
             "tagged_tests": len(linked), "passed": sum(t["result"] == "pass" for t in linked),
             "failed": sum(t["result"] == "fail" for t in linked),
+            "scenarios_passed": f"{sum(o == 'PASS' for o in outcomes.values())}/{len(scenarios)}",
             "coverage": "covered" if linked else "NOT COVERED",
             "register_status": "; ".join(f"{s} {sources.scenarios.get(s, {}).get('status', 'NOT IN REGISTER')}" for s in scenarios),
             "named_tests": " ".join(req["tests"]), "status": status,
@@ -198,32 +242,35 @@ def _pct(part: int, whole: int) -> str:
     return f"{100 * part / whole:.1f}% ({part}/{whole})" if whole else "no data (0/0)"
 
 
-def g13(sources: Sources, release: str, rows: list[dict]) -> dict:
+def g13(sources: Sources, release: str) -> dict:
+    """The G13 figures (B6b-spec B.3), counted per scenario from this release's JUnit and the register."""
     figures: dict = {"coverage": {}}
+    in_scope = sorted({s for r in sources.requirements for s in r["scenario_ids"]})
+    outcome = {s: scenario_outcome(sources, s) for s in in_scope}
+    executed = [s for s in in_scope if outcome[s] != "NOT RUN"]
     for cls in ("A", "B", "C"):
-        in_class = [r for r in rows if r["class"] == cls]
-        figures["coverage"][cls] = _pct(sum(r["coverage"] == "covered" for r in in_class), len(in_class))
+        in_class = [r for r in sources.requirements if r["class"] == cls]
+        hit = sum(any(outcome.get(s) != "NOT RUN" for s in r["scenario_ids"]) for r in in_class)
+        figures["coverage"][cls] = _pct(hit, len(in_class))
     class_a = [r for r in sources.requirements if r["class"] == "A"]
     figures["negative_coverage_class_a"] = _pct(sum(bool(r["negative_scenarios"]) for r in class_a), len(class_a))
-    in_scope = sorted({s for r in sources.requirements for s in r["scenario_ids"]})
-    ran = [t for t in sources.tests if t["result"] != "skipped"]
-    executed = sorted({s for t in ran for s in t["scenarios"]} & set(in_scope))
     figures["execution_progress"] = _pct(len(executed), len(in_scope))
-    tagged = [t for t in ran if t["scenarios"]]
-    figures["pass_rate_tagged_tests"] = _pct(sum(t["result"] == "pass" for t in tagged), len(tagged))
+    figures["pass_rate"] = _pct(sum(outcome[s] == "PASS" for s in executed), len(executed))
+    ran = _ran(sources)
     figures["pass_rate_all_tests"] = _pct(sum(t["result"] == "pass" for t in ran), len(ran))
     devs = release_deviations(sources, release)
     deviated = {d.get("test_or_scenario", "").strip() for d in devs}
-    failed = {s for t in ran if t["result"] == "fail" for s in t["scenarios"]}
-    figures["first_pass_yield"] = _pct(sum(s not in deviated and s not in failed for s in executed), len(executed))
+    figures["first_pass_yield"] = _pct(sum(outcome[s] == "PASS" and s not in deviated for s in executed), len(executed))
     figures["defect_leakage"] = (
         "no source yet: MDARIX's own complaint and CAPA registers do not exist until B6b Part D (D4)"
     )
     days = []
     for d in devs:
-        if d.get("closed_utc") and d.get("raised_utc"):
-            opened, closed = (datetime.fromisoformat(d[k].replace("Z", "+00:00")) for k in ("raised_utc", "closed_utc"))
-            days.append((closed - opened).total_seconds() / 86400)
+        if d.get("closed_utc", "").strip() and d.get("raised_utc", "").strip():
+            try:
+                days.append((_utc(d["closed_utc"]) - _utc(d["raised_utc"])).total_seconds() / 86400)
+            except ValueError:
+                pass  # listed by check()
     figures["deviation_closure_days"] = (
         {"median": round(statistics.median(days), 1), "max": round(max(days), 1), "closed": len(days)}
         if days
@@ -232,10 +279,10 @@ def g13(sources: Sources, release: str, rows: list[dict]) -> dict:
     open_devs = [d for d in devs if d.get("status", "").strip().lower() != "closed"]
     by_class: dict[str, int] = {}
     for d in open_devs:
-        by_class[d.get("classification") or "unclassified"] = (
-            by_class.get(d.get("classification") or "unclassified", 0) + 1
-        )
+        key = d.get("classification") or "unclassified"
+        by_class[key] = by_class.get(key, 0) + 1
     figures["open_deviations"] = {"count": len(open_devs), "by_classification": dict(sorted(by_class.items()))}
+    figures["post_go_live_effectiveness"] = "no source yet: incident, complaint and CAPA registers come in B6b Part D"
     return figures
 
 
@@ -477,9 +524,11 @@ def vsr(ctx: Context, s: Sources, rows: list[dict], figures: dict, devs: list[di
         + ("\n".join(f"- {p}" for p in ctx.problems) if ctx.problems else "- none")
         + "\n\n"
         + "## 8. Known limitations\n\n- Requirements without a scenario or a negative scenario are listed in section 7.\n"
-        "- Defect leakage has no source until MDARIX's own complaint and CAPA registers exist (B6b Part D).\n\n"
-        + "## 9. Independence statement\n\nThe quality approver, who did not write the code or the tests, reviewed the results.\n\n"
-        + "## 10. Audit-finding self-check\n\n"
+        "- Defect leakage has no source until MDARIX's own complaint and CAPA registers exist (B6b Part D).\n"
+        "- Test tags are at file level: every test in a tagged file carries the file's scenarios. A file is tagged with a "
+        "scenario only where the register row names it, or it is the scenario group's own test file.\n\n"
+        + "## 9. Independence statement\n\nReviewed by the quality approver, who did not write the code or the tests: "
+        "name ________ date ________\n\n" + "## 10. Audit-finding self-check\n\n"
         "- URS not written by engineering alone: ____\n- QA reviewed independently: ____\n- PQ executed by users: ____\n"
         "- Periodic-review owner named: ____\n- Security assessment (MDX-B10-006) linked into the risk assessment: ____\n"
         "- Every requirement traced to a test: ____\n\n" + f"## 11. Conclusion\n\n{conclusion}\n"
@@ -494,9 +543,9 @@ def approval(ctx: Context, s: Sources, figures: dict, hashes: dict, devs: list[d
     }  # fmt: skip
     return {
         "document_id": "MDX-VAL-012", "release": ctx.release, "commit": ctx.commit, "tag": ctx.tag, "migration_head": ctx.head,
-        "release_checks": {"result": checks.get("passed"), "sha256": hashes.get("release-checks.json")},
+        "release_checks": {"result": checks.get("passed"), "full_suite": checks.get("full_suite"), "sha256": hashes.get("release-checks.json")},
         "junit_summary": summary, "rtm_sha256": hashes.get("rtm.csv"), "g13": figures,
-        "open_deviations": [{"dev_id": d["dev_id"], "classification": d.get("classification"), "rationale": d.get("impact")}
+        "open_deviations": [{"dev_id": d["dev_id"], "classification": d.get("classification"), "acceptance_rationale": ""}
                             for d in devs if d.get("status", "").strip().lower() != "closed"],
         "change_impact_reference": "", "customer_change_notice_date": "", "restore_point_and_rollback": "",
         "approver": QUALITY_APPROVER, "approval_date": "",
@@ -544,7 +593,7 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
 
     files: dict[str, bytes] = {}
     rows = rtm(s)
-    figures = g13(s, ctx.release, rows)
+    figures = g13(s, ctx.release)
     devs = release_deviations(s, ctx.release)
     scripted, log = oq_tables(s)
     rtm_rows = [list(rows[0].keys())] + [list(r.values()) for r in rows] if rows else [["req_id"]]
@@ -556,7 +605,7 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
     files["deviations.xlsx"] = xlsx_write.write({"Deviations": dev_rows})
     files["g13.json"] = (json.dumps(figures, indent=2, sort_keys=True) + "\n").encode("utf-8")
     if s.release_checks is not None:
-        files["release-checks.json"] = (json.dumps(s.release_checks, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        files["release-checks.json"] = s.release_checks_raw or (json.dumps(s.release_checks, indent=2) + "\n").encode()
     files["checks.txt"] = ("\n".join(ctx.problems) + "\n" if ctx.problems else "no failing check\n").encode("utf-8")
     hashes = {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
     documents = {
@@ -583,7 +632,32 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
     return files
 
 
+def release_check_problems(checks: dict | None, commit: str, has_junit: bool) -> list[str]:
+    """A release pack needs this release's full-suite evidence: a real (not dry-run) release-checks run of the whole
+    suite on the same commit, every step passed, and its JUnit."""
+    problems = [] if has_junit else ["no JUnit XML given"]
+    if checks is None:
+        return problems + ["no release-checks JSON given"]
+    if checks.get("dry_run"):
+        problems.append("release-checks JSON is a dry run")
+    if not checks.get("full_suite"):
+        problems.append("release-checks JSON is not a full-suite run (-Full)")
+    if checks.get("passed") is not True or any(s.get("result") != "pass" for s in checks.get("steps") or []):
+        problems.append("release-checks JSON has a step that did not pass (skipped or failed)")
+    theirs = str(checks.get("commit") or "")
+    if not theirs or not (commit.startswith(theirs) or theirs.startswith(commit)):
+        problems.append(f"release-checks JSON is for commit {theirs or '(none)'}, not {commit}")
+    return problems
+
+
 def write(out: Path, files: dict[str, bytes]) -> None:
+    """Writes the pack. Files an earlier run generated (its manifest) that this run does not are removed; files a
+    person added (change impact, PQ record) are kept."""
     out.mkdir(parents=True, exist_ok=True)
+    old = out / "manifest.json"
+    if old.exists():
+        for name in json.loads(old.read_text(encoding="utf-8")).get("sha256", {}):
+            if name not in files and (out / name).is_file():
+                (out / name).unlink()
     for name, raw in files.items():
         (out / name).write_bytes(raw)

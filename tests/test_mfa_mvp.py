@@ -19,10 +19,6 @@ from tests.conftest import with_signing_plan
 PASSWORD = "Mfa-Test-Password-2026!"
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("B6-20", "B6-21", "B6-30", "DT-12")
-
-
 def _make_user(role="APPROVER") -> str:
     email = f"mfa-{uuid.uuid4().hex[:10]}@example.invalid"
     with SessionLocal() as db:

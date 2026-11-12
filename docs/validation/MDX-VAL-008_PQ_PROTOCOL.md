@@ -44,7 +44,7 @@ customer template MDX-CUS-001.
 | PQ-002 | Complaint handler | Record an awareness date later than the earliest known | Refused without a signature and, outside a trial, a second person | TR-05, CI-08 |
 | PQ-003 | Triage reviewer | Confirm triage; open the deadline list | One deadline per market; overdue first; the same deadline on every screen | TR-12, B6-03 |
 | PQ-004 | Regulatory reviewer | Answer the market questions with one Unknown | "Not reportable" refused; "Needs more information" shown | DT-06, DT-08 |
-| PQ-005 | Regulatory reviewer | Complete the answers and sign the US conclusion | Signature asks for the password session and a fresh authenticator code; the rule version is named | DT-12, RG-12 |
+| PQ-005 | Regulatory reviewer | Complete the answers and sign the US conclusion | Signature asks for the password session and a fresh authenticator code; the rule version is named | B6-21, RG-12 |
 | PQ-006 | Regulatory reviewer | Prepare the eMDR file and the EU MIR file | Values from the approved snapshot only; the file passes its schema check; the MIR XML is served only after approval | RG-19, B8-15 |
 | PQ-007 | Quality approver | Try to approve a record made by the same person (outside a trial) | Refused | CI-17 |
 | PQ-008 | Investigator | Submit an investigation with an open challenge question | Refused until it is answered or marked not applicable | B5-05 |

@@ -8,7 +8,6 @@ FORCEd ``mdarix_tenant_isolation`` policy (migrations md05/md15/md34), or a revi
 from sqlalchemy import text
 
 from backend.app.db.session import engine
-import pytest
 
 POLICY = "mdarix_tenant_isolation"
 
@@ -27,10 +26,6 @@ EXEMPT = {
 # The organization and its customer, which have no tenant_id column of their own (md34).
 ORGANIZATION_TABLES = ("tenants", "customers", "customer_contacts", "customer_domains", "customer_onboarding_drafts")
 MASTER_POLICIES = {"mdarix_master_read", "mdarix_master_insert", "mdarix_master_update", "mdarix_master_delete"}
-
-
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("B6-45", "B8-30", "B9-27", "OC-14", "P360-11", "S360-14")
 
 
 def _tables(sql: str) -> dict[str, tuple]:

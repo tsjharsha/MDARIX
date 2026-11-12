@@ -20,7 +20,7 @@ from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_market_assessment_api import WHY, _acknowledge, _save, _sign
 from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _ok, _purge, _reports
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = [pytest.mark.db, pytest.mark.requirement("B9-13", "B9-17", "B9-18", "B9-19", "B9-20", "B9-23", "B9-33")]
 
 CA = dict(CA1="YES", CA2="YES", CA3="NO", CA4="YES", CA5="YES", CA6="NOT_APPLICABLE")

@@ -38,10 +38,6 @@ PASSWORD = "Signals triage 2026!"
 REASON = "Reason recorded for the audit trail"
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("CI-13", "IN-05", "TR-27", "TR-28", "TR-29", "TR-30", "TR-31")
-
-
 @pytest.fixture(scope="module")
 def org():
     """A fresh organization with a triage lead, two investigators and a viewer, removed afterwards."""

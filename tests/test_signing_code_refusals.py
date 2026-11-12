@@ -54,10 +54,6 @@ SIGNING_ROUTES = {
 }
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("B6-20", "B6-21", "B6-30", "DT-12")
-
-
 def _reaches(function, target: str, seen: set) -> bool:
     """Whether a function (or a module-level helper it calls, at any depth, imported from another app module too: B7's
     resolve-and-close signs through the disposition router's ``sign``) names ``target``."""

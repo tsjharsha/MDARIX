@@ -20,8 +20,8 @@ from tests.test_b6a_change_reason import TODAY, _signed
 from tests.test_market_assessment_api import _market, _url, org  # noqa: F401
 from tests.test_reporting_capa_api import _complaint
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = [pytest.mark.db, pytest.mark.requirement("B6-36", "B6-37", "B6-38")]
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = [pytest.mark.db, pytest.mark.requirement("B6-38")]
 UPLOAD = "/api/v1/data/import/complaints"
 
 

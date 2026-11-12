@@ -14,7 +14,7 @@ import pytest
 from backend.app import standards
 from backend.app.rule_register import engine, register
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = [pytest.mark.unit, pytest.mark.requirement("OC-03", "OC-04", "OC-09", "OC-12", "OC-19")]
 
 QUESTIONS = ("OT1", "OT2", "OT3", "OT4", "OT5", "OT6", "OT7")

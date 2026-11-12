@@ -30,7 +30,7 @@ WEEK = {"from": "2026-10-05", "to": "2026-10-11"}
 CLEAN = {"from": "2026-09-21", "to": "2026-09-25"}
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = pytest.mark.requirement("B6-28", "B6-29", "B6-30", "B6-31", "B6-32", "B6-33", "B6-34", "B6-35")
 
 

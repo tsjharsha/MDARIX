@@ -15,7 +15,7 @@ V1 = emdr.RULES.with_name("us_emdr.csv")
 V1_COLUMNS = ("row", "block", "label", "report_types", "rule", "m_i", "m_f", "xpath", "source")
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = pytest.mark.requirement("B9-13", "B9-17", "B9-18", "B9-19", "B9-20", "B9-23", "B9-33")
 
 

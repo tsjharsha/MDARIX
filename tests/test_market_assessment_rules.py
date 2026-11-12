@@ -12,8 +12,8 @@ from backend.app.complaint_classification import rules as classification
 from backend.app.reportability import markets
 from backend.app.reportability import rules as watch_rules
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = [pytest.mark.unit, pytest.mark.requirement("DT-06", "DT-07", "DT-08", "RG-05", "RR-02")]
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("RR-02")]
 
 WHY = "Read from the complaint record"
 

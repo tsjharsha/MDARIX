@@ -47,7 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     root = args.root
     docs = root / "docs" / "validation"
-    out = args.out or docs / "releases" / args.release
+    # A dry run never writes into the controlled release folder unless --out says so.
+    out = args.out or (
+        root / "artifacts" / "validation-pack-dryrun" / args.release
+        if args.dry_run
+        else docs / "releases" / args.release
+    )
     version_file = (root / "VERSION").read_text(encoding="utf-8").strip() if (root / "VERSION").exists() else ""
     if args.release != version_file:
         print(f"WARNING: release {args.release} differs from VERSION {version_file or '(missing)'}; "
@@ -60,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         scenarios=pack.read_register(docs / "scenario-register.md"),
         tests=pack.read_junit(args.junit) if args.junit else [],
         release_checks=json.loads(args.release_checks.read_text(encoding="utf-8-sig")) if args.release_checks else None,
+        release_checks_raw=args.release_checks.read_bytes() if args.release_checks else None,
         deviations=pack.read_deviations(docs / "deviation-log.csv"),
         clock_check=json.loads(args.clock_check.read_text(encoding="utf-8")) if args.clock_check else None,
     )
@@ -68,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         release=args.release, version_file=version_file, commit=commit, tag=args.tag,
         date=args.date or _git("show", "-s", "--format=%cs", commit) or "1970-01-01", dry_run=args.dry_run,
         head=pack.migration_head(root / "infrastructure" / "database" / "migrations" / "versions"),
-        problems=pack.check(sources, args.release),
+        problems=pack.check(sources, args.release)
+        + pack.release_check_problems(sources.release_checks, commit, bool(sources.tests)),
     )  # fmt: skip
     for problem in ctx.problems:
         print(f"CHECK FAILED: {problem}", file=sys.stderr)

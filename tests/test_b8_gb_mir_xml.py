@@ -10,7 +10,7 @@ from lxml import etree
 from backend.app.authority_reports import forms, mir_rules, mir_xml
 from tests.test_b8_mir_xml import FULL, NOW, _party
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = [pytest.mark.unit, pytest.mark.requirement("B8-05", "B8-15", "B8-24", "B8-26")]
 
 GB = forms.GB_MIR.code

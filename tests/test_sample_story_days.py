@@ -29,10 +29,6 @@ FLAGSHIP_US = dict(US1="NO", US2A="NO", US2B="NO", US2C="NO", US3="NO", US4="YES
 FLAGSHIP_IN = dict(IN1="NO", IN2A="NO", IN2B="NO", IN2C="NO", IN2D="NO", IN2E="NO", IN2F="NO", IN3="NO")
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("CI-18", "P360-13", "TR-16")
-
-
 def _ok(response):
     assert response.status_code == 200, response.text
     return response.json()

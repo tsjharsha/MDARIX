@@ -16,8 +16,7 @@ from backend.app.complaint_disposition import rules, triggers
 from backend.app.complaint_disposition.service import routine_offer
 from backend.app.signer_training import service as training
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = [pytest.mark.unit, pytest.mark.requirement("IN-22")]
+pytestmark = pytest.mark.unit
 
 CASE = str(uuid.uuid4())
 

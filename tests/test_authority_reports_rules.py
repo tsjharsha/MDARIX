@@ -6,15 +6,10 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 from backend.app.authority_reports import forms, rules
-import pytest
 
 DUE = date(2026, 12, 4)
 # The end of the latest day: 23:59:59 in the counting time zone (UTC here: no market, no organization zone; 0.10.63).
 END = datetime(2026, 12, 4, 23, 59, 59, tzinfo=timezone.utc)
-
-
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("RG-15", "RG-16", "RG-17")
 
 
 def _row(left: timedelta) -> dict:

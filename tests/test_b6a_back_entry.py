@@ -16,7 +16,7 @@ from backend.app.db.models.intake import InboundMessage
 from backend.app.db.session import SessionLocal
 from tests.test_free_trial import _approved_trial_client
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = [pytest.mark.db, pytest.mark.requirement("B6-07", "B6-08", "B6-09")]
 
 INTAKE = "/api/v1/intake"

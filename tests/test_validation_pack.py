@@ -3,6 +3,7 @@ B6-58), on a small golden example; no database."""
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,12 @@ JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="py
 </testsuite></testsuites>"""
 
 
+RELEASE_CHECKS = (
+    '{"release": "9.9.9", "commit": "abc12345", "dry_run": false, "full_suite": true, "passed": true,'
+    ' "tools": {"python": "Python 3.x", "node": "v20"}, "steps": [{"step": "pytest", "result": "pass"}]}'
+)
+
+
 def _root(tmp_path: Path, *, requirements=REQUIREMENTS, register=REGISTER, junit=JUNIT, deviations="") -> Path:
     docs = tmp_path / "docs" / "validation"
     docs.mkdir(parents=True)
@@ -50,11 +57,13 @@ def _root(tmp_path: Path, *, requirements=REQUIREMENTS, register=REGISTER, junit
     (versions / "a.py").write_text('revision = "r1"\ndown_revision = None\n')
     (versions / "b.py").write_text('revision = "r2"\ndown_revision = "r1"\n')
     (tmp_path / "junit.xml").write_text(junit, encoding="utf-8")
+    (tmp_path / "release-checks.json").write_text(RELEASE_CHECKS, encoding="utf-8")
     return tmp_path
 
 
 def _run(root: Path, *extra: str) -> int:
     args = ["--root", str(root), "--release", "9.9.9", "--junit", str(root / "junit.xml")]
+    args += ["--release-checks", str(root / "release-checks.json")]
     return validation_pack.main(args + ["--commit", "abc12345", "--date", "2026-11-12", *extra])
 
 
@@ -72,6 +81,15 @@ def test_requirement_marker_reaches_the_junit_xml(tmp_path):
     )  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
     assert [t["scenarios"] for t in pack.read_junit(junit)] == [["IN-01", "IN-02"]]
+    # The wiring in tests/conftest.py: a test of this file, run through the real conftest, carries its marker.
+    real = tmp_path / "real.xml"
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_validation_pack.py::test_xlsx_reads_back_equal_and_formula_stays_text",
+         "-p", "no:cacheprovider", "-q", f"--junitxml={real}"],
+        cwd=ROOT, capture_output=True, text=True, timeout=300, env={**os.environ, "MDARIX_TEST_NO_DATABASE": "1"},
+    )  # fmt: skip
+    assert done.returncode == 0, done.stdout[-2000:] + done.stderr[-2000:]
+    assert [t["scenarios"] for t in pack.read_junit(real)] == [["B6-48"]]
 
 
 @pytest.mark.requirement("B6-48")
@@ -148,7 +166,14 @@ def test_rtm_lists_every_class_a_requirement_as_covered_or_not_covered(tmp_path)
     )
     real_rows = {r["req_id"]: r for r in pack.rtm(real)}
     class_a = [r["req_id"] for r in real.requirements if r["class"] == "A"]
-    assert class_a and all(real_rows[r]["coverage"] in ("covered", "NOT COVERED") for r in class_a)
+    assert class_a and set(real_rows) == {r["req_id"] for r in real.requirements}
+    assert all(real_rows[r]["coverage"] == "NOT COVERED" and real_rows[r]["status"] != "Verified" for r in class_a)
+    # A register FAIL makes the requirement Failed even when its tagged tests pass.
+    failing = pack.Sources(pack.read_requirements(root / "docs/validation/requirements.csv"),
+                           pack.read_register(root / "docs/validation/scenario-register.md"),
+                           pack.read_junit(root / "junit.xml"))  # fmt: skip
+    failing.scenarios["AA-01"]["status"] = "FAIL"
+    assert {r["req_id"]: r["status"] for r in pack.rtm(failing)}["REQ-T-001"] == "Failed"
 
 
 def test_golden_figures_and_documents(tmp_path, capsys):
@@ -159,7 +184,7 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert figures["coverage"] == {"A": "100.0% (1/1)", "B": "0.0% (0/1)", "C": "no data (0/0)"}
     assert figures["negative_coverage_class_a"] == "100.0% (1/1)"
     assert figures["execution_progress"] == "66.7% (2/3)"
-    assert figures["pass_rate_tagged_tests"] == "100.0% (2/2)" and figures["pass_rate_all_tests"] == "100.0% (3/3)"
+    assert figures["pass_rate"] == "100.0% (2/2)" and figures["pass_rate_all_tests"] == "100.0% (3/3)"
     assert figures["defect_leakage"].startswith("no source yet")
     assert "WARNING: release 9.9.9" not in capsys.readouterr().err  # same as VERSION
     vsr = (out / "MDX-VAL-011-VSR.md").read_text(encoding="utf-8")
@@ -212,3 +237,29 @@ def test_no_release_approval_record_while_a_critical_deviation_is_open(tmp_path,
     assert "MDX-VAL-011-VSR.md" in names and not any(n.startswith("MDX-VAL-012") for n in names)
     figures = __import__("json").loads((tmp_path / "dry" / "g13.json").read_text())
     assert figures["open_deviations"] == {"by_classification": {"critical": 1}, "count": 1}
+
+
+def test_stale_approval_record_is_removed_and_bom_log_still_read(tmp_path):
+    root = _root(tmp_path)
+    assert _run(root, "--out", str(tmp_path / "out")) == 0
+    assert (tmp_path / "out" / "MDX-VAL-012-release-approval.json").exists()
+    (tmp_path / "out" / "change-impact.md").write_text("kept")
+    log = root / "docs" / "validation" / "deviation-log.csv"
+    critical = DEV.format(n="001", risk="high", cls="critical", retest="", result="", approver="", closed="", status="open")  # fmt: skip
+    log.write_bytes(b"\xef\xbb\xbf" + log.read_bytes() + critical.encode())  # saved by Excel: byte-order mark
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "out")) == 1
+    names = {p.name for p in (tmp_path / "out").iterdir()}
+    assert not any(n.startswith("MDX-VAL-012") for n in names) and "change-impact.md" in names
+    log.write_text("dev_id,status\nDEV-9.9.9-001,open\n")
+    with pytest.raises(ValueError):
+        pack.read_deviations(log)
+
+
+def test_release_pack_needs_full_suite_evidence_of_the_same_commit():
+    good = {"commit": "abc12345", "dry_run": False, "full_suite": True, "passed": True, "steps": [{"result": "pass"}]}
+    assert pack.release_check_problems(good, "abc12345", True) == []
+    bad = {**good, "dry_run": True, "full_suite": False, "commit": "ffff0000", "steps": [{"result": "skipped"}]}
+    said = " ".join(pack.release_check_problems(bad, "abc12345", False))
+    for part in ("no JUnit", "dry run", "not a full-suite", "did not pass", "for commit ffff0000"):
+        assert part in said
+    assert pack.release_check_problems(None, "abc12345", True) == ["no release-checks JSON given"]

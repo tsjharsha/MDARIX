@@ -27,8 +27,8 @@ THREE = ("YES", "NO", "UNKNOWN")
 FIVE = ("YES", "NO", "UNKNOWN", "NOT_APPLICABLE", None)
 
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = pytest.mark.requirement("DT-33", "DT-37", "RR-01", "RR-03")
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = pytest.mark.requirement("RR-01", "RR-02", "RR-03")
 
 
 def _same(market: str, given: dict) -> None:

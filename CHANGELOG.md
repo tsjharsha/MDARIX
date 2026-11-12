@@ -45,7 +45,7 @@ pack is generated as a dry run only: its statuses are development results, not v
   NOT RUN.
 - **Scenario register under version control**: `docs/validation/scenario-register.md` is now the master copy
   (copied byte for byte from the planning folder, which keeps a pointer).
-- **Requirements (URS source)**, `docs/validation/requirements.csv`: 67 requirements (57 class A, 9 B, 1 C), one
+- **Requirements (URS source)**, `docs/validation/requirements.csv`: 69 requirements (59 class A, 9 B, 1 C), one
   "shall" statement each, with revision, class, source spec, RSK IDs, scenarios, negative scenarios and named tests.
   The 34 risk rows without a requirement now name theirs (MDX-VAL-002).
 - **Validation-pack generator**, `scripts/validation_pack.py` (logic in `validation/pack.py`, with a small

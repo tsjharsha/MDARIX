@@ -18,8 +18,7 @@ from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_tenant
 from tests.test_free_trial import _approved_trial_client
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = [pytest.mark.db, pytest.mark.requirement("B5-05", "B5-07")]
+pytestmark = pytest.mark.db
 
 
 @pytest.fixture(scope="module")

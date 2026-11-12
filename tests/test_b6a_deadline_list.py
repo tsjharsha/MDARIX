@@ -21,7 +21,7 @@ from backend.app.oversight.rules import zone_info
 from tests.test_free_trial import _approved_trial_client
 from tests.test_reporting_capa_api import _client
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
 pytestmark = [pytest.mark.db, pytest.mark.requirement("B6-01", "B6-02", "B6-03", "B6-04", "B6-05", "B6-06")]
 
 URL = "/api/v1/oversight"

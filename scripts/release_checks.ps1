@@ -45,6 +45,8 @@ $python = if (Test-Path "$root\.venv\Scripts\python.exe") { "$root\.venv\Scripts
 $version = (Get-Content "$root\VERSION" -Raw).Trim()
 $logs = Join-Path $root "artifacts\release-checks"
 New-Item -ItemType Directory -Force $logs | Out-Null
+# A junit.xml left by an earlier run is never reported as this run's.
+Remove-Item (Join-Path $logs "junit.xml") -ErrorAction SilentlyContinue
 
 function Invoke-Measures {
     $env:MDARIX_TRIAL_LOAD_MEASURE = "1"

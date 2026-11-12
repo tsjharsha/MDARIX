@@ -11,8 +11,7 @@ from backend.app import import_quarantine as quarantine
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.trial import imports
 
-# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
-pytestmark = [pytest.mark.unit, pytest.mark.requirement("IN-13", "TR-21", "TR-36")]
+pytestmark = pytest.mark.unit
 
 
 def test_harm_from_flags_and_words():
