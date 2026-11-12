@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { TraceBody, TraceLink, type ValueTrace } from "./sections/TraceValue";
+import { TraceBody, TraceLink, originPlace, type ValueTrace } from "./sections/TraceValue";
 
 // B6a G20 "Trace this value" (B6-39, B6-40): the panel's three parts, in order; the link only while the switch is on.
 const TRACE: ValueTrace = {
@@ -15,6 +15,7 @@ const TRACE: ValueTrace = {
       file_name: "orbit-complaints.csv",
       imported_by: "Asha Rao",
       imported_at: "2026-10-03T09:00:00+00:00",
+      has_report: true,
     },
   ],
   field_changes: [],
@@ -68,6 +69,38 @@ describe("Trace this value", () => {
     const html = renderToStaticMarkup(<TraceBody data={{ ...TRACE, origin: null, imports: [], snapshot: null }} />);
     expect(html).toContain("Entered on this report by a person.");
     expect(html).toContain("Not frozen yet: sending it for approval freezes it.");
+  });
+
+  it("opens the record's page and, for people who may open imports, the import's data-quality report", () => {
+    const inWorkspace = (permissions: string[]) =>
+      renderToStaticMarkup(
+        <WorkspaceContext.Provider
+          value={
+            {
+              session: { allowed_menu: ["products"], business_permissions: permissions },
+              open: () => undefined,
+            } as unknown as WorkspaceApi
+          }
+        >
+          <TraceBody data={TRACE} />
+        </WorkspaceContext.Provider>,
+      );
+    const importer = inWorkspace(["records.write"]);
+    expect(importer).toContain('class="ac-link">SAMPLE-RV-06</button>');
+    expect(importer).toContain("Data-quality report");
+    // Every report reader sees the file and who imported it (owner, 12 Nov); the import screen needs records.write.
+    const reader = inWorkspace([]);
+    expect(reader).toContain('class="ac-link">SAMPLE-RV-06</button>');
+    expect(reader).toContain("orbit-complaints.csv</strong>, row 7 · by Asha Rao");
+    expect(reader).not.toContain("Data-quality report");
+    expect(originPlace(TRACE.origin!)).toEqual(["Complaint", "Summary?ref=SAMPLE-RV-06"]);
+    expect(originPlace({ type: "Product", ref: "PW-200", label: "", id: "p-1" })).toEqual([
+      "Product 360",
+      "Product 360?product=p-1",
+    ]);
+    // A source with no page of its own (the report, a setting, a lot) stays text.
+    expect(originPlace({ type: "Obligation", ref: null, label: "", id: null })).toBeNull();
+    expect(originPlace({ type: "Lot", ref: "L7", label: "", id: "l-1" })).toBeNull();
   });
 
   it("shows the link only while the server has the switch on", () => {

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import "./decide.css";
 import { Panel } from "../../admin/console/charts";
 import { Drawer, formatDate, useResource } from "../../customer-admin/shared";
 import { REPORTS } from "../authorityReports";
-import { useTrace } from "../workspaceContext";
+import { productTab } from "../productHub";
+import { WorkspaceContext, canImportOwnData, useTrace, type WorkspaceSection } from "../workspaceContext";
 
 type TraceEvent = {
   action: string;
@@ -23,6 +24,7 @@ export type ValueTrace = {
     file_name: string | null;
     imported_by: string | null;
     imported_at: string;
+    has_report?: boolean;
   }[];
   field_changes: { field: string; before: string | null; after: string | null; source: string; at: string }[];
   record_events: TraceEvent[];
@@ -64,16 +66,37 @@ function Events({ items, empty }: { items: TraceEvent[]; empty: string }) {
   );
 }
 
+/** The page of the record a value comes from: a complaint by its reference, a product by its record ID; else none. */
+export function originPlace(origin: NonNullable<ValueTrace["origin"]>): [WorkspaceSection, string] | null {
+  if (origin.type === "Complaint" && origin.ref)
+    return ["Complaint", `Summary?${new URLSearchParams({ ref: origin.ref })}`];
+  if (origin.type === "Product" && origin.id) return ["Product 360", productTab(origin.id)];
+  return null;
+}
+
 /** B6a G20: what the Trace link shows, in order: the record the value comes from and the import row that brought it,
  * who entered or changed it and when, and the snapshot it is frozen in. Read only. */
 export function TraceBody({ data }: { data: ValueTrace }) {
   const { origin, snapshot } = data;
+  // Navigation polish (B6a D4 #10): the record opens its page; an import row its data-quality report, for people who
+  // may open imports (the report's readers all see the file and who imported it: owner, 12 Nov).
+  const workspace = useContext(WorkspaceContext);
+  const place = workspace && origin ? originPlace(origin) : null;
+  const imports = workspace && canImportOwnData(workspace.session) ? workspace : null;
   return (
     <div className="tr-body">
       <section>
         <h3>1. Where it comes from</h3>
         <p>
-          {origin ? `${origin.label}${origin.ref ? `: ${origin.ref}` : ""}` : "Entered on this report by a person."}
+          {origin ? `${origin.label}${origin.ref ? ": " : ""}` : "Entered on this report by a person."}
+          {origin?.ref &&
+            (place && workspace ? (
+              <button type="button" className="ac-link" onClick={() => workspace.open(...place)}>
+                {origin.ref}
+              </button>
+            ) : (
+              origin.ref
+            ))}
         </p>
         {data.imports.length > 0 ? (
           <ul className="tr-list">
@@ -82,6 +105,20 @@ export function TraceBody({ data }: { data: ValueTrace }) {
                 Imported from <strong>{item.file_name ?? "a file"}</strong>, row {item.line}
                 {item.imported_by ? ` · by ${item.imported_by}` : ""} · {formatDate(item.imported_at)}
                 <span className="tr-values">Mapping version {item.mapping_version}</span>
+                {item.has_report && imports && (
+                  <button
+                    type="button"
+                    className="ac-link"
+                    onClick={() =>
+                      imports.open(
+                        imports.isTrial ? "Import your data" : "Import data",
+                        `?${new URLSearchParams({ report: item.import_ref })}`,
+                      )
+                    }
+                  >
+                    Data-quality report
+                  </button>
+                )}
               </li>
             ))}
           </ul>

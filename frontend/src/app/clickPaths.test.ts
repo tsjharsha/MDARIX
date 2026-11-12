@@ -197,6 +197,27 @@ export const PATHS: Array<{
     steps: [{ go: ["My Work", "Team overview"] }],
     note: "the Value Centre panel is on Team overview (Readiness › Oversight on the classic navigation)",
   },
+  // B6a navigation polish (D4 backlog items 2, 4, 5, 10, 14, 15 and the audit trail review).
+  {
+    key: "p",
+    task: "Open a possible duplicate's record before linking or dismissing it",
+    today: 4,
+    proposed: 2,
+    steps: [{ go: ["My Work", "Queues?view=Possible duplicates"] }, { press: "opens in a new tab", in: "BackEntry" }],
+    note: "today: the menu, a list and a search for the reference; the late-entry form shows the same link",
+  },
+  {
+    key: "q",
+    task: "From a traced value to its record and its import's data-quality report",
+    today: 5,
+    proposed: 3,
+    steps: [
+      { go: ["Complaints", "Reports?complaint=c1"] },
+      { press: "Trace", in: "TraceValue" },
+      { press: "Data-quality report", in: "TraceValue" },
+    ],
+    note: "the record's reference in the same panel opens its page (originPlace); today: the menu and a search",
+  },
 ];
 
 describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {
