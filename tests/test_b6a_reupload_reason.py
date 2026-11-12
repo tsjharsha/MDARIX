@@ -103,6 +103,23 @@ def test_a_reupload_behind_a_signed_conclusion_needs_one_reason_for_the_run(org,
     assert uploader.post(UPLOAD, content=plain).status_code == 200
     # The same file again changes nothing: no reason asked.
     assert uploader.post(f"{UPLOAD}/check", content=body).json()["signed_decisions_changed"] == []
+    # A kit (one row per lot): its first row is written, so the second row's awareness is not a change; the lots the
+    # file adds are (by name).
+    received = (TODAY - timedelta(days=5)).isoformat()
+    kit = "complaint_id,product_id,description,received_date,awareness_date,lot_id\n" + "".join(
+        f"{rows[0][0]},{rows[0][1]},Pump alarm,{received},{day},{lot}\n"
+        for day, lot in ((earlier, "KIT-A"), ((TODAY - timedelta(days=8)).isoformat(), "KIT-B"))
+    )
+    (item,) = uploader.post(f"{UPLOAD}/check", content=kit).json()["signed_decisions_changed"]
+    assert item["fields"] == ["lot"] and item["after"] == {"lot": "KIT-A"}
+    # The received date (the clock's fallback) counts too. (A file never moves a complaint to another product: the
+    # check refuses that row.)
+    moved = (TODAY - timedelta(days=9)).isoformat()
+    other = f"complaint_id,product_id,description,received_date\n{rows[1][0]},{rows[1][1]},Pump alarm,{moved}\n"
+    checked = uploader.post(f"{UPLOAD}/check", content=other).json()
+    assert checked["ready"], checked["issues"]
+    (item,) = checked["signed_decisions_changed"]
+    assert item["fields"] == ["received date"] and item["after"]["received date"].startswith(moved)
     # Switched off: today's behaviour (no reason asked), the change still audited per complaint.
     monkeypatch.setenv("MDARIX_B6_CHANGE_REASON", "off")
     later = (TODAY - timedelta(days=7)).isoformat()

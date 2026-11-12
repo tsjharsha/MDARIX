@@ -350,6 +350,10 @@ def quarantine_reprocess(
             created_at=datetime.now(timezone.utc),
         )
     )
+    # B6a G10: with the reason switched off, a corrected row may change a signed fact: audited like a re-upload.
+    db.add_all(
+        imports.signed_change_events(tenant_id, str(ctx.user_id), result.get("signed_decisions_changed") or [], None)
+    )
     db.commit()
     return result
 

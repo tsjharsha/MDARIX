@@ -2508,6 +2508,8 @@ SIGNED_FACTS = {
     "country": "country",
     "awareness_timestamp": "awareness date",
     "event_timestamp": "event date",
+    # The clock's awareness falls back on the received date when no awareness date is kept (reportability.service).
+    "complaint_timestamp": "received date",
     "death": "death",
     "serious_injury": "serious injury",
     "product_id": "product",
@@ -2519,7 +2521,7 @@ SIGNED_FACTS_REIMPORTED = "COMPLAINT_FACTS_REIMPORTED"
 def signed_fact_changes(db: Session, tenant_id, rows) -> list[dict]:
     """B6a G10 (B6-38): the complaints already here with a signed market conclusion whose facts (SIGNED_FACTS) these
     rows change, each with the facts' values before and after, read the way _write_rows sets them (a column the file
-    leaves out keeps its value; a complaint's first row counts). Nothing signed is rewritten: the conclusion then
+    leaves out keeps its value; of a kit's rows, the first). Nothing signed is rewritten: the conclusion then
     reads "Facts changed after signing: re-check" (reportability/assessment_router.facts_changed)."""
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment as Conclusion
 
@@ -2542,22 +2544,34 @@ def signed_fact_changes(db: Session, tenant_id, rows) -> list[dict]:
             )
             .distinct()
         }
-    found: list[dict] = []
-    seen: set = set()
+    # A complaint on several rows is a kit (one row per lot; any other repeat is refused): its first row is written.
+    chosen: dict[str, dict] = {}
     for _, row in rows:
+        if not ("lot_id" in row and row["complaint_id"] in chosen):
+            chosen[row["complaint_id"]] = row
+    found: list[dict] = []
+    for row in chosen.values():
         complaint = stored.get(row["complaint_id"])
-        if complaint is None or complaint.id not in signed or row["complaint_id"] in seen:
+        if complaint is None or complaint.id not in signed:
             continue
-        seen.add(row["complaint_id"])
         values = {name: value for name, value in _complaint_details(row).items() if name in SIGNED_FACTS}
         product = lookup.product(row["product_id"])
-        values["product_id"] = product.id if product else None
-        if "event_date" in row:
-            values["event_timestamp"] = _date(row["event_date"]) if row["event_date"] else None
+        # A product or lot the file adds (a free trial) is not here yet: its name stands for it, so it counts as a change.
+        values["product_id"] = product.id if product else row["product_id"]
+        for column, field in (("event_date", "event_timestamp"), ("received_date", "complaint_timestamp")):
+            if column in row:
+                values[field] = _date(row[column]) if row[column] else None
         if "lot_id" in row:
             lot = lookup.lot(row["lot_id"]) if row["lot_id"] else None
-            values["lot_batch_id"] = lot.id if lot else None
+            values["lot_batch_id"] = lot.id if lot else (row["lot_id"] or None)
         changes = _field_changes(complaint, values, row["complaint_id"])
+        for change in changes:  # the product and lot as people know them, not internal ids
+            if change["field"] == "product_id":
+                was = db.get(Product, complaint.product_id) if complaint.product_id else None
+                change.update(before=was.product_identifier if was else None, after=row["product_id"])
+            elif change["field"] == "lot_batch_id":
+                was = db.get(LotBatch, complaint.lot_batch_id) if complaint.lot_batch_id else None
+                change.update(before=was.lot_identifier if was else None, after=row["lot_id"] or None)
         if changes:
             found.append(
                 {

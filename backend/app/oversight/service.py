@@ -27,7 +27,7 @@ from backend.app.trial.sample_source import is_sample
 from backend.app import links
 import logging
 import uuid
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -571,7 +571,7 @@ def _capa_items(db: Session, tenant_id) -> list[dict]:
     ]
 
 
-def _review_items(control_db: Session | None, tenant_id, now: datetime) -> list[dict]:
+def _review_items(control_db: Session | None, tenant_id, now: datetime, calendar: rules.Calendar) -> list[dict]:
     """B6a G1, G14: "Audit trail review due" (every 1-12 months after the last signed one, as a Leader set it; monthly
     by default) and "Access review due" (90 days after the last signed one); counted from the organization's start
     when none was ever signed. Read from the control database; none while the reviews are switched off."""
@@ -593,7 +593,7 @@ def _review_items(control_db: Session | None, tenant_id, now: datetime) -> list[
             "review:audit-trail",
             "REVIEW",
             "Audit trail review due: a Leader or Quality Reviewer reviews the flags and signs",
-            datetime.combine(audit_due, time(23, 59), timezone.utc),
+            calendar.day_end(audit_due),
             ref="Audit trail review",
             queue="Leaders and Quality Reviewers",
             opens=links.target("Readiness", "Oversight"),
@@ -603,7 +603,7 @@ def _review_items(control_db: Session | None, tenant_id, now: datetime) -> list[
             "review:access",
             "REVIEW",
             "Access review due: a customer administrator marks every user and signs (Customer administration > Reviews)",
-            datetime.combine(access_due, time(23, 59), timezone.utc),
+            calendar.day_end(access_due),
             ref="Access review",
             queue="Customer administrators",
             opens=links.target("Readiness", "Oversight"),
@@ -667,7 +667,7 @@ def due_items(
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
         ("e-mails", lambda: _mail_items(db, tenant_id, calendar)),
-        ("reviews", lambda: _review_items(control_db, tenant_id, now)),
+        ("reviews", lambda: _review_items(control_db, tenant_id, now, calendar)),
     )
     if ids is not None:
         sources = tuple(source for source in sources if source[0] not in ("guides", "capas", "e-mails", "reviews"))

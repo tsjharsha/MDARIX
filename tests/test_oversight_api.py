@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from backend.app import feature_set
 from backend.app.oversight import rules
 from backend.app.oversight.rules import Calendar
 from tests.test_free_trial import PASSWORD, _approved_trial_client
@@ -159,9 +160,12 @@ def test_the_working_calendar_is_set_by_quality_and_used_by_the_communications_l
     )
     wrong = user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Mars/Olympus"})
     assert wrong.status_code == 422 and wrong.json()["detail"]["code"] == "SETTINGS_INVALID"
-    # B6a G10: the calendar changes only with a reason (it changes reminders, not legal clocks).
+    # B6a G10: the calendar changes only with a reason (it changes reminders, not legal clocks); switched off, as before.
     no_reason = user.put(f"{VIEW}/settings", json={**_settings(), "reason": "  "})
-    assert no_reason.status_code == 422 and no_reason.json()["detail"]["code"] == "CHANGE_REASON_REQUIRED"
+    if feature_set.switched_on("MDARIX_B6_CHANGE_REASON"):
+        assert no_reason.status_code == 422 and no_reason.json()["detail"]["code"] == "CHANGE_REASON_REQUIRED"
+    else:
+        assert no_reason.status_code == 200, no_reason.text
     # A browser's old name is stored under the current one.
     saved = _ok(user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Asia/Calcutta"}))
     assert saved["time_zone"] == "Asia/Kolkata" and saved["holidays"][0] == {"date": "2026-11-09", "name": "Diwali"}

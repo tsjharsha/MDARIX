@@ -538,6 +538,8 @@ function ImportForm({
   };
   const limit = setup.file_limit_bytes;
   const [changeReason, setChangeReason] = useState("");
+  // A reason belongs to one file: another file or template asks again.
+  useEffect(() => setChangeReason(""), [file, entity]);
   const choices: FileChoices = { sheet, numberFormat, dateColumn, changeReason };
 
   const send = async (mode: "check" | "import") => {

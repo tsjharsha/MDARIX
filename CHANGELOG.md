@@ -157,6 +157,23 @@ No migration. Switches `MDARIX_B6_REVIEWS` and `MDARIX_B6_CHANGE_REASON` (both o
   organization; a review whose content no longer matches cannot be confirmed, and a double signature answers 409;
   MDARIX staff accounts never read the reviews; the comparison says "incomplete" past 5,000 change events. Not
   changed: "data changed by administrators" uses each person's role today (a known limit).
+- **Re-upload behind a signed decision (G10, B6-38, run 6).** Checking a complaints file now lists the complaints
+  with a signed market conclusion whose facts the file changes (country, awareness date, received date, event date,
+  death, serious injury, product, lot) and asks one reason for the whole import (`change_reason` on `POST /api/v1/data/import/
+  complaints`; 422 `CHANGE_REASON_REQUIRED` without it while `MDARIX_B6_CHANGE_REASON` is on). The reason is on the
+  run's audit event and on one `COMPLAINT_FACTS_REIMPORTED` event per such complaint (before and after values, the
+  product and lot by their identifiers), so
+  the audit trail review lists them under "edits after a signature". A QMS connector sync is never refused: it records
+  the reason "QMS sync <run id>" by itself. A set-aside row processed again that would change such a fact is refused
+  (import it in a file with a reason; with the switch off it is audited the same way). Signed conclusions are never rewritten; they read "Facts changed after signing:
+  re-check".
+- **Reviews fall due in Oversight (G1, G14, run 6).** Oversight gains the kind "Signed reviews": "Audit trail review
+  due" and "Access review due", due at the end of the organization's day, counted from the last signed review (else
+  the organization's start); no reminder
+  e-mails for them. The audit trail review falls due every 1-12 months (monthly by default): a Leader changes it with a
+  reason (`PUT /api/v1/reviews/audit-trail/frequency`), kept as an audit event `AUDIT_TRAIL_REVIEW_FREQUENCY_SET` with
+  the months before and after (no migration).
+- **User guide:** "Reviews you sign: audit trail, access and configuration" (with the reason for change).
 
 ## [0.11.02] - not released yet
 

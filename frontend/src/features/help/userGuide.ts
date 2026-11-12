@@ -1519,6 +1519,65 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           },
         ],
       },
+      {
+        id: "signed-reviews",
+        title: "Reviews you sign: audit trail, access and configuration",
+        where:
+          "Admin console › Reviews (customer administrators and Leaders); the audit trail review also under Readiness › Oversight",
+        purpose:
+          "The periodic reviews an inspector asks for, signed with your password (and authenticator code) and kept unchanged: what was looked at, what was found, who signed and when. A correction is a new review that names the earlier one.",
+        tasks: [
+          {
+            title: "Review the audit trail",
+            who: "A Leader or Quality Reviewer signs; a customer administrator reads it but never signs.",
+            steps: [
+              "Open Reviews › Audit trail review. The period starts where the last signed review ended; choose From and To for another.",
+              "Read the red flags first, each with its count: edits without a reason, edits after a signature, data changed by administrator accounts or MDARIX staff, bulk changes, changes outside the working calendar, failed sign-in spikes. Choose Show to list a flag's events with their before and after values.",
+              "Check the audit chain line: intact, or broken from an event number (then contact MDARIX support).",
+              "Write your findings (or none), enter Your password and, when asked, the Authenticator code, and choose Sign the audit trail review.",
+              "When your own actions are among the flags, another Leader or Quality Reviewer chooses Confirm as second reviewer.",
+            ],
+            result:
+              "The signed review is kept with its fingerprint; download it as PDF or JSON. Oversight shows Audit trail review due when the next one falls due.",
+          },
+          {
+            title: "Set how often the audit trail review falls due",
+            who: "A Leader.",
+            steps: [
+              "Under the audit trail review, choose Review every 1 to 12 months (monthly unless changed), write Why does it change? and choose Change the frequency.",
+            ],
+            result:
+              "The next due date counts from the last signed review. The change is in the audit trail with its reason.",
+          },
+          {
+            title: "Review who has access",
+            who: "A customer administrator signs. Your own row is marked by another administrator, or by a Leader when you are the only one.",
+            steps: [
+              "Open Reviews › Access review: one row per active user with roles, MFA, last active, who invited them and role changes since the last review.",
+              "Mark each row Keep, Change or Remove. Change and Remove are then done in Users, as usual.",
+              "When every row is marked, write your findings and choose Sign the access review.",
+            ],
+            result: "Due again 90 days later; Oversight shows Access review due.",
+          },
+          {
+            title: "Sign and compare the configuration",
+            who: "A customer administrator signs; a Leader may read and compare.",
+            steps: [
+              "Open Reviews › Configuration and choose Sign a snapshot of now: reporting windows and roles per market, rule versions, switches, the calendar, intake and connector settings (never keys) and every user's roles.",
+              "Choose Compare with now on a signed snapshot: each changed item with its before and after, and who changed it, when and why.",
+            ],
+          },
+          {
+            title: "Say why a reporting fact changes",
+            steps: [
+              "Changing a complaint's country or awareness date, or the working calendar, asks Why it changes; the change is not saved without it.",
+              "Importing a complaints file that changes a fact a signed market conclusion used (country, awareness, received or event date, death, serious injury, product or lot) lists those complaints after Check file and asks Why do these facts change? once for the whole import. A sync from your QMS records its reason by itself (QMS sync and the run).",
+            ],
+            result:
+              "The signed conclusion is never rewritten: it reads Facts changed after signing: re-check. Re-check it by signing it again with a change reason.",
+          },
+        ],
+      },
     ],
   },
   {
