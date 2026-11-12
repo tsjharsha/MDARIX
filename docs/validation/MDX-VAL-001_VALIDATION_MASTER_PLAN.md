@@ -20,7 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
-| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3) | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -324,7 +324,10 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 
 ## 12. Acceptance criteria for a release
 
-- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence.
+- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence, except a scenario that verifies an
+  MDX-VAL-002 row marked Open: such a scenario may be NOT RUN or FAIL when the row has a risk acceptance signed by the
+  quality approver that names its interim control and due date (MDX-VAL-002 RA-R07) and is listed in the release
+  approval record (RA-R08). A risk acceptance shall never cover a critical failure (VMP-R60) (owner decision O12).
 - **VMP-R50** No open deviation shall affect patient safety or data integrity.
 - **VMP-R51** Every other open deviation shall have an acceptance rationale signed by the quality approver.
 - **VMP-R52** The isolation tests shall show zero cross-organisation access, in both directions, on every surface
