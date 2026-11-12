@@ -182,6 +182,12 @@ def _proves(sources: Sources, test: dict, sid: str) -> bool:
     return sid in test.get("file_scenarios", ()) and sid not in class_a_scenarios(sources)
 
 
+def is_future(sources: Sources, sid: str) -> bool:
+    """A register row whose Notes start with "future:" describes a feature not built yet: never a scripted OQ step,
+    never verification (owner, 12 Nov 2026)."""
+    return sources.scenarios.get(sid, {}).get("notes", "").startswith("future:")
+
+
 def scenario_outcome(sources: Sources, sid: str) -> str:
     """This release's outcome of one scenario: FAIL (a tagged test failed, or the register says FAIL), BLOCKED,
     PASS (a tagged test ran and passed), else NOT RUN. A register PASS alone is a development result (VMP-R31)."""
@@ -203,6 +209,8 @@ def check(sources: Sources, release: str) -> list[str]:
             problems.append(f"{rid}: no scenario")
         if req["class"] == "A" and not req["negative_scenarios"]:
             problems.append(f"{rid}: class A without a negative scenario")
+        elif req["class"] == "A" and all(is_future(sources, s) for s in req["negative_scenarios"]):
+            problems.append(f"{rid}: class A whose negative scenarios are all future (not built)")
         for sid in sorted(set(req["scenario_ids"]) | set(req["negative_scenarios"])):
             if sid not in sources.scenarios:
                 problems.append(f"{rid}: scenario {sid} is not in the register")
@@ -212,7 +220,7 @@ def check(sources: Sources, release: str) -> list[str]:
                     problems.append(
                         f"{rid}: class-A scenario {sid} FAIL; a failed class-A test blocks the release (VMP-R50)"
                     )
-    for sid in class_a_scenarios(sources):
+    for sid in [s for s in class_a_scenarios(sources) if not is_future(sources, s)]:
         expected = sources.oq_expected.get(sid)
         if not expected or not expected.get("expected_result", "").strip():
             problems.append(f"{sid}: class-A scenario without a concrete OQ expected result (oq-expected-results.csv)")
@@ -304,6 +312,7 @@ def rtm(sources: Sources) -> list[dict]:
             "coverage": "covered" if linked else "file-level only, not verification" if file_only else "NOT COVERED",
             "register_status": "; ".join(f"{s} {sources.scenarios.get(s, {}).get('status', 'NOT IN REGISTER')}" for s in scenarios),
             "named_tests": " ".join(req["tests"]), "status": status,
+            "future": " ".join(s for s in scenarios if is_future(sources, s)),
         })  # fmt: skip
     return rows
 
@@ -512,7 +521,7 @@ def oq_tables(s: Sources) -> tuple[list[list], list[list]]:
             continue
         for sid in req["scenario_ids"]:
             row = s.scenarios.get(sid)
-            if row:
+            if row and not is_future(s, sid):
                 n += 1
                 concrete = s.oq_expected.get(sid, {})
                 scripted.append([f"OQ-{n:03d}", req["req_id"], sid, row["title"], concrete.get("input", ""),
@@ -605,6 +614,7 @@ def rtm_markdown(ctx: Context, rows: list[dict]) -> str:
         "failed",
         "coverage",
         "status",
+        "future",
     ]
     return (
         _header(ctx, "MDX-VAL-009", "Requirements traceability matrix", SYSTEM_OWNER, QUALITY_APPROVER)
@@ -613,7 +623,8 @@ def rtm_markdown(ctx: Context, rows: list[dict]) -> str:
         "Tests link to a requirement through their `requirement` markers naming one of its scenarios; for class A only a "
         'test\'s own marker counts (O24). "NOT COVERED" = '
         "no tagged test in this JUnit; the scripted OQ steps (MDX-VAL-007-R) then carry the evidence. Status: Verified / "
-        "Not verified / Failed / Blocked / Requires human decision (MDX-B10-005 section 6). Full columns in `rtm.csv`.\n\n"
+        "Not verified / Failed / Blocked / Requires human decision (MDX-B10-005 section 6). "
+        '"future": scenarios of features not built yet, never verification. Full columns in `rtm.csv`.\n\n'
         + _table(keys, [[r[k] for k in keys] for r in rows])
     )
 

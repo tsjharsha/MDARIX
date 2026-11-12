@@ -11,6 +11,8 @@ Started 7 Nov 2026 (product direction approved by the owner). This is one shared
 
 A blocked or unexecuted scenario is never counted as a pass. "Status" holds exactly one of the five values; run notes, partial results (for example "API-tested; E2E NOT RUN", recorded as NOT RUN) and measurements are in "Notes" (normalised 12 Nov 2026, B6b B2). The validation-pack generator (`scripts/validation_pack.py`) reads "Status" only. Nothing here claims a scenario is implemented today.
 
+A scenario whose Notes start with "future: <item>" describes a feature not built yet (owner, 12 Nov 2026): it stays NOT RUN, is not a scripted OQ step and is never counted as verification; the generator lists it in the RTM column "future".
+
 A status recorded here before the first release pack under MDX-VAL-001 is a development result, not validation evidence. The validation evidence for a release is the set of results kept in its release folder (`docs/validation/releases/<version>/`).
 
 ## Scenario definition: every scenario, when specified in full, contains
@@ -74,7 +76,7 @@ A status recorded here before the first release pack under MDX-VAL-001 is a deve
 | RG-07 | Device distributed to several markets | A separate assessment per relevant jurisdiction | B3 | NOT RUN | |
 | RG-08 | Sold in one market, incident in another | Jurisdiction and distribution facts evaluated | B3 | NOT RUN | |
 | RG-09 | Distributor aware before the manufacturer | Event, receipt and awareness chronology kept | B2 | NOT RUN | |
-| RG-10 | Weekend or public holiday | The market's own calendar and rule | B3 / B4 | NOT RUN | |
+| RG-10 | Weekend or public holiday | The market's own calendar and rule | B3 / B4 | NOT RUN | future: market holiday calendar (public holidays count as work days today); not verification until built |
 | RG-11 | Deadline crosses a daylight-saving change | Correct local calculation | B4 | NOT RUN | |
 | RG-12 | Rule changes after the incident | The applicable historical version kept (rule register) | B4 | NOT RUN | |
 | RG-13 | Reportable in one market, not in another | Separate signed conclusions | B3 | NOT RUN | |
@@ -142,7 +144,7 @@ CI-01 to CI-28 are the deep dive's edge cases, in its order. CI-29 to CI-44 are 
 | CI-10 | Product not in master data | Typed, resolved later by "Correct a fact" | B2 | NOT RUN | |
 | CI-11 | Attachment with patient data | Scan and mask before any processing | B7 | NOT RUN | |
 | CI-12 | Literature or social-media report | Its own channel; awareness = when found; the same check | B2 | NOT RUN | |
-| CI-13 | Death by phone (urgent) | Complaint at once; fast track; clock kept until a signed conclusion (out-of-app notice B7) | B2 | NOT RUN | |
+| CI-13 | Death by phone (urgent) | Complaint at once; fast track; clock kept until a signed conclusion (out-of-app notice B7) | B2 | NOT RUN | future: fix C2 (the provisional deadline leaves Oversight after triage; strict xfail today); not verification until built |
 | CI-14 | Trial with no QMS | Case → Complaint → report with no QMS step | B2 | NOT RUN | |
 | CI-15 | Imported complaint matches an earlier Case | Proposed link; a QMS ID match merges into the escalated complaint | B2 | NOT RUN | |
 | CI-16 | Case left pending past its due time | Re-sign task; escalation after 2 working days | B2 | NOT RUN | |
@@ -163,7 +165,7 @@ CI-01 to CI-28 are the deep dive's edge cases, in its order. CI-29 to CI-44 are 
 | CI-31 | Connect: the import brings the escalated complaint's QMS ID | Same complaint updated; ownership passes to the QMS; no duplicate | B2 | NOT RUN | |
 | CI-32 | Connect: master fields after hand-over | Read-only, "Correct it in your QMS"; MDARIX decisions editable | B2 | NOT RUN | |
 | CI-33 | Complete: correcting a fact on an MDARIX complaint | Saved with a reason; history old → new | B2 | NOT RUN | |
-| CI-34 | QMS complaint not expected | Named reason, signed, not the Case's signer outside the trial | B2 | NOT RUN | |
+| CI-34 | QMS complaint not expected | Named reason, signed, not the Case's signer outside the trial | B2 | NOT RUN | future: password signature on 'QMS complaint not expected'; not verification until built |
 | CI-35 | Withdraw: entered in error | Before escalation only; signed; not the logger outside the trial | B2 | NOT RUN | |
 | CI-36 | Bulk assign and bulk follow-up | Up to 200 at once; no bulk signing | B2 | NOT RUN | |
 | CI-37 | Pending always owned | Owner, due task and alert on every Pending Case | B2 | NOT RUN | |
@@ -173,7 +175,7 @@ CI-01 to CI-28 are the deep dive's edge cases, in its order. CI-29 to CI-44 are 
 | CI-41 | Getting started: service-only branch | Steps 3–8 not needed; QA review card; 9–10 open | B2 | NOT RUN | |
 | CI-42 | Getting started: not reportable | Steps 6–8 skipped; still feeds trends | B2 | NOT RUN | |
 | CI-43 | Customer contact privacy | Masked in exports, never in AI, need-to-know, erased per retention | B2 | REQUIRES HUMAN DECISION | |
-| CI-44 | Signed complaint Case from before the upgrade | Escalated by the upgrade step, audited; sample rows untouched | B2 | NOT RUN | |
+| CI-44 | Signed complaint Case from before the upgrade | Escalated by the upgrade step, audited; sample rows untouched | B2 | NOT RUN | future: writing step of the 0.10.93 upgrade (only the listing step exists); not verification until built |
 
 ## Triage (TR) → backlog B2 (merged from the triage deep dive by `b2-case-design/spec.md`, 7 Nov 2026)
 TR-01 to TR-24 are the deep dive's scenario table, in its order. TR-25 to TR-41 are its matrix rows not already covered (matrix rows 3, 9, 10, 12, 13, 14, 15 and 22 map to TR-18, TR-06, TR-01, TR-05, TR-04, TR-20, TR-19 and TR-23). Expected behaviour in full: the spec, section 8.3.
@@ -229,12 +231,12 @@ Configuration and safety cases for customer-configurable reportability questionn
 |---|---|---|---|---|---|
 | DT-01 | Author tries to remove the death question (US Q1) | Refused: an MDARIX floor question (21 CFR 803.50(a)(1)) cannot be removed or retired | B4b | NOT RUN | |
 | DT-02 | Author edits a floor question's wording or clause | Refused; help text and examples beside it are allowed | B4b | NOT RUN | |
-| DT-03 | Author tries to write a rule ending in "Not reportable" | Not offered in the builder; refused on import. Not reportable = no rule applies | B4b / B4c | NOT RUN | |
+| DT-03 | Author tries to write a rule ending in "Not reportable" | Not offered in the builder; refused on import. Not reportable = no rule applies | B4b / B4c | NOT RUN | future: B4b (organisation rule builder and rule import); not verification until built |
 | DT-04 | Organisation rule raises: implant AND malfunction → Reportable 30 days | A floor "not reportable" becomes Reportable; the one-sentence result names the organisation rule | B4b | NOT RUN | |
 | DT-05 | Organisation rule "lab evaluation not complete → Needs more information" | Not reportable cannot be signed while it applies | B4b | NOT RUN | |
 | DT-06 | A floor question answered Unknown | Needs more information; a request to the reporter is raised; Not reportable refused (Unknown is never No) | B4 | NOT RUN | |
 | DT-07 | An Unknown that could only shorten the clock (US Q6, EU threat) | Reportable with the shorter clock and its note | B4 | NOT RUN | |
-| DT-08 | An organisation question left Unknown inside a raising rule | Needs more information; Not reportable refused | B4b | NOT RUN | |
+| DT-08 | An organisation question left Unknown inside a raising rule | Needs more information; Not reportable refused | B4b | NOT RUN | future: B4b (organisation raising rules); not verification until built |
 | DT-09 | A new version fails an MDARIX starter test row | Cannot be sent for approval | B4b | NOT RUN | |
 | DT-10 | A new version fails an RG-xx row (RG-01 to RG-05, RG-10, RG-12, RG-13) | Cannot be sent for approval | B4b | NOT RUN | |
 | DT-11 | A new version fails the organisation's own test row | Cannot be sent for approval | B4b | NOT RUN | |
@@ -242,9 +244,9 @@ Configuration and safety cases for customer-configurable reportability questionn
 | DT-13 | An administrator tries to approve a version | Refused: administrators never approve | B4b | NOT RUN | |
 | DT-14 | A one-person trial approves its own version | Allowed, labelled "Same person (trial practice)" | B4b | NOT RUN | |
 | DT-15 | The version changes after the approval request | Back to draft; the approval is refused as "version changed" | B4b | NOT RUN | |
-| DT-16 | Effective date in the past; in the future; at midnight in the organisation's zone, across daylight saving | Past refused; future shows Scheduled; in use from the exact moment in the organisation's zone | B4 | NOT RUN | |
-| DT-17 | An open draft assessment crosses a new version's effective date | Prompt: re-check with the new version (diff shown) or continue on the old one with a reason; the signed record names the version used | B4b | NOT RUN | |
-| DT-18 | A signed conclusion on an open complaint, which the new version would decide differently | Signed record unchanged; a re-check task, never an automatic change | B4b | NOT RUN | |
+| DT-16 | Effective date in the past; in the future; at midnight in the organisation's zone, across daylight saving | Past refused; future shows Scheduled; in use from the exact moment in the organisation's zone | B4 | NOT RUN | future: B4b (rule write path with effective dates; the read side is RR-13); not verification until built |
+| DT-17 | An open draft assessment crosses a new version's effective date | Prompt: re-check with the new version (diff shown) or continue on the old one with a reason; the signed record names the version used | B4b | NOT RUN | future: B4b (re-check prompt with the diff, or continue on the old version with a reason); not verification until built |
+| DT-18 | A signed conclusion on an open complaint, which the new version would decide differently | Signed record unchanged; a re-check task, never an automatic change | B4b | NOT RUN | future: B4b (re-check task on a signed conclusion; the signed record never changing is B6-37 and RG-12); not verification until built |
 | DT-19 | The same on a closed complaint | Listed in the impact list only | B4b | NOT RUN | |
 | DT-20 | Awareness before a floor change, assessment after it | The floor in force at awareness applies ("at the event"); the current floor is shown for comparison | B4 | NOT RUN | |
 | DT-21 | Two markets: incident in Germany, device also sold in the US | EU/NI tree required with its own version and clock; the US shown as "may also apply", advice only | B4 | NOT RUN | |
@@ -262,7 +264,7 @@ Configuration and safety cases for customer-configurable reportability questionn
 | DT-33 | A floor version's content is changed in code without a new version | The build test fails (content hash per version) | B4 | NOT RUN | |
 | DT-34 | The same facts on an MDARIX-owned complaint and on a QMS-imported one | The same questionnaire, outcome, clock and rule IDs; the fact's origin shown | B4 | NOT RUN | |
 | DT-35 | A Customer Admin without the "Questionnaire author" set opens the section | Read only | B4b | NOT RUN | |
-| DT-36 | Random organisation rules added to each market's floor | Never lowers the outcome and never lengthens the clock (property test) | B4b | NOT RUN | |
+| DT-36 | Random organisation rules added to each market's floor | Never lowers the outcome and never lengthens the clock (property test) | B4b | NOT RUN | future: B4b (organisation rules over the floor and their property test); not verification until built |
 | DT-37 | The floor rules against 0.10.92's logic | Identical suggestion and report type for every Yes/No/Unknown combination of the core questions in all five markets | B4 | NOT RUN | |
 | DT-38 | "None of these" on a criteria group when the record says a death | Disabled; each criterion still answerable on its own | B4 | NOT RUN | |
 
@@ -639,7 +641,7 @@ tagging plan). Drafts: the quality approver reviews and approves each expected r
 | PL-23 | Negative: another person of the same organisation uses the requester's export link | Refused | B6b | NOT RUN | REQ-EXP-003; negative; draft for owner review; tests to tag: test to add (threat model PT-13) |
 | PL-24 | Restore the latest backup into an empty database | The restore completes; the audit chain of every organisation verifies | B6b | NOT RUN | REQ-BAK-001; draft for owner review; tests to tag: tests/test_backup_retention.py; restore drill |
 | PL-25 | Negative: a person erased after the backup was taken; the backup is restored | The erasures are re-applied; the erased personal data does not come back | B6b | NOT RUN | REQ-BAK-001; negative; draft for owner review; tests to tag: restore drill step (`reapply_erasures`, backend/app/tenant_purge.py) |
-| PL-26 | Negative: the newest production backup is 27 hours old | The backup-age check raises an alert | B6b | NOT RUN | REQ-BAK-002; negative; draft for owner review; tests to tag: tests/test_backup_retention.py, tests/test_infra_backup_role.py |
+| PL-26 | Negative: the newest production backup is 27 hours old | The backup-age check raises an alert | B6b | NOT RUN | future: a tagged test of the backup-age alert (the check exists and alerts at 26 h or more; no test found); not verification until built; REQ-BAK-002; negative; draft for owner review; tests to tag: tests/test_backup_retention.py, tests/test_infra_backup_role.py |
 | PL-27 | The newest production backup is 2 hours old | No alert | B6b | NOT RUN | REQ-BAK-002; draft for owner review; tests to tag: tests/test_backup_retention.py |
 | PL-28 | Quarterly drill: restore the latest backup with the key kept off the server into an empty database | Restored; recovery record written | B6b | NOT RUN | REQ-BAK-003; draft for owner review; tests to tag: quarterly drill record (no automated test) |
 | PL-29 | Negative: the drill is run with a wrong or missing key | Decryption fails; the drill is recorded as FAIL with a deviation, never as a pass | B6b | NOT RUN | REQ-BAK-003; negative; draft for owner review; tests to tag: quarterly drill record (no automated test) |

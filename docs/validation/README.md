@@ -152,7 +152,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 |---|---|---|---|---|
 | MDX-VAL-000 | Validation document control and index | this file | 0.5 | DRAFT; section 4 to be signed by the owner before the big-bang deploy |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.5 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.5 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.6 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.4 | DRAFT |
@@ -225,7 +225,7 @@ from the big-bang deploy rest on this section; until it is signed they are draft
 
 These documents cite "owner decision B6b-Dn" or "owner decision On". Each one is listed here, so that the signed
 copy of this document is the controlled record of it. The owner (Srinivas Telikicherla) approved D1 to D21 on
-12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026, and approved O7 to O16 on 12 Nov 2026 ("approve all B6b recommendations") and O17 to O24 on 12 Nov 2026 ("approve all eight"). O5 is older (see its row). Items marked "consultant to confirm" are
+12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026, and approved O7 to O16 on 12 Nov 2026 ("approve all B6b recommendations") and O17 to O24 on 12 Nov 2026 ("approve all eight") and O25 onward on 12 Nov 2026 ("approve control-gap fixes and all recommendations"). O5 is older (see its row). Items marked "consultant to confirm" are
 also questions in MDX-VAL-013.
 
 | ID | Decision |
@@ -275,6 +275,8 @@ also questions in MDX-VAL-013.
 | O22 | The approved specs are copied into the repository under `docs/specs/` byte for byte, with a pointer line in each planning copy; `spec_ref` in `requirements.csv` cites them there (owner, 12 Nov 2026) |
 | O23 | `STAFF_ACCOUNTS` in `backend/app/rule_register/register.py` names the person accounts (Srinivas, Sriharsha), not roles; the 12 Nov 2026 back-fill of the account fields on rule versions approved on 11 Nov 2026 is a documented deviation (owner, 12 Nov 2026; `deviation-log.csv` DEV-0.11.04-001; MDX-VAL-002 RSK-065) |
 | O24 | For class-A requirements only test-level `requirement` markers count as verification; a file-level marker is shown as "file-level only, not verification" (owner, 12 Nov 2026; `validation/pack.py`) |
+| O25 | Control gaps found while drafting the OQ expected results are fixed before the full end-to-end run of 30 Nov 2026 on the big-bang line: RSK-036 (export download checks the requester; an expired export is refused at download), RSK-066 (purge only after the exit hand-back is documented; otherwise audit rows are not deleted before their retention date), RSK-011 (signer training applies to every organisation); RSK-026 (system-scope background jobs) reviewed: controls documented or a deviation logged; RSK-037 audit-chain check on restore in B6b Part D; RSK-004 and RSK-008 aligned with the B6a "Facts changed after signing: re-check" flag, the rest planned (owner, 12 Nov 2026; MDX-VAL-002) |
+| O26 | A scenario of a feature not built yet is marked "future: <item>" in the register Notes; it is not a scripted OQ step and never counts as verification (owner, 12 Nov 2026; scenario register; `validation/pack.py`) |
 
 ## 5. Codes used in these documents
 
@@ -288,7 +290,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6, PL followed by a number | Scenario IDs in the scenario register |
-| O1 to O24, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O31, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 

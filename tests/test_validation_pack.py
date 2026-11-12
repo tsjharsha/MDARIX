@@ -390,3 +390,22 @@ def test_signing_pdfs_hold_section_4_and_the_template_unsigned():
     assert text.startswith("# MDX-VAL-000 section 4:") and "| O24 |" in text and "## 5. " not in text
     assert "I approve the owner decisions in this section as in force" in text
     assert signing.render(text, "MDX-VAL-000-section-4").startswith(b"%PDF")
+
+
+def test_a_future_scenario_is_never_an_oq_step_or_verification(tmp_path):
+    """Owner, 12 Nov 2026: a register row whose Notes start with "future:" (feature not built) stays out of the scripted
+    OQ steps and the expected-result checks; the RTM lists it; a class-A REQ whose only negative is future is flagged."""
+    register = REGISTER.replace("| AA-02 | Bad input | Refused | X | NOT RUN | |",
+                                "| AA-02 | Bad input | Refused | X | NOT RUN | future: B4b (refusal); not verification |")  # fmt: skip
+    root = _root(tmp_path, register=register, approve=False)
+    docs = root / "docs" / "validation"
+    (docs / "oq-expected-results.csv").write_text(
+        OQ_EXPECTED.splitlines()[0] + "\n" + OQ_EXPECTED.splitlines()[1] + "\n"
+    )
+    sources = pack.Sources(pack.read_requirements(docs / "requirements.csv"), pack.read_register(docs / "scenario-register.md"),
+                           oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"))  # fmt: skip
+    assert [row[2] for row in pack.oq_tables(sources)[0][1:]] == ["AA-01"]
+    problems = pack.check(sources, "9.9.9")
+    assert not any("AA-02" in p and "OQ expected" in p for p in problems)
+    assert "REQ-T-001: class A whose negative scenarios are all future (not built)" in problems
+    assert {r["req_id"]: r["future"] for r in pack.rtm(sources)} == {"REQ-T-001": "AA-02", "REQ-T-002": ""}
