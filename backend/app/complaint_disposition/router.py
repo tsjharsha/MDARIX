@@ -305,8 +305,8 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "history": [service.disposition_view(row, names, cases) for row in reversed(versions) if row is not current],
         "version": max((row.version for row in versions), default=0),
         "training": training.status(db, tenant_id, ctx.user_id, needed),
-        # The practice training before signing is a free trial's rule (T-G40P).
-        "training_required": trial,
+        # RSK-011 (owner, 12 Nov 2026): every organization's signer holds a record on the current versions first.
+        "training_required": True,
         # The signature needs an authenticator code (verify_signing_credentials): the form asks for it before sending.
         "code_required": mfa.signatures_require_mfa(),
         "trained_colleagues": [names.get(ref) or "A colleague" for ref in holders],
@@ -530,17 +530,19 @@ def sign(
         raise _error(403, "ADMINISTRATOR_CANNOT_SIGN", "Administrators cannot sign dispositions")
     needed = training.for_disposition()
     trial = is_trial(control_db, tenant_id)
-    # The practice training before signing is a free trial's rule (T-G40P); other organizations sign without it.
-    untrained = training.missing(db, tenant_id, ctx.user_id, needed) if trial else []
+    # RSK-011 (owner, 12 Nov 2026, replacing decision 6): a record on the current versions comes first in every
+    # organization; in a free trial it is a practice acknowledgement (T-G40P).
+    untrained = training.missing(db, tenant_id, ctx.user_id, needed)
     if untrained:
         trained = training.holders(db, tenant_id, needed, exclude=str(ctx.user_id))
         names = people(control_db, tenant_id, trained)
         raise _error(
             409,
             "TRAINING_REQUIRED",
-            "Practice training needed before signing: "
+            ("Practice training" if trial else "Training")
+            + " needed before signing: "
             + " and ".join(f"{document.title}, version {document.version}" for document in untrained)
-            + ".",
+            + ". Read each one and confirm it on this screen (Signer training).",
             missing=[document.as_dict() for document in untrained],
             trained_colleagues=[names.get(user) or "A colleague" for user in trained],
         )
@@ -694,7 +696,7 @@ def sign(
             *(f"market conclusion {market}" for market in routine_markets),
         ],
         "change_reason": change_reason or None,
-        "training": [document.as_dict() for document in needed] if trial else [],
+        "training": [document.as_dict() for document in needed],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
     }

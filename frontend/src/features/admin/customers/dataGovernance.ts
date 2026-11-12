@@ -17,6 +17,8 @@ export type DataExport = {
   created_at: string;
   completed_at?: string | null;
   expires_at: string | null;
+  /** Whether the signed-in person asked for it: only they can download it (RSK-036). */
+  yours?: boolean;
 };
 
 /**
