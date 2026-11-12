@@ -28,6 +28,10 @@ CONTACT = (
 )
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("RG-19")
+
+
 def _party(**extra):
     base = dict(
         id=None,

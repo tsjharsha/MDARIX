@@ -13,7 +13,8 @@ from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_market_assessment_api import _save
 from tests.test_release_c3_0_10_75 import _flagship, _ok, _purge, _us_answers
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("CI-44", "DT-17", "DT-18", "DT-20", "RG-12")]
 
 
 @pytest.fixture(scope="module")

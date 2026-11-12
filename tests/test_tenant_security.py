@@ -25,6 +25,10 @@ from backend.app.main import app
 from tests.test_customer_admin_account_security import PASSWORD, _client_for, _tenant, _user
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("B6-45", "B8-30", "B9-27", "OC-14", "P360-11", "S360-14")
+
+
 def _set(model, row_id, **values):
     db = SessionLocal()
     try:

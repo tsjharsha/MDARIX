@@ -9,7 +9,8 @@ import pytest
 
 from backend.app.closed_loop import rules
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("B5-05", "B5-07")]
 
 ACTION = date(2026, 1, 1)
 

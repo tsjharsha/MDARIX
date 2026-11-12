@@ -5,7 +5,8 @@ import pytest
 
 from backend.app.complaint_disposition import rules
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("RT-13", "RT-14", "RT-18", "RT-19", "RT-22", "RT-24")]
 
 FULL = {
     "troubleshooting": "Alarm check and filter inspection",

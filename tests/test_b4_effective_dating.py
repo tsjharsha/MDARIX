@@ -31,7 +31,8 @@ from tests.test_market_assessment_api import (
 )
 from tests.test_reporting_capa_api import _complaint
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("DT-33", "DT-37", "RR-01", "RR-03")]
 
 TODAY = datetime.now(timezone.utc).date()
 CHANGE = TODAY - timedelta(days=3)  # the test-only law change: complaints aware 5 days ago stay on version 1

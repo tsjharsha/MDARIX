@@ -15,7 +15,8 @@ from backend.app.oversight import urgent_alert
 from tests.test_free_trial import _approved_trial_client
 from tests.test_intake_triage_api import INTAKE, _all_no, _ok, _sign
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("RT-13", "RT-14", "RT-18", "RT-19", "RT-22", "RT-24")]
 SETTINGS = "/api/v1/oversight/settings/alerts-and-files"
 WORDS = "The patient died after the pump stopped during the infusion at the ward"
 

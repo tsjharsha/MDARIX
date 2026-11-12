@@ -10,7 +10,8 @@ import pytest
 from backend.app import feature_set
 from backend.app.reportability import markets, rules
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("DT-33", "DT-37", "RR-01", "RR-03")]
 
 
 def _window(name: str, days: int, basis: str = rules.CALENDAR, markets_: list[str] | None = None) -> dict:

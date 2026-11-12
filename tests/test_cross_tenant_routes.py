@@ -39,6 +39,10 @@ SKIP = {
 }
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("B6-45", "B8-30", "B9-27", "OC-14", "P360-11", "S360-14")
+
+
 def _purge_cross_tenant_fixtures():
     """Remove Tenant B fixtures (this and earlier runs) so other tests' whole-database counts stay exact."""
     from backend.app.trial.retention import purge_trial

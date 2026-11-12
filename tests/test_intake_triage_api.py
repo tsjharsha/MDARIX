@@ -15,7 +15,26 @@ from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_ro
 from backend.app.db.tenant_scope import bind_tenant
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [
+    pytest.mark.db,
+    pytest.mark.requirement(
+        "CI-08",
+        "CI-13",
+        "IN-05",
+        "RG-06",
+        "TR-02",
+        "TR-05",
+        "TR-11",
+        "TR-19",
+        "TR-27",
+        "TR-28",
+        "TR-29",
+        "TR-30",
+        "TR-31",
+        "TR-40",
+    ),
+]
 
 INTAKE = "/api/v1/intake"
 TRIAGE = "/api/v1/triage"

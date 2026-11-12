@@ -9,7 +9,8 @@ from backend.app import import_lineage as lineage
 from backend.app.db.models.ingestion import ImportLineage
 from backend.app.trial.imports import TEMPLATES
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("IN-13", "TR-21", "TR-36")]
 
 
 def test_mapping_version_is_stable_and_follows_the_headers():

@@ -24,7 +24,8 @@ from tests.test_reporting_capa_api import (
     _product,
 )
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("OC-03", "OC-04", "OC-09", "OC-12", "OC-19")]
 
 WHY = "Read from the complaint record and the distributor's report"
 REPORTS = "/api/v1/reports"

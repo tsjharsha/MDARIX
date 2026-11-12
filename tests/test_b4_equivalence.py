@@ -27,6 +27,10 @@ THREE = ("YES", "NO", "UNKNOWN")
 FIVE = ("YES", "NO", "UNKNOWN", "NOT_APPLICABLE", None)
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("DT-33", "DT-37", "RR-01", "RR-03")
+
+
 def _same(market: str, given: dict) -> None:
     answers = {key: {"answer": value} for key, value in given.items() if value is not None}
     content = _first(market)["content"]  # the oracle is valid for version 1 only (B4); B9 corrects IN and CA

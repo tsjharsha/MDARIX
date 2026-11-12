@@ -30,6 +30,10 @@ SUPERSEDE_REASON = "The decision is corrected: no further action is needed after
 RETURN_COMMENT = "The bench test of lot 7 must be in the brief before I decide"
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("CI-26", "TR-24")
+
+
 @pytest.fixture(scope="module")
 def org():
     """A fresh organization with an investigator (who writes briefs), a quality reviewer, three approvers, a leader,

@@ -16,7 +16,8 @@ from backend.app.db.models.decision_outcomes import DECISION_OUTCOMES, FOLLOW_UP
 from backend.app.decision_brief import rules as brief_rules
 from backend.app.human_decision import rules
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("CI-07", "DT-15", "IV-16", "TR-02")]
 
 RATIONALE = "The bench test reproduces the sensor drift of release B"
 HASH = "a" * 64

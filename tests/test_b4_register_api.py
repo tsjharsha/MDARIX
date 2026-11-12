@@ -8,7 +8,8 @@ import pytest
 from backend.app import feature_set
 from tests.test_reporting_capa_api import _client, _organization
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("DT-33", "DT-37", "RR-01", "RR-03")]
 
 URL = "/api/v1/rule-register"
 

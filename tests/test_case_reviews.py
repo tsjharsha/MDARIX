@@ -47,6 +47,10 @@ RATIONALE = "The complaints do not change the risk estimate of the occlusion haz
 BASE = "/api/v1/case-reviews"
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("CI-17", "CI-34", "CI-35", "DT-12")
+
+
 def _organization(prefix: str):
     from backend.app.customer_lifecycle import build_customer_tenant
 

@@ -12,7 +12,8 @@ import pytest
 from backend.app.reportability import markets
 from backend.app.rule_register import engine, register
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("B9-13", "B9-17", "B9-18", "B9-19", "B9-20", "B9-23", "B9-33")]
 
 VALUES = ("YES", "NO", None)  # None: Unknown (no answer)
 IMPORTER_QS = ("US1", "US2A", "US2B", "US2C", "US3", "US4", "US5")

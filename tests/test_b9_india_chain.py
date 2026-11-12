@@ -13,7 +13,8 @@ from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_tenant
 from tests.test_authority_reports_api import REPORTS, _fields, _items, _ok, trial  # noqa: F401
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("B9-13", "B9-17", "B9-18", "B9-19", "B9-20", "B9-23", "B9-33")]
 
 WHAT = "The returned probe was examined: the heating element had a cracked seal."
 

@@ -31,7 +31,8 @@ from tests.test_free_trial import PASSWORD, _activation_token, _approved_trial_c
 from tests.test_market_assessment_api import _acknowledge, _answers, _market, _save, _sign, _url, org  # noqa: F401
 from tests.test_reporting_capa_api import WATCH, _complaint
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("RG-10", "TR-12")]
 
 EU_THREAT = dict(EU1="YES", EU2="NO", EU4="YES", EU5="YES", EU6="NO", **{f"EU3{x}": "NO" for x in "ABCDEF"})
 US_PENDING = dict(US1="NO", US2A="UNKNOWN", US2B="UNKNOWN", US2C="UNKNOWN", US3="YES", US4="NO", US5="NO", US6="NO")

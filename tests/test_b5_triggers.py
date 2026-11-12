@@ -24,6 +24,10 @@ from tests.test_free_trial import _approved_trial_client
 D = date(2026, 6, 1)
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("B5-05", "B5-07")
+
+
 def _complaint(ref, *, version="v1", lot=None, on=D, harm=False):
     return {"ref": ref, "id": ref, "version_id": version, "lot_id": lot, "event_on": on, "harm": harm}
 

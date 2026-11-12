@@ -12,7 +12,8 @@ import pytest
 
 from backend.app import clock_check
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("B6-10", "B6-11")]
 
 
 class _Connection:

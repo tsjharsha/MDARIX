@@ -8,7 +8,11 @@ import pytest
 from backend.app.import_quarantine import harm_words as quarantine_harm
 from backend.app.intake import rules
 
-pytestmark = pytest.mark.unit
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.requirement("CI-06", "CI-19", "CI-24", "CI-25", "IN-03", "IN-08", "IN-21", "RG-09", "TR-04", "TR-32"),
+]
 
 
 def answers(default: str = "NO", **given) -> dict:

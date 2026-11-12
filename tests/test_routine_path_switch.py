@@ -20,6 +20,10 @@ C = "/api/v1/complaints/00000000-0000-0000-0000-000000000001"
 CASE = "/api/v1/intake/00000000-0000-0000-0000-000000000001"
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("RT-13", "RT-14", "RT-18", "RT-19", "RT-22", "RT-24")
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("value", ["", "on", "off"])
 def test_serves_path_follows_the_switch(monkeypatch, value):

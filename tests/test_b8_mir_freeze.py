@@ -23,7 +23,8 @@ from backend.app.human_decision.rules import fingerprint
 from tests.test_authority_reports_api import REPORTS, _fields, _ok, trial  # noqa: F401
 from tests.test_b8_mir_chain import _approve, _code, _initial
 
-pytestmark = pytest.mark.db
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = [pytest.mark.db, pytest.mark.requirement("B8-05", "B8-15", "B8-24", "B8-26")]
 
 PARTIES = "/api/v1/regulatory-reference/responsible-parties"
 PARTS = {

@@ -155,6 +155,10 @@ ROLE_MATRIX = {
 # ------------------------------------------------------------------------------------------------ the route table
 
 
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("DT-13")
+
+
 def _walk(dependant):
     for dep in dependant.dependencies:
         yield dep

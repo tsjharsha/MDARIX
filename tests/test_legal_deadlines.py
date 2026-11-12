@@ -13,8 +13,13 @@ from datetime import date, datetime, timezone
 
 from backend.app.intake import rules as intake_rules
 from backend.app.reportability import deadlines, rules
+import pytest
 
 UTC = timezone.utc
+
+
+# B6b B3: the scenarios this file verifies (requirements.csv, class A); file level, so every test here carries them.
+pytestmark = pytest.mark.requirement("DT-16", "RG-10", "RG-11")
 
 
 def test_india_counts_the_awareness_day_as_day_1_and_ends_in_india_time():
