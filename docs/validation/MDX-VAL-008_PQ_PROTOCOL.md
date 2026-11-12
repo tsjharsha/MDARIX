@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-008 |
 | Title | MDARIX performance qualification protocol |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver (executes as the business user) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B9) | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | Signature block added after an independent rating; PQ-011 cites PL-18 | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | After the second rating: PQ-001, PQ-005 and PQ-006 cite the scenarios their steps exercise (TR-28 serious injury, TR-12 several markets; B6-20 code, RG-01 rule reference; PL-43 snapshot values, B8-16 same snapshot); PQ-R06 organisation type | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -36,17 +37,19 @@ customer template MDX-CUS-001.
   and an evidence ID (screenshot or export with its SHA-256).
 - **PQ-R04** A step with a result other than PASS shall be logged in the deviation log before any fix (MDX-VAL-010).
 - **PQ-R05** The expected results below shall be approved by the system owner before the first execution.
+- **PQ-R06** The PQ shall run in an organisation of the pilot type, not a free trial, so that the second-person rules
+  of steps PQ-002 and PQ-007 apply; the sample story is loaded into it as synthetic data.
 
 ## 3. Steps (the sample story, one persona per step)
 
 | Step | Persona | Action | Expected result | Scenarios |
 |---|---|---|---|---|
-| PQ-001 | Complaint handler | Log a complaint call that alleges a device fault with a serious injury | Case created; fast track; awareness from the call; deadlines shown for each market | IN-05, TR-27, RG-10 |
+| PQ-001 | Complaint handler | Log a complaint call that alleges a device fault with a serious injury | Case created; fast track; awareness from the call; deadlines shown for each market | IN-05, TR-28, TR-12 |
 | PQ-002 | Complaint handler | Record an awareness date later than the earliest known | Refused without a signature and, outside a trial, a second person | TR-05, CI-08 |
 | PQ-003 | Triage reviewer | Confirm triage; open the deadline list | One deadline per market; overdue first; the same deadline on every screen | TR-12, B6-03 |
 | PQ-004 | Regulatory reviewer | Answer the market questions with one Unknown | "Not reportable" refused; "Needs more information" shown | DT-06, DT-08 |
-| PQ-005 | Regulatory reviewer | Complete the answers and sign the US conclusion | Signature asks for the password session and a fresh authenticator code; the rule version is named | B6-21, RG-12 |
-| PQ-006 | Regulatory reviewer | Prepare the eMDR file and the EU MIR file | Values from the approved snapshot only; the file passes its schema check; the MIR XML is served only after approval | RG-19, B8-15 |
+| PQ-005 | Regulatory reviewer | Complete the answers and sign the US conclusion | The signer re-enters the current password and a fresh 6-digit authenticator code; the rule version is named | B6-20, B6-21, RG-01 |
+| PQ-006 | Regulatory reviewer | Prepare the eMDR file and the EU MIR file | Values from the approved snapshot only; the file passes its schema check; the MIR XML is served only after approval | PL-43, B8-16, B8-15 |
 | PQ-007 | Quality approver | Try to approve a record made by the same person (outside a trial) | Refused | CI-17 |
 | PQ-008 | Investigator | Submit an investigation with an open challenge question | Refused until it is answered or marked not applicable | B5-05 |
 | PQ-009 | Quality approver | Sign the audit-trail review for the period | Flags shown; own flagged actions need a second reviewer; the signed review does not change | B6-28, B6-29, B6-31 |

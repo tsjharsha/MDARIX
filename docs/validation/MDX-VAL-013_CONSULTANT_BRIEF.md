@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-013 |
 | Title | Consultant brief and question pack |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A, item A5) | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13); MDX-VAL-008, -010 and the -012 template added to the documents to review | Srinivas Telikicherla |
+| 0.4 | 12 Nov 2026 | Section 6 states exactly what a signer re-enters at each signing (password and a fresh authenticator code), after the second rating | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -93,7 +94,9 @@ model.
 
 ## 6. Electronic-record and electronic-signature controls (implemented; not yet validated)
 
-Each signing needs the password session plus a fresh authenticator code; the signature records the signer, the
+At each signing the signer, already signed in, re-enters the current password and a fresh 6-digit authenticator code
+(both components at every signing, 21 CFR 11.200(a)(1); the code cannot be switched off on a server:
+`config_check.py` refuses it). The signature records the signer, the
 time and the stated meaning, and is bound to the record version by a content fingerprint and signature hash. Audit
 events are append-only (a database trigger refuses update and delete) and chained by hash per organisation, with a
 daily verification. Signers need training on the current document versions. Five wrong codes lock signing for

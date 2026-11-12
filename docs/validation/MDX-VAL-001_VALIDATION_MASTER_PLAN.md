@@ -200,10 +200,12 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 - **VMP-R22** A function with no failure mode that can affect a record or a decision shall be class C, with its
   rationale recorded in MDX-VAL-002 section 4.
 - **VMP-R23** The assurance for a change shall be set by the change's own risk, assessed in the release's
-  change-impact assessment (section 9.3), not by the class of the function it touches (owner decision O11). A change
-  that can alter a class-A function's records, decisions, clocks, signatures, reports or data model shall be treated
-  as class A, whatever its size. A change that cannot (for example the wording of a label or help text, a style or a
-  layout) shall be re-validated as its own class, with the reason recorded in the change-impact assessment and checked
+  change-impact assessment (section 9.3), not by the class of the function it touches (owner decision O11).
+- **VMP-R23a** A change that can alter a class-A function's records, decisions, clocks, signatures, reports or data
+  model shall be treated as class A, whatever its size.
+- **VMP-R23b** A change that cannot (for example the wording of a label or help text, a style or a layout) shall be
+  re-validated as its own class.
+- **VMP-R23c** The reason for a VMP-R23b classification shall be recorded in the change-impact assessment and checked
   by the quality approver.
 
 ## 9. Lifecycle and per-release validation
