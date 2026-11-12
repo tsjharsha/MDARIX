@@ -455,6 +455,9 @@ def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime
         reason=f"Free trial ended more than {RETENTION_DAYS} days ago; its data is deleted as the trial terms state.",
         storage=storage,
         now=now,
+        # The trial terms are the hand-back basis (RSK-066): the retention job reaches only Free Trial organizations
+        # on the shared trial plane (``plans``); a customer organization goes through the API's export rule.
+        evidence={"export": "NOT_REQUIRED_FREE_TRIAL"},
     )
 
 
