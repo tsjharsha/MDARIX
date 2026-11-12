@@ -7,11 +7,11 @@
 | Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
-| Reviewer | Independent CSV consultant (first full pack, VMP-R09; not engaged yet) |
+| Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds these documents and a SUPERSEDED banner in `validation/csa_package.py`); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -124,7 +124,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
   role, meaning, date (UTC), PDF path and the PDF's SHA-256.
 - **DC-R36** A signature row and its PDF shall be committed in the same commit.
 - **DC-R37** The PDF for signature shall be generated at the version it approves (1.0 for a first issue) with the
-  status IN REVIEW.
+  status line "APPROVED when signed below".
 - **DC-R38** The signed PDF shall be the approved record.
 - **DC-R39** The source shall change to the status APPROVED in the same commit that adds the signed PDF and its
   `signatures.csv` row.
@@ -182,7 +182,7 @@ MDX-VAL-002; both carry a banner saying so.
 
 These documents cite "owner decision B6b-Dn" or "owner decision On". Each one is listed here, so that the signed
 copy of this document is the controlled record of it. The owner (Srinivas Telikicherla) approved D1 to D21 on
-12 Nov 2026 ("approve B6b spec") and answered O1 to O4 on 12 Nov 2026. Items marked "consultant to confirm" are
+12 Nov 2026 ("approve B6b spec") and answered O1 to O4 on 12 Nov 2026. O5 is older (see its row). Items marked "consultant to confirm" are
 also questions in MDX-VAL-013.
 
 | ID | Decision |
@@ -193,7 +193,7 @@ also questions in MDX-VAL-013.
 | B6b-D4 | FMEA: severity, occurrence and detectability 1 to 5; RPN = S x O x D; class set by severity alone; action at RPN 40 or more, or S5 with D 3 or more (consultant to confirm) |
 | B6b-D5 | GAMP 5: Category 4 for MDARIX, Category 5 for anything written for one customer, Category 1 for infrastructure; not shown to a customer before the consultant confirms |
 | B6b-D6 | MDARIX's own documents are signed as PDFs (by hand and scanned, or a PDF digital signature), with the SHA-256 in `signatures.csv`; MDARIX's own e-signature is not used for them |
-| B6b-D7 | The quality approver signs a release approval record before every production deploy; for an emergency fix, a written OK before the deploy and the signed record within 1 working day |
+| B6b-D7 | The quality approver signs a release approval record before every production deploy; for an emergency fix, a written OK before the deploy and the signed record within 1 working day. In force from the first production release under MDX-VAL-001 version 1.0 (MDX-VAL-001 section 9.4); the rule for deploys before then is an open owner question (MDX-VAL-001 OP-8) |
 | B6b-D8 | Recovery point stated to customers: 24 hours today (daily encrypted backup, no point-in-time recovery); target 15 minutes with point-in-time recovery on pilot hosting |
 | B6b-D9 | EU GMP Annex 11 is assessed clause by clause as a benchmark; it binds EU pharmaceutical GMP only; MDARIX is never called "Annex 11 compliant" |
 | B6b-D10 | After a restore, every unsent outbox event older than the restore point is held (dead-lettered, audited); only those the mail provider's log shows as not sent are replayed |
@@ -210,8 +210,9 @@ also questions in MDX-VAL-013.
 | B6b-D21 | The test marker is `requirement(<scenario ID>)`, as registered in `pytest.ini`; `requirements.csv` maps REQ IDs to scenarios |
 | O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
 | O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (B6b Part B) |
-| O3 | The rule register refuses the same person as author and approver of a rule version (MDX-VAL-002 RSK-065) |
-| O4 | RSK-023, RSK-029 and RSK-039 are class A (privacy line of the severity scale) |
+| O3 | The rule register shall refuse the same person as author and approver of a rule version (MDX-VAL-002 RSK-065); the refusal is added in B6b Part B |
+| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5; RSK-029 and RSK-039 by the privacy line of severity 4 |
+| O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
 
 ## 5. Codes used in these documents
 
@@ -225,7 +226,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6 followed by a number | Scenario IDs in the scenario register |
-| O1 to O4, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O5, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 

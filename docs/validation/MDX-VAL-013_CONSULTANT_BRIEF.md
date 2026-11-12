@@ -7,11 +7,11 @@
 | Version | 0.1 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
-| Reviewer | Independent CSV consultant (the addressee; answers are recorded against each question) |
+| Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds these documents and a SUPERSEDED banner in `validation/csa_package.py`) |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change) |
 
 Change history
 
@@ -68,10 +68,10 @@ compliant for any customer.
 | Order | Document | What to look at |
 |---|---|---|
 | 1 | MDX-VAL-001 Validation Master Plan | Roles, approach, classes, per-release validation, transition (9.4), acceptance criteria, deviations |
-| 2 | MDX-VAL-002 Product risk assessment | Severity, occurrence and detectability scales; class by severity; the 65 failure modes; Open rows |
+| 2 | MDX-VAL-002 Product risk assessment | Severity, occurrence and detectability scales; class by severity; the 67 failure modes; Open rows |
 | 3 | MDX-VAL-003 GAMP 5 category justification | Category per part and its rationale |
 | 4 | MDX-VAL-000 Validation document control and index | Signing, versions, owner decisions (section 4) |
-| 5 | `docs/validation/scenario-register.md` | The scenarios that requirements and tests trace to |
+| 5 | `docs/validation/scenario-register.md` | The scenarios that requirements and tests trace to. Its PASS statuses are development results, not validation evidence (MDX-VAL-001 VMP-R31) |
 | Later | First release pack (B6b Part B); GxP impact and shared responsibility (MDX-SUP-002) and Part 11 / Annex 11 assessment (MDX-SUP-003) (B6b Part C) | Sent when written |
 
 Context documents (drafts of 8 Nov 2026, moving into `docs/validation/` under owner decision O2): MDX-B10-001
@@ -92,7 +92,7 @@ Each signing needs the password session plus a fresh authenticator code; the sig
 time and the stated meaning, and is bound to the record version by a content fingerprint and signature hash. Audit
 events are append-only (a database trigger refuses update and delete) and chained by hash per organisation, with a
 daily verification. Signers need training on the current document versions. Five wrong codes lock signing for
-15 minutes. There is no periodic password expiry (owner decision; NIST SP 800-63B): lockout, breached-password
+15 minutes. There is no periodic password expiry (owner decision O5; NIST SP 800-63B): lockout, breached-password
 checks and multi-factor authentication apply instead. File and line references are in MDX-VAL-002 (RSK-009 to
 RSK-021) and will be in MDX-SUP-003.
 
@@ -112,7 +112,7 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 7 | FMEA scales of 1 to 5, RPN = S x O x D, class set by severity alone, action at RPN 40 or more or S5 with D 3 or more: acceptable? | MDX-VAL-002 section 3 |
 | 8 | Annex 11 for device makers: benchmark only? The status of the revised Annex 11 and of the draft Annex 22 (AI)? | MDX-VAL-001 R14, Annex D |
 | 9 | ISO/TR 80002-2:2017 as the main method, PIC/S PI 011-3 as cross-check, FDA CSA final guidance (please confirm its date and status): the right set? | MDX-VAL-001 section 7 |
-| 10 | One shared version for every customer: with a 10-working-day change notice and a per-release pack, can customers keep control of change without deferring upgrades? | MDX-VAL-001 VMP-R34 |
+| 10 | One shared version for every customer: with a 10-working-day change notice and a per-release pack, can customers keep control of change without deferring upgrades? | MDX-VAL-001 VMP-R37 |
 | 11 | Recovery validation after a restore (database, audit chain, configuration, held outbox events): is the list sufficient? Is holding unsent outbox events the right control? | MDX-VAL-001 section 14 |
 | 12 | Data migration: what reconciliation and sampling level do you expect for imported regulated records? | MDX-VAL-002 RSK-027, RSK-028 |
 | 13 | A periodic review every 12 months: enough for a Category 4 SaaS? | MDX-VAL-001 section 14 |
@@ -124,6 +124,8 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 19 | Customer-written organisation rules can only raise an outcome. Do they need any customer test beyond the UAT/PQ template? | MDX-VAL-003 OP-2 |
 | 20 | Should a customer's ISO 14971 risk management file reference MDARIX's product risk assessment? | MDX-VAL-002 OP-4 |
 | 21 | Two founders cover system owner and quality approver, with each approving the other's documents. Is that segregation of duties enough for the first pilots, and when should a third person be added? | MDX-VAL-001 section 6 |
+| 22 | The recovery point is 24 hours today (no point-in-time recovery). Is that acceptable for the first pilots, and with what interim control, until point-in-time recovery is in place? | MDX-VAL-002 RSK-038 (owner decision B6b-D8) |
+| 23 | Audit events are kept 7 years from each event, with a full export at exit. Is that sufficient against customers' own record-retention periods? | MDX-VAL-001 section 16.4 |
 
 ## 8. Open points
 

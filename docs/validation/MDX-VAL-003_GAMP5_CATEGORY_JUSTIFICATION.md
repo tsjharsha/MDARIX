@@ -11,7 +11,7 @@
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds these documents and a SUPERSEDED banner in `validation/csa_package.py`) |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change) |
 
 Change history
 
@@ -45,7 +45,7 @@ MDX-VAL-000 section 4).
 |---|---|---|
 | The MDARIX application (web application, API, background service, database schema), as released by tag | **4: configured product** | One product, one code base and one version for every customer; each customer configures it through settings and data, never through code |
 | Rule content shipped with MDARIX (rule register versions, starter question sets, reporting windows) | Part of Category 4 (configuration supplied with the product) | Held as versioned data with a content hash, checked when it loads; a change is a new version, never an edit |
-| Platform software: operating system, PostgreSQL, container runtime, web server, file scanner, Python and Node runtimes | **1: infrastructure software** | Used as supplied; MDARIX tests only its own use of them (MDX-VAL-001, VMP-R14 and VMP-R15) |
+| Platform software: operating system, PostgreSQL, container runtime, web server, file scanner, Python and Node runtimes | **1: infrastructure software** | Used as supplied; MDARIX tests only its own use of them (MDX-VAL-001, VMP-R16 and VMP-R17) |
 | Libraries built into the application (for example FastAPI, SQLAlchemy, React) | Part of Category 4 (components of the product) | Tested as part of the product; listed by version in each release's software bill of materials; changed under the change-impact rule (MDX-VAL-001 section 9.3) |
 | Anything MDARIX writes for one customer: a custom connector, a custom mapping, a custom report or a script run for one customer | **5: custom application** | Written for one customer and not part of the shared product; validated as custom software |
 
@@ -53,8 +53,9 @@ MDX-VAL-000 section 4).
 
 GAMP 5 places a product in Category 4 when it is configured to meet a user's business process, and in Category 5
 when it is written to a user's requirements. The category is the regulated user's view: for the customer, MDARIX is
-a configured product (Category 4). MDARIX itself develops the product under a full software lifecycle, validated
-per release under MDX-VAL-001. The following facts support Category 4 for MDARIX.
+a configured product (Category 4). MDARIX itself develops the product as its own code; its software lifecycle is to
+be documented in MDX-SOP-001 (B6b Part C), and each release will be validated under MDX-VAL-001 once that plan is
+approved (MDX-VAL-001 section 9.4). The following facts support Category 4 for MDARIX.
 
 1. **One product, one version.** Every customer runs the same released version on the shared plane (`VERSION`,
    the git tag and `.github/workflows/release.yml`). There is no customer branch of the code.
@@ -121,7 +122,7 @@ The cloud provider's infrastructure is assessed as a supplier in the hosting ass
 
 | # | Point | Owner |
 |---|---|---|
-| OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (MDX-VAL-013, question 2). The approval below stands; a change the consultant asks for is a new version | Srinivas |
+| OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (MDX-VAL-013, question 2). Version 1.0 is signed only after the consultant's written answer to question 2 (owner decision B6b-D20) | Srinivas |
 | OP-2 | Whether customer-written organisation rules (rules that can only raise an outcome) need any extra customer test beyond the UAT/PQ template | Srinivas |
 | OP-3 | The rule register records who wrote and who approved each rule version but does not yet refuse the same person in both; owner decision O3: `register.py` refuses it (B6b Part B) | Sriharsha |
 

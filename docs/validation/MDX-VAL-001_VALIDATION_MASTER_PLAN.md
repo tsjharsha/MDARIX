@@ -11,7 +11,7 @@
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds these documents and a SUPERSEDED banner in `validation/csa_package.py`); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -123,8 +123,11 @@ The architecture decisions are in `docs/adr/`. The security design is in R7.
 - **VMP-R10** For a class-A control, the review or the execution shall be done by someone other than the developer
   of that control.
 - **VMP-R11** No document marked C for the consultant in section 6.3 shall be given to a customer before the
-  consultant has reviewed its first issue. Later issues follow section 6.3 without waiting for the consultant, and
-  records without a consultant column entry (for example a release approval record) are approved under section 6.3.
+  consultant has reviewed its first issue.
+- **VMP-R12** A later issue of such a document shall be approved under section 6.3 without waiting for the
+  consultant.
+- **VMP-R13** A record without a consultant entry in section 6.3 (for example a release approval record) shall be
+  approved under section 6.3 without waiting for the consultant.
 
 ### 6.3 RACI
 
@@ -163,18 +166,21 @@ basis for using supplier evidence. The FDA Computer Software Assurance guidance 
 risk class. PIC/S PI 011-3 (R12) is the cross-check of what an inspector looks for. Each reference is **to confirm
 with your consultant**: edition, status and fit (MDX-VAL-013, question 9).
 
-- **VMP-R12** Each function's validation activities shall be those set for its class in section 8.
-- **VMP-R13** Each VSR shall state, for each reference R9 to R12, which of its expectations the release pack meets
+- **VMP-R14** Each function's validation activities shall be those set for its class in section 8.
+- **VMP-R15** Each VSR shall state, for each reference R9 to R12, which of its expectations the release pack meets
   and which it does not.
-- **VMP-R14** Platform software (operating system, PostgreSQL, container runtime, web server, file scanner, Python
+- **VMP-R16** Platform software (operating system, PostgreSQL, container runtime, web server, file scanner, Python
   and Node runtimes) shall be used as supplied, with its version recorded in the IQ record.
-- **VMP-R15** MDARIX shall test its own use of platform software, not the platform software itself.
-- **VMP-R16** An automated test shall count as evidence for the scenario named in its `requirement` marker
-  (`pytest.ini`) only when it ran on the tagged build and its JUnit output is kept in the release folder. Whether
-  this counts as OQ evidence under CSA is **to confirm with your consultant**.
-- **VMP-R17** Libraries built into the application (for example FastAPI, SQLAlchemy, React) shall be treated as
+- **VMP-R17** MDARIX shall test its own use of platform software, not the platform software itself.
+- **VMP-R18** An automated test shall count as evidence for the scenario named in its `requirement` marker
+  (`pytest.ini`) only when it ran on the tagged build and its JUnit output is kept in the release folder.
+
+Whether such evidence counts as OQ evidence under CSA is **to confirm with your consultant** (MDX-VAL-013,
+question 3).
+
+- **VMP-R19** Libraries built into the application (for example FastAPI, SQLAlchemy, React) shall be treated as
   part of the product and listed by version in the release's software bill of materials.
-- **VMP-R18** A change of such a library shall follow the change-impact rule (section 9.3).
+- **VMP-R20** A change of such a library shall follow the change-impact rule (section 9.3).
 
 ## 8. Risk classes and assurance levels
 
@@ -186,10 +192,10 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 | **B: Medium** (severity 3) | A failure shows wrong or missing information that a trained person is expected to catch before signing, or delays work | Scenario testing: the scenario register row is the test, the tester records what was done and seen; automated tests where they exist; peer review |
 | **C: Low** (severity 1 or 2) | Cosmetic or convenience; no record or decision effect | Automated build checks (lint, unit tests, build); the class-C rationale recorded in MDX-VAL-002 section 4; only failures recorded |
 
-- **VMP-R19** A function's class shall be the class of its highest-severity failure mode in MDX-VAL-002.
-  A function with no failure mode that can affect a record or a decision is class C on the rationale recorded in
-  MDX-VAL-002 section 4.
-- **VMP-R20** A change that touches a class-A function shall be treated as class A for that release, whatever its
+- **VMP-R21** A function's class shall be the class of its highest-severity failure mode in MDX-VAL-002.
+- **VMP-R22** A function with no failure mode that can affect a record or a decision shall be class C, with its
+  rationale recorded in MDX-VAL-002 section 4.
+- **VMP-R23** A change that touches a class-A function shall be treated as class A for that release, whatever its
   size.
 
 ## 9. Lifecycle and per-release validation
@@ -212,33 +218,34 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 
 ### 9.2 Per-release (agile) validation
 
-MDARIX is released in small, frequent releases on one shared version for every customer. Each release is validated
-for MDARIX's own intended use by the steps below, instead of one large validation at the end.
+MDARIX is released in small, frequent releases on one shared version for every customer. Once this plan is
+approved, each release will be validated for MDARIX's own intended use by the steps below, instead of one large
+validation at the end (section 9.4 sets when this starts).
 
-- **VMP-R21** Each release spec shall list the REQ IDs and scenario IDs it adds or changes.
-- **VMP-R22** Each release shall carry a change-impact assessment that sets which scenarios must be re-run (9.3).
-- **VMP-R23** The automated suite shall run on the tagged build.
-- **VMP-R24** The suite's JUnit output and the release-checks JSON shall be kept in
+- **VMP-R24** Each release spec shall list the REQ IDs and scenario IDs it adds or changes.
+- **VMP-R25** Each release shall carry a change-impact assessment that sets which scenarios must be re-run (9.3).
+- **VMP-R26** The automated suite shall run on the tagged build.
+- **VMP-R27** The suite's JUnit output and the release-checks JSON shall be kept in
   `docs/validation/releases/<version>/`.
-- **VMP-R25** Every class-A scenario named by the change impact shall be executed and recorded before release.
-- **VMP-R26** A scenario's status in the register shall be one of PASS, FAIL, BLOCKED, NOT RUN, REQUIRES HUMAN
+- **VMP-R28** Every class-A scenario named by the change impact shall be executed and recorded before release.
+- **VMP-R29** A scenario's status in the register shall be one of PASS, FAIL, BLOCKED, NOT RUN, REQUIRES HUMAN
   DECISION.
-- **VMP-R27** A BLOCKED or NOT RUN scenario shall not be counted as passed.
-- **VMP-R28** A status recorded in the scenario register before the first release pack under this plan is a
+- **VMP-R30** A BLOCKED or NOT RUN scenario shall not be counted as passed.
+- **VMP-R31** A status recorded in the scenario register before the first release pack under this plan is a
   development result and shall not be cited as validation evidence.
-- **VMP-R29** The validation evidence for a release shall be the results kept in its release folder (VMP-R24).
-- **VMP-R30** The RTM and the validation figures shall be generated for each release, not written by hand.
-- **VMP-R31** The quality approver shall sign the release approval record before every production deploy (owner
+- **VMP-R32** The validation evidence for a release shall be the results kept in its release folder (VMP-R27).
+- **VMP-R33** The RTM and the validation figures shall be generated for each release, not written by hand.
+- **VMP-R34** The quality approver shall sign the release approval record before every production deploy (owner
   decision B6b-D7).
-- **VMP-R32** For an emergency fix, the quality approver's written OK shall be given before the deploy.
-- **VMP-R33** For an emergency fix, the signed release approval record shall follow within 1 working day of the
+- **VMP-R35** For an emergency fix, the quality approver's written OK shall be given before the deploy.
+- **VMP-R36** For an emergency fix, the signed release approval record shall follow within 1 working day of the
   deploy.
-- **VMP-R34** A change to a class-A function, a rule floor or a sub-processor shall be notified to customers at least
+- **VMP-R37** A change to a class-A function, a rule floor or a sub-processor shall be notified to customers at least
   10 working days before the deploy (owner decision B6b-D14).
-- **VMP-R35** An emergency security fix shall be notified to customers after the deploy, within the period the
-  change-control SOP (MDX-SOP-002) sets.
-- **VMP-R36** A release folder holding a signed approval shall not be overwritten.
-- **VMP-R37** A correction to a signed release record shall be a new version that names the one it replaces.
+- **VMP-R38** An emergency security fix shall be notified to customers after the deploy, within the period the
+  change-control SOP (MDX-SOP-002) sets. (Testable once MDX-SOP-002 is written, B6b Part C.)
+- **VMP-R39** A release folder holding a signed approval shall not be overwritten.
+- **VMP-R40** A correction to a signed release record shall be a new version that names the one it replaces.
 
 ### 9.3 Change impact
 
@@ -258,14 +265,14 @@ No release deployed to production before this plan is approved was released unde
 releases of the free-trial phase (0.10.92 at the date of this draft); no VSR or release approval record exists for
 them. The approach below is proposed in this draft; the owner confirms it and the consultant reviews it (OP-7).
 
-- **VMP-R38** VMP-R21 to VMP-R37 shall apply from the first production release after this plan is approved as
+- **VMP-R41** VMP-R24 to VMP-R40 shall apply from the first production release after this plan is approved as
   version 1.0.
-- **VMP-R39** The first release pack under this plan shall execute every class-A scenario, not only those named by
+- **VMP-R42** The first release pack under this plan shall execute every class-A scenario, not only those named by
   its change impact.
-- **VMP-R40** The VSR of that first pack shall state that it is the retrospective validation of the functions
+- **VMP-R43** The VSR of that first pack shall state that it is the retrospective validation of the functions
   already in production.
-- **VMP-R41** Until that VSR is approved, no MDARIX communication shall describe MDARIX as validated; it may say
-  "validation in progress under MDX-VAL-001".
+- **VMP-R44** Until that VSR is approved, any MDARIX statement of validation status shall read only: "Validation
+  in progress; plan MDX-VAL-001 (draft)."
 
 ## 10. Environments (owner decision B6b-D16)
 
@@ -275,11 +282,11 @@ them. The approach below is proposed in this draft; the owner confirms it and th
 | Staging (not available yet) | IQ, OQ and PQ execution once it exists; penetration test | Synthetic or sample data; never production data |
 | Production | IQ checks of the installed release only (version, health, configuration check, clock check) | No test data entered |
 
-- **VMP-R42** Until staging exists, the identity of the controlled local environment (commit, migration head,
+- **VMP-R45** Until staging exists, the identity of the controlled local environment (commit, migration head,
   versions of Python, Node and PostgreSQL) shall be recorded as an IQ of the test environment.
-- **VMP-R43** Until staging exists, the VSR shall label every result "controlled local environment".
-- **VMP-R44** No test data shall be entered in production.
-- **VMP-R45** The GxP workflow check of a recovery shall run on a scratch copy of the backup, never in production
+- **VMP-R46** Until staging exists, the VSR shall label every result "controlled local environment".
+- **VMP-R47** No test data shall be entered in production.
+- **VMP-R48** The GxP workflow check of a recovery shall run on a scratch copy of the backup, never in production
   (owner decision B6b-D15).
 
 ## 11. Deliverables
@@ -307,94 +314,104 @@ them. The approach below is proposed in this draft; the owner confirms it and th
 
 ## 12. Acceptance criteria for a release
 
-- **VMP-R46** Every class-A scenario in scope shall be PASS, with evidence.
-- **VMP-R47** No open deviation shall affect patient safety or data integrity.
-- **VMP-R48** Every other open deviation shall have an acceptance rationale signed by the quality approver.
-- **VMP-R49** The isolation tests shall show zero cross-organisation access, in both directions, on every surface
+- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence.
+- **VMP-R50** No open deviation shall affect patient safety or data integrity.
+- **VMP-R51** Every other open deviation shall have an acceptance rationale signed by the quality approver.
+- **VMP-R52** The isolation tests shall show zero cross-organisation access, in both directions, on every surface
   tested (API, search, export, files, reports, background jobs).
-- **VMP-R50** Every signed record in the test set shall verify (signature hash, snapshot hash).
-- **VMP-R51** The audit chain of every organisation in the test set shall verify from start to end.
-- **VMP-R52** Every legal clock in the test set shall match its pre-approved expected date and time, including
+- **VMP-R53** Every signed record in the test set shall verify (signature hash, snapshot hash).
+- **VMP-R54** The audit chain of every organisation in the test set shall verify from start to end.
+- **VMP-R55** Every legal clock in the test set shall match its pre-approved expected date and time, including
   weekends, holidays and daylight-saving changes.
-- **VMP-R53** Every value in an authority-report file in the test set shall trace to the approved snapshot.
-- **VMP-R54** Every FDA eMDR file in the test set shall validate against FDA's schemas.
-- **VMP-R55** Every EU and GB MIR file in the test set shall validate against its form schema.
-- **VMP-R56** The full automated suite shall pass on the tagged build.
-- **VMP-R57** A critical failure shall block the release: cross-organisation access, an uncontrolled change to a
+- **VMP-R56** Every value in an authority-report file in the test set shall trace to the approved snapshot.
+- **VMP-R57** Every FDA eMDR file in the test set shall validate against FDA's schemas.
+- **VMP-R58** Every EU and GB MIR file in the test set shall validate against its form schema.
+- **VMP-R59** The full automated suite shall pass on the tagged build.
+- **VMP-R60** A critical failure shall block the release: cross-organisation access, an uncontrolled change to a
   record, missing audit evidence, an approval that cannot be reproduced, a wrong legal clock, wrong report data, a
   signature not bound to its version, or the sample clock moving a real record.
 
 ## 13. Deviations
 
-- **VMP-R58** Every failed step, blocked step or protocol error shall be recorded in the deviation log before any fix
+Definitions used by the rules below:
+
+| Term | Meaning |
+|---|---|
+| Critical | A failure of a type listed in VMP-R60, or any class-A acceptance criterion of section 12 not met |
+| Major | Any other failure in a class-A function, or a class-B failure that leaves wrong information in a record |
+| Minor | Any other failure: class C, or an error in a protocol or record that does not change a result |
+| GxP risk high, medium, low | The severity of the failed function's worst failure mode in MDX-VAL-002: S4 or S5 is high, S3 medium, S1 or S2 low |
+| Affects patient safety or data integrity | GxP risk high |
+
+- **VMP-R61** Every failed step, blocked step or protocol error shall be recorded in the deviation log before any fix
   is made.
-- **VMP-R59** Each deviation shall be assessed for its impact on patient, product and data integrity.
-- **VMP-R60** Each deviation shall be given a GxP risk: high, medium or low.
-- **VMP-R61** Each deviation shall be given a classification: critical, major or minor.
-- **VMP-R62** A deviation shall be closed only with a retest result and the quality approver's approval.
-- **VMP-R63** Each deviation shall record whether change control is needed.
-- **VMP-R64** An open critical deviation shall block the release.
+- **VMP-R62** Each deviation shall be assessed for its impact on patient, product and data integrity.
+- **VMP-R63** Each deviation shall be given a GxP risk: high, medium or low.
+- **VMP-R64** Each deviation shall be given a classification: critical, major or minor.
+- **VMP-R65** A deviation shall be closed only with a retest result and the quality approver's approval.
+- **VMP-R66** Each deviation shall record whether change control is needed.
+- **VMP-R67** An open critical deviation shall block the release.
 
 The log's columns and lifecycle are in Annex C. The log itself is MDX-VAL-010 (B6b Part B).
 
 ## 14. Maintaining the validated state
 
-- **VMP-R65** The configuration baseline of each release (migration head, rule-register versions and content hashes,
+- **VMP-R68** The configuration baseline of each release (migration head, rule-register versions and content hashes,
   question-set versions, switches) shall be recorded in its IQ record.
-- **VMP-R66** A recovery validation (database, audit chain, configuration, held outbox events) shall be run and
+- **VMP-R69** A recovery validation (database, audit chain, configuration, held outbox events) shall be run and
   recorded at each quarterly restore drill (MDX-OPS-001).
-- **VMP-R67** This plan shall be reviewed every 12 months (owner decision B6b-D18).
-- **VMP-R68** The product risk assessment (MDX-VAL-002) shall be reviewed every 12 months, in addition to its
+- **VMP-R70** This plan shall be reviewed every 12 months (owner decision B6b-D18).
+- **VMP-R71** The product risk assessment (MDX-VAL-002) shall be reviewed every 12 months, in addition to its
   update in each release.
-- **VMP-R69** The supplier assessment (MDX-SUP-001 and MDX-SUP-004) shall be reviewed every 12 months.
-- **VMP-R70** The customer periodic review template (MDX-CUS-004) shall set a review every 12 months.
-- **VMP-R71** MDARIX's own periodic review report shall list the incidents, complaints about MDARIX, MDARIX CAPAs
+- **VMP-R72** The supplier assessment (MDX-SUP-001 and MDX-SUP-004) shall be reviewed every 12 months.
+- **VMP-R73** The customer periodic review template (MDX-CUS-004) shall set a review every 12 months.
+- **VMP-R74** MDARIX's own periodic review report shall list the incidents, complaints about MDARIX, MDARIX CAPAs
   and customer audit findings of the period, from the registers set up in B6b Part D.
 
 ## 15. AI
 
 AI is off in every release under this plan, and AI helpers are out of scope.
 
-- **VMP-R72** No AI helper shall be switched on for a customer before the AI release gate
+- **VMP-R75** No AI helper shall be switched on for a customer before the AI release gate
   (`backend/app/ai_release_gate.py`) passes for it.
-- **VMP-R73** No AI helper shall be switched on for a customer before an AI validation protocol, covering at least
+- **VMP-R76** No AI helper shall be switched on for a customer before an AI validation protocol, covering at least
   the items of Annex D, has been approved as a change to this plan.
 
 ## 16. Supporting controls
 
 ### 16.1 Tools that produce evidence
 
-- **VMP-R74** Each tool that produces validation evidence (the test runner, the release-checks script, the RTM and
+- **VMP-R77** Each tool that produces validation evidence (the test runner, the release-checks script, the RTM and
   figures generator) shall be recorded by version in the IQ record of the release.
-- **VMP-R75** A tool MDARIX writes to produce evidence (the release-checks script, the validation-pack generator)
+- **VMP-R78** A tool MDARIX writes to produce evidence (the release-checks script, the validation-pack generator)
   shall have its own automated tests, including tests that it fails on bad input (B6b scenarios B6-47 to B6-51).
-- **VMP-R76** A third-party test tool (for example pytest) shall be used as supplied.
-- **VMP-R77** A new major version of such a tool shall be qualified by use: a test known to fail shall be seen to
+- **VMP-R79** A third-party test tool (for example pytest) shall be used as supplied.
+- **VMP-R80** A new major version of such a tool shall be qualified by use: a test known to fail shall be seen to
   fail in the qualifying run.
 
 ### 16.2 Training
 
-- **VMP-R78** Each person who executes or approves a protocol shall have read this plan and that protocol before
+- **VMP-R81** Each person who executes or approves a protocol shall have read this plan and that protocol before
   executing or approving.
-- **VMP-R79** Each VSR shall list who executed and who approved, with the date each read this plan and the protocol.
-- **VMP-R80** Each person who executes or approves a protocol shall have a recorded qualification for that role
+- **VMP-R82** Each VSR shall list who executed and who approved, with the date each read this plan and the protocol.
+- **VMP-R83** Each person who executes or approves a protocol shall have a recorded qualification for that role
   (CSV or GxP training, or documented experience).
-- **VMP-R81** Each VSR shall cite the qualification record of each executor and approver.
+- **VMP-R84** Each VSR shall cite the qualification record of each executor and approver.
 
 ### 16.3 Good documentation practice for executed evidence
 
-- **VMP-R82** Each executed step shall record the actual result, the executor, the date and time (UTC) and the
+- **VMP-R85** Each executed step shall record the actual result, the executor, the date and time (UTC) and the
   evidence reference.
-- **VMP-R83** A screenshot or file used as evidence shall be stored with its SHA-256 in the release folder.
-- **VMP-R84** A correction to an executed record shall keep the original entry readable and record who corrected it,
+- **VMP-R86** A screenshot or file used as evidence shall be stored with its SHA-256 in the release folder.
+- **VMP-R87** A correction to an executed record shall keep the original entry readable and record who corrected it,
   when and why.
-- **VMP-R85** An expected result shall not be changed after execution has started; a needed change is a deviation.
+- **VMP-R88** An expected result shall not be changed after execution has started; a needed change is a deviation.
 
 ### 16.4 Retention
 
-- **VMP-R86** Validation records of a release shall be kept for at least 10 years after the release leaves the last
+- **VMP-R89** Validation records of a release shall be kept for at least 10 years after the release leaves the last
   customer.
-- **VMP-R87** Where a customer makes implantable devices, the validation records of each release it used shall be
+- **VMP-R90** Where a customer makes implantable devices, the validation records of each release it used shall be
   kept for at least 15 years after the release leaves that customer.
 
 Both periods are owner decision O1 (MDX-VAL-000 section 4), consultant to confirm. They count from a release leaving
@@ -403,9 +420,9 @@ each audit event, a different start.
 
 ### 16.5 Retirement of MDARIX or of a function
 
-- **VMP-R88** Before a function or the product is retired, a retirement plan shall state how each customer's records
+- **VMP-R91** Before a function or the product is retired, a retirement plan shall state how each customer's records
   are exported, handed back, kept readable for their retention period, and purged.
-- **VMP-R89** The retirement plan shall be approved by the quality approver before the retirement starts.
+- **VMP-R92** The retirement plan shall be approved by the quality approver before the retirement starts.
 
 ## 17. Open points and blockers
 
@@ -417,7 +434,8 @@ each audit event, a different start.
 | OP-4 | `VERSION` (0.10.94) and the CHANGELOG section disagree; the release identity must be fixed before the first per-release pack | Sriharsha |
 | OP-5 | MDX-B10-001, -002, -005 and -006 are drafts outside version control; owner decision O2 moves them into this folder in B6b Part B; this plan is not approved before they are (section 3) | Srinivas |
 | OP-6 | Each reference R9 to R13 to be confirmed with the consultant | Srinivas |
-| OP-7 | The transition approach for the releases already in production (section 9.4): the owner confirms it; the consultant reviews it (MDX-VAL-013) | Srinivas |
+| OP-7 | The transition approach for the releases already in production (section 9.4): the owner confirms it; the consultant reviews it (MDX-VAL-013, question 15) | Srinivas |
+| OP-8 | Owner to decide what governs production deploys before this plan is approved as 1.0: a signed release approval record from the next deploy, or the current practice until then (MDX-VAL-000 section 4, B6b-D7) | Srinivas |
 
 ## Annex A: writing standard
 
@@ -425,7 +443,7 @@ The writing standard for every document under this plan is MDX-VAL-000 section 2
 
 ## Annex B: audit-finding self-check (in every VSR)
 
-- **VMP-R90** Every VSR shall answer each line below with yes or no and name the evidence.
+- **VMP-R93** Every VSR shall answer each line below with yes or no and name the evidence.
 
 1. The URS was not written by engineering alone.
 2. QA reviewed every protocol and result independently.
@@ -457,15 +475,16 @@ The deviation log (MDX-VAL-010) is one CSV file across releases, `docs/validatio
 | Status | Open, corrected, retested, closed |
 
 Lifecycle: identify, document first, assess impact and GxP risk, correct, retest, approve and close, decide whether
-change control is needed. VMP-R58 to VMP-R64 apply. Blocked or not run is never a pass.
+change control is needed. VMP-R61 to VMP-R67 apply. Blocked or not run is never a pass.
 
 ## Annex D: AI validation items (for the protocol before switch-on)
 
-The AI validation protocol required by VMP-R73 covers at least:
+The AI validation protocol required by VMP-R76 covers at least:
 
 1. The intended use of each AI feature.
 2. The GxP risk of each AI feature, added to MDX-VAL-002.
-3. Qualification against the signed-off golden dataset (`docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md`), with
+3. Qualification against the signed-off golden dataset (`docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md`, to be
+   re-issued with a document ID before use, MDX-VAL-000 DC-R10), with
    pass criteria set before the run.
 4. The provider and model version pinned and recorded (`docs/compliance/AI_PROVIDER_REGISTER.md`).
 5. Human review and sign-off of every AI output before it reaches a record.
