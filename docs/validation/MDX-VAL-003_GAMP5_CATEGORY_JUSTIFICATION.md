@@ -9,6 +9,7 @@
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (confirms; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
+| Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R41) |
 | Date | 12 Nov 2026 |
 | Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only) |
 
@@ -116,6 +117,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I wrote this justification and reviewed every line. | | |
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for this justification and reviewed every line of the draft. | | |
 | Reviewer (C) | Independent CSV consultant | I confirm, or comment on, the categories and their rationale. | | |
 | Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this justification, subject to the consultant's confirmation. | | |

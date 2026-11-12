@@ -9,6 +9,7 @@
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
+| Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R41) |
 | Date | 12 Nov 2026 |
 | Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
@@ -108,7 +109,8 @@ The architecture decisions are in `docs/adr/`. The security design is in R7.
   writes or executes.
 - **VMP-R03** The system owner shall approve, as system owner, every document that the quality approver writes.
 - **VMP-R04** Text drafted with software assistance shall have a named person as author (R).
-- **VMP-R05** That author shall review every line before the text goes for approval.
+- **VMP-R05** That author shall review every line before the text goes for approval, and the document header
+  shall name that reviewer (MDX-VAL-000, DC-R41).
 - **VMP-R06** Software shall not be named as author, reviewer or signer.
 - **VMP-R07** The independent CSV consultant shall review the first full validation pack before it is given to any
   customer.
@@ -443,6 +445,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I wrote this plan and reviewed every line. | | |
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for this plan and reviewed every line of the draft. | | |
 | Reviewer (C) | Independent CSV consultant | I reviewed this plan; my comments are recorded. | | |
 | Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this plan for use. | | |

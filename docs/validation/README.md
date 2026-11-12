@@ -8,7 +8,8 @@
 | Status | DRAFT, for review and signature |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first full pack, VMP-R07; not engaged yet) |
-| Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner |
+| Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R40: the quality approver is the author) |
+| Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R41) |
 | Date | 12 Nov 2026 |
 | Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
@@ -16,7 +17,7 @@ Change history
 
 | Version | Date | Change | By |
 |---|---|---|---|
-| 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after an independent review | Srinivas Telikicherla |
+| 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after an independent review; one signature rule for every document (DC-R39 to DC-R41, header field "Drafting") | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -82,6 +83,7 @@ Each rule has a number (DC-Rnn), so that a review comment, a deviation or a chec
 | Author (R) | name, role |
 | Reviewer | name, role |
 | Approver (A) | name, role |
+| Drafting | "Written by the author" or "Drafted with software assistance; every line reviewed by <name>" |
 | Date | d Mon yyyy |
 | Code baseline | tag or commit of the product code the document describes |
 ```
@@ -117,6 +119,12 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
   role, meaning, date (UTC), PDF path and the PDF's SHA-256.
 - **DC-R34** A signature row and its PDF shall be committed in the same commit.
 - **DC-R35** The approver (A) of a document shall be a different person from its author (R) (MDX-VAL-001, VMP-R01).
+- **DC-R39** The quality approver (Srinivas Telikicherla, QA/RA; owner decision B6b-D1) shall approve every MDARIX
+  validation document that the quality approver did not write.
+- **DC-R40** A document that the quality approver wrote shall be approved by the system owner (Sriharsha
+  Telikicherla, Product & Engineering) as the second person.
+- **DC-R41** The header field "Drafting" of a document drafted with software assistance shall name the person who
+  reviewed every line.
 
 ### 2.7 Retirement
 
@@ -163,6 +171,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (DC
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), quality approver | Srinivas Telikicherla, QA/RA | I wrote this document and reviewed every line. | | |
+| Author (R) | Srinivas Telikicherla, QA/RA | I am responsible for this document and reviewed every line of the draft. | | |
 | Reviewer (C) | Independent CSV consultant | I reviewed this document; my comments are recorded. | | |
-| Approver (A), system owner | Sriharsha Telikicherla, Product & Engineering | I approve these document-control rules for use. | | |
+| Approver (A), second person (DC-R40) | Sriharsha Telikicherla, Product & Engineering, system owner | I approve these document-control rules for use. | | |

@@ -9,6 +9,7 @@
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (proposes every rating) |
 | Reviewer | Independent CSV consultant (confirms severities and scales; not engaged yet). The quality approver reviews every severity before approving |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
+| Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R41) |
 | Date | 12 Nov 2026 |
 | Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only); every file path below exists at that commit |
 
@@ -234,6 +235,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I proposed every rating and reviewed every line. | | |
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for every proposed rating and reviewed every line of the draft. | | |
 | Reviewer (C) | Independent CSV consultant | I reviewed the severities, scales and ratings; my comments are recorded. | | |
 | Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I reviewed every severity and approve this assessment for use. | | |
