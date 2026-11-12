@@ -1,13 +1,15 @@
 # Backup and restore
 
-Targets: lose at most **1 hour** of database changes (RPO) and be back within **4 hours** (RTO).
+Targets (owner decision B6b-D8, 12 Nov 2026): **RPO 24 hours today**: production has a daily encrypted backup and a
+daily disk snapshot and **no point-in-time recovery** (`legal/SUBPROCESSORS.md`). **Target RPO 15 minutes**, with
+point-in-time recovery on pilot hosting. Be back within **4 hours** (RTO). State the RPO to customers in these words.
 
 MDARIX keeps three things: the control database (identities, audit trail, signatures, every shared-plane tenant's
 records), any dedicated tenant databases, and uploaded files. Two independent layers protect them.
 
 | Layer | What | How often | Kept |
 |---|---|---|---|
-| 1. Managed database | Point-in-time recovery of every database (provider feature) | continuous | 7+ days |
+| 1. Managed database (pilot hosting; today's production has none) | Point-in-time recovery of every database (provider feature) | continuous | 7+ days |
 | 1. Managed database | Automated snapshots | daily | 14+ days |
 | 1. File bucket (pilots: `MDARIX_OBJECT_STORAGE_PROVIDER=s3`) | Object versioning in the bucket that holds uploaded files | every write | 90 days of old versions (lifecycle rule) |
 | 2. MDARIX backup | Encrypted logical dump of every database (plus the `objects` volume when files are stored locally), copied off-site | daily (cron) | Local: every backup of the last 30 days, then the newest of each of 12 months, and always the newest (0.10.88); off-site: the bucket lifecycle rule (set it to the same: see 3) |
@@ -24,8 +26,8 @@ Erased data stays in these backups for that period; see section 4.
 
 Layer 2 does not depend on the database provider, so it also covers a lost account or a provider outage.
 
-**File RPO.** Database changes are protected to the minute by point-in-time recovery; uploaded files are not part of
-it. With the pilot choice, files in an S3 bucket with versioning, a stored file is durable as soon as the upload
+**File RPO.** With a managed database (pilot hosting), database changes are protected to the minute by point-in-time
+recovery; today's production has none (RPO 24 hours, above). Uploaded files are not part of it. With the pilot choice, files in an S3 bucket with versioning, a stored file is durable as soon as the upload
 finishes and an overwritten or deleted one can be recovered from its previous version, so the file RPO is
 effectively zero for the provider's own failures. Files are *not* in the daily layer-2 dump in that setup: losing the
 bucket's account loses them, which is why the bucket has versioning and the backup bucket lives in another account.

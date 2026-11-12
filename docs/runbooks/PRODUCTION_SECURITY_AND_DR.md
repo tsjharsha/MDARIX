@@ -6,7 +6,7 @@ This page is an index. The procedures live in:
 |---|---|
 | Hosting, secrets (`.env.production` / `.env.migrate`), TLS, release and rollback by image tag | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Every setting and which file holds it | [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) |
-| Backups, restore drill, point-in-time recovery; targets RPO 1 hour, RTO 4 hours | [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) |
+| Backups, restore drill, point-in-time recovery; RPO 24 hours today (no point-in-time recovery), target 15 minutes on pilot hosting; RTO 4 hours | [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) |
 | Security incidents, breach notification, key rotation | [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |
 | Database roles, TLS and row-level security | [DATABASE_HARDENING_RUNBOOK.md](DATABASE_HARDENING_RUNBOOK.md) |
 
