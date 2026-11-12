@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from validation import pack  # noqa: E402
+from validation import pack, pytest_requirements  # noqa: E402
 
 
 def _git(*args: str) -> str:
@@ -66,6 +66,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"REFUSED: {said}; set VERSION at the release join, then generate the pack.", file=sys.stderr)
             return 1
         print(f"WARNING: {said}; the release identity is set at the release join.", file=sys.stderr)
+    tree = pytest_requirements.tree_state(root)[1]
+    if tree != "clean":  # owner, 12 Nov 2026: a pack describes committed code only
+        if not args.dry_run:
+            print(f"REFUSED: the working tree is {tree}; commit or discard the changes first.", file=sys.stderr)
+            return 1
+        print(f"WARNING: the working tree is {tree}; a dry run only.", file=sys.stderr)
     if pack.signed(out, args.release, docs / "signatures.csv"):
         print(f"REFUSED: {out} holds a signed release approval; a correction is a new version.", file=sys.stderr)
         return 2
@@ -76,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         release_checks=json.loads(args.release_checks.read_text(encoding="utf-8-sig")) if args.release_checks else None,
         release_checks_raw=args.release_checks.read_bytes() if args.release_checks else None,
         junit_raw=args.junit.read_bytes() if args.junit else None,
+        junit_meta=pack.read_junit_meta(args.junit) if args.junit else None,
         deviations=pack.read_deviations(docs / "deviation-log.csv"),
         clock_check=json.loads(args.clock_check.read_text(encoding="utf-8")) if args.clock_check else None,
         oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"),
@@ -90,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         head=pack.migration_head(root / "infrastructure" / "database" / "migrations" / "versions"),
         problems=pack.check(sources, args.release)
         + pack.release_check_problems(sources.release_checks, commit, bool(sources.tests))
+        + pack.junit_binding_problems(sources.junit_meta, commit)
         + ([] if approved or args.oq_protocol else [
             f"OQ protocol {pack.PROTOCOL_ID} {args.release} is not approved: no signatures.csv row with content_sha256 "
             f"{protocol_sha}; no OQ results without an approved protocol (owner decision O20)"]),

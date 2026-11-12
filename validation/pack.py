@@ -23,6 +23,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from validation import docx_render, xlsx_write
+from validation.pytest_requirements import HOOK_VERSION
 
 FIVE = ("NOT RUN", "PASS", "FAIL", "BLOCKED", "REQUIRES HUMAN DECISION")
 DEV_BANNER = "DEVELOPMENT RESULTS, NOT VALIDATION EVIDENCE"
@@ -75,6 +76,7 @@ class Sources:
     release_checks: dict | None = None
     release_checks_raw: bytes | None = None  # hashed as written, never re-serialised
     junit_raw: bytes | None = None  # copied into the release folder as junit.xml
+    junit_meta: dict | None = None  # the suite's commit, tree and hook_version (read_junit_meta)
     deviations: list[dict] = field(default_factory=list)
     clock_check: dict | None = None
     oq_expected: dict[str, dict] = field(default_factory=dict)  # scenario -> concrete OQ expected result (O20)
@@ -134,6 +136,34 @@ def read_junit(path: Path) -> list[dict]:
             "seconds": float(case.get("time") or 0), "scenarios": scenarios, "file_scenarios": file_scenarios,
         })  # fmt: skip
     return sorted(tests, key=lambda t: t["id"])
+
+
+def read_junit_meta(path: Path) -> dict:
+    """The test-suite properties the requirement hook records: ``commit``, ``tree``, ``hook_version``."""
+    meta: dict = {}
+    for suite in ElementTree.parse(path).getroot().iter("testsuite"):
+        props = suite.find("properties")
+        if props is not None:
+            meta.update({p.get("name"): p.get("value", "") for p in props.findall("property")})
+    return meta
+
+
+def junit_binding_problems(meta: dict | None, commit: str) -> list[str]:
+    """A JUnit counts only for the commit it ran on, on a clean tree, with the current marker hook (owner, 12 Nov 2026):
+    an older JUnit counted file-level markers as test-level ones."""
+    if meta is None:
+        return []  # no JUnit at all is listed by release_check_problems
+    problems = []
+    theirs = meta.get("commit", "")
+    if theirs in ("", "unknown") or not (theirs.startswith(commit) or commit.startswith(theirs)):
+        problems.append(f"JUnit is for commit {theirs or '(not recorded)'}, not {commit}")
+    if meta.get("tree") != "clean":
+        problems.append(f"JUnit ran on a working tree '{meta.get('tree') or 'not recorded'}', not a clean one")
+    if meta.get("hook_version") != HOOK_VERSION:
+        problems.append(
+            f"JUnit hook_version {meta.get('hook_version') or 'not recorded'}, not {HOOK_VERSION}: run the suite again"
+        )
+    return problems
 
 
 def read_deviations(path: Path) -> list[dict]:

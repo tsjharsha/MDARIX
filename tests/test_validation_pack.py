@@ -12,10 +12,17 @@ import pytest
 
 from backend.app.trial.xlsx import read_rows
 from scripts import validation_pack
-from validation import pack, xlsx_write
+from validation import pack, pytest_requirements, xlsx_write
 
 pytestmark = pytest.mark.unit
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _clean_tree(monkeypatch):
+    """The generator refuses a changed working tree; the golden roots here are not git checkouts."""
+    monkeypatch.setattr(pytest_requirements, "tree_state", lambda root=None: ("abc12345", "clean"))
+
 
 REQUIREMENTS = """req_id,revision,text,class,spec_ref,risk_ids,scenario_ids,negative_scenarios,tests
 REQ-T-001,A,The thing shall refuse a bad input.,A,spec 1,RSK-001,AA-01 AA-02,AA-02,tests/test_a.py
@@ -33,7 +40,8 @@ OQ_EXPECTED = """scenario_id,revision,input,expected_result,checked_by,source,co
 AA-01,A,Submit a good input,200; saved,tests/test_a.py::test_saved,requirement,Srinivas 2026-11-13
 AA-02,A,Submit a bad input,422 BAD_INPUT; nothing saved,tests/test_a.py::test_refused,requirement,Srinivas 2026-11-13
 """
-JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest">
+JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest"><properties><property name="commit" value="abc12345ffffffff"/>
+<property name="tree" value="clean"/><property name="hook_version" value="2"/></properties>
 <testcase classname="tests.test_a" name="test_refused" time="0.10"><properties>
 <property name="requirement" value="AA-02"/></properties></testcase>
 <testcase classname="tests.test_a" name="test_saved" time="0.20"><properties>
@@ -430,3 +438,33 @@ def test_a_future_scenario_is_never_an_oq_step_or_verification(tmp_path):
     assert not any("AA-02" in p and "OQ expected" in p for p in problems)
     assert "REQ-T-001: class A whose negative scenarios are all future (not built)" in problems
     assert {r["req_id"]: r["future"] for r in pack.rtm(sources)} == {"REQ-T-001": "AA-02", "REQ-T-002": ""}
+
+
+def test_junit_is_bound_to_its_commit_clean_tree_and_hook(tmp_path, capsys, monkeypatch):
+    """Owner, 12 Nov 2026: a JUnit of another commit, of a changed tree or of an older marker hook is a check failure;
+    the generator refuses a changed working tree outside a dry run."""
+    junit = (
+        JUNIT.replace("abc12345ffffffff", "0123abcd").replace('"clean"', '"dirty"').replace('value="2"', 'value="1"')
+    )
+    root = _root(tmp_path, junit=junit)
+    assert _run(root) == 1
+    said = capsys.readouterr().err
+    assert "JUnit is for commit 0123abcd, not abc12345" in said
+    assert "JUnit ran on a working tree 'dirty', not a clean one" in said and "JUnit hook_version 1, not 2" in said
+    monkeypatch.setattr(pytest_requirements, "tree_state", lambda root=None: ("abc12345", "dirty"))
+    (root / "junit.xml").write_text(JUNIT, encoding="utf-8")
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert "REFUSED: the working tree is dirty" in capsys.readouterr().err and not (tmp_path / "out").exists()
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 0
+    assert "WARNING: the working tree is dirty" in capsys.readouterr().err
+    # The real hook records the three properties on the suite.
+    junit_file = tmp_path / "real.xml"
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_validation_pack.py::test_xlsx_reads_back_equal_and_formula_stays_text",
+         "-p", "no:cacheprovider", "-q", f"--junitxml={junit_file}"],
+        cwd=ROOT, capture_output=True, text=True, timeout=300, env={**os.environ, "MDARIX_TEST_NO_DATABASE": "1"},
+    )  # fmt: skip
+    assert done.returncode == 0, done.stdout[-2000:] + done.stderr[-2000:]
+    meta = pack.read_junit_meta(junit_file)
+    assert meta["hook_version"] == pytest_requirements.HOOK_VERSION and meta["tree"] in ("clean", "dirty")
+    assert len(meta["commit"]) == 40
