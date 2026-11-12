@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-002 |
 | Title | Product risk assessment |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (proposes every rating) |
 | Reviewer | Independent CSV consultant (confirms severities and scales; not engaged yet). The quality approver reviews every severity before approving |
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after a software-assisted review, findings dispositioned by the author: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action; REQ IDs from `requirements.csv` for the 34 rows without a seed (OP-3); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O7 severity 5 = permanent loss of regulated records, severity 4 = recoverable loss; every row citing either line re-checked (section 3.7): RSK-037 and RSK-040 raised to S5 | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -50,8 +51,8 @@ consultant confirms the severities and scales. The whole assessment is **to conf
 
 | S | Meaning |
 |---|---|
-| 5 | A reportable event is missed or reported late; a wrong regulatory conclusion is signed; wrong data goes to an authority; one customer's data, or personal data, reaches someone outside that customer. Indirect effect on patient safety: a safety signal or report does not reach the authority in time |
-| 4 | The integrity of a regulated record is lost: a signed or submitted record changes without trace; a signature is invalid or not bound to its record; audit history is lost or incomplete; regulated records are lost; an unauthorised person approves. Or a security or privacy failure inside the customer: erased personal data comes back, or code runs on a user's computer |
+| 5 | A reportable event is missed or reported late; a wrong regulatory conclusion is signed; wrong data goes to an authority; one customer's data, or personal data, reaches someone outside that customer; regulated records are permanently lost (no backup or copy can bring them back). Indirect effect on patient safety: a safety signal or report does not reach the authority in time |
+| 4 | The integrity of a regulated record is lost: a signed or submitted record changes without trace; a signature is invalid or not bound to its record; audit history is lost or incomplete; regulated records are lost but can be recovered (from a backup or the source system); an unauthorised person approves. Or a security or privacy failure inside the customer: erased personal data comes back, or code runs on a user's computer |
 | 3 | Wrong or missing information is shown, but a trained person is expected to catch it before signing; work is delayed or repeated |
 | 2 | Inconvenience; management information wrong; no record or decision effect |
 | 1 | Cosmetic |
@@ -109,7 +110,21 @@ MDX-B10-004 used three levels. Its S3 rows are now S5 (report, conclusion or cro
 (record-integrity effect); its S2 rows are S3. Its likelihood L1, L2, L3 became O2, O3, O4. Detectability is new. The conversion itself moved no row between classes. The re-rating after the first review moved RSK-023,
 -029 and -039 from class B to class A (owner decision O4): RSK-023 because a rejected, therefore late, report is the
 late-report line of severity 5; RSK-029 and RSK-039 by the privacy line of severity 4. RSK-066 is S5 by owner decision O6
-(regulated records lost before their retention date).
+(regulated records lost before their retention date). Owner decision O7 (12 Nov 2026) split the loss of regulated
+records: permanent loss is S5, recoverable loss is S4. Every row that cites either line was re-checked (section 3.7).
+
+### 3.7 Re-check under owner decision O7 (permanent vs recoverable loss)
+
+| Row | Loss | Severity |
+|---|---|---|
+| RSK-016 | An audit row deleted: recoverable from the daily backup, and the chain check shows the gap | 4 (unchanged) |
+| RSK-019 | A signed conclusion edited in place: the integrity line ("changes without trace"), not a loss | 4 (unchanged) |
+| RSK-035 | Export misses records: the records stay in MDARIX until a separate purge (RSK-066), so the loss is recoverable | 4 (unchanged) |
+| RSK-037 | A backup fails silently, then a disaster: no good copy, so the loss is permanent | 4 to 5 |
+| RSK-038 | Up to 24 hours lost without point-in-time recovery: permanent | 5 (unchanged) |
+| RSK-040 | Backup key lost: no restore possible, so the loss is permanent | 4 to 5 |
+| RSK-056 | Notifications held or re-sent after a restore: no regulated record lost | 3 (unchanged) |
+| RSK-066 | Purge: permanent | 5 (unchanged) |
 
 ## 4. GxP impact per function
 
@@ -193,10 +208,10 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-034 | Classification | Classification codes drive a deadline by mistake | Wrong clock | 5 | 2 | 3 | 30 | A | Yes | Classification never sets a deadline or conclusion (`backend/app/complaint_classification/rules.py`) | `tests/test_complaint_disposition_rules.py` | - | REQ-CLS-003 | Acceptable after verification |
 | RSK-035 | Export and exit | The export misses records or versions | Incomplete inspection pack or exit copy | 4 | 3 | 3 | 36 | A | No | Tables discovered from the database; manifest with counts, SHA-256 and verified audit head (`backend/app/tenant_export.py`) | `tests/test_day25_retention_export.py`, `tests/test_export_purge_mfa.py` | - | REQ-EXP-001 | **Open (verification):** a readable export of record, versions, approvals, audit and rule versions to verify |
 | RSK-036 | Export and exit | An export link is used after expiry or by another person | Data leak | 5 | 3 | 4 | 60 | A | Yes | Exports expire and are deleted; download streamed behind sign-in (`backend/app/tenant_export_api.py`) | `tests/test_tenant_data.py` (export expiry); download by another person: threat-model test PT-13 to add | PT-11, PT-13 | REQ-EXP-003 | **Open (verification):** test PT-13, download by another person |
-| RSK-037 | Backup and restore | A backup fails silently | Data loss at a disaster | 4 | 3 | 2 | 24 | A | No | Daily encrypted dump with SHA-256 manifest (`infrastructure/docker/backup/backup.sh`); backup-age check, 26 h (`scripts/check_backup_age.sh`); off-site copy (`docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
+| RSK-037 | Backup and restore | A backup fails silently | Regulated records permanently lost at a disaster (no good backup) | 5 | 3 | 2 | 30 | A | No | Daily encrypted dump with SHA-256 manifest (`infrastructure/docker/backup/backup.sh`); backup-age check, 26 h (`scripts/check_backup_age.sh`); off-site copy (`docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
 | RSK-038 | Backup and restore | Up to 24 hours of records lost (no point-in-time recovery; files on the server disk) | Lost complaints, signatures, awareness times; a report can be missed | 5 | 4 | 4 | 80 | A | Yes | Daily dump and daily disk snapshot only; the RPO is stated as 24 hours (owner decision B6b-D8) | Restore drill | G-1, G-2 | REQ-BAK-002 | **Open:** gap to the 15-minute target; closed by point-in-time recovery on pilot hosting. The recovery check (B6b Part D) shows each organisation the window to back-enter |
 | RSK-039 | Backup and restore | A restore brings back erased personal data | Erased personal data back in use | 4 | 3 | 2 | 24 | A | No | Erasure log and `reapply_erasures` (`backend/app/tenant_purge.py`); restore runbook section 4 | Restore drill step (dry run recorded 3 Nov 2026) | - | REQ-BAK-001 | Acceptable after verification |
-| RSK-040 | Backup and restore | A restore cannot be done (key lost) | Total loss | 4 | 2 | 2 | 16 | A | No | The backup private key is kept off the server by the operator | Quarterly drill | G-7 | REQ-BAK-003 | **Open:** key custody needs a second holder (threat model G-7) |
+| RSK-040 | Backup and restore | A restore cannot be done (key lost) | Regulated records permanently lost (total loss) | 5 | 2 | 2 | 20 | A | No | The backup private key is kept off the server by the operator | Quarterly drill | G-7 | REQ-BAK-003 | **Open:** key custody needs a second holder (threat model G-7) |
 | RSK-041 | AI (off) | An AI suggestion is accepted without review, or overrides a person | Wrong conclusion | 5 | n/a | n/a | n/a | A | n/a | AI release gate enforced in production (`backend/app/ai_release_gate.py`); advisory only | Golden evaluation before switch-on | PT-09 | (at switch-on) | Not applicable while AI is off |
 | RSK-042 | AI (off) | Prompt injection from evidence files | Manipulated suggestion or data leak | 5 | n/a | n/a | n/a | A | n/a | Field allowlist for AI context (`backend/app/ai_boundary.py`); PII masking | Before switch-on | PT-09 | (at switch-on) | Not applicable while AI is off |
 | RSK-043 | AI (off) | Customer data sent to a non-contracted provider | Privacy breach | 5 | n/a | n/a | n/a | A | n/a | Contracted-provider and retention checks (`genai/policy.py`, `genai/provider.py`) | `tests/test_ai_release_gate_unit.py` | PT-10 | (at switch-on) | Not applicable while AI is off |

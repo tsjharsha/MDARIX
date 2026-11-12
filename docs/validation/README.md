@@ -221,6 +221,7 @@ also questions in MDX-VAL-013.
 | O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-029 and RSK-039 by the privacy line of severity 4 |
 | O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
 | O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |
+| O7 | Severity 5 includes the permanent loss of regulated records; severity 4 the loss of regulated records that can be recovered (owner, 12 Nov 2026; MDX-VAL-002 section 3.7) |
 
 ## 5. Codes used in these documents
 
