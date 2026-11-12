@@ -8,7 +8,7 @@ import { requestJson } from "../../../app/apiClient";
 import { downloadFile } from "../../reports/download";
 import { useCan, useLateEntry, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
 import { ApiError } from "../../../app/apiClient";
-import { DuplicateHits, LateEntryField, duplicatesPath, looksLate, type DuplicateHit } from "./BackEntry";
+import { DuplicateHits, LateEntryField, RecordRef, duplicatesPath, looksLate, type DuplicateHit } from "./BackEntry";
 import { DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
@@ -2091,7 +2091,7 @@ function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }
       <div className="uw-fc-pair">
         {[pair.left, pair.right].map((side) => (
           <div key={side.id}>
-            <strong>{side.ref}</strong> <span className="uw-cr-meta">{side.source}</span>
+            <RecordRef record={side} /> <span className="uw-cr-meta">{side.source}</span>
             <q className="uw-cr-text uw-cr-clip">{side.words}</q>
             <p className="uw-cr-meta">
               Aware {formatDate(side.awareness_at)} ({side.awareness_source})

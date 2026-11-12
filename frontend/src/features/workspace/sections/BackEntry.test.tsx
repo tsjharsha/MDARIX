@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { DuplicateHits, LateEntryField, duplicatesPath, looksLate } from "./BackEntry";
+import { DuplicateHits, LateEntryField, duplicatesPath, looksLate, recordAddress } from "./BackEntry";
+import { routeFor } from "../../../app/linkTable";
 import { HelpMenu, OUTAGE_SOP_PATH } from "../../shared/HelpMenu";
 
 // B6a Part A (G18b-d): back-entry after an outage, and the SOP template in Help.
@@ -42,6 +43,24 @@ describe("back-entry after an outage", () => {
     );
     expect(hits).toContain("SAMPLE-RV-11");
     expect(hits).toContain("save anyway");
+    // Navigation polish: the reference opens the record in a new tab, so the form stays.
+    expect(hits).toContain('href="/app/readiness?tab=Oversight&amp;event=c1"');
+    expect(hits).toContain('target="_blank"');
+    expect(hits).toContain("(opens in a new tab)");
+  });
+
+  it("opens a complaint on its page (new navigation) or Oversight (classic), a Case on its check", () => {
+    const complaint = { kind: "COMPLAINT", id: "c1", ref: "RV 06" };
+    expect(recordAddress(complaint, "new")).toBe("/app/complaints/RV%2006");
+    expect(recordAddress(complaint, "classic")).toBe("/app/readiness?tab=Oversight&event=c1");
+    expect(recordAddress({ kind: "INTAKE", id: "i1", ref: "CASE-1" })).toBe(
+      "/app/complaints?tab=First+contact&check=i1",
+    );
+    // The new navigation reads that former address as My work › Queues › Calls to check, the Case's check open.
+    expect(routeFor("Complaints", "First contact?check=i1", "mvp", "new")).toEqual({
+      section: "My Work",
+      tab: "Queues?check=i1&view=Calls+to+check",
+    });
   });
 
   it("offers the manual-workaround SOP template in Help, marked to confirm with a consultant", () => {
