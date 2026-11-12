@@ -84,7 +84,22 @@ pack is generated as a dry run only: its statuses are development results, not v
 - **Approved build specs under version control** (O22): fifteen specs copied unchanged into `docs/specs/`;
   `requirements.csv` cites them there.
 - **Deviation DEV-0.11.04-001** (O23): the 12 Nov back-fill of the rule-register account fields.
+- **Validation pack, run 6 (owner decisions O25 to O31, 12 Nov 2026):** the JUnit file carries the commit, a
+  clean/dirty tree mark and the marker-hook version, and the generator refuses a JUnit of another commit, a changed
+  tree or an older hook, and a changed working tree outside a dry run; executed IQ and scripted OQ results come from
+  `executed-results.csv` and fill the IQ record, the OQ results, the RTM ("scripted OQ") and the VSR, never typed into
+  a generated document; `oq-expected-results.csv` records `source` and `confirmed_by`, and a class-A result drafted
+  from the code or not confirmed by the owner is a check failure; `signatures.csv` keeps `content_sha256` apart from
+  the signed PDF's `sha256`; scenarios of features not built yet are marked "future" and never verify anything;
+  deviations need an allowed `found_in`. URS requirements for 21 CFR 11.50, 11.100 and 11.300 (REQ-P11-001 to -004,
+  scenarios PL-47 to PL-54). The B6b spec, the B3 plan and the W1 spec are in `docs/specs/`; every spec there has an
+  "Approval record".
 ### Changed
+- **Run 6 documents:** DEV-0.11.04-001 reclassified major (GxP risk high); MDX-VAL-000 section 4 co-signed by the
+  system owner (signing PDF regenerated); VMP-R42a (the first pack executes every class-A scenario); PQ 0.4 (six more
+  steps, intended-use coverage); release-approval criterion 9 checkable before signing, with a post-deploy section;
+  RSK-004 and RSK-008 aligned with the "Facts changed after signing: re-check" flag; RSK-040 occurrence 4 and RSK-028
+  severity 5, with the reasons.
 - **Owner decisions O17 to O24 of 12 Nov 2026** recorded in MDX-VAL-000 section 4: big-bang gate for the action
   rows marked "Acceptable after verification"; a risk acceptance covers only NOT RUN scenarios and Open rows, and a
   failed class-A test always blocks a release (the generator lists it as a check failure); RSK-037 re-scored D4
