@@ -4,14 +4,14 @@
 |---|---|
 | Document ID | MDX-VAL-003 |
 | Title | GAMP 5 category justification |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (confirms; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10) |
 
 Change history
 
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A); revised after a software-assisted review, findings dispositioned by the author (libraries, customer-side rules worded as template instructions) | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: whose view the category takes (section 4); owner decision O3 on the rule register; how each rule is checked (section 7); unconditional approval meaning, consultant confirmation tracked as OP-1 | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Editorial fixes after a third software-assisted review: code baseline names `cb75e8da`; OP-1 cites B6b-D5 | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decision O10: rule versions name the builder's and the approver's staff accounts; code baseline names `ef27c87e` | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -66,7 +67,7 @@ approved (MDX-VAL-001 section 9.4). The following facts support Category 4 for M
 3. **Rules are data.** Each rule MDARIX applies is one JSON file per rule version in
    `backend/app/rule_register/data/`. `backend/app/rule_register/register.py` refuses the register when a version's
    content does not match its content hash, when versions overlap, or when coverage has a gap. A change of rule is a
-   new version file; the file records who wrote it and who approved it (the owner or a named regulatory approver).
+   new version file; the file records the staff account that built it and the different staff account that approved it (owner decisions O3 and O10).
    The register refuses a version approved by the person who built it (owner decision O3, MDX-VAL-002 RSK-065). Signed records name the version they used.
 4. **Roles and permissions are fixed data.** Personas and their permissions are defined in
    `access_control/personas.py` and `backend/app/access/permissions.py`; the customer assigns them, it does not

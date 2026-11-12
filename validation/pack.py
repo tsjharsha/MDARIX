@@ -45,7 +45,8 @@ INTERIM_BASIS = (
 INTERIM_CRITERIA = (
     "Release identity: the release equals VERSION, the commit is the tagged commit, one migration head",
     "Release checks: full suite on this commit, every step passed (release-checks JSON and its SHA-256)",
-    "Every class-A scenario named by the change-impact assessment is PASS with evidence (VMP-R49)",
+    "Every class-A scenario named by the change-impact assessment is PASS with evidence, "
+    "or covered by a risk acceptance under criterion 4 (VMP-R49)",
     "Every Open MDX-VAL-002 row this release relies on has a signed risk acceptance listed in this record (RA-R07, RA-R08)",
     "No open critical deviation; every other open deviation has its acceptance rationale (VMP-R50, VMP-R51)",
     "No critical failure of VMP-R60 (a risk acceptance never covers one)",

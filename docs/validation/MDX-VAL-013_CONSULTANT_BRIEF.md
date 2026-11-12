@@ -11,7 +11,7 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), made a comparison of staff accounts by `ef27c87e` (owner decision O10) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10) |
 
 Change history
 
@@ -19,7 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A, item A5) | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13) | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13); MDX-VAL-008, -010 and the -012 template added to the documents to review | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -74,6 +74,9 @@ compliant for any customer.
 | 3 | MDX-VAL-003 GAMP 5 category justification | Category per part and its rationale |
 | 4 | MDX-VAL-000 Validation document control and index | Signing, versions, owner decisions (section 4) |
 | 5 | `docs/validation/scenario-register.md` | The scenarios that requirements and tests trace to. Its PASS statuses are development results, not validation evidence (MDX-VAL-001 VMP-R31) |
+| 6 | MDX-VAL-008 MDARIX PQ protocol | The sample story end to end, per persona |
+| 7 | MDX-VAL-010 Deviation log and change-impact template | Deviation fields; the change-impact assessment that sets each release's re-tests |
+| 8 | MDX-VAL-012 Release approval record: interim template | The nine criteria the quality approver checks before each deploy (question 24) |
 | Later | First release pack (B6b Part B); GxP impact and shared responsibility (MDX-SUP-002) and Part 11 / Annex 11 assessment (MDX-SUP-003) (B6b Part C) | Sent when written |
 
 Context documents (drafts of 8 Nov 2026, in `docs/validation/` since 12 Nov 2026, owner decision O2): MDX-B10-001

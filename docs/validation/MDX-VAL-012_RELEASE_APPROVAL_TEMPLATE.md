@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-012 (template) |
 | Title | Release approval record: interim template |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (prepares each record) |
 | Reviewer | Independent CSV consultant (not engaged yet; MDX-VAL-013 question 24) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft, owner decision O13: an interim release approval template for the big-bang deploy, before MDX-VAL-001 is approved as 1.0 | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -37,13 +38,15 @@ The record approves a deploy. It does not state that the release is validated un
   a class-A requirement without a negative scenario, an open critical deviation, release checks that are not a full
   suite on the same commit, or a release that differs from `VERSION` (owner decision O16).
 - **RA-T03** The system owner shall fill the blank fields of section 3 by hand before the approver signs.
-- **RA-T04** The quality approver shall initial each criterion of section 4 as met, not met or accepted, and sign
-  section 5. A criterion marked "not met" stops the deploy.
+- **RA-T04** The quality approver shall initial each criterion of section 4 as met or not met, and sign section 6.
+  A criterion marked "not met" stops the deploy. Only criterion 3 may instead be marked "accepted": for a scenario of
+  an Open MDX-VAL-002 row whose signed risk acceptance is listed under criterion 4 (VMP-R49).
 - **RA-T05** For an emergency fix, the approver's written OK (e-mail or chat, quoted with its time) shall be given
   before the deploy and recorded in the field "Emergency fix: written OK"; the signed record follows within 1 working
   day (VMP-R35, VMP-R36).
 - **RA-T06** The signed PDF shall be saved as `MDX-VAL-012-release-approval-signed.pdf` in the release folder and
-  listed in `signatures.csv`; the generator then never overwrites that folder (VMP-R39).
+  listed in `signatures.csv`; the generator then never overwrites that folder (VMP-R39). A per-release record is filed
+  in its release folder, not under `signed/` (generated records, MDX-VAL-000 section 3).
 
 ## 3. Fields
 
@@ -70,7 +73,7 @@ The record approves a deploy. It does not state that the release is validated un
 |---|---|
 | 1 | Release identity: the release equals `VERSION`, the commit is the tagged commit, one migration head |
 | 2 | Release checks: full suite on this commit, every step passed (release-checks JSON and its SHA-256) |
-| 3 | Every class-A scenario named by the change-impact assessment is PASS with evidence (VMP-R49) |
+| 3 | Every class-A scenario named by the change-impact assessment is PASS with evidence, or covered by a risk acceptance under criterion 4 (VMP-R49) |
 | 4 | Every Open MDX-VAL-002 row this release relies on has a signed risk acceptance listed in this record (RA-R07, RA-R08) |
 | 5 | No open critical deviation; every other open deviation has its acceptance rationale (VMP-R50, VMP-R51) |
 | 6 | No critical failure of VMP-R60 (a risk acceptance never covers one) |

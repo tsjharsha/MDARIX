@@ -18,7 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B10) | Sriharsha Telikicherla |
-| 0.2 | 12 Nov 2026 | Owner decision O11: each change carries its own risk, which sets its re-test rule (MDX-VAL-001 VMP-R23) | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | Owner decision O11: each change carries its own risk, which sets its re-test rule (MDX-VAL-001 VMP-R23); DL-R06 keeps every version of a row in git; re-run scope as MDX-VAL-001 section 9.3; signature block | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -40,8 +40,8 @@ definitions are those of MDX-VAL-001 section 13 and Annex C; they are not repeat
   does not (scenario B6-57).
 - **DL-R05** While a critical deviation of the release is not closed, the generator shall produce no release approval
   record and shall list the deviation (scenario B6-58).
-- **DL-R06** A row shall be added, never rewritten; a correction to a row is a later commit whose message names the
-  row, so git history keeps both.
+- **DL-R06** Every change to a row (a status change or a correction) shall be its own commit whose message names
+  the row, so git history keeps every earlier version of it; a row is never deleted.
 
 ## 3. Change-impact assessment (template, one per release)
 
@@ -55,7 +55,17 @@ Kept in the release folder as `change-impact.md`; its ID is quoted in the releas
 | Risk of each change (VMP-R23) | Per change: can it alter a class-A function's records, decisions, clocks, signatures, reports or data model? Yes: class A. No: its own class, with the reason (for example "label wording only"). The quality approver checks each reason |
 | Risk rows affected | RSK IDs, with any re-rating |
 | Requirements affected | REQ IDs from `requirements.csv` (new, changed, unchanged) |
-| Scenarios to re-run | Every class-A scenario of a requirement affected by a class-A change (VMP-R23, VMP-R28); for the first pack, every class-A scenario (VMP-R42) |
+| Scenarios to re-run | Every class-A scenario of each function a class-A change can alter (MDX-VAL-001 section 9.3, VMP-R23, VMP-R28); for the first pack, every class-A scenario (VMP-R42) |
 | Re-test rule applied | The row of MDX-VAL-001 section 9.3 |
 | Customer impact | Whether a change notice is needed, and its date |
 | Prepared by / reviewed by | System owner / quality approver, with dates (UTC) |
+
+## Signatures
+
+Unsigned. The signed PDF and its `signatures.csv` row are added after review (MDX-VAL-000 section 2.6).
+
+| Role | Name | Meaning of signature | Signature | Date |
+|---|---|---|---|---|
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for this document and reviewed every line of the draft. | | |
+| Reviewer (C) | Independent CSV consultant | I reviewed this document; my comments are recorded. | | |
+| Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this document for use. | | |

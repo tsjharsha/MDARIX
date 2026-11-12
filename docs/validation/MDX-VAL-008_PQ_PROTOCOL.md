@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-008 |
 | Title | MDARIX performance qualification protocol |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver (executes as the business user) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B9) | Srinivas Telikicherla |
+| 0.2 | 12 Nov 2026 | Signature block added after an independent rating | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -61,3 +62,13 @@ A BLOCKED or NOT RUN step is never a pass.
 
 Each execution is kept in the release folder `docs/validation/releases/<release>/` as `pq-record.csv` (step, result,
 executor, date UTC, evidence ID, deviation ID) and is summarised in the VSR (MDX-VAL-011).
+
+## Signatures
+
+Unsigned. The signed PDF and its `signatures.csv` row are added after review (MDX-VAL-000 section 2.6).
+
+| Role | Name | Meaning of signature | Signature | Date |
+|---|---|---|---|---|
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for this document and reviewed every line of the draft. | | |
+| Reviewer (C) | Independent CSV consultant | I reviewed this document; my comments are recorded. | | |
+| Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this document for use. | | |

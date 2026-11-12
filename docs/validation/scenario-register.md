@@ -610,7 +610,7 @@ Targeted unit and database tests exist for each (named in the last column); none
 Scenarios for the 17 class-A requirements that had none, and negative scenarios for the 12 class-A requirements that
 had scenarios but no negative one. Each row names its requirement in `requirements.csv`; "Tests to tag" are the
 existing tests expected to give the evidence once they carry the `requirement` marker (MDX-VAL-001 section 16.1,
-tagging plan). Drafts: the quality approver reviews each expected result before any is executed (MDX-VAL-001 VMP-R49).
+tagging plan). Drafts: the quality approver reviews and approves each expected result before any is executed (MDX-VAL-001 section 8, class A).
 
 | ID | Scenario | Expected | Backlog | Status | Notes |
 |---|---|---|---|---|---|

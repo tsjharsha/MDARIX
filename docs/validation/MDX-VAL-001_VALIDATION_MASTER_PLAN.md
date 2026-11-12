@@ -11,7 +11,7 @@
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), made a comparison of staff accounts by `ef27c87e` (owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -403,7 +403,7 @@ AI is off in every release under this plan, and AI helpers are out of scope.
   fail in the qualifying run.
 
 **Known gap: few tests are tagged (owner decision O14).** At the B6b dry run (12 Nov 2026) the `requirement` marker
-was on 22 test files, at file level, so only 11 of the 59 class-A requirements showed as verified in the generated
+was on 22 test files, at file level (24 files at the end of 12 Nov 2026, two of them at test level), so only 11 of the 59 class-A requirements showed as verified in the generated
 RTM; the other tests ran but gave no traceable evidence. The PL-xx scenario group (owner decision O15) gave every
 class-A requirement a scenario and a negative scenario, which are not yet tagged. Plan:
 

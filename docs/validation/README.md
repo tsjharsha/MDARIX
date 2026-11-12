@@ -11,7 +11,7 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), made a comparison of staff accounts by `ef27c87e` (owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -151,14 +151,14 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-VAL-000 | Validation document control and index | this file | 0.4 | DRAFT |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.4 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.4 | DRAFT |
-| MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.3 | DRAFT |
+| MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.3 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
-| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.1 | DRAFT |
+| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.2 | DRAFT |
 | MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.2 | DRAFT; log empty |
-| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.1 | DRAFT |
+| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.2 | DRAFT |
 | MDX-VAL-004, -005, -006, -007, -009, -011, -012 | URS, FS/DS, IQ record, OQ protocol and results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
 | (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 69 requirements |
 | MDX-SUP, MDX-SOP, MDX-OPS, MDX-CUS | Planned (B6b Parts C to E, section 5) | | | Not written |
@@ -253,7 +253,7 @@ also questions in MDX-VAL-013.
 | Rules | Check | Evidence |
 |---|---|---|
 | Place, format, numbering, versions, header, writing standard (sections 2.1 to 2.5) | The author's pre-signature check (DC-R31), recorded in the change history; the reviewer's comments | Change history; signed PDF |
-| Traceability of product requirements (DC-R27) | The validation-pack generator refuses a requirement without a test or scenario (B6b Part B) | RTM in the release folder |
+| Traceability of product requirements (DC-R27) | The validation-pack generator refuses a requirement without a scenario and a class-A requirement without a negative scenario; the RTM shows each requirement as verified or not (B6b Part B) | RTM in the release folder |
 | Review, signature and signing sequence (section 2.6) | The approver checks the signature block against DC-R40 to DC-R43 before signing; each signature has its `signatures.csv` row | `signatures.csv`; git history |
 | Retirement (section 2.7) | Banner check at each document's next review | The superseded file in git |
 
