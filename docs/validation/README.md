@@ -150,6 +150,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.2 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.2 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.2 | DRAFT |
+| MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.1 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
@@ -160,12 +161,13 @@ Other files in this folder: [AI_GOLDEN_DATASET_QUALIFICATION.md](AI_GOLDEN_DATAS
 and the local data set; AI is off and out of scope (MDX-VAL-001, section 15). Neither is cited as validation
 evidence (DC-R10).
 
-### 3.1 Referenced planning documents (not under version control yet)
+### 3.1 Validation planning drafts of 8 Nov 2026
 
-MDX-VAL-001 and -002 reference these drafts of 8 Nov 2026 in `MDARIX-planning/b10/`: MDX-B10-001 (intended use),
--002 (regulatory applicability matrix), -005 (traceability structure) and -006 (threat model). They stay in force as
-drafts. Owner decision O2 (section 4) moves them into this folder with B6b Part B; MDX-VAL-001 is not approved
-as 1.0 before they are under document control and approved. MDX-B10-003 (validation plan) is superseded by MDX-VAL-001, and MDX-B10-004 (software risk assessment) by
+MDX-VAL-001 and -002 reference these drafts, moved into this folder on 12 Nov 2026 (owner decision O2) unchanged:
+[MDX-B10-001](MDX-B10-001-Intended-Use-Statement.md) intended use, [MDX-B10-002](MDX-B10-002-Regulatory-Applicability-Matrix.md) regulatory applicability matrix,
+[MDX-B10-005](MDX-B10-005-Traceability-Structure.md) traceability structure and [MDX-B10-006](MDX-B10-006-Threat-Model.md) threat model. Each is version
+0.1, status DRAFT. They are now under version control; MDX-VAL-001 is not approved as 1.0 before they are approved
+(VMP-R01). The planning copies carry a pointer to these. MDX-B10-003 (validation plan) is superseded by MDX-VAL-001, and MDX-B10-004 (software risk assessment) by
 MDX-VAL-002; both carry a banner saying so.
 
 ### 3.2 Superseded and corrected documents

@@ -74,7 +74,7 @@ compliant for any customer.
 | 5 | `docs/validation/scenario-register.md` | The scenarios that requirements and tests trace to. Its PASS statuses are development results, not validation evidence (MDX-VAL-001 VMP-R31) |
 | Later | First release pack (B6b Part B); GxP impact and shared responsibility (MDX-SUP-002) and Part 11 / Annex 11 assessment (MDX-SUP-003) (B6b Part C) | Sent when written |
 
-Context documents (drafts of 8 Nov 2026, moving into `docs/validation/` under owner decision O2): MDX-B10-001
+Context documents (drafts of 8 Nov 2026, in `docs/validation/` since 12 Nov 2026, owner decision O2): MDX-B10-001
 intended use, MDX-B10-002 regulatory applicability matrix, MDX-B10-005 traceability structure, MDX-B10-006 threat
 model.
 

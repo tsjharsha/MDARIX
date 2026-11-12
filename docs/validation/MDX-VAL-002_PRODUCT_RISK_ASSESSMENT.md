@@ -38,9 +38,9 @@ consultant confirms the severities and scales. The whole assessment is **to conf
 | Ref | Document |
 |---|---|
 | R1 | MDX-VAL-001 Validation Master Plan |
-| R2 | MDX-B10-001 Intended Use Statement (draft, `MDARIX-planning/b10/`) |
-| R3 | MDX-B10-005 Traceability Structure, section 7 seed requirements REQ-&lt;AREA&gt;-nnn (draft, as R2) |
-| R4 | MDX-B10-006 Threat Model: penetration-test threats PT-01 to PT-17 and gaps G-1 to G-12 (draft, as R2) |
+| R2 | MDX-B10-001 Intended Use Statement (draft, [MDX-B10-001-Intended-Use-Statement.md](MDX-B10-001-Intended-Use-Statement.md)) |
+| R3 | MDX-B10-005 Traceability Structure, section 7 seed requirements REQ-&lt;AREA&gt;-nnn (draft, [MDX-B10-005-Traceability-Structure.md](MDX-B10-005-Traceability-Structure.md)) |
+| R4 | MDX-B10-006 Threat Model: penetration-test threats PT-01 to PT-17 and gaps G-1 to G-12 (draft, [MDX-B10-006-Threat-Model.md](MDX-B10-006-Threat-Model.md)) |
 | R5 | [scenario-register.md](scenario-register.md) (scenario IDs IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6) |
 
 ## 3. Method (owner decision B6b-D4)

@@ -47,10 +47,10 @@ B6b Part E). No document produced under this plan states that MDARIX is validate
 | R1 | MDX-VAL-000 Validation document control and index | This folder |
 | R2 | MDX-VAL-002 Product risk assessment | This folder |
 | R3 | MDX-VAL-003 GAMP 5 category justification | This folder |
-| R4 | MDX-B10-001 Intended Use Statement, draft 8 Nov 2026 | `MDARIX-planning/b10/` (not under version control yet) |
-| R5 | MDX-B10-002 Regulatory Applicability Matrix, draft 8 Nov 2026 | as R4 |
-| R6 | MDX-B10-005 Traceability Structure, draft 8 Nov 2026 | as R4 |
-| R7 | MDX-B10-006 Threat Model, draft 8 Nov 2026 | as R4 |
+| R4 | MDX-B10-001 Intended Use Statement, draft 8 Nov 2026 | [MDX-B10-001-Intended-Use-Statement.md](MDX-B10-001-Intended-Use-Statement.md) |
+| R5 | MDX-B10-002 Regulatory Applicability Matrix, draft 8 Nov 2026 | [MDX-B10-002-Regulatory-Applicability-Matrix.md](MDX-B10-002-Regulatory-Applicability-Matrix.md) |
+| R6 | MDX-B10-005 Traceability Structure, draft 8 Nov 2026 | [MDX-B10-005-Traceability-Structure.md](MDX-B10-005-Traceability-Structure.md) |
+| R7 | MDX-B10-006 Threat Model, draft 8 Nov 2026 | [MDX-B10-006-Threat-Model.md](MDX-B10-006-Threat-Model.md) |
 | R8 | Scenario register (master copy) | [scenario-register.md](scenario-register.md) |
 | R9 | ISO/TR 80002-2:2017, validation of software for medical device quality systems | Main method. **To confirm with your consultant** |
 | R10 | ISPE GAMP 5, A Risk-Based Approach to Compliant GxP Computerized Systems, 2nd edition (2022) | Software categories and supplier leverage. **To confirm with your consultant** |
@@ -62,7 +62,7 @@ B6b Part E). No document produced under this plan states that MDARIX is validate
 | R16 | MDX-VAL-013 Consultant brief and question pack | This folder |
 
 - **VMP-R01** R4 to R7 shall be under document control in this folder and approved before this plan is approved as
-  version 1.0 (owner decision O2 moves them here in B6b Part B).
+  version 1.0 (they were moved here on 12 Nov 2026, owner decision O2).
 
 ## 4. Intended use (summary of R4)
 
@@ -432,7 +432,7 @@ each audit event, a different start.
 | OP-2 | The company is not registered yet; the supplier documents need the legal entity and its signatory | Srinivas |
 | OP-3 | No staging environment: formal execution on the controlled local environment until then (section 10) | Srinivas |
 | OP-4 | `VERSION` (0.10.94) and the CHANGELOG section disagree; the release identity must be fixed before the first per-release pack | Sriharsha |
-| OP-5 | MDX-B10-001, -002, -005 and -006 are drafts outside version control; owner decision O2 moves them into this folder in B6b Part B; this plan is not approved before they are (section 3) | Srinivas |
+| OP-5 | MDX-B10-001, -002, -005 and -006 moved into this folder on 12 Nov 2026 (owner decision O2) and are still DRAFT; this plan is not approved before they are approved (VMP-R01) | Srinivas |
 | OP-6 | Each reference R9 to R13 to be confirmed with the consultant | Srinivas |
 | OP-7 | The transition approach for the releases already in production (section 9.4): the owner confirms it; the consultant reviews it (MDX-VAL-013, question 15) | Srinivas |
 | OP-8 | Owner to decide what governs production deploys before this plan is approved as 1.0: a signed release approval record from the next deploy, or the current practice until then (MDX-VAL-000 section 4, B6b-D7) | Srinivas |
