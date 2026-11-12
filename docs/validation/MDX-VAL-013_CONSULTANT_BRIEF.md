@@ -11,7 +11,7 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), made a comparison of staff accounts by `ef27c87e` (owner decision O10) |
 
 Change history
 

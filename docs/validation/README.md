@@ -4,14 +4,14 @@
 |---|---|
 | Document ID | MDX-VAL-000 |
 | Title | Validation document control and index |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), made a comparison of staff accounts by `ef27c87e` (owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after a software-assisted review, findings dispositioned by the author | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: one signature rule for every document and the header field "Drafting"; signing sequence; registers and legacy files; owner decisions (section 4) and codes (section 5) recorded here; rules renumbered in reading order | Srinivas Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations") recorded as O7 to O16; MDX-VAL-012 interim template added to the index; PL scenario code; document versions updated | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -147,16 +148,16 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
-| MDX-VAL-000 | Validation document control and index | this file | 0.3 | DRAFT |
-| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.3 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.3 | DRAFT |
+| MDX-VAL-000 | Validation document control and index | this file | 0.4 | DRAFT |
+| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.4 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.4 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.3 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
-| MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.2 | DRAFT |
+| MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.3 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
 | MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.1 | DRAFT |
-| MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.1 | DRAFT; log empty |
+| MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.2 | DRAFT; log empty |
 | MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.1 | DRAFT |
 | MDX-VAL-004, -005, -006, -007, -009, -011, -012 | URS, FS/DS, IQ record, OQ protocol and results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
 | (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 69 requirements |
@@ -190,7 +191,7 @@ MDX-VAL-002; both carry a banner saying so.
 
 These documents cite "owner decision B6b-Dn" or "owner decision On". Each one is listed here, so that the signed
 copy of this document is the controlled record of it. The owner (Srinivas Telikicherla) approved D1 to D21 on
-12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026. O5 is older (see its row). Items marked "consultant to confirm" are
+12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026, and approved O7 to O16 on 12 Nov 2026 ("approve all B6b recommendations"). O5 is older (see its row). Items marked "consultant to confirm" are
 also questions in MDX-VAL-013.
 
 | ID | Decision |
@@ -245,7 +246,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6, PL followed by a number | Scenario IDs in the scenario register |
-| O1 to O6, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O16, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 
