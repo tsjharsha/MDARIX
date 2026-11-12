@@ -42,6 +42,7 @@ JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="py
 </testsuite></testsuites>"""
 
 
+PDF_SHA = "f" * 64  # the signed PDF's own hash (signatures.csv sha256), never the content hash (O31)
 RELEASE_CHECKS = (
     '{"release": "9.9.9", "commit": "abc12345", "dry_run": false, "full_suite": true, "passed": true,'
     ' "tools": {"python": "Python 3.x", "node": "v20"}, "steps": [{"step": "pytest", "result": "pass"}]}'
@@ -55,7 +56,9 @@ def _approve_protocol(root: Path, release: str = "9.9.9") -> str:
                            oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"))  # fmt: skip
     sha = pack.protocol_sha256(pack.oq_tables(sources)[0])
     with open(docs / "signatures.csv", "a", encoding="utf-8") as signatures:
-        signatures.write(f"{pack.PROTOCOL_ID},{release},S. T.,quality approver,approval,2026-11-12,p.pdf,{sha}\n")
+        signatures.write(
+            f"{pack.PROTOCOL_ID},{release},S. T.,quality approver,approval,2026-11-12,p.pdf,{PDF_SHA},{sha}\n"
+        )
     return sha
 
 
@@ -67,7 +70,9 @@ def _root(
     (docs / "requirements.csv").write_text(requirements, encoding="utf-8")
     (docs / "scenario-register.md").write_text(register, encoding="utf-8")
     (docs / "deviation-log.csv").write_text(",".join(pack.DEVIATION_COLUMNS) + "\n" + deviations, encoding="utf-8")
-    (docs / "signatures.csv").write_text("document_id,version,signer,role,meaning,date_utc,pdf_path,sha256\n")
+    (docs / "signatures.csv").write_text(
+        "document_id,version,signer,role,meaning,date_utc,pdf_path,sha256,content_sha256\n"
+    )
     (tmp_path / "VERSION").write_text("9.9.9\n")
     versions = tmp_path / "infrastructure" / "database" / "migrations" / "versions"
     versions.mkdir(parents=True)
@@ -157,7 +162,7 @@ def test_signed_release_folder_is_never_overwritten(tmp_path, capsys):
     assert [p.name for p in folder.iterdir()] == ["MDX-VAL-012-release-approval-signed.pdf"]
     (folder / "MDX-VAL-012-release-approval-signed.pdf").unlink()
     with open(root / "docs" / "validation" / "signatures.csv", "a") as signatures:
-        signatures.write("MDX-VAL-012-9.9.9,9.9.9,S. T.,quality approver,approval,2026-11-12,x.pdf,00\n")
+        signatures.write("MDX-VAL-012-9.9.9,9.9.9,S. T.,quality approver,approval,2026-11-12,x.pdf,00,\n")
     assert _run(root) == 2
 
 
@@ -248,12 +253,17 @@ def test_no_oq_results_without_an_approved_protocol(tmp_path, capsys):
     assert {p.name for p in (tmp_path / "p").iterdir()} >= {"MDX-VAL-007-P-OQ-protocol.pdf", "oq-protocol.csv"}
     assert not any("results" in p.name or p.name == "oq-log.xlsx" for p in (tmp_path / "p").iterdir())
     assert _run(root, "--out", str(tmp_path / "out")) == 1
-    assert f"is not approved: no signatures.csv row with SHA-256 {sha}" in capsys.readouterr().err
+    assert f"is not approved: no signatures.csv row with content_sha256 {sha}" in capsys.readouterr().err
+    # O31: the protocol's hash in the signed-PDF column (sha256) never approves the content
+    with open(root / "docs" / "validation" / "signatures.csv", "a", encoding="utf-8") as signatures:
+        signatures.write(f"{pack.PROTOCOL_ID},9.9.9,S. T.,quality approver,approval,2026-11-12,p.pdf,{sha},{PDF_SHA}\n")
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    capsys.readouterr()
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
     assert "NOT APPROVED (dry run only" in (tmp_path / "dry" / "MDX-VAL-007-R-OQ-results.md").read_text("utf-8")
     assert _approve_protocol(root) == sha
     assert _run(root, "--out", str(tmp_path / "out")) == 0
-    assert f"approved (`signatures.csv`, SHA-256 `{sha}`)" in (
+    assert f"approved (`signatures.csv`, content SHA-256 `{sha}`)" in (
         tmp_path / "out" / "MDX-VAL-007-R-OQ-results.md"
     ).read_text("utf-8")
     expected = root / "docs" / "validation" / "oq-expected-results.csv"

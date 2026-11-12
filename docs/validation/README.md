@@ -126,7 +126,9 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 - **DC-R34** Each signed PDF shall be stored as `docs/validation/signed/<document ID>_v<version>.pdf`, except a
   generated per-release record, which is stored in its release folder `docs/validation/releases/<release>/`.
 - **DC-R35** Each signature shall be one row in [signatures.csv](signatures.csv) with: document ID, version, signer,
-  role, meaning, date (UTC), PDF path and the PDF's SHA-256.
+  role, meaning, date (UTC), PDF path, the signed PDF's SHA-256 (`sha256`) and, where the signature approves
+  generated content, the SHA-256 of that content (`content_sha256`; for the OQ protocol, of its steps table as CSV,
+  owner decision O31). The two are never the same field.
 - **DC-R36** A signature row and its PDF shall be committed in the same commit.
 - **DC-R37** The PDF for signature shall be generated at the version it approves (1.0 for a first issue) with the
   status line "APPROVED when signed below".
@@ -288,6 +290,7 @@ also questions in MDX-VAL-013.
 | O28 | DEV-0.11.04-001 is classed major (a failure in a class-A function), with `found_in` from the allowed list (MDX-VAL-010 DL-R07) and a question to the consultant on the back-fill (owner, 12 Nov 2026; MDX-VAL-013 question 25) |
 | O29 | The B6b spec and the B3 plan are copied into `docs/specs/` after the drafting-tool name and folder references are removed from the planning copies; the W1 spec is copied too; every spec in `docs/specs/` carries an "Approval record" section (date, the owner's approval words as recorded, approver), and approved specs are no longer headed DRAFT (owner, 12 Nov 2026; section 3.3) |
 | O30 | Sriharsha Telikicherla co-signs section 4 of this document as system owner; the owner signs last (owner, 12 Nov 2026; `signing/MDX-VAL-000-section-4.pdf`) |
+| O31 | `signatures.csv` keeps the content hash (`content_sha256`) apart from the signed PDF's hash (`sha256`); the generator checks the OQ protocol approval against `content_sha256` (owner, 12 Nov 2026; DC-R35; `validation/pack.py`) |
 
 ## 5. Codes used in these documents
 

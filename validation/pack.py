@@ -390,7 +390,9 @@ class Context:
     dry_run: bool
     head: str
     problems: list[str]
-    oq_approved: bool = False  # signatures.csv holds this release's OQ protocol with the current SHA-256 (O20)
+    oq_approved: bool = (
+        False  # signatures.csv holds this release's OQ protocol with the current content_sha256 (O20, O31)
+    )
 
 
 def _header(ctx: Context, doc_id: str, title: str, author: str, approver: str) -> str:
@@ -555,11 +557,12 @@ def protocol_sha256(scripted: list[list]) -> str:
 
 
 def protocol_approved(signatures: Path, release: str, sha256: str) -> bool:
-    """``signatures.csv`` holds the signed OQ protocol of this release with exactly this SHA-256."""
+    """``signatures.csv`` holds the signed OQ protocol of this release whose ``content_sha256`` (the steps table, not
+    the signed PDF, whose hash is ``sha256``) is exactly this SHA-256 (owner decision O31)."""
     if not signatures.exists():
         return False
     return any(
-        row.get("document_id") == PROTOCOL_ID and row.get("version") == release and row.get("sha256") == sha256
+        row.get("document_id") == PROTOCOL_ID and row.get("version") == release and row.get("content_sha256") == sha256
         for row in csv.DictReader(signatures.read_text(encoding="utf-8-sig").splitlines())
     )
 
@@ -591,7 +594,7 @@ def oq_protocol(ctx: Context, scripted: list[list], sha256: str) -> str:
 def oq(ctx: Context, s: Sources, scripted: list[list], log: list[list], sha256: str, approved: bool) -> str:
     untagged = sum(1 for t in s.tests if not t["scenarios"] and not t.get("file_scenarios"))
     state = (
-        f"approved (`signatures.csv`, SHA-256 `{sha256}`)"
+        f"approved (`signatures.csv`, content SHA-256 `{sha256}`)"
         if approved
         else f"NOT APPROVED (dry run only; SHA-256 `{sha256}`)"
     )

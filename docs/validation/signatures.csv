@@ -1,1 +1,1 @@
-document_id,version,signer,role,meaning,date_utc,pdf_path,sha256
+document_id,version,signer,role,meaning,date_utc,pdf_path,sha256,content_sha256

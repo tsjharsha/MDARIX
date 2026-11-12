@@ -7,7 +7,7 @@ writes into docs/validation/signing/:
 - MDX-VAL-000-section-4.pdf: the header of MDX-VAL-000 and its section 4 (owner decisions in force), with a signature
   block for the owner and the system owner's co-signature (owner decision O30).
 Each PDF carries "FOR SIGNATURE - NOT SIGNED" on every page. The signed scan or digitally signed PDF is saved next to
-it as *-signed.pdf and listed in signatures.csv with its SHA-256 (MDX-VAL-000 DC-R32 to DC-R36); this script never
+it as *-signed.pdf and listed in signatures.csv with its SHA-256 in sha256 (MDX-VAL-000 DC-R32 to DC-R36); this script never
 overwrites a signed file."""
 
 from __future__ import annotations

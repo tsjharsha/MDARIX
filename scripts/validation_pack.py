@@ -12,7 +12,7 @@ still 1 when a check fails. A release folder holding a signed approval is never 
     python scripts/validation_pack.py --release 0.11.04 --oq-protocol
 
 writes only the OQ protocol (MDX-VAL-007-P) and prints its SHA-256: the quality approver signs it before execution
-and its signatures.csv row names that SHA-256. Outside a dry run no OQ results are written without that row (O20)."""
+and its signatures.csv row names that SHA-256 in content_sha256 (sha256 is the signed PDF's). Outside a dry run no OQ results are written without that row (O20)."""
 
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         problems=pack.check(sources, args.release)
         + pack.release_check_problems(sources.release_checks, commit, bool(sources.tests))
         + ([] if approved or args.oq_protocol else [
-            f"OQ protocol {pack.PROTOCOL_ID} {args.release} is not approved: no signatures.csv row with SHA-256 "
+            f"OQ protocol {pack.PROTOCOL_ID} {args.release} is not approved: no signatures.csv row with content_sha256 "
             f"{protocol_sha}; no OQ results without an approved protocol (owner decision O20)"]),
         oq_approved=approved,
     )  # fmt: skip
@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         files, sha = pack.build_protocol(ctx, sources)
         pack.write(out, files)
         print(f"Written the OQ protocol to {out}; SHA-256 {sha}. Sign it, then add its signatures.csv row "
-              f"({pack.PROTOCOL_ID},{args.release},...,{sha}) before execution.")  # fmt: skip
+              f"({pack.PROTOCOL_ID},{args.release},...,<signed PDF sha256>,{sha}) before execution.")  # fmt: skip
         return 0
     for problem in ctx.problems:
         print(f"CHECK FAILED: {problem}", file=sys.stderr)
