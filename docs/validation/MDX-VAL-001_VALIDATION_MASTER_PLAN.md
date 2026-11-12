@@ -197,7 +197,7 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 ### 9.2 Per-release (agile) validation
 
 MDARIX is released in small, frequent releases on one shared version for every customer. Each release is validated
-by the steps below instead of one large validation at the end.
+for MDARIX's own intended use by the steps below, instead of one large validation at the end.
 
 - **VMP-R17** Each release spec shall list the REQ IDs and scenario IDs it adds or changes.
 - **VMP-R18** Each release shall carry a change-impact assessment that sets which scenarios must be re-run (9.3).

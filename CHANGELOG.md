@@ -10,6 +10,42 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.11.04] - not released yet
+
+B6b Part A: validation documents. MDARIX's own validation documents now live in the repository under
+`docs/validation/`, versioned with the code. All are drafts for the owner's review and signature; none is signed and
+none is to be given to a customer before the independent CSV consultant has reviewed it. No code change for users,
+no migration, no switch.
+
+### Added
+- **Document control and index (MDX-VAL-000)**, `docs/validation/README.md`: document numbering (MDX-VAL, -SUP,
+  -SOP, -OPS, -CUS), versions and statuses, header template, writing standard, signing as a PDF with its SHA-256 in
+  `docs/validation/signatures.csv` (header only for now), retirement rule, document index.
+- **Validation Master Plan (MDX-VAL-001)**: scope, intended use, system description, roles (system owner:
+  Product & Engineering; quality approver: QA/RA), segregation-of-duties rules and a RACI per deliverable,
+  risk-based approach, risk classes A/B/C by severity, lifecycle and per-release validation, change impact, release
+  approval before every production deploy, 10-working-day customer change notice, environments, deliverables,
+  acceptance criteria, deviations. Replaces the planning draft MDX-B10-003.
+- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 64 failure modes with severity,
+  occurrence and detectability (1-5), RPN and an action rule, each linked to the threat model and to seed
+  requirement IDs. Replaces the planning draft MDX-B10-004.
+- **GAMP 5 category justification (MDX-VAL-003)**: Category 4 for MDARIX, Category 5 for anything written for one
+  customer, Category 1 for platform software.
+- **Scenario register under version control**: `docs/validation/scenario-register.md` is now the master copy
+  (copied byte for byte from the planning folder, which keeps a pointer).
+
+### Changed
+- **Password expiry claim corrected.** `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` said passwords expire
+  after 90 days; the code has no password expiry (owner decision). It now states that, with the breached-password
+  refusal and the sign-in lockout; MFA for signatures is described as on by default and refused off in production.
+- **RPO stated one way everywhere**: 24 hours today (daily encrypted backup and disk snapshot, no point-in-time
+  recovery); target 15 minutes with point-in-time recovery on pilot hosting. Corrected in
+  `docs/runbooks/BACKUP_AND_RESTORE.md` (it said 1 hour), `PRODUCTION_DATABASE_READINESS_GATES.md`,
+  `PRODUCTION_SECURITY_AND_DR.md` and handover 38.
+- **MVP-1.0 CSA package retired.** `docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md` (never executed), its protocol,
+  the hand-kept traceability table and the customer IQ instructions carry a SUPERSEDED banner pointing to
+  `docs/validation/`. The banner is part of the generator (`validation/csa_package.py`), so regenerating keeps it.
+
 ## [0.11.03] - not released yet
 
 B6a: deadline protection, speed, reviews and trace. Part A (deadline protection, G18 and G19): legal reporting clocks
