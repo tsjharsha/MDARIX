@@ -5,7 +5,7 @@
 writes into docs/validation/signing/:
 - MDX-VAL-012-template.pdf: the interim release approval template, whole;
 - MDX-VAL-000-section-4.pdf: the header of MDX-VAL-000 and its section 4 (owner decisions in force), with a signature
-  block for the owner.
+  block for the owner and the system owner's co-signature (owner decision O30).
 Each PDF carries "FOR SIGNATURE - NOT SIGNED" on every page. The signed scan or digitally signed PDF is saved next to
 it as *-signed.pdf and listed in signatures.csv with its SHA-256 (MDX-VAL-000 DC-R32 to DC-R36); this script never
 overwrites a signed file."""
@@ -23,10 +23,13 @@ from validation import docx_render  # noqa: E402
 
 WATERMARK = "FOR SIGNATURE - NOT SIGNED"
 OWNER_BLOCK = """
-## Signature (owner decision O19)
+## Signatures (owner decisions O19 and O30)
+
+The system owner co-signs first; the owner signs last.
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
+| System owner (co-signs) | Sriharsha Telikicherla, Product & Engineering | I confirm, as system owner, that each decision in this section is implemented or planned as its row states, and I accept them for the system. | | |
 | Owner and quality approver | Srinivas Telikicherla, QA/RA | I approve the owner decisions in this section as in force from the big-bang deploy. | | |
 """
 

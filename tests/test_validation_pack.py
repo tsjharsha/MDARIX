@@ -399,6 +399,7 @@ def test_signing_pdfs_hold_section_4_and_the_template_unsigned():
     text = signing.section_4((ROOT / "docs" / "validation" / "README.md").read_text(encoding="utf-8"))
     assert text.startswith("# MDX-VAL-000 section 4:") and "| O24 |" in text and "## 5. " not in text
     assert "I approve the owner decisions in this section as in force" in text
+    assert "| System owner (co-signs) | Sriharsha Telikicherla" in text  # O30
     assert signing.render(text, "MDX-VAL-000-section-4").startswith(b"%PDF")
 
 

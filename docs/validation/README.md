@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-000 |
 | Title | Validation document control and index |
-| Version | 0.5 |
+| Version | 0.6 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
@@ -22,6 +22,7 @@ Change history
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations") recorded as O7 to O16; MDX-VAL-012 interim template added to the index; PL scenario code; document versions updated | Srinivas Telikicherla |
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight") recorded as O17 to O24; section 4 marked to be signed by the owner before the big-bang deploy, with its PDF for signature; section 3.3 indexes the approved specs copied into `docs/specs/`; OQ expected results and the OQ protocol and results IDs (MDX-VAL-007-P, -007-R) in the index | Srinivas Telikicherla |
+| 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations") recorded as O25 to O31; section 4 co-signed by the system owner (O30); section 3.3 adds the B6b spec, the B3 plan and the W1 spec and the approval records (O29); index versions | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -150,7 +151,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
-| MDX-VAL-000 | Validation document control and index | this file | 0.5 | DRAFT; section 4 to be signed by the owner before the big-bang deploy |
+| MDX-VAL-000 | Validation document control and index | this file | 0.6 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.5 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.6 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
@@ -225,7 +226,7 @@ has no verbatim approval words (its record says so).
 
 ## 4. Owner decisions in force
 
-**Signing status: to be signed by the owner before the big-bang deploy (owner decision O19).** The rules in force
+**Signing status: to be co-signed by Sriharsha Telikicherla as system owner and signed by the owner before the big-bang deploy (owner decisions O19, O30).** The rules in force
 from the big-bang deploy rest on this section; until it is signed they are drafts. The PDF for signature is
 `signing/MDX-VAL-000-section-4.pdf` (generated, unsigned; `scripts/validation_signing_pdfs.py`).
 
@@ -286,6 +287,7 @@ also questions in MDX-VAL-013.
 | O27 | Every class-A OQ expected result is re-derived from its requirement (not from the code) by Sriharsha Telikicherla and confirmed by the owner, the 24 TO CONFIRM rows included; `oq-expected-results.csv` records `source` (`requirement` / `code`) and `confirmed_by`, and the generator treats a row drafted from the code or not confirmed as not yet approved: a check failure outside a dry run (owner, 12 Nov 2026; `validation/pack.py`) |
 | O28 | DEV-0.11.04-001 is classed major (a failure in a class-A function), with `found_in` from the allowed list (MDX-VAL-010 DL-R07) and a question to the consultant on the back-fill (owner, 12 Nov 2026; MDX-VAL-013 question 25) |
 | O29 | The B6b spec and the B3 plan are copied into `docs/specs/` after the drafting-tool name and folder references are removed from the planning copies; the W1 spec is copied too; every spec in `docs/specs/` carries an "Approval record" section (date, the owner's approval words as recorded, approver), and approved specs are no longer headed DRAFT (owner, 12 Nov 2026; section 3.3) |
+| O30 | Sriharsha Telikicherla co-signs section 4 of this document as system owner; the owner signs last (owner, 12 Nov 2026; `signing/MDX-VAL-000-section-4.pdf`) |
 
 ## 5. Codes used in these documents
 
