@@ -725,6 +725,51 @@ def export(
     )
 
 
+def _value_centre(db, control_db, ctx) -> dict:
+    """B6a P2: the outcome numbers (404 while MDARIX_B6_VALUE_CENTRE is off)."""
+    from backend.app.oversight import value_centre
+
+    if not value_centre.enabled():
+        raise _error(404, "VALUE_CENTRE_OFF", "The Value Centre is switched off")
+    return value_centre.build(db, control_db, _tenant(ctx), service.now_utc())
+
+
+@router.get("/value-centre", dependencies=[SETTERS])
+def value_centre_view(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B6a P2 Value Centre v0: time to triage, to the reportability decision and to an approved report, and report
+    completeness, from recorded timestamps; never a person's time. Leaders, quality reviewers and approvers."""
+    return _value_centre(db, control_db, ctx)
+
+
+@router.get("/value-centre.csv", dependencies=[SETTERS, Depends(require_permission(DATA_EXPORT))])
+def value_centre_csv(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The Value Centre as CSV (numbers and counts only); the download is audited."""
+    from backend.app import csv_safe
+    from backend.app.oversight import value_centre
+
+    found = _value_centre(db, control_db, ctx)
+    stream = io.StringIO()
+    writer = csv_safe.writer(stream, fieldnames=list(value_centre.CSV_FIELDS))
+    writer.writeheader()
+    for row in value_centre.csv_rows(found):
+        writer.writerow(row)
+    _audit(db, ctx, "VALUE_CENTRE_EXPORTED", "ValueCentre", None)
+    db.commit()
+    return Response(
+        content=stream.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": attachment("mdarix-value-centre.csv")},
+    )
+
+
 def _deadlines(db, control_db, ctx, kind: str) -> tuple[dict, list[dict]]:
     """B6a G18a: the open reporting deadlines for an offline copy; the download is audited (the caller commits)."""
     from backend.app.oversight import deadline_list

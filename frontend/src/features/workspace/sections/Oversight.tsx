@@ -32,6 +32,7 @@ import {
 import { InlineError, Why } from "./boardParts";
 import { TryDailyList } from "./Account";
 import { AuditTrailReview } from "../../customer-admin/sections/Reviews";
+import { ValueCentre } from "./ValueCentre";
 
 const useOpen = useOpenTarget;
 
@@ -57,6 +58,9 @@ export function OversightView({
   const view = data.data;
   // B6a G1: the audit trail review is signed by a Leader or Quality Reviewer (the server decides; this only shows it).
   const reviews = useCan("quality.review");
+  // B6a P2: the Value Centre, for Leaders, quality reviewers and approvers (the server decides).
+  const approves = useCan("regulatory.approve");
+  const outcomes = reviews || approves;
   const go = useOpen();
   const { open } = useWorkspace();
   if (part === "events")
@@ -135,6 +139,7 @@ export function OversightView({
       {part === "all" && view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {part === "all" && view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
       {part === "all" && reviews && <AuditTrailReview />}
+      {part === "all" && outcomes && <ValueCentre />}
       {event && <EventDrawer complaintId={event} onClose={() => setEvent(null)} onChanged={data.reload} />}
     </div>
   );
