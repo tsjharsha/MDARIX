@@ -134,7 +134,7 @@ Requirement wording is a first draft from the specs and code; each will be confi
 | # | Point | Owner |
 |---|---|---|
 | OP-1 | Approve the area codes and the REQ format. | Owner |
-| OP-2 | Approve the new PL-xx scenario group (§7 gaps). | Owner |
+| OP-2 | Approved by the owner on 12 Nov 2026 (MDX-VAL-000 section 4, O15): PL-01 to PL-45 drafted in the scenario register; the owner reviews each expected result. | Owner |
 | OP-3 | Decide where `requirements.csv` lives (MDARIX-planning or the product repository). Recommended: the product repository, so it versions with the code. | Owner |
 | OP-4 | Agree the test-marker convention (`@pytest.mark.scenario(...)`) before B2 tests are written. | Engineering |
 | OP-5 | Handover 50/51 matrices predate the scenario register; retire or regenerate them. | Engineering |
