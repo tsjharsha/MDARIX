@@ -233,7 +233,11 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert record["document_id"] == "MDX-VAL-012-9.9.9" and record["template"] == "MDX-VAL-012"
     assert (out / "junit.xml").read_bytes() == (root / "junit.xml").read_bytes()
     assert record["junit_sha256"] == __import__("hashlib").sha256((root / "junit.xml").read_bytes()).hexdigest()
-    assert "## 8a. Class-A verification (VMP-R96)" in vsr and "| 1 | ____" in vsr and "(VMP-R15)" in vsr
+    assert (
+        "## 8a. Class-A verification (VMP-R96)" in vsr
+        and "| 1 | 0 (from executed-results.csv) | 0 |" in vsr
+        and "(VMP-R15)" in vsr
+    )
     assert "| Reviewer | Independent CSV consultant" in vsr and "Change history" in vsr
     assert "| 9 | After the deploy: deploy_gate.py passed" in (out / "MDX-VAL-012-release-approval.md").read_text(
         "utf-8"
@@ -468,3 +472,43 @@ def test_junit_is_bound_to_its_commit_clean_tree_and_hook(tmp_path, capsys, monk
     meta = pack.read_junit_meta(junit_file)
     assert meta["hook_version"] == pytest_requirements.HOOK_VERSION and meta["tree"] in ("clean", "dirty")
     assert len(meta["commit"]) == 40
+
+
+RESULTS = """step,scenario_id,executed_by,date_utc,result,evidence_id
+IQ-004,,S. T.,2026-11-30T09:00:00Z,PASS,EVD-IQ-004
+OQ-001,AA-01,S. T.,2026-11-30T10:00:00Z,PASS,EVD-OQ-001
+OQ-002,AA-02,S. T.,2026-11-30T10:05:00Z,PASS,EVD-OQ-002
+"""
+
+
+def test_executed_results_feed_the_iq_oq_rtm_and_vsr(tmp_path, capsys):
+    """Owner, 12 Nov 2026: executed IQ and scripted OQ results come from executed-results.csv, never typed into a
+    generated document; a scripted PASS verifies a class-A scenario, a scripted FAIL blocks the release."""
+    untagged = '<testcase classname="tests.test_b" name="test_untagged" time="0.05"/>'
+    junit = JUNIT.split("<testcase")[0] + untagged + "\n</testsuite></testsuites>"
+    root = _root(tmp_path, junit=junit)
+    (root / "results.csv").write_text(RESULTS, encoding="utf-8")
+    assert _run(root, "--results", str(root / "results.csv"), "--out", str(tmp_path / "out")) == 0
+    out = tmp_path / "out"
+    body = {
+        r[0]: dict(zip(read_rows((out / "rtm.xlsx").read_bytes())[0], r))
+        for r in read_rows((out / "rtm.xlsx").read_bytes())[1:]
+    }
+    assert body["REQ-T-001"]["status"] == "Verified" and body["REQ-T-001"]["coverage"] == "scripted OQ"
+    assert "| 0 | 1 (from executed-results.csv) | 0 |" in (out / "MDX-VAL-011-VSR.md").read_text("utf-8")
+    assert "| S. T. | 2026-11-30T09:00:00Z | PASS | EVD-IQ-004 |" in (out / "MDX-VAL-006-IQ.md").read_text("utf-8")
+    assert "| PASS | EVD-OQ-002 |" in (out / "MDX-VAL-007-R-OQ-results.md").read_text("utf-8")
+    assert (out / "executed-results.csv").read_text("utf-8") == RESULTS
+    bad = RESULTS.replace("PASS,EVD-OQ-001", "PASS,").replace("10:05:00Z,PASS", "10:05:00Z,FAIL")
+    (root / "results.csv").write_text(bad + "XQ-1,,S. T.,2026-11-30T11:00:00Z,MAYBE,\n", encoding="utf-8")
+    assert _run(root, "--results", str(root / "results.csv"), "--out", str(tmp_path / "out2")) == 1
+    said = capsys.readouterr().err
+    for part in ("executed OQ-001: PASS without executor, date or evidence ID", "class-A scenario AA-02 FAIL",
+                 "executed XQ-1: result 'MAYBE' is not one of the five values", "executed XQ-1: step is not IQ-nnn"):  # fmt: skip
+        assert part in said
+    unapproved = _root(tmp_path / "u", junit=junit, approve=False)
+    (unapproved / "results.csv").write_text(RESULTS, encoding="utf-8")
+    assert (
+        _run(unapproved, "--results", str(unapproved / "results.csv"), "--dry-run", "--out", str(tmp_path / "d")) == 1
+    )
+    assert "executed-results.csv holds OQ results but the OQ protocol is not approved" in capsys.readouterr().err

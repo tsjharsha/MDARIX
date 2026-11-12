@@ -42,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release", required=True, help="release identity, e.g. 0.11.04")
     parser.add_argument("--junit", type=Path, help="pytest JUnit XML of this release (with requirement properties)")
     parser.add_argument("--release-checks", type=Path, help="artifacts/release-checks-<version>.json")
+    parser.add_argument("--results", type=Path, help="executed IQ/OQ results CSV; default <out>/executed-results.csv")
     parser.add_argument("--clock-check", type=Path, help="a clock-check JSON from scripts/clock_check.py")
     parser.add_argument("--commit", default="", help="default: the current commit")
     parser.add_argument("--tag", default="", help="the release tag, when there is one")
@@ -87,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
         clock_check=json.loads(args.clock_check.read_text(encoding="utf-8")) if args.clock_check else None,
         oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"),
     )
+    results = args.results or out / "executed-results.csv"
+    if results.exists():  # executed IQ/OQ results, fed into the documents, never typed into them
+        sources.executed, sources.executed_raw = pack.read_results(results), results.read_bytes()
     commit = args.commit or _git("rev-parse", "--short=8", "HEAD") or "unknown"
     scripted, _ = pack.oq_tables(sources)
     protocol_sha = pack.protocol_sha256(scripted)
@@ -100,7 +104,9 @@ def main(argv: list[str] | None = None) -> int:
         + pack.junit_binding_problems(sources.junit_meta, commit)
         + ([] if approved or args.oq_protocol else [
             f"OQ protocol {pack.PROTOCOL_ID} {args.release} is not approved: no signatures.csv row with content_sha256 "
-            f"{protocol_sha}; no OQ results without an approved protocol (owner decision O20)"]),
+            f"{protocol_sha}; no OQ results without an approved protocol (owner decision O20)"])
+        + ([] if approved or not any(r.get("step", "").startswith("OQ-") for r in sources.executed) else [
+            "executed-results.csv holds OQ results but the OQ protocol is not approved (owner decision O20)"]),
         oq_approved=approved,
     )  # fmt: skip
     if args.oq_protocol:

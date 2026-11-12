@@ -80,6 +80,8 @@ class Sources:
     deviations: list[dict] = field(default_factory=list)
     clock_check: dict | None = None
     oq_expected: dict[str, dict] = field(default_factory=dict)  # scenario -> concrete OQ expected result (O20)
+    executed: list[dict] = field(default_factory=list)  # executed IQ / scripted OQ results (read_results)
+    executed_raw: bytes | None = None  # copied into the release folder as executed-results.csv
 
 
 # ---- reading -------------------------------------------------------------------------------------------------------
@@ -136,6 +138,23 @@ def read_junit(path: Path) -> list[dict]:
             "seconds": float(case.get("time") or 0), "scenarios": scenarios, "file_scenarios": file_scenarios,
         })  # fmt: skip
     return sorted(tests, key=lambda t: t["id"])
+
+
+RESULT_COLUMNS = ["step", "scenario_id", "executed_by", "date_utc", "result", "evidence_id"]
+
+
+def read_results(path: Path) -> list[dict]:
+    """``executed-results.csv``: one row per executed IQ step (``IQ-nnn``) or scripted OQ step (``OQ-nnn`` with its
+    scenario), written by the executor; the generator feeds them into the IQ record, the OQ results, the RTM and the
+    VSR, so no generated document is edited by hand (owner, 12 Nov 2026). Any other header is refused."""
+    reader = csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())
+    if reader.fieldnames != RESULT_COLUMNS:
+        raise ValueError(f"{path.name}: the header is not {','.join(RESULT_COLUMNS)}")
+    return list(reader)
+
+
+def _executed(sources: Sources, sid: str) -> set[str]:
+    return {r["result"].strip() for r in sources.executed if r.get("scenario_id", "").strip() == sid}
 
 
 def read_junit_meta(path: Path) -> dict:
@@ -225,12 +244,13 @@ def scenario_outcome(sources: Sources, sid: str) -> str:
     """This release's outcome of one scenario: FAIL (a tagged test failed, or the register says FAIL), BLOCKED,
     PASS (a tagged test ran and passed), else NOT RUN. A register PASS alone is a development result (VMP-R31)."""
     results = {t["result"] for t in _ran(sources) if _proves(sources, t, sid)}
+    scripted = _executed(sources, sid)  # executed scripted OQ steps (results CSV)
     status = sources.scenarios.get(sid, {}).get("status", "")
-    if "fail" in results or status == "FAIL":
+    if "fail" in results or "FAIL" in scripted or status == "FAIL":
         return "FAIL"
-    if status == "BLOCKED":
+    if status == "BLOCKED" or "BLOCKED" in scripted:
         return "BLOCKED"
-    return "PASS" if "pass" in results else "NOT RUN"
+    return "PASS" if "pass" in results or "PASS" in scripted else "NOT RUN"
 
 
 def check(sources: Sources, release: str) -> list[str]:
@@ -277,6 +297,19 @@ def check(sources: Sources, release: str) -> list[str]:
         for sid in test["scenarios"] + test.get("file_scenarios", []):
             if sid not in sources.scenarios:
                 problems.append(f"{test['id']}: marker names unknown scenario {sid}")
+    steps = {s for req in sources.requirements if req["class"] == "A" for s in req["scenario_ids"]}
+    for row in sources.executed:
+        step, result = row.get("step", "").strip(), row.get("result", "").strip()
+        if result not in FIVE:
+            problems.append(f"executed {step}: result '{result}' is not one of the five values")
+        if not step.startswith(("IQ-", "OQ-")):
+            problems.append(f"executed {step or '(blank)'}: step is not IQ-nnn or OQ-nnn")
+        if step.startswith("OQ-") and row.get("scenario_id", "").strip() not in steps:
+            problems.append(f"executed {step}: scenario '{row.get('scenario_id')}' is not a scripted class-A step")
+        if result in ("PASS", "FAIL") and not all(
+            row.get(k, "").strip() for k in ("executed_by", "date_utc", "evidence_id")
+        ):
+            problems.append(f"executed {step}: {result} without executor, date or evidence ID")
     for dev in release_deviations(sources, release):
         dev_id, status = dev["dev_id"], dev.get("status", "").strip().lower()
         if status not in DEV_STATUSES:
@@ -329,6 +362,7 @@ def rtm(sources: Sources) -> list[dict]:
         scenarios = req["scenario_ids"]
         linked = [t for t in _ran(sources) if any(_proves(sources, t, s) for s in scenarios)]
         file_only = not linked and any(set(t.get("file_scenarios", ())) & set(scenarios) for t in _ran(sources))
+        scripted = sum("PASS" in _executed(sources, s) for s in scenarios)
         outcomes = {s: scenario_outcome(sources, s) for s in scenarios}
         statuses = {sources.scenarios.get(s, {}).get("status", "") for s in scenarios}
         if "FAIL" in outcomes.values():
@@ -348,7 +382,9 @@ def rtm(sources: Sources) -> list[dict]:
             "tagged_tests": len(linked), "passed": sum(t["result"] == "pass" for t in linked),
             "failed": sum(t["result"] == "fail" for t in linked),
             "scenarios_passed": f"{sum(o == 'PASS' for o in outcomes.values())}/{len(scenarios)}",
-            "coverage": "covered" if linked else "file-level only, not verification" if file_only else "NOT COVERED",
+            "scripted_oq_passed": scripted,
+            "coverage": "covered" if linked else "scripted OQ" if scripted
+            else "file-level only, not verification" if file_only else "NOT COVERED",
             "register_status": "; ".join(f"{s} {sources.scenarios.get(s, {}).get('status', 'NOT IN REGISTER')}" for s in scenarios),
             "named_tests": " ".join(req["tests"]), "status": status,
             "future": " ".join(s for s in scenarios if is_future(sources, s)),
@@ -532,11 +568,17 @@ def iq(ctx: Context, s: Sources) -> str:
         ["IQ-007", "Clock check (`scripts/clock_check.py`)", json.dumps(clock.get("status") or clock.get("result") or "not supplied"), "recorded" if clock else "to record"],
         ["IQ-008", "Release checks JSON", f"passed = {checks.get('passed')}, full suite = {checks.get('full_suite')}" if checks else "not supplied", "recorded" if checks else "to record"],
     ]  # fmt: skip
+    done = {r["step"].strip(): r for r in s.executed if r.get("step", "").startswith("IQ-")}
+    keys = ("executed_by", "date_utc", "result", "evidence_id")
+    rows = [row + [done.get(row[0], {}).get(k, "") for k in keys] for row in rows]
     return (
         _header(ctx, "MDX-VAL-006", "Installation qualification record", SYSTEM_OWNER, QUALITY_APPROVER)
         + _sources_section(ctx)
-        + '## 2. Installation checks\n\nExecuted by: ________ Date: ________ (a check marked "to record" is filled in by hand at installation).\n\n'
-        + _table(["Step", "Check", "Recorded", "Result"], rows)
+        + '## 2. Installation checks\n\nA check marked "to record" is executed at installation and written as a row of '
+        "`executed-results.csv` (step IQ-nnn); the next generation fills it in here, never by hand.\n\n"
+        + _table(
+            ["Step", "Check", "Recorded", "Result", "Executed by", "Date (UTC)", "Executed result", "Evidence ID"], rows
+        )
     )
 
 
@@ -628,7 +670,11 @@ def oq(ctx: Context, s: Sources, scripted: list[list], log: list[list], sha256: 
         if approved
         else f"NOT APPROVED (dry run only; SHA-256 `{sha256}`)"
     )
-    steps = [scripted[0][:3] + scripted[0][5:6] + RESULT_HEADER] + [r[:3] + r[5:6] + [""] * 4 for r in scripted[1:]]
+    done = {r.get("scenario_id", "").strip(): r for r in s.executed if r.get("step", "").startswith("OQ-")}
+    keys = ("executed_by", "date_utc", "result", "evidence_id")
+    steps = [scripted[0][:3] + scripted[0][5:6] + RESULT_HEADER] + [
+        r[:3] + r[5:6] + [done.get(r[2], {}).get(k, "") for k in keys] for r in scripted[1:]
+    ]
     return (
         _header(ctx, RESULTS_ID, "Operational qualification results", SYSTEM_OWNER, QUALITY_APPROVER)
         + _sources_section(ctx)
@@ -716,7 +762,8 @@ def vsr(ctx: Context, s: Sources, rows: list[dict], figures: dict, devs: list[di
 def _vsr_required(rows: list[dict]) -> str:
     """The VSR content MDX-VAL-001 asks for: VMP-R96 counts, VMP-R46 label, VMP-R82/R84 people, VMP-R15 references."""
     class_a = [r for r in rows if r["class"] == "A"]
-    tagged = sum(r["status"] == "Verified" for r in class_a)
+    tagged = sum(r["status"] == "Verified" and r["coverage"] == "covered" for r in class_a)
+    scripted = sum(r["status"] == "Verified" and r["coverage"] == "scripted OQ" for r in class_a)
     return (
         "## 8a. Class-A verification (VMP-R96)\n\n"
         + _table(
@@ -725,7 +772,7 @@ def _vsr_required(rows: list[dict]) -> str:
                 "Verified by executed scripted OQ steps (MDX-VAL-007-R)",
                 "Not verified",
             ],
-            [[tagged, "____ (counted from the signed OQ results)", f"{len(class_a) - tagged} less the scripted count"]],
+            [[tagged, f"{scripted} (from executed-results.csv)", len(class_a) - tagged - scripted]],
         )  # fmt: skip
         + "\nUntil staging exists every result in this report is from the controlled local environment (VMP-R46).\n\n"
         "## 8b. People (VMP-R82, VMP-R84)\n\n"
@@ -835,6 +882,8 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
         files["release-checks.json"] = s.release_checks_raw or (json.dumps(s.release_checks, indent=2) + "\n").encode()
     if s.junit_raw is not None:
         files["junit.xml"] = s.junit_raw
+    if s.executed_raw is not None:
+        files["executed-results.csv"] = s.executed_raw
     files["checks.txt"] = ("\n".join(ctx.problems) + "\n" if ctx.problems else "no failing check\n").encode("utf-8")
     hashes = {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
     documents = {
