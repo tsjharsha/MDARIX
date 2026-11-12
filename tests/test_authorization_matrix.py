@@ -447,6 +447,9 @@ def world():
 
     previous = os.environ.get("MDARIX_FEATURE_SET")
     os.environ["MDARIX_FEATURE_SET"] = "full"  # every route served, so the guards themselves answer
+    # B7b: e-mail intake answers 404 while switched off, before the guard runs; switch it on so the guard is reached.
+    previous_intake = os.environ.get("MDARIX_EMAIL_INTAKE")
+    os.environ["MDARIX_EMAIL_INTAKE"] = "on"
     _purge_trial_business_data()
     try:
         owner, approval, owner_email = _approved_trial_client()
@@ -514,6 +517,10 @@ def world():
             os.environ.pop("MDARIX_FEATURE_SET", None)
         else:
             os.environ["MDARIX_FEATURE_SET"] = previous
+        if previous_intake is None:
+            os.environ.pop("MDARIX_EMAIL_INTAKE", None)
+        else:
+            os.environ["MDARIX_EMAIL_INTAKE"] = previous_intake
 
 
 # ------------------------------------------------------------------------------------------- dead states: nothing
