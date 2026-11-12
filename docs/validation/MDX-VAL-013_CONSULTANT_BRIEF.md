@@ -11,14 +11,14 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change) |
+| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test) |
 
 Change history
 
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A, item A5) | Srinivas Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations | Srinivas Telikicherla |
+| 0.2 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -87,14 +87,14 @@ model.
 | Customer | Validation of its own intended use (UAT/PQ); its configuration and its signed configuration snapshot; user accounts and roles; access reviews and audit-trail reviews with the product's tools; its e-signature policy and the certification letter to FDA (21 CFR 11.100(c)); training records; accuracy of data entered; checking starter rule content against its own procedure; submission to authorities; its periodic review; its outage procedure |
 | Both | Data retention and exit; inputs to the periodic review; investigation of a deviation that affects the customer |
 
-## 6. Electronic-record and electronic-signature controls in place
+## 6. Electronic-record and electronic-signature controls (implemented; not yet validated)
 
 Each signing needs the password session plus a fresh authenticator code; the signature records the signer, the
 time and the stated meaning, and is bound to the record version by a content fingerprint and signature hash. Audit
 events are append-only (a database trigger refuses update and delete) and chained by hash per organisation, with a
 daily verification. Signers need training on the current document versions. Five wrong codes lock signing for
 15 minutes. There is no periodic password expiry (owner decision O5; NIST SP 800-63B): lockout, breached-password
-checks and multi-factor authentication apply instead. File and line references are in MDX-VAL-002 (RSK-009 to
+checks and multi-factor authentication apply instead. File references are in MDX-VAL-002 (RSK-009 to
 RSK-021) and will be in MDX-SUP-003.
 
 ## 7. Question pack

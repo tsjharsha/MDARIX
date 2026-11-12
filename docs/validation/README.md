@@ -11,7 +11,7 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -19,7 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after a software-assisted review, findings dispositioned by the author | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: one signature rule for every document and the header field "Drafting"; signing sequence; registers and legacy files; owner decisions (section 4) and codes (section 5) recorded here; rules renumbered in reading order | Srinivas Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4) | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -54,7 +54,7 @@ Each rule has a number (DC-Rnn), so that a review comment, a deviation or a chec
 | MDX-OPS | Operational records | -001 recovery record, -002 monthly health report |
 | MDX-CUS | Templates for customers | -001 UAT/PQ, -002 migration plan, -003 migration report, -004 periodic review, -005 go-live checklist and support plan, -006 customer validation instructions |
 
-- **DC-R07** Each document shall carry an ID from the table above.
+- **DC-R07** Each document shall carry an ID from the table above, or, for the four drafts moved in by owner decision O2, its legacy MDX-B10 ID (section 3.1).
 - **DC-R08** A document ID shall not be reused, even after the document is retired.
 - **DC-R09** A register (the scenario register, `signatures.csv`, the deviation log) shall be controlled by its git
   history; it needs no document ID and no DC-R19 header.
@@ -110,7 +110,7 @@ Each rule has a number (DC-Rnn), so that a review comment, a deviation or a chec
 - **DC-R28** No document shall name a competitor.
 - **DC-R29** No document shall state a price.
 - **DC-R30** No document shall say that MDARIX is "validated", "compliant", "aligned" or "certified" for every
-  customer. MDARIX validates each release for its own intended use; each customer validates its own use.
+  customer, nor state a validation status that an approved VSR does not support (MDX-VAL-001, VMP-R44). MDARIX validates each release for its own intended use; each customer validates its own use.
 - **DC-R31** Before signature, the author shall check consistency, numbering, references and the signature block,
   and record that check in the change history.
 
@@ -150,7 +150,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-VAL-000 | Validation document control and index | this file | 0.3 | DRAFT |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.3 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.3 | DRAFT |
-| MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.2 | DRAFT |
+| MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.3 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.2 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
@@ -212,8 +212,8 @@ also questions in MDX-VAL-013.
 | B6b-D20 | The consultant is engaged before Part A is approved, for Part A, the GxP impact and Part 11 / Annex 11 assessments and the first release pack; until then Part A stays DRAFT and is shared with no customer |
 | B6b-D21 | The test marker is `requirement(<scenario ID>)`, as registered in `pytest.ini`; `requirements.csv` maps REQ IDs to scenarios |
 | O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
-| O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (B6b Part B) |
-| O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added in B6b Part B) |
+| O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (done 12 Nov 2026, commit `69248534`) |
+| O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added 12 Nov 2026, commit `cb75e8da`) |
 | O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-029 and RSK-039 by the privacy line of severity 4 |
 | O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
 | O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |

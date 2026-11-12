@@ -11,7 +11,7 @@
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -19,7 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only) | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -153,6 +153,8 @@ R = writes or does the work. A = approves and signs (one person). C = reviews an
 | Hosting assessment (-004), SOC 2 / ISO 27001 mapping (-005) | R | A | | I |
 | Trust facts (-006) | R (evidence check) | A (claims owner) | | |
 | SOPs (MDX-SOP-001 to -005) | R | A | C | I |
+| Consultant brief (MDX-VAL-013) | C | R, then A after the system owner's review | (recipient) | |
+| Moved drafts MDX-B10-001, -002, -005, -006 (VMP-R01) | R (-005, -006), C (-001, -002) | R (-001, -002), A (all four) | C | I (-001) |
 | Recovery record (MDX-OPS-001) | R (executes) | A | | I (summary) |
 | Monthly health report (MDX-OPS-002) | R (generates) | A (reviews before sending) | | I |
 | Customer templates (MDX-CUS-001 to -006) | C, then A | R | C | |
@@ -365,7 +367,7 @@ The log's columns and lifecycle are in Annex C. The log itself is MDX-VAL-010 (B
 - **VMP-R70** This plan shall be reviewed every 12 months (owner decision B6b-D18).
 - **VMP-R71** The product risk assessment (MDX-VAL-002) shall be reviewed every 12 months, in addition to its
   update in each release.
-- **VMP-R72** The supplier assessment (MDX-SUP-001 and MDX-SUP-004) shall be reviewed every 12 months.
+- **VMP-R72** The supplier documents (MDX-SUP-001 to -006) shall be reviewed every 12 months (B6b-D18).
 - **VMP-R73** The customer periodic review template (MDX-CUS-004) shall set a review every 12 months.
 - **VMP-R74** MDARIX's own periodic review report shall list the incidents, complaints about MDARIX, MDARIX CAPAs
   and customer audit findings of the period, from the registers set up in B6b Part D.

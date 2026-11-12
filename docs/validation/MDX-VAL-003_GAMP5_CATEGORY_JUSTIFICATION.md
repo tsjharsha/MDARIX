@@ -4,14 +4,14 @@
 |---|---|
 | Document ID | MDX-VAL-003 |
 | Title | GAMP 5 category justification |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (confirms; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change) |
+| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test) |
 
 Change history
 
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A); revised after a software-assisted review, findings dispositioned by the author (libraries, customer-side rules worded as template instructions) | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: whose view the category takes (section 4); owner decision O3 on the rule register; how each rule is checked (section 7); unconditional approval meaning, consultant confirmation tracked as OP-1 | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Editorial fixes after a third software-assisted review: code baseline names `cb75e8da`; OP-1 cites B6b-D5 | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -121,7 +122,7 @@ The cloud provider's infrastructure is assessed as a supplier in the hosting ass
 
 | # | Point | Owner |
 |---|---|---|
-| OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (MDX-VAL-013, question 2). Version 1.0 is signed only after the consultant's written answer to question 2 (owner decision B6b-D20) | Srinivas |
+| OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (MDX-VAL-013, question 2). Version 1.0 is signed only after the consultant's written answer to question 2 (owner decision B6b-D5) | Srinivas |
 | OP-2 | Whether customer-written organisation rules (rules that can only raise an outcome) need any extra customer test beyond the UAT/PQ template | Srinivas |
 | OP-3 | Closed 12 Nov 2026: `register.py` refuses the same person as builder and approver (owner decision O3) | Sriharsha |
 

@@ -11,7 +11,7 @@
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 12 Nov 2026 |
-| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` changes documentation only, plus the SUPERSEDED banner in `validation/csa_package.py` and its test; no product-code change); every file path below exists at that commit |
+| Code baseline | Product code at `628c624a`, plus two changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test); every file path below exists at `cb75e8da` |
 
 Change history
 
@@ -19,7 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after a software-assisted review, findings dispositioned by the author: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -88,16 +88,17 @@ consultant confirms the severities and scales. The whole assessment is **to conf
 - **RA-R05** A row that needs action shall have its action done before the release that relies on it.
 - **RA-R06** That action shall be the open item named in "Residual risk", or, where none is named, executing the
   row's class-A scenarios with pre-approved expected results.
-- **RA-R07** A class-A row marked Open that a production release relies on shall have a risk acceptance signed by the
+- **RA-R07** A row marked Open that is class A or needs action, and that a production release relies on, shall have a risk acceptance signed by the
   quality approver, naming its interim control and a due date (consultant to confirm, MDX-VAL-013 question 16).
 - **RA-R08** Each such acceptance shall be listed in the release approval record (MDX-VAL-012).
-- **RA-R09** "Residual risk" shall hold one of the three values defined below.
+- **RA-R09** "Residual risk" shall hold one of the four values defined below; any note goes in "Verification".
 
 | Residual risk | Meaning |
 |---|---|
 | Acceptable | The control is in place and its verification is named; nothing is left to do (used only where no validation run is needed, class C) |
 | Acceptable after verification | The control is in place; the row is acceptable once its named verification passes in a release pack |
 | Open | A control or a verification is missing; the missing item is named and listed in section 6 |
+| Not applicable while AI is off | AI rows only (RSK-041 to -043); rated before AI is switched on (MDX-VAL-001 section 15) |
 
 How these rules are checked: the quality approver checks each row against RA-R01 to RA-R09 before approving
 (OP-1); the release approval record lists the Open rows the release relies on and their acceptances (RA-R07).
@@ -177,7 +178,7 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-019 | Records | A signed conclusion is edited in place | History lost | 4 | 2 | 2 | 16 | A | No | A signed decision is never edited; a correction is a superseding version (`backend/app/human_decision/rules.py`) | IV-16, CI-07, CI-24, TR-02, TR-03 | PT-04 | REQ-REC-001 | Acceptable after verification |
 | RSK-020 | Records | A submitted report is overwritten | Record differs from what was sent | 4 | 2 | 3 | 24 | A | No | Obligation lifecycle states; a follow-up after submission (`backend/app/authority_reports/rules.py`) | RG-15 to RG-17 | PT-04 | REQ-REC-002 | Acceptable after verification |
 | RSK-021 | Records | An upgrade script changes signed records | Silent change | 4 | 3 | 2 | 24 | A | No | Upgrade scripts list, never change, signed conclusions; audited | CI-44; `tests/test_release_0_10_88_resign.py` | PT-04 | (B6b B1) | Acceptable after verification |
-| RSK-022 | Authority reports | A value is placed in the wrong field or code list | Wrong report sent by the customer | 5 | 3 | 3 | 45 | A | Yes | Values only from the approved snapshot; a choice ticked only on FDA's exact wording; unplaced values listed (`backend/app/authority_reports/fda_3500a.py`); eMDR validated against FDA schemas (`emdr.py`) | RG-19; `tests/test_fda_3500a_emdr.py` | - | REQ-ARD-001 | Acceptable after verification for the US; see RSK-053 and RSK-054 for the other markets |
+| RSK-022 | Authority reports | A value is placed in the wrong field or code list | Wrong report sent by the customer | 5 | 3 | 3 | 45 | A | Yes | Values only from the approved snapshot; a choice ticked only on FDA's exact wording; unplaced values listed (`backend/app/authority_reports/fda_3500a.py`); eMDR validated against FDA schemas (`emdr.py`) | RG-19; `tests/test_fda_3500a_emdr.py` (US; other markets: RSK-053, RSK-054) | - | REQ-ARD-001 | Acceptable after verification |
 | RSK-023 | Authority reports | A missing required field is not flagged | Rejected, therefore late, report | 5 | 3 | 2 | 30 | A | No | `check` names every block FDA requires (`emdr.py`) | Scenario to add: an eMDR with a required block missing is refused by `check`; test to name in `tests/test_fda_3500a_emdr.py` | - | (B6b B1) | **Open (verification):** scenario and test to add |
 | RSK-024 | Authority reports | Responsible-party details changed after approval appear on the report | Report differs from the approval | 5 | 2 | 3 | 30 | A | Yes | The party is used only while it still reads exactly as on the approved report (`emdr.py`) | Scenario to add (no test yet) | PT-04 | REQ-ARD-001 | **Open (verification):** add a scenario and a test |
 | RSK-025 | Tenant isolation | One organisation reads another's record by ID, search, export, file or report | Data breach | 5 | 2 | 4 | 40 | A | Yes | Tenant from the server session only; forced row-level security with a secret system scope (`backend/app/db/tenant_scope.py`, migrations `md05_rls_system_scope.py`, `md15_rls_system_token.py`, `md34_rls_defence.py`) | P360-11, S360-14, B6-45; `tests/test_rls_coverage.py`, `tests/test_cross_tenant_routes.py`, `tests/test_tenant_security.py` | PT-01, PT-02, PT-16 | REQ-TEN-001 | **Open:** independent penetration test before the first paid pilot |
@@ -208,12 +209,12 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-050 | Rule register | The wrong rule version applies to an event (effective dating), or a new floor gives a different outcome from the one it replaces | Wrong conclusion or clock | 5 | 3 | 3 | 45 | A | Yes | Effective dating per version; equivalence tests against the previous floor; window floors (`backend/app/rule_register/`) | RR rows; `tests/test_b4_effective_dating.py`, `tests/test_b4_equivalence.py`, `tests/test_b4_window_floor.py`, `tests/test_b4_register_api.py` | - | REQ-RPT-005 | Acceptable after verification |
 | RSK-051 | Investigation and challenge loop | An investigation conclusion is signed while a challenge or a changed fact is unanswered | Wrong conclusion signed | 4 | 3 | 3 | 36 | A | No | Challenge triggers and questions; facts and follow-up fields; the brief reflects open challenges | B5 rows; `tests/test_b5_loop_rules.py`, `tests/test_b5_loop_api.py`, `tests/test_b5_triggers.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-052 | Routine path | A routine (service or CAPA) path closes a complaint that needed a reportability assessment | Missed report | 5 | 3 | 3 | 45 | A | Yes | Routine path only after a signed Case check; urgent alert; switch per organisation | RT rows, UA rows; `tests/test_routine_rules_b7.py`, `tests/test_routine_path_switch.py`, `tests/test_urgent_alert_b7.py` | - | (B6b B1) | Acceptable after verification |
-| RSK-053 | EU and GB MIR files | A value is placed in the wrong MIR field, or the file is not valid against the form schema | Wrong report sent by the customer | 5 | 3 | 3 | 45 | A | Yes | MIR 7.3.1 and GB MIR 7.2.1 mappings; schema validation; file frozen at approval | B8 rows; `tests/test_b8_mir_xml.py`, `tests/test_b8_gb_mir_xml.py`, `tests/test_b8_mir_freeze.py` | - | (B6b B1) | Acceptable after verification; owner's by-eye check of each form |
+| RSK-053 | EU and GB MIR files | A value is placed in the wrong MIR field, or the file is not valid against the form schema | Wrong report sent by the customer | 5 | 3 | 3 | 45 | A | Yes | MIR 7.3.1 and GB MIR 7.2.1 mappings; schema validation; file frozen at approval | B8 rows; `tests/test_b8_mir_xml.py`, `tests/test_b8_gb_mir_xml.py`, `tests/test_b8_mir_freeze.py`; owner's by-eye check of each form | - | (B6b B1) | Acceptable after verification |
 | RSK-054 | India, Canada, US roles | The wrong reporting role, form or clock is used for a market | Missed or late report | 5 | 3 | 3 | 45 | A | Yes | Rule book per market; role floors; frozen forms | B9 rows; `tests/test_b9_rule_book.py`, `tests/test_b9_india_chain.py`, `tests/test_b9_canada_chain.py`, `tests/test_b9_us_role_floors.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-055 | Other countries | A country outside the five markets is not assessed or its report date is not tracked | Missed report in that country | 5 | 3 | 3 | 45 | A | Yes | Country recorded with its own conclusion; unsigned ones on the daily deadline list | OC rows; `tests/test_b9b_other_countries.py`, `tests/test_b9b_other_floor.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-056 | Restore and outbox | After a restore, events delivered after the backup come back unsent and are sent again, or are lost | Duplicate or missing notifications | 3 | 4 | 4 | 48 | B | Yes | None in the restore runbook today | Recovery check (B6b Part D) | G-1 | (B6b B1) | **Open:** the recovery check holds every unsent event older than the restore point (owner decision B6b-D10) |
 | RSK-057 | Trace this value | The trace shows the wrong origin for a value | Wrong information shown | 3 | 2 | 3 | 18 | B | No | Read only; values of the traced field only; origin from the import line and the snapshot | B6-39, B6-40; `tests/test_b6a_trace.py` | - | (B6b B1) | Acceptable after verification |
-| RSK-058 | Similar-wording duplicates | A duplicate is not suggested, or a wrong pair is suggested | Duplicate complaint not linked | 3 | 3 | 3 | 27 | B | No | Suggestion only; the person chooses attach or create; dismissed pairs not shown again | B6-41, B6-42; `tests/test_b6a_similar_wording.py` | - | (B6b B1) | Acceptable after verification; known limit: typos are missed |
+| RSK-058 | Similar-wording duplicates | A duplicate is not suggested, or a wrong pair is suggested | Duplicate complaint not linked | 3 | 3 | 3 | 27 | B | No | Suggestion only; the person chooses attach or create; dismissed pairs not shown again | B6-41, B6-42; `tests/test_b6a_similar_wording.py`; known limit: typos are missed | - | (B6b B1) | Acceptable after verification |
 | RSK-059 | Trends and signals | A pattern to review is missed or shown wrongly | Signal reviewed late | 3 | 3 | 4 | 36 | B | No | "Pattern to review", never a confirmed signal; statistics tests | `tests/test_signal_trend_rules.py`, `tests/test_trend_check_statistics.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-060 | Product 360 and Supplier 360 | Counts by product, version, lot or supplier are wrong | Wrong information shown | 3 | 3 | 3 | 27 | B | No | Counts from the organisation's own records; links to the source records | P360 and S360 rows; `tests/test_supplier360_rules.py`, `tests/test_product360_links.py` | PT-16 | (B6b B1) | Acceptable after verification |
 | RSK-061 | CAPA effectiveness | An effectiveness check shows as done or not due when it is due | Late effectiveness check | 3 | 3 | 3 | 27 | B | No | CAPA reference and effectiveness check with due dates | CP rows; `tests/test_reporting_capa_rules.py`, `tests/test_reporting_capa_api.py` | - | (B6b B1) | Acceptable after verification |
@@ -244,7 +245,7 @@ give the evidence. It does not claim they have passed in a validation run: most 
 - **Verification gaps** (a test or check missing): RSK-024 (no scenario or test), RSK-026 (outbox test covers part
   only), RSK-023 (missing-block scenario and test), RSK-030 (job never runs in a pilot organisation), RSK-035 (readable export), RSK-036 (download by another
   person: threat-model test PT-13 to add).
-- Each Open class-A row a release relies on needs the signed acceptance of RA-R07 until it is closed.
+- Each Open row a release relies on that is class A or needs action needs the signed acceptance of RA-R07 until it is closed.
 
 ## 7. Open points
 
