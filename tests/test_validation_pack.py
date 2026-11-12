@@ -40,7 +40,7 @@ OQ_EXPECTED = """scenario_id,revision,input,expected_result,checked_by,source,co
 AA-01,A,Submit a good input,200; saved,tests/test_a.py::test_saved,requirement,Srinivas 2026-11-13
 AA-02,A,Submit a bad input,422 BAD_INPUT; nothing saved,tests/test_a.py::test_refused,requirement,Srinivas 2026-11-13
 """
-JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest"><properties><property name="commit" value="abc12345ffffffff"/>
+JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest"><properties><property name="commit" value="abc12345ffffffffffffffffffffffffffffffff"/>
 <property name="tree" value="clean"/><property name="hook_version" value="2"/></properties>
 <testcase classname="tests.test_a" name="test_refused" time="0.10"><properties>
 <property name="requirement" value="AA-02"/></properties></testcase>
@@ -373,6 +373,13 @@ def test_deviation_cannot_close_without_retest_and_approver(tmp_path, capsys):
     wrong = DEV.format(n="003", risk="low", cls="minor", retest="", result="", approver="", closed="", status="open")
     assert _run(_root(tmp_path / "found", deviations=wrong.replace(",SH,OQ,", ",SH,document review,"))) == 1
     assert "DEV-9.9.9-003: found_in 'document review' is not one of IQ, OQ, PQ" in capsys.readouterr().err
+    high = DEV.format(
+        n="004", risk="high", cls="major", retest="OQ-1", result="PASS", approver="", closed="", status="retested"
+    )
+    assert _run(_root(tmp_path / "high", deviations=high)) == 1
+    assert (
+        "DEV-9.9.9-004: open deviation with GxP risk high; it blocks the release (VMP-R50a)" in capsys.readouterr().err
+    )
 
 
 @pytest.mark.requirement("B6-58")
@@ -442,13 +449,15 @@ def test_a_future_scenario_is_never_an_oq_step_or_verification(tmp_path):
     assert not any("AA-02" in p and "OQ expected" in p for p in problems)
     assert "REQ-T-001: class A whose negative scenarios are all future (not built)" in problems
     assert {r["req_id"]: r["future"] for r in pack.rtm(sources)} == {"REQ-T-001": "AA-02", "REQ-T-002": ""}
+    sources.tests = pack.read_junit(root / "junit.xml")  # AA-02's own passing test never verifies a future scenario
+    assert pack.scenario_outcome(sources, "AA-02") == "NOT RUN" and pack.scenario_outcome(sources, "AA-01") == "PASS"
 
 
 def test_junit_is_bound_to_its_commit_clean_tree_and_hook(tmp_path, capsys, monkeypatch):
     """Owner, 12 Nov 2026: a JUnit of another commit, of a changed tree or of an older marker hook is a check failure;
     the generator refuses a changed working tree outside a dry run."""
     junit = (
-        JUNIT.replace("abc12345ffffffff", "0123abcd").replace('"clean"', '"dirty"').replace('value="2"', 'value="1"')
+        JUNIT.replace("abc12345ffffffffffffffffffffffffffffffff", "0123abcd").replace('"clean"', '"dirty"').replace('value="2"', 'value="1"')
     )
     root = _root(tmp_path, junit=junit)
     assert _run(root) == 1

@@ -175,7 +175,7 @@ def junit_binding_problems(meta: dict | None, commit: str) -> list[str]:
         return []  # no JUnit at all is listed by release_check_problems
     problems = []
     theirs = meta.get("commit", "")
-    if theirs in ("", "unknown") or not (theirs.startswith(commit) or commit.startswith(theirs)):
+    if len(theirs) != 40 or not theirs.startswith(commit):  # the full hash, never a short prefix
         problems.append(f"JUnit is for commit {theirs or '(not recorded)'}, not {commit}")
     if meta.get("tree") != "clean":
         problems.append(f"JUnit ran on a working tree '{meta.get('tree') or 'not recorded'}', not a clean one")
@@ -244,6 +244,8 @@ def is_future(sources: Sources, sid: str) -> bool:
 def scenario_outcome(sources: Sources, sid: str) -> str:
     """This release's outcome of one scenario: FAIL (a tagged test failed, or the register says FAIL), BLOCKED,
     PASS (a tagged test ran and passed), else NOT RUN. A register PASS alone is a development result (VMP-R31)."""
+    if is_future(sources, sid):
+        return "NOT RUN"  # O26: a feature not built is never verified, whatever a test says
     results = {t["result"] for t in _ran(sources) if _proves(sources, t, sid)}
     scripted = _executed(sources, sid)  # executed scripted OQ steps (results CSV)
     status = sources.scenarios.get(sid, {}).get("status", "")
@@ -330,6 +332,9 @@ def check(sources: Sources, release: str) -> list[str]:
                 problems.append(f"{dev_id}: closed without a retest result")
             if not dev.get("approved_by", "").strip():
                 problems.append(f"{dev_id}: closed without an approver")
+    for dev in release_deviations(sources, release):
+        if dev.get("gxp_risk", "").strip().lower() == "high" and dev.get("status", "").strip().lower() != "closed":
+            problems.append(f"{dev['dev_id']}: open deviation with GxP risk high; it blocks the release (VMP-R50a)")
     for dev in open_critical(sources, release):
         problems.append(f"{dev['dev_id']}: critical deviation open; no release approval record can be produced")
     return problems
