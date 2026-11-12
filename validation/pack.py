@@ -55,7 +55,8 @@ INTERIM_CRITERIA = (
     "No critical failure of VMP-R60 (a risk acceptance never covers one)",
     "Change-impact assessment reviewed; customer change notice given where VMP-R37 needs one",
     "Restore point taken before the deploy and the rollback plan written",
-    "After the deploy: deploy_gate.py passed on production, result recorded",
+    "Post-deploy check ready before signing: the deploy_gate.py command for this release is in section 4 of the record, "
+    "and a failure starts the rollback of criterion 8",
 )
 
 
@@ -835,6 +836,9 @@ def approval_markdown(ctx: Context, record: dict) -> str:
         + _table(["#", "Criterion", "Met (yes / no / accepted)", "Initials"], CRITERIA_ROWS)
         + "\n## 3. Signature\n\nName: ____________ Role: quality approver Date (UTC): ____________\n\n"
         "Meaning: I approve this release for production after the checks listed.\n"
+        + f"\n## 4. Post-deploy record (after the signature; RA-T07)\n\nCommand: `python scripts/deploy_gate.py --release "
+        f"v{ctx.release} --require worker,scheduler` on production. A failure starts the rollback (criterion 8).\n\n"
+        "Result: ________ Time (UTC): ________ Run by (system owner): ________\n"
     )
 
 

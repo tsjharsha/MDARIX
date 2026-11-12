@@ -154,16 +154,16 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
 | MDX-VAL-000 | Validation document control and index | this file | 0.6 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
-| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.5 | DRAFT |
+| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.6 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.6 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.5 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
-| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.3 | DRAFT |
+| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.4 | DRAFT |
 | MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.3 | DRAFT; log: DEV-0.11.04-001 (major, retested, not closed) |
-| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.3 | DRAFT; to be signed by the owner before the big-bang deploy |
+| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.4 | DRAFT; to be signed by the owner before the big-bang deploy |
 | MDX-VAL-004, -005, -006, -007-P, -007-R, -009, -011, -012-&lt;release&gt; | URS, FS/DS, IQ record, OQ protocol (approved before execution, O20) and OQ results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
 | (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, source (`requirement` / `code`), confirmed by | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT: all 176 rows drafted from the code (`source` `code`, 24 of them say TO CONFIRM in the text); each to be re-derived from its requirement by Sriharsha Telikicherla and confirmed by the owner (O27) |
 | (data, per release) | Executed IQ and scripted OQ results: step, scenario, executed by, date (UTC), result, evidence ID; the generator feeds them into the IQ record, the OQ results, the RTM and the VSR (no generated document is edited by hand) | `releases/<release>/executed-results.csv` | per release | none yet |

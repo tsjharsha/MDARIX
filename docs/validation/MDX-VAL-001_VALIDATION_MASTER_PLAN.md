@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.5 |
+| Version | 0.6 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
@@ -22,6 +22,7 @@ Change history
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered); RACI: nobody approves their own document (MDX-VAL-013, MDX-B10 drafts); Annex F, the seven interface checks of import, e-mail intake, authority files and outbox mapped to existing tests, with three gaps | Sriharsha Telikicherla |
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight"): O17 big-bang gate (VMP-R50b, R50c); O18 a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test blocks (VMP-R49 split into R49 and R49a-c, VMP-R50 into R50 and R50a); O20 concrete OQ expected results and an OQ protocol approved before execution (lifecycle step 5; deliverables MDX-VAL-007-P and -007-R). After the second rating: VMP-R23 split into R23 and R23a-c | Sriharsha Telikicherla |
+| 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations"): VMP-R42a settles VMP-R42 against VMP-R49a for the first pack; OQ expected results derived from the requirement and confirmed (O27); content hash in `signatures.csv` (O31) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -282,6 +283,10 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
   deploy from the big-bang deploy onward, before this plan is approved (owner decision, 12 Nov 2026; OP-8).
 - **VMP-R42** The first release pack under this plan shall execute every class-A scenario, not only those named by
   its change impact.
+- **VMP-R42a** In that first release pack VMP-R49a shall not apply: a class-A scenario NOT RUN fails the pack, except
+  a scenario marked "future" (a feature not built yet, owner decision O26), which the VSR lists as outside the
+  retrospective validation. The big-bang deploy is not that pack: it is approved before this plan is 1.0, under the
+  interim release approval record (VMP-R41, VMP-R50b, VMP-R50c), where VMP-R49a applies.
 - **VMP-R43** The VSR of that first pack shall state that it is the retrospective validation of the functions
   already in production.
 - **VMP-R44** Until that VSR is approved, any MDARIX statement of validation status shall read only: "Validation
@@ -327,7 +332,8 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 
 ## 12. Acceptance criteria for a release
 
-- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence, or NOT RUN under VMP-R49a.
+- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence, or NOT RUN under VMP-R49a (except in the
+  first release pack, VMP-R42a).
 - **VMP-R49a** A class-A scenario that is NOT RUN shall be listed in a risk acceptance signed by the quality approver
   that names its interim control and due date (MDX-VAL-002 RA-R07).
 - **VMP-R49b** Each such risk acceptance shall be listed in the release approval record (RA-R08).

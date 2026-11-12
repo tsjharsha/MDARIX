@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-012 (the template; each per-release record is MDX-VAL-012-&lt;release&gt;) |
 | Title | Release approval record: interim template |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT. To be signed by the owner before the big-bang deploy (owner decision O19); PDF for signature: `signing/MDX-VAL-012-template.pdf` (unsigned) |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (prepares each record) |
 | Reviewer | Independent CSV consultant (not engaged yet; MDX-VAL-013 question 24) |
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft, owner decision O13: an interim release approval template for the big-bang deploy, before MDX-VAL-001 is approved as 1.0 | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records; section 5 cites the regression run | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Each per-release record has its own ID, MDX-VAL-012-&lt;release&gt; (RA-T01, RA-T06). Owner decisions O17 to O19 of 12 Nov 2026: big-bang gate for the "Acceptable after verification" action rows (section 5); a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test always blocks (criteria 3 to 5, RA-T04); to be signed by the owner before the big-bang deploy | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Criterion 9 checkable before signing: the post-deploy command and the rollback rule are in the record; the result goes into its post-deploy section (RA-T07) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -51,6 +52,10 @@ The record approves a deploy. It does not state that the release is validated un
   listed in `signatures.csv` under document MDX-VAL-012-&lt;release&gt;; the generator then never overwrites that
   folder (VMP-R39). A per-release record is filed
   in its release folder, not under `signed/` (generated records, MDX-VAL-000 section 3).
+- **RA-T07** Right after the deploy the system owner shall run the command in section 4 of the record (post-deploy
+  record) and write its result, time and name there; a failure starts the rollback. The approver checks before
+  signing only that the command and the rollback rule are there (criterion 9), so every criterion can be checked
+  before the signature.
 
 ## 3. Fields
 
@@ -83,7 +88,7 @@ The record approves a deploy. It does not state that the release is validated un
 | 6 | No critical failure of VMP-R60 (a risk acceptance never covers one) |
 | 7 | Change-impact assessment reviewed; customer change notice given where VMP-R37 needs one |
 | 8 | Restore point taken before the deploy and the rollback plan written |
-| 9 | After the deploy: `deploy_gate.py` passed on production, result recorded |
+| 9 | Post-deploy check ready before signing: the `deploy_gate.py` command for this release is in section 4 of the record, and a failure starts the rollback of criterion 8 |
 
 The same nine lines are printed in each generated record (`validation/pack.py`, `INTERIM_CRITERIA`); a change to one
 is a change to both.

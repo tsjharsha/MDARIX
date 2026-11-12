@@ -239,7 +239,7 @@ def test_golden_figures_and_documents(tmp_path, capsys):
         and "(VMP-R15)" in vsr
     )
     assert "| Reviewer | Independent CSV consultant" in vsr and "Change history" in vsr
-    assert "| 9 | After the deploy: deploy_gate.py passed" in (out / "MDX-VAL-012-release-approval.md").read_text(
+    assert "| 9 | Post-deploy check ready before signing" in (out / "MDX-VAL-012-release-approval.md").read_text(
         "utf-8"
     )
 

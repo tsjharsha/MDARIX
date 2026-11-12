@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-008 |
 | Title | MDARIX performance qualification protocol |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver (executes as the business user) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B9) | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | Signature block added after an independent rating; PQ-011 cites PL-18 | Srinivas Telikicherla |
 | 0.3 | 12 Nov 2026 | After the second rating: PQ-001, PQ-005 and PQ-006 cite the scenarios their steps exercise (TR-28 serious injury, TR-12 several markets; B6-20 code, RG-01 rule reference; PL-43 snapshot values, B8-16 same snapshot); PQ-R06 organisation type | Srinivas Telikicherla |
+| 0.4 | 12 Nov 2026 | After the third rating: PQ-R07 to PQ-R10 (real time zone and markets, two people with their own accounts, a negative step per persona, coverage of the intended use); PQ-012 to PQ-017 (late entry, not-a-complaint path, facts changed after signing, signature manifestation, lockout, audit chain); section 3.1 coverage table | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -39,6 +40,14 @@ customer template MDX-CUS-001.
 - **PQ-R05** The expected results below shall be approved by the system owner before the first execution.
 - **PQ-R06** The PQ shall run in an organisation of the pilot type, not a free trial, so that the second-person rules
   of steps PQ-002 and PQ-007 apply; the sample story is loaded into it as synthetic data.
+- **PQ-R07** The organisation's time zone shall be America/New_York and its markets US and EU, so that clock and
+  daylight-saving behaviour is exercised under real conditions; the date of execution is recorded per step.
+- **PQ-R08** At least two people shall take part (a second person for the four-eyes steps); each persona signs in with
+  its own account and authenticator, never a shared one.
+- **PQ-R09** Each persona shall have at least one negative step (an action the system must refuse); a negative step
+  passes only when the refusal is seen and audited.
+- **PQ-R10** The steps shall cover every function of the intended use (MDX-B10-001 section 4.1); the table in section
+  3.1 shows the coverage. A function without a step is a gap recorded in the VSR.
 
 ## 3. Steps (the sample story, one persona per step)
 
@@ -55,6 +64,24 @@ customer template MDX-CUS-001.
 | PQ-009 | Quality approver | Sign the audit-trail review for the period | Flags shown; own flagged actions need a second reviewer; the signed review does not change | B6-28, B6-29, B6-31 |
 | PQ-010 | Administrator of another organisation | Open the product, supplier and report addresses of step PQ-006 | 404; nothing of the first organisation is shown | P360-11, S360-14, B8-30 |
 | PQ-011 | Quality approver | Export the organisation's records | Export holds every record and the verified audit head, with a SHA-256 per entry | (REQ-EXP-001; PL-18) |
+| PQ-012 | Complaint handler | Enter a complaint more than 24 hours after awareness, first without a reason | Refused without a late-entry reason; with it, saved and shown "Entered late" | B6-07 |
+| PQ-013 | Complaint handler | Close a call that is not a complaint (service only) | Signed "Service only" with a reason; QA review before closing; closed with a resolution summary | RT-01 |
+| PQ-014 | Regulatory reviewer | Change the awareness date of the signed US conclusion of PQ-005, with a reason | The signed conclusion is unchanged and reads "Facts changed after signing: re-check" | B6-37 |
+| PQ-015 | Quality approver | Print the signed US conclusion of PQ-005 | The print shows the signer's printed name, the date and time and the meaning of the signature | PL-47 |
+| PQ-016 | Regulatory reviewer | Enter a wrong authenticator code five times when signing | The account locks for 15 minutes; the lock is in the audit trail; nothing is signed | PL-51, PL-52 |
+| PQ-017 | Quality approver | Run the audit-chain verification for the organisation after PQ-001 to PQ-016 | Verified; the head is recorded as an anchor | PL-09 |
+
+### 3.1 Coverage of the intended use (MDX-B10-001 section 4.1)
+
+| Function | Steps |
+|---|---|
+| Record and route complaints | PQ-001, PQ-002, PQ-003, PQ-012, PQ-013 |
+| Reportability decision per market, with deadlines | PQ-003, PQ-004, PQ-005, PQ-014 |
+| Authority report files prepared for the customer to submit | PQ-006 |
+| Investigation | PQ-008 |
+| Signatures, reviews and audit trail | PQ-005, PQ-007, PQ-009, PQ-015, PQ-016, PQ-017 |
+| Separation of organisations; export at exit | PQ-010, PQ-011 |
+
 
 ## 4. Acceptance
 
