@@ -51,6 +51,14 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   the request, and `POST .../unknowns` and `POST .../failure-chains` build only on the saved explanations and challenges
   for the same point in time; while AI does not answer, neither generates new ones (so no analysis runs) and both answer
   "AI analysis is off for this organization" without writing anything. The Intelligence tab is unchanged (RCA-D13).
+- A full data export is downloaded only by the person who asked for it (`EXPORT_NOT_REQUESTER`, 403) and only inside
+  its 7-day download period, checked at the download itself rather than when the hourly expiry job runs
+  (`EXPORT_EXPIRED`, 410). Each refusal is in the audit trail (`TENANT_EXPORT_DOWNLOAD_REFUSED`). The export lists
+  show "Only whoever asked for it" in place of the download link for anyone else (RSK-036).
+- An organization's data, its audit trail included, is deleted only with a recorded hand-back: an export made after
+  the suspension or a recorded waiver for a customer organization, the trial terms for a free trial, or a re-applied
+  earlier purge after a restore. `purge_tenant` itself refuses any other call (`EXPORT_REQUIRED`), not only the
+  Platform Admin route (RSK-066).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
