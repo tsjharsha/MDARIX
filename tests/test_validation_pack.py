@@ -374,3 +374,13 @@ def test_release_pack_needs_full_suite_evidence_of_the_same_commit():
     for part in ("no JUnit", "dry run", "not a full-suite", "did not pass", "for commit ffff0000"):
         assert part in said
     assert pack.release_check_problems(None, "abc12345", True) == ["no release-checks JSON given"]
+
+
+def test_signing_pdfs_hold_section_4_and_the_template_unsigned():
+    """O19: MDX-VAL-000 section 4 and the MDX-VAL-012 template are produced for the owner's signature, unsigned."""
+    from scripts import validation_signing_pdfs as signing
+
+    text = signing.section_4((ROOT / "docs" / "validation" / "README.md").read_text(encoding="utf-8"))
+    assert text.startswith("# MDX-VAL-000 section 4:") and "| O24 |" in text and "## 5. " not in text
+    assert "I approve the owner decisions in this section as in force" in text
+    assert signing.render(text, "MDX-VAL-000-section-4").startswith(b"%PDF")
