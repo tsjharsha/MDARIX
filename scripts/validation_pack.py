@@ -4,8 +4,8 @@
         --release-checks artifacts/release-checks-0.11.04.json
     python scripts/validation_pack.py --release 0.11.04 --junit <file> --dry-run --out artifacts/validation-pack-dryrun
 
-The release identity is an argument; a warning is printed when it differs from VERSION (the real value is set at the
-release join). Every failing traceability or deviation check is listed and the pack is not written (exit 1); with
+The release identity is an argument and must equal VERSION: a mismatch refuses the pack (exit 1, nothing written; owner
+decision O16), except in a dry run, where it is a warning. Every failing traceability or deviation check is listed and the pack is not written (exit 1); with
 --dry-run the pack is written anyway, marked "development results, not validation evidence", and the exit code is
 still 1 when a check fails. A release folder holding a signed approval is never overwritten (exit 2)."""
 
@@ -55,8 +55,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     version_file = (root / "VERSION").read_text(encoding="utf-8").strip() if (root / "VERSION").exists() else ""
     if args.release != version_file:
-        print(f"WARNING: release {args.release} differs from VERSION {version_file or '(missing)'}; "
-              "the release identity is set at the release join.", file=sys.stderr)  # fmt: skip
+        said = f"release {args.release} differs from VERSION {version_file or '(missing)'}"
+        if not args.dry_run:  # B6b owner decision O16: a release pack names the release that VERSION says
+            print(f"REFUSED: {said}; set VERSION at the release join, then generate the pack.", file=sys.stderr)
+            return 1
+        print(f"WARNING: {said}; the release identity is set at the release join.", file=sys.stderr)
     if pack.signed(out, args.release, docs / "signatures.csv"):
         print(f"REFUSED: {out} holds a signed release approval; a correction is a new version.", file=sys.stderr)
         return 2

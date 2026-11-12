@@ -35,6 +35,26 @@ DEVIATION_COLUMNS = [
 ]  # fmt: skip
 
 
+# MDX-VAL-012 interim template (owner decision O13, B6b-D7, MDX-VAL-001 VMP-R41): the release approval record used
+# from the big-bang deploy until MDX-VAL-001 is approved as 1.0; docs/validation/MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md
+# holds the same lines. The quality approver initials each criterion.
+INTERIM_BASIS = (
+    "Interim release approval (MDX-VAL-001 VMP-R41, owner decision B6b-D7): the Validation Master Plan is a draft; "
+    "this record approves the deploy, it does not state that the release is validated under the plan."
+)
+INTERIM_CRITERIA = (
+    "Release identity: the release equals VERSION, the commit is the tagged commit, one migration head",
+    "Release checks: full suite on this commit, every step passed (release-checks JSON and its SHA-256)",
+    "Every class-A scenario named by the change-impact assessment is PASS with evidence (VMP-R49)",
+    "Every Open MDX-VAL-002 row this release relies on has a signed risk acceptance listed in this record (RA-R07, RA-R08)",
+    "No open critical deviation; every other open deviation has its acceptance rationale (VMP-R50, VMP-R51)",
+    "No critical failure of VMP-R60 (a risk acceptance never covers one)",
+    "Change-impact assessment reviewed; customer change notice given where VMP-R37 needs one",
+    "Restore point taken before the deploy and the rollback plan written",
+    "After the deploy: deploy_gate.py passed on production, result recorded",
+)
+
+
 class PackRefused(Exception):
     """The pack may not be written (a signed release folder)."""
 
@@ -547,11 +567,17 @@ def approval(ctx: Context, s: Sources, figures: dict, hashes: dict, devs: list[d
         "junit_summary": summary, "rtm_sha256": hashes.get("rtm.csv"), "g13": figures,
         "open_deviations": [{"dev_id": d["dev_id"], "classification": d.get("classification"), "acceptance_rationale": ""}
                             for d in devs if d.get("status", "").strip().lower() != "closed"],
+        "risk_acceptances": [],  # per Open row relied on: RSK ID, interim control, due date, signed acceptance ref
         "change_impact_reference": "", "customer_change_notice_date": "", "restore_point_and_rollback": "",
+        "emergency_fix_written_ok": "", "deploy_gate_result": "", "basis": INTERIM_BASIS,
+        "prepared_by": SYSTEM_OWNER, "prepared_date": "",
         "approver": QUALITY_APPROVER, "approval_date": "",
         "meaning": "I approve this release for production after the checks listed.",
         "status": DEV_BANNER if ctx.dry_run else "PREPARED, NOT SIGNED",
     }  # fmt: skip
+
+
+CRITERIA_ROWS = [[n, text, "", ""] for n, text in enumerate(INTERIM_CRITERIA, 1)]
 
 
 def approval_markdown(ctx: Context, record: dict) -> str:
@@ -562,7 +588,9 @@ def approval_markdown(ctx: Context, record: dict) -> str:
         )
         + "## 1. Record\n\n"
         + _table(["Item", "Value"], rows)
-        + "\n## 2. Signature\n\nName: ____________ Role: quality approver Date (UTC): ____________\n\n"
+        + "\n## 2. Criteria (the quality approver initials each)\n\n"
+        + _table(["#", "Criterion", "Met (yes / no / accepted)", "Initials"], CRITERIA_ROWS)
+        + "\n## 3. Signature\n\nName: ____________ Role: quality approver Date (UTC): ____________\n\n"
         "Meaning: I approve this release for production after the checks listed.\n"
     )
 

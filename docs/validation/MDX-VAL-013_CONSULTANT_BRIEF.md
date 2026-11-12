@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-013 |
 | Title | Consultant brief and question pack |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A, item A5) | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -127,6 +128,7 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 21 | Two founders, who are related (father and son), cover system owner and quality approver, with each approving the other's documents. Mitigations: the segregation-of-duties rules (MDX-VAL-001 section 6; the approver is never the author, DC-R40) and your review of the first full release pack. Is that segregation of duties enough for the first pilots, and when should a third person be added? | MDX-VAL-001 section 6 |
 | 22 | The recovery point is 24 hours today (no point-in-time recovery). Is that acceptable for the first pilots, and with what interim control, until point-in-time recovery is in place? | MDX-VAL-002 RSK-038 (owner decision B6b-D8) |
 | 23 | Audit events are kept 7 years from each event, with a full export at exit. Is that sufficient against customers' own record-retention periods? | MDX-VAL-001 section 16.4 |
+| 24 | Until the Validation Master Plan is approved, each production deploy is approved by the quality approver on an interim release approval record (nine criteria; Open risk rows covered by signed risk acceptances; never a critical failure). Is that a sufficient control for the first pilots, and what would you add? | MDX-VAL-012 template; MDX-VAL-001 VMP-R41, VMP-R49 |
 
 ## 8. Open points
 

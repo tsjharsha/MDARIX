@@ -191,6 +191,20 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert "fit for MDARIX's intended use as validated" in vsr and "DEVELOPMENT RESULTS" not in vsr
     assert "| IQ-002 | Migration head (one head) | r2 | one head |" in (out / "MDX-VAL-006-IQ.md").read_text("utf-8")
     assert "OQ-001" in (out / "MDX-VAL-007-OQ.md").read_text("utf-8")
+    record = __import__("json").loads((out / "MDX-VAL-012-release-approval.json").read_text())
+    assert record["risk_acceptances"] == [] and record["basis"] == pack.INTERIM_BASIS  # O13 interim template
+    assert "| 9 | After the deploy: deploy_gate.py passed" in (out / "MDX-VAL-012-release-approval.md").read_text(
+        "utf-8"
+    )
+
+
+def test_interim_template_and_generator_list_the_same_criteria():
+    """O13: MDX-VAL-012 template section 4 and the generated record print the same nine criteria."""
+    text = (ROOT / "docs" / "validation" / "MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md").read_text(encoding="utf-8")
+    section = text.split("## 4. Criteria")[1].split("\n## ")[0]
+    lines = [line for line in section.splitlines() if line[:3] == "| " and line[2].isdigit()]
+    rows = [line.split(" | ", 1)[1].rstrip(" |").replace("`", "") for line in lines]
+    assert rows == list(pack.INTERIM_CRITERIA)
 
 
 def test_release_identity_warning_and_dry_run_banner(tmp_path, capsys):
@@ -202,6 +216,19 @@ def test_release_identity_warning_and_dry_run_banner(tmp_path, capsys):
     for name in ("MDX-VAL-004-URS.md", "MDX-VAL-011-VSR.md", "MDX-VAL-012-release-approval.md"):
         assert "DEVELOPMENT RESULTS, NOT VALIDATION EVIDENCE" in (tmp_path / "dry" / name).read_text("utf-8")
     assert "REQ-T-009: no scenario" in (tmp_path / "dry" / "checks.txt").read_text("utf-8")
+
+
+def test_release_identity_mismatch_is_refused_outside_a_dry_run(tmp_path, capsys):
+    """O16: outside a dry run a release that differs from VERSION writes nothing; the same release as VERSION is allowed."""
+    root = _root(tmp_path)
+    args = ["--root", str(root), "--release", "1.0.0", "--junit", str(root / "junit.xml")]
+    args += ["--release-checks", str(root / "release-checks.json"), "--commit", "abc12345", "--date", "2026-11-12"]
+    assert validation_pack.main(args + ["--out", str(tmp_path / "out")]) == 1
+    assert "REFUSED: release 1.0.0 differs from VERSION 9.9.9" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+    (root / "VERSION").write_text("1.0.0\n")
+    assert validation_pack.main(args + ["--out", str(tmp_path / "out")]) == 0
+    assert "differs from VERSION" not in capsys.readouterr().err
 
 
 DEV = "DEV-9.9.9-{n},2026-11-10T09:00:00Z,SH,OQ,AA-02,REQ-T-001,refused,saved,2026-11-10T09:05:00Z,none,{risk},{cls},,,{retest},{result},no,,{approver},{closed},{status}\n"
