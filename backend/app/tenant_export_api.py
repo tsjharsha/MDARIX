@@ -125,7 +125,7 @@ def _queue(db: Session, tenant_id, actor_ref: str, reason: str, unmask_contacts:
     return describe(row)
 
 
-def _list(db: Session, tenant_id) -> dict:
+def _list(db: Session, tenant_id, actor_ref: str) -> dict:
     rows = (
         db.query(TenantExport)
         .filter(TenantExport.tenant_id == tenant_id)
@@ -133,7 +133,8 @@ def _list(db: Session, tenant_id) -> dict:
         .limit(20)
         .all()
     )
-    return {"exports": [describe(row) for row in rows]}
+    # ``yours``: the screen offers the download only to the person who asked for it (RSK-036, _download).
+    return {"exports": [{**describe(row), "yours": row.requested_by == actor_ref} for row in rows]}
 
 
 def _chunks(content: bytes):
@@ -142,7 +143,51 @@ def _chunks(content: bytes):
         yield bytes(view[start : start + DOWNLOAD_CHUNK])
 
 
+def _refuse_download(db: Session, tenant_id, row: TenantExport, actor_ref: str, status: int, code: str, message: str):
+    """The refusal is audited and committed, so a reviewer sees who tried to take the archive and why it was stopped."""
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor_ref,
+            action="TENANT_EXPORT_DOWNLOAD_REFUSED",
+            entity_type="TenantExport",
+            entity_id=row.id,
+            details={"code": code, "requested_by": row.requested_by},
+        )
+    )
+    db.commit()
+    raise HTTPException(status, detail={"code": code, "message": message})
+
+
 def _download(db: Session, tenant_id, export_id: uuid.UUID, actor_ref: str) -> StreamingResponse:
+    # RSK-036: only the person who asked for the export takes it, and only inside its download period (the hourly
+    # export-expiry job deletes it later; the period is enforced here, not by that job).
+    row = (
+        db.query(TenantExport)
+        .filter(TenantExport.id == export_id, TenantExport.tenant_id == uuid.UUID(str(tenant_id)))
+        .first()
+    )
+    if row is not None and row.status == "READY":
+        if row.requested_by != actor_ref:
+            _refuse_download(
+                db,
+                tenant_id,
+                row,
+                actor_ref,
+                403,
+                "EXPORT_NOT_REQUESTER",
+                "Only the person who asked for this export can download it; prepare your own export",
+            )
+        if row.expires_at is not None and row.expires_at <= datetime.now(timezone.utc):
+            _refuse_download(
+                db,
+                tenant_id,
+                row,
+                actor_ref,
+                410,
+                "EXPORT_EXPIRED",
+                "This export's download period has ended; prepare a new export",
+            )
     try:
         row, content = read_export(db, tenant_id, export_id)
     except (LookupError, FileNotFoundError):
@@ -192,7 +237,7 @@ def request_own_export(payload: ExportRequest, request: Request, db: Session = D
 @router.get("/admin/exports")
 def list_own_exports(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    return _list(db, admin.tenant_id)
+    return _list(db, admin.tenant_id, str(admin.id))
 
 
 @router.get("/admin/exports/{export_id}/download")
@@ -363,8 +408,8 @@ def request_tenant_export(
 
 @router.get("/platform-admin/tenants/{tenant_id}/exports")
 def list_tenant_exports(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    _require_platform_admin(request, db)
-    return _list(db, _tenant(db, tenant_id))
+    platform_admin = _require_platform_admin(request, db)
+    return _list(db, _tenant(db, tenant_id), str(platform_admin.id))
 
 
 @router.get("/platform-admin/tenants/{tenant_id}/exports/{export_id}/download")

@@ -258,7 +258,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "answer_labels": markets.ANSWER_LABELS,
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
-        "training_required": trial,
+        "training_required": True,  # RSK-011: every organization (owner, 12 Nov 2026)
         "legacy_decision": (
             {**service.decision_view(legacy, names), "note": LEGACY_NOTE} if legacy is not None else None
         ),
@@ -473,16 +473,17 @@ def sign_conclusion(
     needed = training.for_market(market, db, tenant_id)
     untrained = training.missing(db, tenant_id, ctx.user_id, needed)
     trial = is_trial(control_db, tenant_id)
-    # Decision 6 (31 Oct 2026): the practice-training rule binds trial organisations only; pilots get G40 later.
-    if untrained and trial:
+    # RSK-011 (owner, 12 Nov 2026, replacing decision 6 of 31 Oct): the record on the current versions comes first in
+    # every organization; in a free trial it is a practice acknowledgement (T-G40P).
+    if untrained:
         trained = training.holders(db, tenant_id, needed, exclude=str(ctx.user_id))
         names = people(control_db, tenant_id, trained)
         raise _error(
             409,
             "TRAINING_REQUIRED",
-            "Before you sign, record your practice training on "
+            f"Before you sign, record your {'practice ' if trial else ''}training on "
             + " and ".join(f"{document.title}, version {document.version}" for document in untrained)
-            + ".",
+            + ". Read each one and confirm it on this screen (Signer training).",
             missing=[document.as_dict() for document in untrained],
             trained_colleagues=[names.get(user) or "A colleague" for user in trained],
         )

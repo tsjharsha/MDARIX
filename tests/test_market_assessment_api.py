@@ -53,7 +53,7 @@ US_NONE = dict(
 
 
 def _on_free_trial(tenant_id) -> None:
-    """Put an organization on the Free Trial plan: the practice-training rule binds trial organizations only."""
+    """Put an organization on the Free Trial plan: its training records are practice acknowledgements."""
     from backend.app.trial.service import _free_trial_plan
 
     now = datetime.now(timezone.utc)
@@ -323,29 +323,38 @@ def test_a_changed_version_makes_the_acknowledgement_out_of_date(org, monkeypatc
     assert [doc["version"] for doc in refused.json()["detail"]["missing"]] == ["US-starter-2"]
 
 
-def test_the_practice_training_rule_binds_a_trial_organization_only(org):
-    """Owner decision 6 (31 Oct 2026): a non-trial organization signs without an acknowledgement, and may record one."""
+def test_the_training_rule_binds_every_organization_not_only_a_trial(org):
+    """RSK-011 (owner, 12 Nov 2026, replacing decision 6): a non-trial organization's signer is refused until they
+    record the current versions, with a clear message and the documents to confirm; then the signature goes through."""
     from backend.app.trial.retention import purge_trial
 
     complaint = _complaint(org["tenant_id"], org["product"], country="US", malfunction=True)
     trial = org["regulatory"].get(_url(complaint)).json()
     assert trial["training_required"] is True and trial["practice_label"]
 
-    tenant_id = _organization("MN")
+    tenant_id = _organization("MN")  # no training record in the organization at all
     try:
         signer = _client(tenant_id, "REGULATORY_REVIEWER", "Nina Pilot")
         _windows(signer)
         complaint = _complaint(tenant_id, _product(tenant_id), country="US", malfunction=True)
         detail = signer.get(_url(complaint)).json()
-        assert detail["training_required"] is False and detail["practice_label"] is None
+        assert detail["training_required"] is True and detail["practice_label"] is None
         assert [entry["state"] for entry in _market(detail, "US")["training"]] == ["MISSING", "MISSING"]
         answers = _answers(**{**US_NONE, "US4": "YES", "US5": "YES"})
         item = _save(signer, complaint, "US", answers, harm_level="MINOR")
-        signed = _sign(signer, complaint, "US", item, "REPORTABLE")
-        assert signed.status_code == 200, signed.text
-        _acknowledge(signer)  # the recording stays available outside a trial
+        refused = _sign(signer, complaint, "US", item, "REPORTABLE")
+        assert refused.status_code == 409, refused.text
+        detail_refused = refused.json()["detail"]
+        assert detail_refused["code"] == "TRAINING_REQUIRED" and "practice" not in detail_refused["message"]
+        assert detail_refused["message"].startswith("Before you sign, record your training on")
+        assert "Signer training" in detail_refused["message"] and len(detail_refused["missing"]) == 2
+        assert detail_refused["trained_colleagues"] == []
+        _acknowledge(signer)
         states = signer.get(f"{TRAINING}?documents=HARM_SCALE").json()["documents"]
         assert states[0]["state"] == "CURRENT" and states[0]["method"] == "read and acknowledged in MDARIX"
+        item = _market(signer.get(_url(complaint)).json(), "US")
+        signed = _sign(signer, complaint, "US", item, "REPORTABLE")
+        assert signed.status_code == 200, signed.text
     finally:
         with SessionLocal() as db:
             purge_trial(db, tenant_id, "test:market-assessment-cleanup")

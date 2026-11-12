@@ -851,7 +851,9 @@ function TenantData({
               key: "download",
               label: "Download",
               render: (row) =>
-                row.status === "READY" ? (
+                row.status === "READY" && row.yours === false ? (
+                  "Only whoever asked for it"
+                ) : row.status === "READY" ? (
                   <a className="ac-link" href={`${base}/exports/${row.id}/download`} download>
                     Download zip
                   </a>
