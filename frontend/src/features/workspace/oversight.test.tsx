@@ -269,6 +269,15 @@ describe("the oversight view", () => {
     expect(html).not.toContain("This list is incomplete");
   });
 
+  it("shows the audit trail review on the new navigation's Team overview too, to people who review quality", () => {
+    resources.data["/api/v1/oversight"] = oversight;
+    // B6a navigation polish: part "items" is My work › Team overview; the classic Oversight (part "all") had it alone.
+    expect(render(<OversightView part="items" />)).toContain("Red flags first, then every event");
+    expect(render(<OversightView />)).toContain("Red flags first, then every event");
+    expect(render(<OversightView part="items" />, ["data.export"])).not.toContain("Red flags first");
+    expect(render(<OversightView part="events" />)).not.toContain("Red flags first");
+  });
+
   it("says plainly when a source reached its read cut (B6a run 3: never silently incomplete)", () => {
     resources.data["/api/v1/oversight"] = {
       ...oversight,

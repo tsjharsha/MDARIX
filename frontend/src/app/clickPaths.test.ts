@@ -254,9 +254,17 @@ export const PATHS: Array<{
     ],
     note: "today: the menu, Complaints, To triage; now one link from the hint itself",
   },
+  {
+    key: "u",
+    task: "Sign the audit trail review on the new navigation",
+    today: 3,
+    proposed: 2,
+    steps: [{ go: ["My Work", "Team overview"] }, { press: "Sign the audit trail review", in: "Reviews" }],
+    note: "today only on the classic Readiness › Oversight (reached on the new navigation by an old address)",
+  },
 ];
 
-describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {
+describe("the click paths a–u on the new navigation (stages 7 and 8, B6a, navigation polish)", () => {
   it.each(PATHS.map((path) => [path.key, path] as const))("path %s: every step exists, within the count", (_, path) => {
     for (const step of path.steps)
       if ("go" in step) expect(lands(step.go), `${path.key}: ${step.go.join(" › ")}`).toBe(true);

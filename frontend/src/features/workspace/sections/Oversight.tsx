@@ -140,8 +140,9 @@ export function OversightView({
       </Panel>
       {part === "all" && view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {part === "all" && view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
-      {part === "all" && reviews && <AuditTrailReview />}
-      {/* The new navigation's Team overview (part "items") is where a manager looks: the numbers show there too. */}
+      {/* The new navigation's Team overview (part "items") is where a manager looks: the audit trail review (B6a
+          polish) and the numbers show there too. */}
+      {reviews && <AuditTrailReview />}
       {outcomes && <ValueCentre />}
       {event && <EventDrawer complaintId={event} onClose={() => setEvent(null)} onChanged={data.reload} />}
     </div>
