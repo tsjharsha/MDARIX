@@ -189,6 +189,33 @@ MDX-VAL-002; both carry a banner saying so.
 | `docs/compliance/CSA_CUSTOMER_IMPLEMENTATION_INSTRUCTIONS.md` | SUPERSEDED | MDX-CUS-006 (B6b Part E) |
 | `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` | Corrected 12 Nov 2026 (no password expiry); current reference for the application controls | The Part 11 / Annex 11 assessment (MDX-SUP-003, B6b Part C) |
 
+### 3.3 Approved build specs under version control (owner decision O22)
+
+The approved specs that `requirements.csv` and the scenario register cite were copied on 12 Nov 2026 into
+`docs/specs/`, unchanged (git stores them with LF line endings, `.gitattributes`). From then on the copy in
+`docs/specs/` is the controlled one; each planning copy starts with a pointer line to it. Not copied, for the owner's
+decision: the B6b spec and the B3 execution plan (each names an AI drafting tool or its folder, which the content
+rules forbid in a document) and the W1 spec (not in the list of O22; build still running). `spec_ref` rows citing
+them still name the planning copy.
+
+| Controlled copy | Planning copy (pointer only) |
+|---|---|
+| [B2-case-design-spec.md](../specs/B2-case-design-spec.md) | `MDARIX-planning/b2-case-design/spec.md` |
+| [B4-rule-register-spec.md](../specs/B4-rule-register-spec.md) | `MDARIX-planning/b4-rule-register/spec.md` |
+| [B4b-questionnaire-config-spec.md](../specs/B4b-questionnaire-config-spec.md) | `MDARIX-planning/b4b-questionnaire-config/spec.md` |
+| [B4c-templates-change-impact-spec.md](../specs/B4c-templates-change-impact-spec.md) | `MDARIX-planning/b4c-templates-change-impact/spec.md` |
+| [B5-challenge-closed-loop-spec.md](../specs/B5-challenge-closed-loop-spec.md) | `MDARIX-planning/b5-challenge-closed-loop/spec.md` |
+| [B6a-speed-evidence-spec.md](../specs/B6a-speed-evidence-spec.md) | `MDARIX-planning/b6-speed-evidence/B6a-spec.md` |
+| [B7-routine-path-spec.md](../specs/B7-routine-path-spec.md) | `MDARIX-planning/b7-routine-path/spec.md` |
+| [B8-eu-gb-mir-execution-plan.md](../specs/B8-eu-gb-mir-execution-plan.md) | `MDARIX-planning/b8-eu-gb-mir/B8-execution-plan.md` |
+| [B9-markets-spec.md](../specs/B9-markets-spec.md) | `MDARIX-planning/b9-markets/spec.md` |
+| [B9b-other-countries-spec.md](../specs/B9b-other-countries-spec.md) | `MDARIX-planning/other-country-reports/spec.md` |
+| [RCA-tools-spec.md](../specs/RCA-tools-spec.md) | `MDARIX-planning/rca-tools/spec.md` |
+| [Q2-benchmark-spec.md](../specs/Q2-benchmark-spec.md) | `MDARIX-planning/q2-benchmark/spec.md` |
+| [AI-R-ai-ready-spec.md](../specs/AI-R-ai-ready-spec.md) | `MDARIX-planning/ai-ready/spec.md` |
+| [Device-classification-spec.md](../specs/Device-classification-spec.md) | `MDARIX-planning/device-classification/spec.md` |
+| [Authority-forms-spec.md](../specs/Authority-forms-spec.md) | `MDARIX-planning/authority-forms-spec/spec.md` |
+
 ## 4. Owner decisions in force
 
 **Signing status: to be signed by the owner before the big-bang deploy (owner decision O19).** The rules in force
