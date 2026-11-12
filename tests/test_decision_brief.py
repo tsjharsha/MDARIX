@@ -29,6 +29,7 @@ from backend.app.db.models.foundation import (
     Investigation,
     InvestigationBrief,
     InvestigationEvidence,
+    LotBatch,
     Product,
     ProductVersion,
     Tenant,
@@ -134,7 +135,9 @@ def _add(tenant_id, *rows) -> None:
 
 
 def _product(tenant_id) -> tuple[str, str]:
-    """A product with one version and one complaint on it: ``(product id, complaint id)``."""
+    """A product with one version and one complaint on it, its version and lot known: ``(product id, complaint id)``.
+    B5 (B5-D3): a complaint without a lot raises the material challenge question C-4, which blocks submit until
+    answered; these tests are about the brief, so their ready case has its records complete."""
     now = datetime.now(timezone.utc)
     tag = uuid.uuid4().hex[:8].upper()
     with SessionLocal() as db:
@@ -159,12 +162,23 @@ def _product(tenant_id) -> tuple[str, str]:
         )
         db.add(version)
         db.flush()
+        lot = LotBatch(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            lot_identifier=f"DB-L-{tag}",
+            product_version_id=version.id,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(lot)
+        db.flush()
         complaint = Complaint(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             complaint_identifier=f"DB-C-{uuid.uuid4().hex[:10].upper()}",
             product_id=product.id,
             product_version_id=version.id,
+            lot_batch_id=lot.id,
             event_timestamp=now - timedelta(days=5),
             description="Occlusion alarm without an occlusion",
             status="open",
