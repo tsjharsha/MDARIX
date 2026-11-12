@@ -1,6 +1,6 @@
 # AI-R: AI ready, switched off
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. AI-R sits in Lane 2 right after DB-1 (owner, 11 Nov: DB-1 → **AI-R** → E11 → E6 → E2). Decisions marked **⚑** touch patient safety, personal data, customer promises or spend: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. AI-R sits in Lane 2 right after DB-1 (owner, 11 Nov: DB-1 → **AI-R** → E11 → E6 → E2). Decisions marked **⚑** touch patient safety, personal data, customer promises or spend: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Goal (owner, 11 Nov):** build AI fully, so that turning it ON later is a decision, not development. AI stays OFF by default everywhere. "Off" means zero calls to an AI model, proven by tests.
 - **Sources:** `complete-plan/MDARIX-complete-plan.md` (AI-R entry, two lanes, Google Cloud billing note of 11 Nov, v2.1 item 7 Definition of done), `b9-markets/spec.md` (format), memory notes on Vertex AI (Gemini on Vertex, Mumbai, chosen 16 Oct) and the golden dataset (v2, 15 scenarios, a real model passes few).
@@ -345,3 +345,14 @@ Nothing here happens in AI-R. Each line is ticked with a date and a name in the 
 
 ## Owner approval (11 Nov 2026)
 The owner replied **"approve AI-R spec"**: every recommendation is accepted as written, including all flagged decisions (D1 model pinned only if still offered in Mumbai with >= 6 months to retirement, else the current stable Flash; D2 Mumbai only, no production fallback, OmniRoute for development on synthetic data only; D3 zero data retention only after Google confirms in writing; D4 no AI feature may decide; D5 no AI in the Decision Centre advisory; D6 no automatic case runs; D7 only reviewed AI items feed downstream; D8 safety 100%, content >= 90% per feature, case analysis 15/15; D9 qualification set written or reviewed by Sriharsha or a QA consultant and signed by the owner; D10 live spend only with the owner's OK per run, after the billing upgrade, with a token cap; D11 output plus a hash of what was sent; D16 drift alert and per-organisation pause; D17 local search model wording). Builds in Lane 2 after DB-1. Switch-ON remains a separate owner decision per the §9 checklist.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve AI-R spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/ai-ready/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

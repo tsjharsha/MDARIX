@@ -1,6 +1,6 @@
 # RCA tools: 5 Whys, fishbone, Pareto, context, work queue, dossier, harm-rate check
 
-Version 1, 12 Nov 2026. **DRAFT for the owner.** Nothing here is built. The RCA tools item sits in **Lane 1 after B6a and B6b** (complete plan, two lanes, approved 11 Nov). It starts when the owner approves this spec and its ⚑ decisions. Decisions marked **⚑** touch signed records, the risk file or what a customer may read as a finding. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 12 Nov 2026. **APPROVED by the owner on 12 Nov 2026 (see "Approval record").** Nothing here is built. The RCA tools item sits in **Lane 1 after B6a and B6b** (complete plan, two lanes, approved 11 Nov). It starts when the owner approves this spec and its ⚑ decisions. Decisions marked **⚑** touch signed records, the risk file or what a customer may read as a finding. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Scope (owner-approved 11 Nov):** complete plan step 5.5 (`complete-plan/MDARIX-complete-plan.md:90`) and v2.1 amendment B (`:174`); best-practice plan P3, P4, P8 (`post-whif-best-practices/plan.md:43,44,48`), A2 and A3 (complete plan `:90`); core methods 5 Whys, fishbone (people, process, method, material, machine, environment, plus software for SaMD), Pareto of confirmed causes, FMEA links to the product risk file.
 - **Code read** (read-only, `git show` / `git grep` / `git ls-tree` only): branch `feat/b9b-other-countries` at `3dc55c0b`. Every `file:line` is on that branch, under `backend/app/` unless shown. B6a and B6b change some files on their own branches; step 0 re-checks every line on the joined line.
@@ -318,3 +318,14 @@ Methods: RCA-01 5 Whys with 2 to 7 whys; RCA-02 a why without evidence shows "Un
 The owner replied **"approve RCA spec"**: every recommendation accepted (RCA-D1 a cause is confirmed only by a signed decision ticking accepted hypotheses and a category; D2 earlier decisions never rewritten, "Not categorised"; D4 category required on an accepted conclusion with "Not determined + reason"; D6 risk estimates imported or entered by a risk reviewer with a reason, labelled; D7 "Above the estimate" only when the 95% lower bound exceeds it, a person decides any risk-file update; D8 shipped, else released units, else counts only, never "per unit sold"; D9 a person maps problem and harm codes to each risk; D13 the R1 keyword analysis panel is hidden — done now as a separate fix before the cut-off; D14 export only from locked versions). Build order A → E → B → C → D in Lane 1 after B6b.
 
 **Owner, 12 Nov 2026 ("accept R1 fix"):** RCA-D13 accepted (commits 1ffb3c4b, 505a1d10, d0ce04d4 and merges); MDARIX's own evaluation run (Platform Admin, synthetic golden tenant, saves nothing) stays open on purpose.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 12 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve RCA spec" |
+| Where recorded | section "Owner approval (12 Nov 2026)" |
+| Planning copy | `MDARIX-planning/rca-tools/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

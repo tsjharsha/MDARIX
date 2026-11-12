@@ -1,6 +1,6 @@
 # Device and IVD risk classes across markets: what MDARIX should hold and do
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. No code, database or git state was changed. Decisions marked **⚑** touch regulatory interpretation or signed records. They need the owner's explicit answer. Each ⚑ says what happens **if no answer arrives** (always the safer path). Per the owner's rule for new work (7 Nov), nothing here starts without a green signal.
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. No code, database or git state was changed. Decisions marked **⚑** touch regulatory interpretation or signed records. They need the owner's explicit answer. Each ⚑ says what happens **if no answer arrives** (always the safer path). Per the owner's rule for new work (7 Nov), nothing here starts without a green signal.
 
 - **Code read** (read-only, `git show` / `git grep`): branch `feat/b8-eu-gb-mir` (tip `dd1870b7`). Every `file:line` is on that branch, under `backend/app/` unless shown. The migration head was checked on `feat/b9b-other-countries` and `feat/b6a-speed-reviews`.
 - **Regulatory sources:** read on the web on 11 Nov 2026, official sites first. Each fact has its URL in section 2. **[O]** = read on the official page or the official PDF. **[O-snip]** = from a search extract of an official page that would not open. **[2nd]** = secondary source only: **to confirm**. Every legal statement stays "starter, for your consultant to confirm", as in B4, B8 and B9.
@@ -316,3 +316,14 @@ The owner replied **"approve classification spec, Lane 2 after AI-R, fix the two
 ## Build status
 
 - 12 Nov 2026: G6 and G7 fixed as the owner's small separate fix ("fix the two form problems now"): `release/bigbang-0.10.96` 793f6430, merged up the chain to `feat/b9b-other-countries` e301c653 (B8 follow-up f005598e: Northern Ireland recognised by the MORE route's names too). Unit tests `tests/test_registration_choice.py` 5 passed on the base, B8, B9b and B3; related unit tests 97 passed, 2 skipped on B9b; three DB worksheet tests passed on the base. Ready for owner acceptance. Details in `STATE.md`.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve classification spec, Lane 2 after AI-R, fix the two form problems now" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/device-classification/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

@@ -194,10 +194,13 @@ MDX-VAL-002; both carry a banner saying so.
 
 The approved specs that `requirements.csv` and the scenario register cite were copied on 12 Nov 2026 into
 `docs/specs/`, unchanged (git stores them with LF line endings, `.gitattributes`). From then on the copy in
-`docs/specs/` is the controlled one; each planning copy starts with a pointer line to it. Not copied, for the owner's
-decision: the B6b spec and the B3 execution plan (each names an AI drafting tool or its folder, which the content
-rules forbid in a document) and the W1 spec (not in the list of O22; build still running). `spec_ref` rows citing
-them still name the planning copy.
+`docs/specs/` is the controlled one; each planning copy starts with a pointer line to it. On 12 Nov 2026 (owner
+decision O29) the B6b spec (up to its owner approval; its build-status sections stay in the planning copy), the B3
+execution plan (after the drafting-tool and folder references were removed from the planning copies) and the W1 spec
+were copied too, and every spec here received an "Approval record" section (date, the owner's approval words as
+recorded, approver, where recorded); a DRAFT status line in an approved spec now reads APPROVED. Nothing else in
+the approved text changed. The approvals were the owner's written replies, not signatures; the Authority-forms spec
+has no verbatim approval words (its record says so).
 
 | Controlled copy | Planning copy (pointer only) |
 |---|---|
@@ -216,6 +219,9 @@ them still name the planning copy.
 | [AI-R-ai-ready-spec.md](../specs/AI-R-ai-ready-spec.md) | `MDARIX-planning/ai-ready/spec.md` |
 | [Device-classification-spec.md](../specs/Device-classification-spec.md) | `MDARIX-planning/device-classification/spec.md` |
 | [Authority-forms-spec.md](../specs/Authority-forms-spec.md) | `MDARIX-planning/authority-forms-spec/spec.md` |
+| [B6b-validation-pack-spec.md](../specs/B6b-validation-pack-spec.md) | `MDARIX-planning/b6-speed-evidence/B6b-spec.md` (build status continues there) |
+| [B3-emdr-execution-plan.md](../specs/B3-emdr-execution-plan.md) | `MDARIX-planning/b3-emdr/B3-execution-plan.md` |
+| [W1-product-supplier-360-spec.md](../specs/W1-product-supplier-360-spec.md) | `MDARIX-planning/w1-product-supplier-360/spec.md` |
 
 ## 4. Owner decisions in force
 
@@ -279,6 +285,7 @@ also questions in MDX-VAL-013.
 | O26 | A scenario of a feature not built yet is marked "future: <item>" in the register Notes; it is not a scripted OQ step and never counts as verification (owner, 12 Nov 2026; scenario register; `validation/pack.py`) |
 | O27 | Every class-A OQ expected result is re-derived from its requirement (not from the code) by Sriharsha Telikicherla and confirmed by the owner, the 24 TO CONFIRM rows included; `oq-expected-results.csv` records `source` (`requirement` / `code`) and `confirmed_by`, and the generator treats a row drafted from the code or not confirmed as not yet approved: a check failure outside a dry run (owner, 12 Nov 2026; `validation/pack.py`) |
 | O28 | DEV-0.11.04-001 is classed major (a failure in a class-A function), with `found_in` from the allowed list (MDX-VAL-010 DL-R07) and a question to the consultant on the back-fill (owner, 12 Nov 2026; MDX-VAL-013 question 25) |
+| O29 | The B6b spec and the B3 plan are copied into `docs/specs/` after the drafting-tool name and folder references are removed from the planning copies; the W1 spec is copied too; every spec in `docs/specs/` carries an "Approval record" section (date, the owner's approval words as recorded, approver), and approved specs are no longer headed DRAFT (owner, 12 Nov 2026; section 3.3) |
 
 ## 5. Codes used in these documents
 

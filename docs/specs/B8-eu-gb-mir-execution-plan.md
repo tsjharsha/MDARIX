@@ -1,6 +1,6 @@
 # B8: EU MIR and GB MIR for exporters. Execution plan
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Plan only: no code was changed, no test was run, no database was read. Per the owner's automatic chain (11 Nov: B9 → **B8** → B9b → B6), B8 starts when B9 is complete, and only after the owner approves this plan. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Plan only: no code was changed, no test was run, no database was read. Per the owner's automatic chain (11 Nov: B9 → **B8** → B9b → B6), B8 starts when B9 is complete, and only after the owner approves this plan. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Sources:** `authority-forms-spec/spec.md` (§4 EU, §5 GB, §8, §9 phases 4 and 5, §10, D10–D14, D17; decisions D1–D18 approved 6 Nov, `development-cycle-1.md` line 7), `authority-forms-mapping.xlsx` (sheets "EU MIR 7.3.1", "GB MIR 7.2.1", "Counts", read with a small standard-library reader), `b3-emdr/B3-execution-plan.md` (chain, frozen files, 3 clicks, owner decisions), `b4-rule-register/spec.md` (approved; rules as data, R-D3 form editions by the day sent for approval), `b9-markets/spec.md` (approved; format, switches, D9 personal data), `master-sequence-proposal.md` (item 13, line 90).
 - **Code read** (read-only, `git show` / `git grep`): branch `feat/b4-rule-register` (tip `76eebdde`). Every `file:line` below is on that branch, under `backend/app/` unless shown. B9 is being built on `feat/b9-markets` (5 commits at the time of writing); section 2.3 lists what it adds that B8 uses. Step 0 re-checks every line on B9's tip.
@@ -466,3 +466,14 @@ Branch `feat/b8-eu-gb-mir` in `trial-093`; local commits only, never pushed. Wor
 **Owner, 11 Nov 2026 ("tick-box"):** a full (unmasked) export leaves out the patient and reporter details held in frozen report snapshots and official files **by default**. An option "Include patient and reporter details from submitted reports" (off by default) includes them; it needs the export right and a reason and is audited as its own event (e.g. `EXPORT_PERSONAL_DATA_INCLUDED`). The exit hand-back export (account closing) always includes everything. Masked exports never include them (already built). Build: small follow-up run after B9b run 2, on the tip of the chain, with tests (default off, on with reason, audit event, exit export complete, masked unchanged).
 
 **Owner, 11 Nov 2026 ("accept (a) and (b)"):** the export tick-box is accepted (Definition of done item 7) with both interpretations: (a) ticking "include patient and reporter details" also unmasks customer contacts in that export (same right, reason and audit); (b) an export made while the organisation is suspended or terminated (exit hand-back) always includes everything, contacts included.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B8 plan" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b8-eu-gb-mir/B8-execution-plan.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

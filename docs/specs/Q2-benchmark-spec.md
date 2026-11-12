@@ -1,6 +1,6 @@
 # Q2: Investigation benchmark ("QMS only" vs "QMS + MDARIX")
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built or run. Q2 runs in Lane 1 right after the RCA tools item (owner-approved 11 Nov). Decisions marked **⚑** touch claims, people or signed records: they need the owner's explicit answer. Each ⚑ says what happens **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 12 Nov 2026 (see "Approval record").** Nothing here is built or run. Q2 runs in Lane 1 right after the RCA tools item (owner-approved 11 Nov). Decisions marked **⚑** touch claims, people or signed records: they need the owner's explicit answer. Each ⚑ says what happens **if no answer arrives** (always the safer path).
 
 - **Sources:** `post-whif-best-practices/plan.md` (Q2 row, line 54; M8 line 34; P8 line 48; timeline lines 64-66), `complete-plan/MDARIX-complete-plan.md` (step 4.4 line 80, RCA tools 5.5 line 90, step 5.6 with A8 line 91, lanes line 183), `scenario-register.md` (IV-01..IV-16, lines 87-104), `b6-speed-evidence/B6a-spec.md` (P1 similar wording, P2 baselines), `b9-markets/spec.md` (format).
 - **Code read** (read-only): branch `feat/b9b-other-countries`, tip `3dc55c0b`. Every `file:line` is on that branch. Step 0 re-checks every line on the release under test.
@@ -375,3 +375,14 @@ The exact device class per market for each fictional product; every reportabilit
 
 ## Owner approval (12 Nov 2026)
 The owner replied **"approve Q2 spec"**: every recommendation accepted (Q2-D1 Sriharsha authors, an outside QA/RA consultant writes the hold-outs and adjudicates, the owner signs the hash-locked key; D2 8 participants (min 6), >= 2 years, <= 2 per company; D3 certificate + summary report; D4 marked free-trial workspaces, excluded from trial statistics, deleted after scoring; D6 internal until the owner approves the report, then fixed wording only, missed targets reported as missed; D8 written consent + DPDP notice, no ethics committee (consultant to confirm); D11 Sriharsha or the owner facilitates from a fixed script, sessions recorded; D14 anonymous unless separate written permission) and D5, D7, D9, D10, D12, D13 as defaults. Runs in Lane 1 after the RCA tools item. Recruiting, consent text and the coverage matrix may start earlier without code.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 12 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve Q2 spec" |
+| Where recorded | section "Owner approval (12 Nov 2026)" |
+| Planning copy | `MDARIX-planning/q2-benchmark/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

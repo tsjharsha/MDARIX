@@ -1,6 +1,6 @@
 # Authority reports for five markets: initial and follow-up reports
 
-**Spec for owner approval.** Prepared 6 Nov 2026. This is research and design only; no code was changed.
+**Spec APPROVED by the owner on 6 Nov 2026, decisions D1 to D18 (see "Approval record").** Prepared 6 Nov 2026. This is research and design only; no code was changed.
 
 **Workbook:** `authority-forms-mapping.xlsx` (in this folder). It has one sheet per market and a Counts sheet. Every row maps an MDARIX data field to the form block, the XML path, the mandatory rule, the code list, the MDARIX source and today's status.
 
@@ -677,3 +677,14 @@ Recommended order: 1 → 2 → 4 → 5 → 6, with 3 when D4 is decided. Phases 
 - MDR 2017 consolidated (to GSR 777(E), 14 Oct 2022): https://cdsco.gov.in/opencms/resources/UploadCDSCOWeb/2022/m_device/mdr,%202017%20(1).pdf
 
 **MDARIX code:** tag v0.10.91: `backend/app/authority_reports/` (forms.py, emdr.py, fda_3500a.py, worksheet.py, render.py, router.py, rules.py), `backend/app/reportability/markets.py`, `backend/app/db/models/authority_reports.py`, `frontend/src/features/workspace/sections/ReportsTab.tsx`.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 6 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | not recorded word for word; recorded as "decisions D1–D18 approved 6 Nov" |
+| Where recorded | `MDARIX-planning/development-cycle-1.md` line 7 (this spec has no approval section) |
+| Planning copy | `MDARIX-planning/authority-forms-spec/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

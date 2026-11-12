@@ -1,6 +1,6 @@
 # B5 design spec: investigation challenge and the closed loop
 
-Version 1, 10 Nov 2026. **DRAFT for the owner's approval.** Nothing here is built.
+Version 1, 10 Nov 2026. **APPROVED by the owner on 10 Nov 2026 (see "Approval record").** Nothing here is built.
 
 - **Plan:** B5 starts when all of B7 is built (B7a routine path, bulk import and export; B7b e-mail intake), on its own branch from B7's tip. Target January 2027. Its release number is given at build time (the backlog row said 0.10.98).
 - **Why now:** every commercial review calls product-version investigation the flagship. The master sequence (10 Nov) puts B5 right after B7. It builds on W1 (Product 360, Supplier 360) and on the PV-1 fixes in 0.10.95.
@@ -453,3 +453,14 @@ Open points for the owner / next run:
 ## Owner decisions on the sample (11 Nov 2026)
 - "sample answers OK": the sample author's answers to C-1 and C-5 (`SAMPLE_CHALLENGE_ANSWERS`) are approved as written.
 - "(2) leave": H-4 does not fire on the sample; no sample data is added for it.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 10 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B5 spec" |
+| Where recorded | section "Owner approval (10 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b5-challenge-closed-loop/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

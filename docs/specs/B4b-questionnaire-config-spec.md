@@ -1,6 +1,6 @@
 # B4b: Reportability questionnaire configuration
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. Per the owner's automatic chain (11 Nov), B4b starts after B9b, and only once this spec is approved. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. Per the owner's automatic chain (11 Nov), B4b starts after B9b, and only once this spec is approved. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Sources:** `decision-tree-deep-dive/report.md` (approved 7 Nov: §3a–3f, G1–G13, S1–S9, D1–D12, DT-01..DT-38), `development-cycle-1.md` (B4b row), `b4-rule-register/spec.md` (approved 11 Nov: engine, floor F1–F12, effective dating, R-D1..R-D14, "Build status" runs 1–2), `b9-markets/spec.md` (role floors, `IN-floor-2`, `CA-floor-2`), `other-country-reports/STATE.md` and `b8-eu-gb-mir/STATE.md` (migration heads), `scenario-register.md` (DT, RG).
 - **Code read** (read-only, `git show feat/b8-eu-gb-mir:<path>`, tip `d57c65a9`). Every `file:line` is on that branch, under `backend/app/`, except `sections/...` (under `frontend/src/features/workspace/`) and `customer-admin/...` (under `frontend/src/features/`). B9b's branch (`feat/b9b-other-countries`) was read only for its register and migration. Step 0 re-checks every line on B9b's tip.
@@ -331,3 +331,14 @@ Answer types, options, position, show-when and the required flag live inside the
 
 ## Owner approval (11 Nov 2026)
 The owner replied **"approve B4b spec"**: every recommendation is accepted as written, including all flagged decisions (D1 legal report type kept, a stricter customer rule only makes the due date earlier; D2 rule suspended when its question is missing, never treated as No; D3 downgrade needs a second person, clock keeps running; D4 new signature wording, signed approvals keep their text; D5 new pre-fills in a separate file, confirm-only; D6 re-check tasks only where given answers decide differently; D7 switch off = floor only). Build starts in Lane 1 after B6a, B6b, the RCA tools item and the Q2 benchmark run. Step 0 re-numbers the migration after the current head (one-head rule).
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B4b spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b4b-questionnaire-config/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

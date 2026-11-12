@@ -1,6 +1,6 @@
 # B6a: deadline protection, speed, reviews and trace (the build part of B6)
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. B6a starts when B9b finishes (lane 1, owner-approved 11 Nov). Decisions marked **⚑** touch legal deadlines, regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. B6a starts when B9b finishes (lane 1, owner-approved 11 Nov). Decisions marked **⚑** touch legal deadlines, regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Sources:** `b6-speed-evidence/STATE.md` (scope, G1-G21), `complete-plan/MDARIX-complete-plan.md` step 5.3, the v2.1 amendments (item 7, Definition of done) and the two-lane note; `development-cycle-1.md` R2 and item 12 (the speed finding); `b9-markets/spec.md` (format).
 - **Code read** (read-only, `git show` / `git grep` only): branch `feat/b8-eu-gb-mir` at `d57c65a9`. Every `file:line` is on that branch, under `backend/app/` unless shown. The migration chain was read on `feat/b9b-other-countries` (`07327472`). Step 0 re-checks every line on the joined line after B9b.
@@ -462,3 +462,14 @@ Owner 12 Nov "2 polish next": the six larger navigation items from run 7's D4 ta
 - **Against the Definition of done:** (1) the polish items are the owner's 12 Nov instruction on the approved D4 table; (2) all six built; (3) targeted tests pass; (4) permission cases: the data-quality report link hidden without import rights while the file and importer stay visible; the effectiveness-check link hidden without Records; the audit trail review only for `quality.review`; the origin read still 403; (5) regression of the touched screens passes; (6) evidence: this section, CHANGELOG `[0.11.03]`, user guide, click paths p-u; (7) **ready for owner acceptance**. Known limits: a duplicate link opens a new tab (by design, to keep the form); on a non-MVP feature set addresses are not read, so the new tab opens the home (every trial and pilot is MVP); a lot, market assessment, classification or triage origin in the trace stays text (no page of its own by id); the classic navigation opens a complaint on Oversight's checklist, as every classic complaint link does. No independent reviewer used (small, link-only changes; no server code changed).
 
 **Owner, 12 Nov 2026 ("accept navigation polish"):** the six navigation items (commits e7fbc044 … 628c624a) accepted.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B6a spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b6-speed-evidence/B6a-spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

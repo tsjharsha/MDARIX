@@ -8,7 +8,7 @@
 > - The build waits for the owner's green signal.
 
 
-**Version 1, 7 Nov 2026. Status: DRAFT for owner approval.** No code is changed by this document.
+**Version 1, 7 Nov 2026. Status: APPROVED by the owner on 7 Nov 2026 (see "Approval record").** No code is changed by this document.
 **Release:** 0.10.93 (backlog item B2, capability C1). Target 28 Nov 2026.
 **Code read:** tag `v0.10.92` of `MDARIX-R1` (read only, with `git show`). Backend paths start at `backend/app/`; frontend paths at `frontend/src/features/workspace/`. Line numbers are at v0.10.92.
 
@@ -1030,3 +1030,14 @@ Today MDARIX never closes a complaint ("Closed in the QMS").
 - **Performance** of the routine triage queue was not measured.
 - **The mail provider** for B7 was not considered.
 - **Personal-data masking reuse:** the import's masking functions were located (`trial/imports.py` 361–392, 427); their behaviour on free-flowing call text was not tested.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 7 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B2 spec with recommendations" |
+| Where recorded | the APPROVED note at the top of this spec |
+| Planning copy | `MDARIX-planning/b2-case-design/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

@@ -1,6 +1,6 @@
 # B9: India MvPI, Canada mandatory problem reporting, US importer and user facility
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. Per the owner's automatic chain (11 Nov), B9 starts when B4 is complete, on the recommendations in section 7 unless the owner changes them. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. Per the owner's automatic chain (11 Nov), B9 starts when B4 is complete, on the recommendations in section 7 unless the owner changes them. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Sources:** `b4-rule-register/spec.md` (approved 11 Nov: engine, data format, floor F1–F12, effective dating, FG-2, R-D11), `master-sequence-proposal.md` (item 12), `development-cycle-1.md` (B9 row, step 6), `authority-forms-spec/spec.md` (§3, §6, §7, §8, §9 phases 3 and 6, D1–D18) and `spot-check.md`, `authority-forms-mapping.xlsx` (Counts sheet and US section F rows, read only), `other-country-reports/spec.md` (approved; B9b stays separate), `b3-emdr/B3-execution-plan.md` (report chain, numbers, frozen files, owner decisions 1–3).
 - **Code read** (read-only): worktree `trial-094`, branch `feat/b3-emdr-0.10.96`. Every `file:line` is on that branch, under `backend/app/` unless shown. B7, B5 and B4 change some of these files on their own branches; step 0 re-checks every line on B4's tip.
@@ -576,3 +576,14 @@ without the fix: review 6's triage/watch test failed (5 vs 10 work days) with th
 review items are built and tested. Left for the owner only: India sample Final; Canada A8/A9/s.61.1 storage; the HC
 form file; F11/F13 dates; "manufacturer unknown"; permission for FDA's importer/user facility example files; plus the
 consultant list items (user facility paper route 803.12(b)). B3 line still needs the sample-clock merge.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B9 spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b9-markets/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

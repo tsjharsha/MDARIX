@@ -1,6 +1,6 @@
 # B4c: Starter templates, Excel import and export, and regulatory change impact (E4)
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. Per the owner's automatic chain (11 Nov), B4c starts after B4b is complete, and only once this spec is approved. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. Per the owner's automatic chain (11 Nov), B4c starts after B4b is complete, and only once this spec is approved. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer. Each ⚑ says what the build does **if no answer arrives** (always the safer path).
 
 - **Sources:** `decision-tree-deep-dive/report.md` (approved 7 Nov: §3d, §3e, G3, G10, G11, D4, D8, DT-23..DT-26, DT-31), `development-cycle-1.md` (B4c row; E4 "fold into B4c"), `b4-rule-register/spec.md` (approved: R-D1 register as files, R-D4 law change vs correction, R-D12 training deferred to B4c/E4, optional step 14 not built), `b4b-questionnaire-config/spec.md` (draft: the organisation layer this builds on), `b9-markets/spec.md` (`IN-floor-2`, `CA-floor-2` corrections), `other-country-reports/STATE.md` (head `tr31othercountries`).
 - **Code read** (read-only, `git show feat/b8-eu-gb-mir:<path>`, tip `d57c65a9`). Every `file:line` is on that branch, under `backend/app/`, except `sections/...` (under `frontend/src/features/workspace/`) and `customer-admin/...` (under `frontend/src/features/`). B4b is not built; its names are taken from its draft spec. Step 0 re-checks every line on B4b's tip.
@@ -322,3 +322,14 @@ The sample has India and Canada examples, and B9 shipped real corrections for bo
 
 ## Owner approval (11 Nov 2026)
 The owner replied **"approve B4c spec"**: every recommendation is accepted as written, including all flagged decisions (D1 no floor exceptions; D2 every signed conclusion in the affected period re-run, open complaints with a different result need a person's decision, closed ones listed except Not reportable → Reportable which needs a decision, nothing changed automatically; D3 change-impact review signed by a regulatory.approve holder, never an administrator, password + MFA, due on the law's date or 5 working days after a correction; D4 "I have read what changed" once per new floor version before the first signature, audited, not a signature; D6 reviews created for IN-floor-2 and CA-floor-2 at release). Build starts in Lane 1 after B4b. Step 0 re-numbers the migration after the current head (one-head rule).
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B4c spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b4c-templates-change-impact/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

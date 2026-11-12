@@ -68,3 +68,14 @@ OC-01 a country outside the five markets can be chosen, and an EU or GB country 
 | OC-D3 | Does recording "Submitted" need a second person's approval, as the built-in forms do | **APPROVED: no second-person approval.** The person recording it signs. No organisation option is built |
 | OC-D4 | Is the Report ID mandatory at Submitted | **Mandatory or "Not issued yet"**, to be filled in later |
 | OC-D5 | Release | **B9b, after B9**, not before WHIF |
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 9 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve OC spec" |
+| Where recorded | the APPROVED line at the top of this spec |
+| Planning copy | `MDARIX-planning/other-country-reports/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

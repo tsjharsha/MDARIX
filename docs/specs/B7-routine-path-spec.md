@@ -1,6 +1,6 @@
 # B7 design spec: the routine complaint path, Case import and export, e-mail intake, the urgent alert
 
-Version 1, 10 Nov 2026. **DRAFT for the owner's approval.** Nothing here is built.
+Version 1, 10 Nov 2026. **APPROVED by the owner on 10 Nov 2026 (see "Approval record").** Nothing here is built.
 
 - **Plan:** B7 starts after the 27 Nov build cut-off, on its own branch, from the big-bang line (B2, W1, audit fixes, ID-2, hardening 0.10.95, B3). Building may go on during the 4–12 Dec freeze. B7 ships in the first release after the freeze; its number is given at build time.
 - **Why now:** a reviewer said the product is "far too complex for day-to-day use; most issues won't go into investigation". Without a short daily path, users will not adopt MDARIX. The master sequence (10 Nov) moved B7 to the first item after B3.
@@ -734,3 +734,14 @@ Worktree `trial-093`, local only, not pushed. On `feat/b7-routine-path`, then me
 **Tests run (targeted, `POSTGRES_DB=mdarix_b2_test`):** on B7: `test_mail_processing.py` + `test_mail_in.py` 16 passed (new: site suggestion; EM-10 extended: one notice however often refused); `test_notifications_delivery.py` + `test_email_intake_api.py` 27 passed (new: limit notice once a day to the customer administrators; wording test). Vitest `workspace/emailIntake.test.tsx` + `linkTable.test.ts` + `logCase.test.tsx` + `src/features/help`: 7 files, 50 passed; `tsc --noEmit` clean. On `feat/b4-rule-register` after all merges: story set (`test_sample_story_days.py`, `test_release_0_10_92.py`, `test_getting_started_part1.py`, `test_flagship_walkthrough.py`, `test_release_0_10_97.py`) 22 passed, 1 xfailed; `test_complaint_page.py` + `test_mail_processing.py` + `test_mail_in.py` + `test_notifications_delivery.py` 45 passed; vitest `linkTable.test.ts` + `workspace/emailIntake.test.tsx` 27 passed.
 
 **Still open from run 5:** the polling fallback (only if port 25 cannot be opened) and the operations to turn e-mail intake on. **Limits:** the site match is the exact sender domain (a sub-domain such as `ward.hospital.example` does not match `hospital.example`); "once a day" is the UTC day.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 10 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B7 spec"; later choices "approve B7 choices" (11 Nov 2026) |
+| Where recorded | sections "Owner approval (10 Nov 2026)" and "Owner decisions on B7 run 3 choices" |
+| Planning copy | `MDARIX-planning/b7-routine-path/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |

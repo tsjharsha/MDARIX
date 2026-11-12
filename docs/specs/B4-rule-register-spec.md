@@ -1,6 +1,6 @@
 # B4: Rule register, rules as data, the MDARIX floor and effective dating
 
-Version 1, 11 Nov 2026. **DRAFT for the owner.** Nothing here is built. Per the owner's automatic chain (11 Nov), B4 starts when B5 is complete, on the recommendations in section 7 unless the owner changes them. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer before the build starts.
+Version 1, 11 Nov 2026. **APPROVED by the owner on 11 Nov 2026 (see "Approval record").** Nothing here is built. Per the owner's automatic chain (11 Nov), B4 starts when B5 is complete, on the recommendations in section 7 unless the owner changes them. Decisions marked **⚑** touch regulatory interpretation or signed records: they need the owner's explicit answer before the build starts.
 
 - **Sources:** `development-cycle-1.md` (B4, B4b, B4c rows; C4; E4; Addenda K), `master-sequence-proposal.md` (item 11), `decision-tree-deep-dive/report.md` (D1–D12, approved 7 Nov), `authority-forms-spec/spec.md` and `spot-check.md`, `other-country-reports/spec.md` (OC-D3, OC-D5), `b3-emdr/B3-execution-plan.md`, `b5-challenge-closed-loop/spec.md`, `b7-routine-path/spec.md`, `scenario-register.md` (DT, RG).
 - **Code read** (read-only): worktree `trial-094`, branch `feat/b3-emdr-0.10.96`. Every `file:line` below is on that branch, under `backend/app/` unless shown. B7 and B5 change some of these files on their own branches; build step 0 re-checks the lines on B5's tip.
@@ -412,3 +412,14 @@ The decision-table test VR-7 was fixed in step 11 by changing the document to `d
 **Review findings not fixed (with reasons):** (4) the deadline and triage equivalence checks compare switch on vs off, not against frozen old code: the reviewer checked the off paths by hand and found them identical to the old constants; freezing `count`/`provisional_deadlines` into `legacy_v1` is left for the test release. `markets.disagreement` still reads today's question set (its serious flags only; identical while version 1 is the only version).
 
 **Next before a version 2 of any floor:** `deadlines.end_of` without `aware` (authority reports) and `disagreement` read today's floor; harmless while zones cannot change between versions (now enforced) and version 1 is the only version.
+
+## Approval record
+
+| Field | Value |
+|---|---|
+| Approved | 11 Nov 2026 |
+| Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
+| Approval words, as recorded | "approve B4 spec" |
+| Where recorded | section "Owner approval (11 Nov 2026)" |
+| Planning copy | `MDARIX-planning/b4-rule-register/spec.md` (reference only) |
+| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |
