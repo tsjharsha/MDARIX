@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.4 |
+| Version | 0.5 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
@@ -21,6 +21,7 @@ Change history
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered); RACI: nobody approves their own document (MDX-VAL-013, MDX-B10 drafts); Annex F, the seven interface checks of import, e-mail intake, authority files and outbox mapped to existing tests, with three gaps | Sriharsha Telikicherla |
+| 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight"): O17 big-bang gate (VMP-R50b, R50c); O18 a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test blocks (VMP-R49 split into R49 and R49a-c, VMP-R50 into R50 and R50a); O20 concrete OQ expected results and an OQ protocol approved before execution (lifecycle step 5; deliverables MDX-VAL-007-P and -007-R). After the second rating: VMP-R23 split into R23 and R23a-c | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
