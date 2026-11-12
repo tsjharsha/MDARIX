@@ -294,6 +294,12 @@ not built yet, and the chain is re-ordered at the release join). The API and web
 - Sample: once the sample decision is signed, Did it work? on SAMPLE-CAPA-02 reads "Too early" with no later
   complaints; no after-action complaints are seeded (B5-D10).
 
+### Tests
+
+- The decision brief and human decision tests (`tests/test_decision_brief.py`, `tests/test_human_decision.py`) give
+  their ready case's complaint a lot. Without one, B5's material question C-4 ("complaints with no version or no
+  lot") blocked submit with 409 `BRIEF_NOT_READY`, as B5-D3 intends; the tests predated that rule. No product change.
+
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
 B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto
@@ -308,6 +314,12 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   `attachment_quota_mb` (100); Case
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
+
+### Tests
+
+- The authorization matrix (`tests/test_authorization_matrix.py`) switches e-mail intake on for its sweeps, as the
+  permission sweep already does: while intake is off its routes answer 404 before the session check and the guards,
+  so 14 sweeps reported them as "answered past the session check". No product change.
 
 ### Added (B7b e-mail intake, switched off by default)
 
