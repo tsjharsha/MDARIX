@@ -152,7 +152,7 @@ def build_package(release: str = "MVP-1.0") -> dict:
             "Obtain QA and system-owner approval.",
         ],
         "approval": {"system_owner": "PENDING", "quality_reviewer": "PENDING", "approval_date": None},
-        "status": "READY_FOR_EXECUTION",
+        "status": "SUPERSEDED",  # retired by B6b (docs/validation/MDX-VAL-001); never executed
         "document_control": {
             "document_id": "MDARIX-CSA-MVP-1.0",
             "version": "1.0",

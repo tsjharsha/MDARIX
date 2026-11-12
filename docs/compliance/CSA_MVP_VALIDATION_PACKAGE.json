@@ -1,7 +1,7 @@
 {
   "package_id": "MDARIX-CSA-MVP-1.0",
   "release": "MVP-1.0",
-  "generated_at": "2026-09-28T15:24:54.584476+00:00",
+  "generated_at": "2026-11-12T03:56:50.735682+00:00",
   "intended_use": "Internal design-partner MVP validation; not a regulatory certification.",
   "requirements": [
     {
@@ -155,7 +155,14 @@
     "quality_reviewer": "PENDING",
     "approval_date": null
   },
-  "status": "READY_FOR_EXECUTION",
+  "status": "SUPERSEDED",
+  "document_control": {
+    "document_id": "MDARIX-CSA-MVP-1.0",
+    "version": "1.0",
+    "effective_date": null,
+    "supersedes": null,
+    "owner": "MDARIX Quality/System Owner"
+  },
   "limitations": [
     "Execution evidence must be generated against the approved test environment.",
     "This package does not certify FDA, ISO, HIPAA, or 21 CFR Part 11 compliance."

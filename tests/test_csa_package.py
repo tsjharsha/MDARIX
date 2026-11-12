@@ -13,7 +13,7 @@ def test_csa_package_has_iq_oq_pq_traceability():
     assert {test["phase"] for test in package["tests"]} == {"IQ", "OQ", "PQ"}
     requirement_ids = {item["id"] for item in package["requirements"]}
     assert all(test.requirement_id in requirement_ids for test in TESTS)
-    assert package["status"] == "READY_FOR_EXECUTION"
+    assert package["status"] == "SUPERSEDED"
 
 
 def test_csa_package_renders_acceptance_and_evidence():
