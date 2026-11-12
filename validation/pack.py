@@ -165,6 +165,7 @@ def migration_head(versions: Path) -> str:
 
 DEV_STATUSES = ("open", "corrected", "retested", "closed")
 DEV_CLASSES = ("critical", "major", "minor")
+DEV_FOUND_IN = ("IQ", "OQ", "PQ", "automated suite", "production")  # MDX-VAL-010 DL-R07
 
 
 def _utc(text: str) -> datetime:
@@ -252,6 +253,8 @@ def check(sources: Sources, release: str) -> list[str]:
             problems.append(f"{dev_id}: status '{dev.get('status')}' is not one of {', '.join(DEV_STATUSES)}")
         if dev.get("classification", "").strip().lower() not in DEV_CLASSES:
             problems.append(f"{dev_id}: classification '{dev.get('classification')}' is not critical, major or minor")
+        if dev.get("found_in", "").strip() not in DEV_FOUND_IN:
+            problems.append(f"{dev_id}: found_in '{dev.get('found_in')}' is not one of {', '.join(DEV_FOUND_IN)}")
         for key in ("raised_utc", "documented_first_utc", "closed_utc"):
             if dev.get(key, "").strip():
                 try:

@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-013 |
 | Title | Consultant brief and question pack |
-| Version | 0.4 |
+| Version | 0.5 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
@@ -21,6 +21,7 @@ Change history
 | 0.2 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations; editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13); MDX-VAL-008, -010 and the -012 template added to the documents to review | Srinivas Telikicherla |
 | 0.4 | 12 Nov 2026 | Section 6 states exactly what a signer re-enters at each signing (password and a fresh authenticator code), after the second rating | Srinivas Telikicherla |
+| 0.5 | 12 Nov 2026 | Question 25 on the back-fill recorded as DEV-0.11.04-001 (owner, 12 Nov 2026) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -135,6 +136,7 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 22 | The recovery point is 24 hours today (no point-in-time recovery). Is that acceptable for the first pilots, and with what interim control, until point-in-time recovery is in place? | MDX-VAL-002 RSK-038 (owner decision B6b-D8) |
 | 23 | Audit events are kept 7 years from each event, with a full export at exit. Is that sufficient against customers' own record-retention periods? | MDX-VAL-001 section 16.4 |
 | 24 | Until the Validation Master Plan is approved, each production deploy is approved by the quality approver on an interim release approval record (nine criteria; Open risk rows covered by signed risk acceptances; never a critical failure). Is that a sufficient control for the first pilots, and what would you add? | MDX-VAL-012 template; MDX-VAL-001 VMP-R41, VMP-R49 |
+| 25 | Deviation DEV-0.11.04-001: the account fields of 58 rule versions approved on 11 Nov 2026 were back-filled on 12 Nov 2026 from the spec approval of 11 Nov, and the deviation was written down after that correction, not before it. It is classed major (class-A function). Is a back-fill from a dated approval record acceptable under ALCOA+, or must those 58 versions be approved again with the account fields recorded at approval? What else would you expect in the record? | `deviation-log.csv` DEV-0.11.04-001; MDX-VAL-001 VMP-R61; MDX-VAL-002 RSK-065 |
 
 ## 8. Open points
 

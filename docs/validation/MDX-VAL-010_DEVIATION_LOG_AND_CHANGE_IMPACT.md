@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-010 |
 | Title | Deviation log and change-impact template |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B10) | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | Owner decision O11: each change carries its own risk, which sets its re-test rule (MDX-VAL-001 VMP-R23); DL-R06 keeps every version of a row in git; re-run scope as MDX-VAL-001 section 9.3; signature block | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | DL-R07 allowed `found_in` values, checked by the generator (owner, 12 Nov 2026) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -42,6 +43,8 @@ definitions are those of MDX-VAL-001 section 13 and Annex C; they are not repeat
   record and shall list the deviation (scenario B6-58).
 - **DL-R06** Every change to a row (a status change or a correction) shall be its own commit whose message names
   the row, so git history keeps every earlier version of it; a row is never deleted.
+- **DL-R07** `found_in` shall be one of IQ, OQ, PQ, automated suite, production (MDX-VAL-001 Annex C); a finding
+  made while preparing a protocol is recorded under that protocol. The generator lists any other value.
 
 ## 3. Change-impact assessment (template, one per release)
 

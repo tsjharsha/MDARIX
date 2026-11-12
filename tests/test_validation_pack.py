@@ -348,6 +348,9 @@ def test_deviation_cannot_close_without_retest_and_approver(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "DEV-9.9.9-001: closed without a retest result" in err and "DEV-9.9.9-001: closed without an approver" in err
     assert "DEV-9.9.9-002" not in err
+    wrong = DEV.format(n="003", risk="low", cls="minor", retest="", result="", approver="", closed="", status="open")
+    assert _run(_root(tmp_path / "found", deviations=wrong.replace(",SH,OQ,", ",SH,document review,"))) == 1
+    assert "DEV-9.9.9-003: found_in 'document review' is not one of IQ, OQ, PQ" in capsys.readouterr().err
 
 
 @pytest.mark.requirement("B6-58")
