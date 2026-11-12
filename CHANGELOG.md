@@ -52,7 +52,7 @@ pack is generated as a dry run only: its statuses are development results, not v
   standard-library XLSX writer `validation/xlsx_write.py` and a DOCX/PDF renderer `validation/docx_render.py`):
   URS, FS/DS, IQ record, OQ protocol and results, RTM, G13 figures, draft VSR and release approval record, in
   Markdown, Word, PDF, CSV and Excel, with a SHA-256 manifest, into `docs/validation/releases/<release>/`. The
-  release identity is an argument (a warning when it differs from `VERSION`). It lists every traceability failure
+  release identity is an argument and must equal `VERSION` (a warning only in a dry run). It lists every traceability failure
   (class-A requirement without a negative scenario, requirement without a scenario, unknown scenario, PASS without
   evidence, marker with an unknown ID) and every deviation-rule failure, and writes nothing unless `--dry-run`. It
   never overwrites a release folder holding a signed approval, and produces no release approval record while a
@@ -64,13 +64,34 @@ pack is generated as a dry run only: its statuses are development results, not v
   requirements that name them.
 - **MDARIX PQ protocol (MDX-VAL-008)** and **deviation log and change-impact template (MDX-VAL-010)**, with
   `docs/validation/deviation-log.csv` (header only).
+- **Interim release approval template (MDX-VAL-012)**, `docs/validation/MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md`:
+  the record the quality approver signs before every production deploy from the big-bang deploy until the Validation
+  Master Plan is approved (owner decision O13). The generated record now carries the same nine criteria for the
+  approver to initial, the risk acceptances for Open risk rows, the emergency-fix OK, the post-deploy check and the
+  interim basis. Consultant question 24.
+- **PL scenario group** (owner decision O15): PL-01 to PL-45 in the scenario register, NOT RUN, drafted for the
+  owner's review. Every class-A requirement now has a scenario and a negative scenario in `requirements.csv`.
+- **Interface checks mapped** (MDX-VAL-001 Annex F): accuracy, completeness, consistency, transformation, sequence,
+  duplicates and failure recovery for import, e-mail intake, authority files and the outbox, each to existing tests;
+  three gaps and three partial cells listed as tests to add.
 
 ### Changed
 - **Scenario register statuses normalised** to the five values (NOT RUN, PASS, FAIL, BLOCKED, REQUIRES HUMAN
   DECISION); run notes and partial results moved to a new Notes column.
-- **Rule register: a second person approves.** `backend/app/rule_register/register.py` refuses a rule version
-  whose `approval.approved_by` is empty or names the same person as `approval.built_by` (owner decision O3,
-  MDX-VAL-002 RSK-065). Every shipped rule file still loads.
+- **Rule register: a second person approves, by account.** `backend/app/rule_register/register.py` refuses a rule
+  version unless `approval.built_by_account` and `approval.approved_by_account` are two different staff accounts
+  (`STAFF_ACCOUNTS`), the approver's account may approve rule content and the names shown are the accounts' names;
+  typed names are no longer compared (owner decisions O3 and O10, MDX-VAL-002 RSK-065). Every shipped rule file names
+  both accounts and still loads.
+- **Validation-pack generator refuses a release/`VERSION` mismatch** outside a dry run (exit 1, nothing written);
+  a dry run still only warns (owner decision O16).
+- **Risk assessment re-scored** (owner decisions O7 to O9): severity 5 now includes the permanent loss of regulated
+  records and severity 4 a recoverable loss (RSK-037, RSK-040 to S5); RSK-029 to S5; a failure found only at the
+  quarterly restore drill has detectability 4 (RSK-039, RSK-040). 32 rows now need action.
+- **Validation Master Plan** (owner decisions O11, O12, O14): a release is gated on each change's own risk in its
+  change-impact assessment (VMP-R23, section 9.3); VMP-R49 allows a release with a signed risk acceptance for an
+  Open row, never for a critical failure; the few tagged tests are stated as a known gap with a tagging plan
+  (VMP-R94 to VMP-R96).
 - **Password expiry claim corrected.** `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` said passwords expire
   after 90 days; the code has no password expiry (owner decision). It now states that, with the breached-password
   refusal and the sign-in lockout; MFA for signatures is described as on by default and refused off in production.
