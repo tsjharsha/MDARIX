@@ -110,7 +110,9 @@ def read_register(path: Path) -> dict[str, dict]:
 
 
 def read_oq_expected(path: Path) -> dict[str, dict]:
-    """``oq-expected-results.csv``: per class-A scenario the input and the concrete expected result (owner decision O20)."""
+    """``oq-expected-results.csv``: per class-A scenario the input and the concrete expected result (owner decision O20),
+    its ``source`` (``requirement``: derived from the requirement; ``code``: drafted from the code) and who confirmed it
+    (``confirmed_by``). Only a row derived from its requirement and confirmed counts as approved (owner, 12 Nov 2026)."""
     if not path.exists():
         return {}
     return {row["scenario_id"]: row for row in csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())}
@@ -224,10 +226,14 @@ def check(sources: Sources, release: str) -> list[str]:
         expected = sources.oq_expected.get(sid)
         if not expected or not expected.get("expected_result", "").strip():
             problems.append(f"{sid}: class-A scenario without a concrete OQ expected result (oq-expected-results.csv)")
-        elif expected.get("confidence", "").strip() != "code":
-            problems.append(
-                f"{sid}: OQ expected result marked {expected.get('confidence') or 'blank'}; confirm it first"
+        else:
+            source, confirmed = expected.get("source", "").strip(), expected.get("confirmed_by", "").strip()
+            why = (
+                [] if source == "requirement" else [f"source '{source or 'blank'}', re-derive it from its requirement"]
             )
+            why += [] if confirmed else ["not confirmed by the owner"]
+            if why:  # owner, 12 Nov 2026: a result drafted from the code checks the code against itself
+                problems.append(f"{sid}: OQ expected result not yet approved ({'; '.join(why)})")
     cited = {s for req in sources.requirements for s in req["scenario_ids"]}
     for sid in sorted(cited & set(sources.scenarios)):
         row = sources.scenarios[sid]

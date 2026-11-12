@@ -29,9 +29,9 @@ REGISTER = """# register
 | AA-02 | Bad input | Refused | X | NOT RUN | |
 | AA-03 | Counts | Equal | X | NOT RUN | |
 """
-OQ_EXPECTED = """scenario_id,revision,input,expected_result,checked_by,confidence
-AA-01,A,Submit a good input,200; saved,tests/test_a.py::test_saved,code
-AA-02,A,Submit a bad input,422 BAD_INPUT; nothing saved,tests/test_a.py::test_refused,code
+OQ_EXPECTED = """scenario_id,revision,input,expected_result,checked_by,source,confirmed_by
+AA-01,A,Submit a good input,200; saved,tests/test_a.py::test_saved,requirement,Srinivas 2026-11-13
+AA-02,A,Submit a bad input,422 BAD_INPUT; nothing saved,tests/test_a.py::test_refused,requirement,Srinivas 2026-11-13
 """
 JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest">
 <testcase classname="tests.test_a" name="test_refused" time="0.10"><properties>
@@ -257,10 +257,17 @@ def test_no_oq_results_without_an_approved_protocol(tmp_path, capsys):
         tmp_path / "out" / "MDX-VAL-007-R-OQ-results.md"
     ).read_text("utf-8")
     expected = root / "docs" / "validation" / "oq-expected-results.csv"
-    expected.write_text(OQ_EXPECTED.replace("422 BAD_INPUT", "409 BAD_INPUT").replace(",code\n", ",TO CONFIRM\n", 1))
+    confirmed = ",requirement,Srinivas 2026-11-13\n"
+    expected.write_text(
+        OQ_EXPECTED.replace("422 BAD_INPUT", "409 BAD_INPUT")
+        .replace(confirmed, ",code,Srinivas 2026-11-13\n", 1)
+        .replace(confirmed, ",requirement,\n", 1)
+    )
     assert _run(root, "--out", str(tmp_path / "out2")) == 1
     said = capsys.readouterr().err
-    assert "is not approved" in said and "AA-01: OQ expected result marked TO CONFIRM" in said
+    assert "is not approved" in said
+    assert "AA-01: OQ expected result not yet approved (source 'code', re-derive it from its requirement)" in said
+    assert "AA-02: OQ expected result not yet approved (not confirmed by the owner)" in said
     expected.write_text(OQ_EXPECTED.splitlines()[0] + "\n")
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry2")) == 1
     assert "AA-02: class-A scenario without a concrete OQ expected result" in capsys.readouterr().err
