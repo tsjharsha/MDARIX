@@ -107,8 +107,8 @@ pack is generated as a dry run only: its statuses are development results, not v
   block is a check failure. The OQ log's result columns come from the executed results.
 ### Changed
 - **Run 7 documents:** RSK-036, RSK-066 and RSK-011 "Acceptable after verification" after the control-gap fixes
-  (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 deviation
-  open; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA
+  (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 "Acceptable after
+  verification" with its fix and tests, deviation DEV-0.11.04-002 open until the owner accepts it; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA
   effectiveness and trends steps); spec copies: the status line is the only change to the copied text, recorded.
 - **Run 6 documents:** DEV-0.11.04-001 reclassified major (GxP risk high); MDX-VAL-000 section 4 co-signed by the
   system owner (signing PDF regenerated); VMP-R42a (the first pack executes every class-A scenario); PQ 0.4 (six more
