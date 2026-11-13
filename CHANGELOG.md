@@ -977,6 +977,10 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   31 Oct). A signer without one, including in an organization with no training records yet, is refused
   (`TRAINING_REQUIRED`) with the documents to read and confirm on the same screen; existing records and the sample's
   signed examples are unchanged. In a free trial the record stays a practice acknowledgement (RSK-011).
+- The background worker no longer hands on an event whose content names another organization than the event's own:
+  it is dead-lettered at once (`PAYLOAD_TENANT_MISMATCH`), without retries, and the log names the event and both
+  organizations, never the content. Every scheduled job now has a test with two organizations proving that its
+  writes, e-mails and queued events stay in the organization each record belongs to (RSK-026).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
