@@ -631,11 +631,18 @@ def test_the_iq_record_holds_the_rule_register_the_tools_and_the_test_environmen
         '<property name="hook_version" value="2"/>', '<property name="hook_version" value="2"/>' + props
     )
     root = _root(tmp_path, junit=junit)
+    # A code-held version has no content hash: its pinned code hash is checked by the pin test, never a mismatch here.
+    code_held = {"code": "P-9-1", "rule": "P-9", "version": 1, "held_as": "CODE", "implementation": "m:f",
+                 "code_hash": "sha256:abc", "effective_from": None, "effective_to": None}  # fmt: skip
+    (root / "backend" / "app" / "rule_register" / "data" / "P-9-1.json").write_text(__import__("json").dumps(code_held))
     assert _run(root, "--out", str(tmp_path / "out")) == 0
     iq = (tmp_path / "out" / "MDX-VAL-006-IQ.md").read_text("utf-8")
     content_hash = _content_hash(RULE["content"])
-    assert f"| T-floor-1 | 1 | start to open | `{content_hash}` | yes |" in iq
-    assert "| IQ-010 | Rule register at this commit (section 3) | 1 versions; content hashes recomputed from the files | all match |" in iq  # fmt: skip
+    assert f"| T-floor-1 | 1 | start to open | DATA | `{content_hash}` | yes |" in iq
+    assert "| P-9-1 | 1 | start to open | CODE | `sha256:abc` | code-held: pin test |" in iq
+    assert (
+        "| IQ-010 | Rule register at this commit (section 3) | 2 versions: 1 data-held" in iq and "| all match |" in iq
+    )
     assert "## 4. Test environment (VMP-R45" in iq and "| IQ-T03 | Python of the test run | 3.13.1 | recorded |" in iq
     assert (
         "| IQ-T04 | Key packages of the test run (pytest included) | fastapi 0.141.1; pytest 9.1.1 | recorded |" in iq
@@ -649,6 +656,7 @@ def test_the_iq_record_holds_the_rule_register_the_tools_and_the_test_environmen
     assert "rule register T-floor-1: content_hash does not match its content" in capsys.readouterr().err
     assert "| MISMATCH: T-floor-1 |" in (tmp_path / "dry" / "MDX-VAL-006-IQ.md").read_text("utf-8")
     rule_file.unlink()
+    (rule_file.parent / "P-9-1.json").unlink()
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
     assert "rule register: no rule version found" in capsys.readouterr().err
 

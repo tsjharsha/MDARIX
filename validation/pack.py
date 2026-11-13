@@ -242,8 +242,10 @@ def _canonical_hash(content) -> str:
 
 
 def read_rule_register(folder: Path) -> list[dict]:
-    """Every rule version at this commit (rating-4 finding 5): code, version, period, recorded content hash, whether it
-    matches the content, and the file's SHA-256 (LF line endings, as git stores it)."""
+    """Every rule version at this commit (rating-4 finding 5): code, version, period, the file's SHA-256 (LF line
+    endings, as git stores it) and its hash. A data-held version carries a content hash, recomputed here (``matches``);
+    a code-held one names its implementation and, when pinned, a code hash, which ``tests/test_rule_pins_unit.py``
+    recomputes from the code (``matches`` None here: the generator does not import the application)."""
     rows = []
     for file in sorted(folder.glob("*.json")) if folder.is_dir() else []:
         raw = file.read_bytes()
@@ -252,11 +254,14 @@ def read_rule_register(folder: Path) -> list[dict]:
         except ValueError:
             rows.append({"code": file.stem, "file": file.name, "unreadable": True})
             continue
+        code_held = entry.get("held_as") == "CODE"
         rows.append({
             "code": entry.get("code", file.stem), "rule": entry.get("rule", ""), "version": entry.get("version", ""),
             "effective_from": entry.get("effective_from") or "start", "effective_to": entry.get("effective_to") or "open",
-            "content_hash": entry.get("content_hash", ""),
-            "matches": entry.get("content_hash") == _canonical_hash(entry.get("content")),
+            "held_as": "CODE" if code_held else "DATA",
+            "hash": (entry.get("code_hash") or f"implementation {entry.get('implementation') or 'not named'}")
+            if code_held else entry.get("content_hash", ""),
+            "matches": None if code_held else entry.get("content_hash") == _canonical_hash(entry.get("content")),
             "file_sha256": hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest(), "file": file.name,
         })  # fmt: skip
     return rows
@@ -430,7 +435,7 @@ def check(sources: Sources, release: str) -> list[str]:
     for rule in sources.rule_versions:
         if rule.get("unreadable"):
             problems.append(f"rule register {rule['file']}: not readable JSON")
-        elif not rule["matches"]:
+        elif rule["matches"] is False:  # a code-held version is checked by its pin test
             problems.append(f"rule register {rule['code']}: content_hash does not match its content")
     for name, text in sorted(sources.count_documents.items()):
         problems += counts_problems(name, text, counts_block(sources))
@@ -885,7 +890,8 @@ def iq(ctx: Context, s: Sources) -> str:
     meta = s.junit_meta or {}
     env = s.environment
     rules = s.rule_versions
-    wrong = [r["code"] for r in rules if r.get("unreadable") or not r.get("matches")]
+    wrong = [r["code"] for r in rules if r.get("unreadable") or r.get("matches") is False]
+    data_held = sum(r.get("held_as") == "DATA" for r in rules)
     rows = [
         ["IQ-001", "Release identity", f"release {ctx.release}; `VERSION` {ctx.version_file}; commit `{ctx.commit}`; tag {ctx.tag or '(none)'}",
          "match" if ctx.release == ctx.version_file else "MISMATCH: set at the release join"],
@@ -897,7 +903,7 @@ def iq(ctx: Context, s: Sources) -> str:
         ["IQ-007", "Clock check (`scripts/clock_check.py`)", json.dumps(clock.get("status") or clock.get("result") or "not supplied"), "recorded" if clock else "to record"],
         ["IQ-008", "Release checks JSON", f"passed = {checks.get('passed')}, full suite = {checks.get('full_suite')}" if checks else "not supplied", "recorded" if checks else "to record"],
         ["IQ-009", "Node of the front-end build image", "to record at installation (`node --version`)", "to record"],
-        ["IQ-010", "Rule register at this commit (section 3)", f"{len(rules)} versions; content hashes recomputed from the files",
+        ["IQ-010", "Rule register at this commit (section 3)", f"{len(rules)} versions: {data_held} data-held (content hash recomputed from the file), {len(rules) - data_held} code-held (code hash pinned, `tests/test_rule_pins_unit.py`)",
          "all match" if rules and not wrong else f"MISMATCH: {' '.join(wrong)}" if wrong else "NONE FOUND"],
     ]  # fmt: skip
     test_env = [
@@ -920,7 +926,9 @@ def iq(ctx: Context, s: Sources) -> str:
     test_env = [row + [done.get(row[0], {}).get(k, "") for k in keys] for row in test_env]
     header = ["Step", "Check", "Recorded", "Result", "Executed by", "Date (UTC)", "Executed result", "Evidence ID"]
     register = [[r.get("code"), r.get("version", ""), f"{r.get('effective_from', '')} to {r.get('effective_to', '')}",
-                 f"`{r.get('content_hash', '')}`", "yes" if r.get("matches") else "NO", f"`{r.get('file_sha256', '')}`"]
+                 r.get("held_as", ""), f"`{r.get('hash', '')}`",
+                 "code-held: pin test" if r.get("matches") is None else "yes" if r.get("matches") else "NO",
+                 f"`{r.get('file_sha256', '')}`"]
                 for r in rules]  # fmt: skip
     return (
         _header(ctx, "MDX-VAL-006", "Installation qualification record", SYSTEM_OWNER, QUALITY_APPROVER)
@@ -930,9 +938,13 @@ def iq(ctx: Context, s: Sources) -> str:
         "The IQ record's approver does not execute it (VMP-R02).\n\n"
         + _table(header, rows)
         + "\n## 3. Rule register at this commit\n\nEvery rule version in `backend/app/rule_register/data/`, with its "
-        "recorded content hash, whether that hash matches the content (recomputed by the generator), and the file's "
-        "SHA-256 (LF line endings, as stored in git).\n\n"
-        + _table(["Code", "Version", "In force", "Content hash", "Matches", "File SHA-256"], register)
+        "SHA-256 (LF line endings, as stored in git). A data-held version shows its content hash and whether it matches "
+        "the content (recomputed by the generator); a code-held version shows its pinned code hash (or its "
+        "implementation), which `tests/test_rule_pins_unit.py` recomputes from the code.\n\n"
+        + _table(
+            ["Code", "Version", "In force", "Held as", "Content or code hash", "Content hash matches", "File SHA-256"],
+            register,
+        )
         + "\n## 4. Test environment (VMP-R45, owner decision B6b-D16)\n\nUntil staging exists the controlled local "
         "environment is qualified here: the values come from the JUnit of this release (the marker hook records the "
         'commit, the tree, Python and the key packages) and the release-checks JSON; a row marked "to record" is '
