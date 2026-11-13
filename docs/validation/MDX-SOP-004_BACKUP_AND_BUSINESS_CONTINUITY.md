@@ -44,6 +44,12 @@ restore (G17), and what happens when MDARIX is unavailable or stops. It wraps th
 - **BC-R07** A backup alert shall be handled as a SEV2 incident (MDX-SOP-003;
   `docs/handover/52_SUPPORT_AND_OWNERSHIP_HANDOVER.md:37`).
 
+**Known gap on today's production.** The off-site copy is made by a host cron job, and nothing alerts when that copy
+fails (`docs/runbooks/GCP_DEPLOYMENT.md:170-171`). Until a check is added, BC-R06 is not met for the off-site copy.
+
+- **BC-R07a** Until that check exists, the system owner shall check the off-site copy log and the bucket listing
+  every working day and record a missing copy in the operations log.
+
 ## 4. Restore drill
 
 - **BC-R08** A restore drill shall run every 3 months, and before the first design partner, as
