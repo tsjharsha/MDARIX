@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-008 |
 | Title | MDARIX performance qualification protocol |
-| Version | 0.4 |
+| Version | 0.5 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver (executes as the business user) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner (MDX-VAL-001 section 6.3: PQ row) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (MDX-VAL-000, DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 13 Nov 2026 |
 | Code baseline | Branch `feat/b6b-validation-pack`; the release under test is named in the PQ record of each pack |
 
 Change history
@@ -21,6 +21,7 @@ Change history
 | 0.2 | 12 Nov 2026 | Signature block added after an independent rating; PQ-011 cites PL-18 | Srinivas Telikicherla |
 | 0.3 | 12 Nov 2026 | After the second rating: PQ-001, PQ-005 and PQ-006 cite the scenarios their steps exercise (TR-28 serious injury, TR-12 several markets; B6-20 code, RG-01 rule reference; PL-43 snapshot values, B8-16 same snapshot); PQ-R06 organisation type | Srinivas Telikicherla |
 | 0.4 | 12 Nov 2026 | After the third rating: PQ-R07 to PQ-R10 (real time zone and markets, two people with their own accounts, a negative step per persona, coverage of the intended use); PQ-012 to PQ-017 (late entry, not-a-complaint path, facts changed after signing, signature manifestation, lockout, audit chain); section 3.1 coverage table | Srinivas Telikicherla |
+| 0.5 | 13 Nov 2026 | Rating-4 finding 8: PQ-R01 and PQ-R08 reconciled (one executor who does not write the code records every result; the second person only acts in the four-eyes steps and records nothing); PQ-R11; PQ-018 (CAPA effectiveness) and PQ-019 (trends) cover the last two functions of the intended use, the native CAPA lifecycle stated out of scope with the reason; section 5 names the columns of `pq-record.csv`, which the generator reads and checks | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -31,7 +32,7 @@ customer template MDX-CUS-001.
 ## 2. Rules
 
 - **PQ-R01** The PQ shall be executed by the quality approver acting as the business user, never by the person who
-  wrote the code under test.
+  wrote the code under test. The executor performs and judges every step and records every result.
 - **PQ-R02** The PQ shall run on the controlled local environment or staging (MDX-VAL-001 section 10), on the sample
   story, never on customer data.
 - **PQ-R03** Each step shall be recorded with its result (PASS / FAIL / BLOCKED / NOT RUN), the executor, the date (UTC)
@@ -42,12 +43,17 @@ customer template MDX-CUS-001.
   of steps PQ-002 and PQ-007 apply; the sample story is loaded into it as synthetic data.
 - **PQ-R07** The organisation's time zone shall be America/New_York and its markets US and EU, so that clock and
   daylight-saving behaviour is exercised under real conditions; the date of execution is recorded per step.
-- **PQ-R08** At least two people shall take part (a second person for the four-eyes steps); each persona signs in with
-  its own account and authenticator, never a shared one.
+- **PQ-R08** At least two people shall take part: the executor (PQ-R01) and a second person, who acts only as the
+  second account in the four-eyes steps (PQ-002, PQ-007, PQ-009) under the executor's direction. The second person
+  may be the system owner, who writes the code; that person performs only the action the step names, and neither
+  judges nor records a result, so PQ-R01 still holds. Each person signs in with their own account and authenticator,
+  never a shared one.
 - **PQ-R09** Each persona shall have at least one negative step (an action the system must refuse); a negative step
   passes only when the refusal is seen and audited.
 - **PQ-R10** The steps shall cover every function of the intended use (MDX-B10-001 section 4.1); the table in section
   3.1 shows the coverage. A function without a step is a gap recorded in the VSR.
+- **PQ-R11** People are recorded by their identifier ("Srinivas T.", "Sriharsha T."), never by the initials "S. T.",
+  which the two founders share.
 
 ## 3. Steps (the sample story, one persona per step)
 
@@ -70,6 +76,8 @@ customer template MDX-CUS-001.
 | PQ-015 | Quality approver | Print the signed US conclusion of PQ-005 | The print shows the signer's printed name, the date and time and the meaning of the signature | PL-47 |
 | PQ-016 | Regulatory reviewer | Enter a wrong authenticator code five times when signing | The account locks for 15 minutes; the lock is in the audit trail; nothing is signed | PL-51, PL-52 |
 | PQ-017 | Quality approver | Run the audit-chain verification for the organisation after PQ-001 to PQ-016 | Verified; the head is recorded as an anchor | PL-09 |
+| PQ-018 | Quality approver | Record the QMS CAPA reference for the investigation of PQ-008 and run its effectiveness check with only a few complaints since the action | Reads "Too few to tell" or "Too early", never "effective" | CP-08, B5-11 |
+| PQ-019 | Quality approver | Open the trends of the sample product, first on one version below the threshold, then on two versions with the same problem | Below the threshold: plain counts, no pattern statement; above it: "Pattern to review" with counts, units and rates and "not a confirmed signal" | S360-08, S360-06 |
 
 ### 3.1 Coverage of the intended use (MDX-B10-001 section 4.1)
 
@@ -81,6 +89,12 @@ customer template MDX-CUS-001.
 | Investigation | PQ-008 |
 | Signatures, reviews and audit trail | PQ-005, PQ-007, PQ-009, PQ-015, PQ-016, PQ-017 |
 | Separation of organisations; export at exit | PQ-010, PQ-011 |
+| CAPA and effectiveness | PQ-018 |
+| Trends | PQ-019 |
+
+Out of scope: the native CAPA lifecycle (actions, owners, due dates, escalation; scenarios CP-05, CP-06). It is not
+built: the intended use (MDX-B10-001 section 4.1) has MDARIX hold the QMS CAPA reference and the effectiveness check
+only, and plans the native lifecycle (decision M5). It joins this protocol when it is specified and built.
 
 
 ## 4. Acceptance
@@ -90,8 +104,13 @@ A BLOCKED or NOT RUN step is never a pass.
 
 ## 5. Record
 
-Each execution is kept in the release folder `docs/validation/releases/<release>/` as `pq-record.csv` (step, result,
-executor, date UTC, evidence ID, deviation ID) and is summarised in the VSR (MDX-VAL-011).
+Each execution is kept in the release folder `docs/validation/releases/<release>/` as `pq-record.csv` with the
+columns `step,executed_by,second_person,date_utc,result,evidence_id,deviation_id`, and each evidence file in its
+`evidence/` folder, named by its evidence ID. `scripts/validation_pack.py` reads the record, lists as a check failure
+a step not in section 3, a result other than the five values, a PASS or FAIL without executor, date or evidence, an
+executor who writes the code (PQ-R01), a second person who is the executor (PQ-R08), a step not passed without a
+logged deviation (PQ-R04) and an evidence ID without its file, and summarises the outcome in the VSR (MDX-VAL-011,
+section 8d).
 
 ## Signatures
 

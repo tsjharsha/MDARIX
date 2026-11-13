@@ -684,7 +684,7 @@ Recommended order: 1 → 2 → 4 → 5 → 6, with 3 when D4 is decided. Phases 
 |---|---|
 | Approved | 6 Nov 2026 |
 | Approver | Srinivas Telikicherla, Founder & CEO, QA/RA (owner) |
-| Approval words, as recorded | not recorded word for word; recorded as "decisions D1–D18 approved 6 Nov" |
-| Where recorded | `MDARIX-planning/development-cycle-1.md` line 7 (this spec has no approval section) |
+| Approval words, as recorded | None: the owner's words were not recorded word for word. The planning record reads "decisions D1–D18 approved 6 Nov" |
+| Where recorded | `MDARIX-planning/development-cycle-1.md` line 7; the planning copy of this spec has no approval section of its own |
 | Planning copy | `MDARIX-planning/authority-forms-spec/spec.md` (reference only) |
-| Form of approval | The owner's written reply, recorded in the spec on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except that a DRAFT status line now reads APPROVED |
+| Form of approval | The owner's written reply, recorded in the planning record on the day; not an electronic or wet signature. This section was added on 12 Nov 2026 (owner decision O29); the approved text above is otherwise unchanged, except its status line ("Spec for owner approval." now reads APPROVED), the only permitted change (MDX-VAL-000 section 3.3). The mapping workbook the spec names is copied beside it, unchanged, on 13 Nov 2026 |

@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-000 |
 | Title | Validation document control and index |
-| Version | 0.6 |
+| Version | 0.7 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 13 Nov 2026 |
 | Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
@@ -23,6 +23,7 @@ Change history
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations") recorded as O7 to O16; MDX-VAL-012 interim template added to the index; PL scenario code; document versions updated | Srinivas Telikicherla |
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight") recorded as O17 to O24; section 4 marked to be signed by the owner before the big-bang deploy, with its PDF for signature; section 3.3 indexes the approved specs copied into `docs/specs/`; OQ expected results and the OQ protocol and results IDs (MDX-VAL-007-P, -007-R) in the index | Srinivas Telikicherla |
 | 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations") recorded as O25 to O31; section 4 co-signed by the system owner (O30); section 3.3 adds the B6b spec, the B3 plan and the W1 spec and the approval records (O29); index versions | Srinivas Telikicherla |
+| 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -153,21 +154,21 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
-| MDX-VAL-000 | Validation document control and index | this file | 0.6 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
-| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.6 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.7 | DRAFT |
+| MDX-VAL-000 | Validation document control and index | this file | 0.7 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
+| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.7 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.8 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.5 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
-| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.4 | DRAFT |
+| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.5 | DRAFT |
 | MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.3 | DRAFT; log: DEV-0.11.04-001 (major, retested, not closed) |
-| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.4 | DRAFT; to be signed by the owner before the big-bang deploy |
+| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.5 | DRAFT; to be signed by the owner before the big-bang deploy |
 | MDX-VAL-004, -005, -006, -007-P, -007-R, -009, -011, -012-&lt;release&gt; | URS, FS/DS, IQ record, OQ protocol (approved before execution, O20) and OQ results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
-| (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, source (`requirement` / `code`), confirmed by | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT: all 176 rows drafted from the code (`source` `code`, 24 of them say TO CONFIRM in the text); each to be re-derived from its requirement by Sriharsha Telikicherla and confirmed by the owner (O27) |
+| (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, source (`requirement` / `code`), confirmed by | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT: every row drafted from the code (`source` `code`; the counts, including the rows that say TO CONFIRM, are in section 3.4); each to be re-derived from its requirement by Sriharsha Telikicherla and confirmed by the owner (O27) |
 | (data, per release) | Executed IQ and scripted OQ results: step, scenario, executed by, date (UTC), result, evidence ID; the generator feeds them into the IQ record, the OQ results, the RTM and the VSR (no generated document is edited by hand) | `releases/<release>/executed-results.csv` | per release | none yet |
-| (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 69 requirements |
+| (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; counts in section 3.4 |
 | MDX-SUP, MDX-SOP, MDX-OPS, MDX-CUS | Planned (B6b Parts C to E, section 5) | | | Not written |
 
 Other files in this folder: [AI_GOLDEN_DATASET_QUALIFICATION.md](AI_GOLDEN_DATASET_QUALIFICATION.md) and
@@ -202,9 +203,20 @@ The approved specs that `requirements.csv` and the scenario register cite were c
 decision O29) the B6b spec (up to its owner approval; its build-status sections stay in the planning copy), the B3
 execution plan (after the drafting-tool and folder references were removed from the planning copies) and the W1 spec
 were copied too, and every spec here received an "Approval record" section (date, the owner's approval words as
-recorded, approver, where recorded); a DRAFT status line in an approved spec now reads APPROVED. Nothing else in
-the approved text changed. The approvals were the owner's written replies, not signatures; the Authority-forms spec
-has no verbatim approval words (its record says so).
+recorded, approver, where recorded); a DRAFT status line in an approved spec now reads APPROVED.
+
+How O22 ("byte for byte") and O29 fit together: apart from the appended "Approval record" section, the status line is
+the only permitted change to the text of a copied spec, and it is recorded here. Each copy differs from its planning
+copy only in (a) the pointer line, which exists in the planning copy only, (b) the status line, from the draft wording
+to "APPROVED by the owner on <date> (see "Approval record")" (none for the B3 plan and the B9b spec, whose status line
+already read approved), and (c) the appended Approval record; checked line by line on 13 Nov 2026. The B6b spec copy
+stops at its owner approval; its build-status sections stay in the planning copy. Any other change is a new version
+under change control.
+
+The approvals were the owner's written replies, not signatures. The Authority-forms spec has no approval words
+recorded word for word; its Approval record cites the planning entry that records the approval of decisions D1 to
+D18 on 6 Nov 2026. Its mapping workbook, which the spec calls its rule book (decision D17), is copied beside it as
+[authority-forms-mapping.xlsx](../specs/authority-forms-mapping.xlsx) (13 Nov 2026, unchanged).
 
 | Controlled copy | Planning copy (pointer only) |
 |---|---|
@@ -226,6 +238,38 @@ has no verbatim approval words (its record says so).
 | [B6b-validation-pack-spec.md](../specs/B6b-validation-pack-spec.md) | `MDARIX-planning/b6-speed-evidence/B6b-spec.md` (build status continues there) |
 | [B3-emdr-execution-plan.md](../specs/B3-emdr-execution-plan.md) | `MDARIX-planning/b3-emdr/B3-execution-plan.md` |
 | [W1-product-supplier-360-spec.md](../specs/W1-product-supplier-360-spec.md) | `MDARIX-planning/w1-product-supplier-360/spec.md` |
+
+### 3.4 Generated counts
+
+The counts these documents state are generated from their sources by `scripts/validation_pack.py --update-counts`,
+never typed. The generator compares the block below with its sources on every run and lists a stale block as a check
+failure (rating-4 finding 9, 13 Nov 2026).
+
+<!-- generated counts: begin (python scripts/validation_pack.py --release <release> --update-counts) -->
+
+| Count | Value |
+|---|---|
+| Requirements (`requirements.csv`) | 75 |
+| Requirements, class A | 66 |
+| Requirements, class B | 8 |
+| Requirements, class C | 1 |
+| Class-A requirements without a negative scenario | 0 |
+| Class-A requirements whose negative scenarios are all future | 3 |
+| Scenarios in the register | 538 |
+| Scenarios marked future (not built) | 11 |
+| Scripted class-A OQ steps | 190 |
+| Class-A scenarios without an OQ expected result | 12 |
+| OQ expected results (`oq-expected-results.csv`) | 178 |
+| OQ expected results derived from the requirement | 0 |
+| OQ expected results drafted from the code | 178 |
+| OQ expected results confirmed by the owner | 0 |
+| OQ expected results whose text says TO CONFIRM | 22 |
+| Deviations in `deviation-log.csv` | 1 |
+| Deviations not closed | 1 |
+| Rows in `signatures.csv` | 0 |
+| MDARIX PQ steps (MDX-VAL-008) | 19 |
+
+<!-- generated counts: end -->
 
 ## 4. Owner decisions in force
 
@@ -282,7 +326,7 @@ also questions in MDX-VAL-013.
 | O19 | The owner signs the MDX-VAL-012 release approval template and section 4 of this document before the big-bang deploy; both are marked so, and their PDFs are produced ready for signature, unsigned (owner, 12 Nov 2026; `docs/validation/signing/`) |
 | O20 | Class-A OQ expected results carry concrete values (`oq-expected-results.csv`); the OQ protocol is approved (signed, with its SHA-256 in `signatures.csv`) before execution, and the generator refuses OQ results without that approval outside a dry run (owner, 12 Nov 2026; MDX-VAL-001 section 12; `scripts/validation_pack.py --oq-protocol`) |
 | O21 | RSK-037 (a backup fails silently; found only at the quarterly restore drill) re-scored D4 under O9: RPN 60, needs action (owner, 12 Nov 2026; MDX-VAL-002) |
-| O22 | The approved specs are copied into the repository under `docs/specs/` byte for byte, with a pointer line in each planning copy; `spec_ref` in `requirements.csv` cites them there (owner, 12 Nov 2026) |
+| O22 | The approved specs are copied into the repository under `docs/specs/` byte for byte, with a pointer line in each planning copy; `spec_ref` in `requirements.csv` cites them there (owner, 12 Nov 2026). With O29: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and it is recorded (section 3.3) |
 | O23 | `STAFF_ACCOUNTS` in `backend/app/rule_register/register.py` names the person accounts (Srinivas, Sriharsha), not roles; the 12 Nov 2026 back-fill of the account fields on rule versions approved on 11 Nov 2026 is a documented deviation (owner, 12 Nov 2026; `deviation-log.csv` DEV-0.11.04-001; MDX-VAL-002 RSK-065) |
 | O24 | For class-A requirements only test-level `requirement` markers count as verification; a file-level marker is shown as "file-level only, not verification" (owner, 12 Nov 2026; `validation/pack.py`) |
 | O25 | Control gaps found while drafting the OQ expected results are fixed before the full end-to-end run of 30 Nov 2026 on the big-bang line: RSK-036 (export download checks the requester; an expired export is refused at download), RSK-066 (purge only after the exit hand-back is documented; otherwise audit rows are not deleted before their retention date), RSK-011 (signer training applies to every organisation); RSK-026 (system-scope background jobs) reviewed: controls documented or a deviation logged; RSK-037 audit-chain check on restore in B6b Part D; RSK-004 and RSK-008 aligned with the B6a "Facts changed after signing: re-check" flag, the rest planned (owner, 12 Nov 2026; MDX-VAL-002) |

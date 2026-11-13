@@ -12,6 +12,7 @@
 *.pdf binary
 *.gz binary
 *.zip binary
+*.xlsx binary
 *.woff binary
 *.woff2 binary
 *.ttf binary

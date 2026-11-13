@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.6 |
+| Version | 0.7 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 13 Nov 2026 |
 | Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
@@ -23,6 +23,7 @@ Change history
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered); RACI: nobody approves their own document (MDX-VAL-013, MDX-B10 drafts); Annex F, the seven interface checks of import, e-mail intake, authority files and outbox mapped to existing tests, with three gaps | Sriharsha Telikicherla |
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight"): O17 big-bang gate (VMP-R50b, R50c); O18 a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test blocks (VMP-R49 split into R49 and R49a-c, VMP-R50 into R50 and R50a); O20 concrete OQ expected results and an OQ protocol approved before execution (lifecycle step 5; deliverables MDX-VAL-007-P and -007-R). After the second rating: VMP-R23 split into R23 and R23a-c | Sriharsha Telikicherla |
 | 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations"): VMP-R42a settles VMP-R42 against VMP-R49a for the first pack; OQ expected results derived from the requirement and confirmed (O27); content hash in `signatures.csv` (O31) | Sriharsha Telikicherla |
+| 0.7 | 13 Nov 2026 | Rating-4 finding 9: the counts of section 16.1 are a generated block (`scripts/validation_pack.py --update-counts`), never typed; the dated figures of the 12 Nov 2026 dry run are no longer restated | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -419,9 +420,39 @@ AI is off in every release under this plan, and AI helpers are out of scope.
   fail in the qualifying run.
 
 **Known gap: few tests are tagged (owner decision O14).** At the B6b dry run (12 Nov 2026) the `requirement` marker
-was on 22 test files, at file level (24 files at the end of 12 Nov 2026, two of them at test level), so only 11 of the 59 class-A requirements showed as verified in the generated
-RTM; the other tests ran but gave no traceable evidence. The PL-xx scenario group (owner decision O15) gave every
-class-A requirement a scenario and a negative scenario, which are not yet tagged. Plan:
+was on a few test files, mostly at file level, so few class-A requirements showed as verified in the generated RTM;
+the other tests ran but gave no traceable evidence. The current figures are in each release's RTM and in the
+generated counts below (never typed; `scripts/validation_pack.py --update-counts`, MDX-VAL-000 section 3.4). The PL-xx
+scenario group (owner decision O15) gave every class-A requirement a scenario and a negative scenario, which are not
+yet tagged.
+
+<!-- generated counts: begin (python scripts/validation_pack.py --release <release> --update-counts) -->
+
+| Count | Value |
+|---|---|
+| Requirements (`requirements.csv`) | 75 |
+| Requirements, class A | 66 |
+| Requirements, class B | 8 |
+| Requirements, class C | 1 |
+| Class-A requirements without a negative scenario | 0 |
+| Class-A requirements whose negative scenarios are all future | 3 |
+| Scenarios in the register | 538 |
+| Scenarios marked future (not built) | 11 |
+| Scripted class-A OQ steps | 190 |
+| Class-A scenarios without an OQ expected result | 12 |
+| OQ expected results (`oq-expected-results.csv`) | 178 |
+| OQ expected results derived from the requirement | 0 |
+| OQ expected results drafted from the code | 178 |
+| OQ expected results confirmed by the owner | 0 |
+| OQ expected results whose text says TO CONFIRM | 22 |
+| Deviations in `deviation-log.csv` | 1 |
+| Deviations not closed | 1 |
+| Rows in `signatures.csv` | 0 |
+| MDARIX PQ steps (MDX-VAL-008) | 19 |
+
+<!-- generated counts: end -->
+
+Plan:
 
 - **VMP-R94** Before the first release pack under this plan, every class-A scenario that an automated test proves
   shall carry the `requirement` marker on that test, at test-function level where one file proves several scenarios.

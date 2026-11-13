@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-012 (the template; each per-release record is MDX-VAL-012-&lt;release&gt;) |
 | Title | Release approval record: interim template |
-| Version | 0.4 |
+| Version | 0.5 |
 | Status | DRAFT. To be signed by the owner before the big-bang deploy (owner decision O19); PDF for signature: `signing/MDX-VAL-012-template.pdf` (unsigned) |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (prepares each record) |
 | Reviewer | Independent CSV consultant (not engaged yet; MDX-VAL-013 question 24) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver (signs each record) |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 13 Nov 2026 |
 | Code baseline | Branch `feat/b6b-validation-pack`; generator `scripts/validation_pack.py` (`validation/pack.py`, `INTERIM_CRITERIA`) |
 
 Change history
@@ -21,6 +21,7 @@ Change history
 | 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records; section 5 cites the regression run | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Each per-release record has its own ID, MDX-VAL-012-&lt;release&gt; (RA-T01, RA-T06). Owner decisions O17 to O19 of 12 Nov 2026: big-bang gate for the "Acceptable after verification" action rows (section 5); a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test always blocks (criteria 3 to 5, RA-T04); to be signed by the owner before the big-bang deploy | Sriharsha Telikicherla |
 | 0.4 | 12 Nov 2026 | Criterion 9 checkable before signing: the post-deploy command and the rollback rule are in the record; the result goes into its post-deploy section (RA-T07) | Srinivas Telikicherla |
+| 0.5 | 13 Nov 2026 | RA-T04 and RA-T07 name the sections of the generated record (2 criteria, 3 signature, 4 post-deploy), not this template's; criteria initialled by identifier ("Srinivas T."), never the shared initials "S. T." | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -41,7 +42,9 @@ The record approves a deploy. It does not state that the release is validated un
   a class-A requirement without a negative scenario, an open critical deviation, release checks that are not a full
   suite on the same commit, or a release that differs from `VERSION` (owner decision O16).
 - **RA-T03** The system owner shall fill the blank fields of section 3 by hand before the approver signs.
-- **RA-T04** The quality approver shall initial each criterion of section 4 as met or not met, and sign section 6.
+- **RA-T04** The quality approver shall mark each criterion in section 2 of the record (the criteria of section 4 of
+  this template) as met or not met, initial it with the identifier "Srinivas T." (never "S. T.", which the two founders
+  share), and sign section 3 of the record.
   A criterion marked "not met" stops the deploy. Only criterion 3 may instead be marked "accepted", and only for a
   class-A scenario that is NOT RUN and listed in a signed risk acceptance under criterion 4 (VMP-R49a). A failed
   class-A test or scenario is never accepted (VMP-R50, owner decision O18).
@@ -52,8 +55,8 @@ The record approves a deploy. It does not state that the release is validated un
   listed in `signatures.csv` under document MDX-VAL-012-&lt;release&gt;; the generator then never overwrites that
   folder (VMP-R39). A per-release record is filed
   in its release folder, not under `signed/` (generated records, MDX-VAL-000 section 3).
-- **RA-T07** Right after the deploy the system owner shall run the command in section 4 of the record (post-deploy
-  record) and write its result, time and name there; a failure starts the rollback. The approver checks before
+- **RA-T07** Right after the deploy the system owner shall run the command in section 4 of the record (its post-deploy
+  record, not section 4 of this template) and write its result, time and name there; a failure starts the rollback. The approver checks before
   signing only that the command and the rollback rule are there (criterion 9), so every criterion can be checked
   before the signature.
 
