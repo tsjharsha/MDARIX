@@ -444,9 +444,9 @@ yet tagged.
 | OQ expected results derived from the requirement | 0 |
 | OQ expected results drafted from the code | 178 |
 | OQ expected results confirmed by the owner | 0 |
-| OQ expected results whose text says TO CONFIRM | 22 |
-| Deviations in `deviation-log.csv` | 1 |
-| Deviations not closed | 1 |
+| OQ expected results whose text says TO CONFIRM | 21 |
+| Deviations in `deviation-log.csv` | 2 |
+| Deviations not closed | 2 |
 | Rows in `signatures.csv` | 0 |
 | MDARIX PQ steps (MDX-VAL-008) | 19 |
 
