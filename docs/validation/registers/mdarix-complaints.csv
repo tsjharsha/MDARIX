@@ -1,0 +1,1 @@
+complaint_id,received_utc,customer,channel,summary,classification,defect,linked_incident,linked_capa,linked_deviation,response_utc,status,closed_utc
