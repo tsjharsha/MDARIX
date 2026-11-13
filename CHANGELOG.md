@@ -94,7 +94,22 @@ pack is generated as a dry run only: its statuses are development results, not v
   deviations need an allowed `found_in`. URS requirements for 21 CFR 11.50, 11.100 and 11.300 (REQ-P11-001 to -004,
   scenarios PL-47 to PL-54). The B6b spec, the B3 plan and the W1 spec are in `docs/specs/`; every spec there has an
   "Approval record".
+- **Validation pack, run 7 (rating-4 findings, 13 Nov 2026):** the OQ protocol approval is checked, not trusted:
+  its signer must be a named quality approver holding that role and its signed PDF must be stored with the row's
+  SHA-256; an executed OQ step must come after that approval and not from the approver, an IQ step not from the IQ
+  record's approver, every executor must be a named person and every evidence ID must resolve to a file in the release
+  folder's `evidence/` (listed with its SHA-256 in `evidence-index.csv`). The IQ record lists every rule-register
+  version with its content hash (recomputed) and file hash, and has a test-environment section (Python and key package
+  versions, which the JUnit hook now records, Node, marker hook, generator hashes). The generated change history names
+  who ran the generator (`--author`, else the git author), never a fixed name; the two founders are "Srinivas T." and
+  "Sriharsha T.", never the shared initials "S. T.". The generator reads and checks `pq-record.csv` and states the PQ
+  outcome in the VSR. Counts in MDX-VAL-000 and MDX-VAL-001 are a generated block (`--update-counts`), and a stale
+  block is a check failure. The OQ log's result columns come from the executed results.
 ### Changed
+- **Run 7 documents:** RSK-036, RSK-066 and RSK-011 "Acceptable after verification" after the control-gap fixes
+  (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 deviation
+  open; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA
+  effectiveness and trends steps); spec copies: the status line is the only change to the copied text, recorded.
 - **Run 6 documents:** DEV-0.11.04-001 reclassified major (GxP risk high); MDX-VAL-000 section 4 co-signed by the
   system owner (signing PDF regenerated); VMP-R42a (the first pack executes every class-A scenario); PQ 0.4 (six more
   steps, intended-use coverage); release-approval criterion 9 checkable before signing, with a post-deploy section;

@@ -29,6 +29,29 @@ FIVE = ("NOT RUN", "PASS", "FAIL", "BLOCKED", "REQUIRES HUMAN DECISION")
 DEV_BANNER = "DEVELOPMENT RESULTS, NOT VALIDATION EVIDENCE"
 SYSTEM_OWNER = "Sriharsha Telikicherla, Product & Engineering, system owner"
 QUALITY_APPROVER = "Srinivas Telikicherla, QA/RA, quality approver"
+# The people who sign, execute or run the generator (owner decision B6b-D1), by a distinct identifier: the two
+# founders share the initials "S. T.", which never identify one person (rating-4 finding 6, 13 Nov 2026).
+# ``writes_code``: the person writes the code under test, so never executes the PQ (MDX-VAL-008 PQ-R01).
+PEOPLE = {
+    "Srinivas T.": {"name": "Srinivas Telikicherla", "roles": ("quality approver",), "writes_code": False},
+    "Sriharsha T.": {"name": "Sriharsha Telikicherla", "roles": ("system owner",), "writes_code": True},
+}
+
+
+def person(text: str) -> str | None:
+    """The identifier of a named person, from the identifier or the full name; None for anything else."""
+    text = (text or "").strip()
+    for key, entry in PEOPLE.items():
+        if text in (key, entry["name"]):
+            return key
+    return None
+
+
+def _named(text: str) -> str:
+    key = person(text)
+    return f"{PEOPLE[key]['name']} ({key})" if key else text
+
+
 DEVIATION_COLUMNS = [
     "dev_id", "raised_utc", "raised_by", "found_in", "test_or_scenario", "req_id", "expected", "seen",
     "documented_first_utc", "impact", "gxp_risk", "classification", "root_cause", "correction", "retest_id",
@@ -83,6 +106,25 @@ class Sources:
     oq_expected: dict[str, dict] = field(default_factory=dict)  # scenario -> concrete OQ expected result (O20)
     executed: list[dict] = field(default_factory=list)  # executed IQ / scripted OQ results (read_results)
     executed_raw: bytes | None = None  # copied into the release folder as executed-results.csv
+    evidence: dict[str, list[dict]] = field(default_factory=dict)  # evidence ID -> stored files (read_evidence)
+    oq_approval: Approval | None = None  # the verified OQ protocol approval (protocol_approval)
+    pq_steps: dict[str, dict] = field(default_factory=dict)  # MDX-VAL-008 steps (read_pq_steps)
+    pq_record: list[dict] | None = None  # pq-record.csv of the release, None when there is none
+    pq_raw: bytes | None = None  # copied into the release folder as pq-record.csv
+    rule_versions: list[dict] = field(default_factory=list)  # the rule register at this commit (read_rule_register)
+    environment: dict = field(default_factory=dict)  # tool versions of the test run and the generator's own hashes
+    signatures: list[dict] = field(default_factory=list)  # signatures.csv rows
+    count_documents: dict[str, str] = field(default_factory=dict)  # documents holding a generated counts block
+
+
+@dataclass
+class Approval:
+    """The OQ protocol approval of a release, checked against its signed PDF and the people register (O20, O31)."""
+
+    approved: bool
+    signer: str = ""  # PEOPLE identifier
+    moment: datetime | None = None  # the approval; a date without a time counts as the end of that day
+    problems: list[str] = field(default_factory=list)
 
 
 # ---- reading -------------------------------------------------------------------------------------------------------
@@ -156,6 +198,72 @@ def read_results(path: Path) -> list[dict]:
 
 def _executed(sources: Sources, sid: str) -> set[str]:
     return {r["result"].strip() for r in sources.executed if r.get("scenario_id", "").strip() == sid}
+
+
+def read_evidence(folder: Path) -> dict[str, list[dict]]:
+    """The stored evidence of a release (VMP-R86): each file in ``<release folder>/evidence/`` is named after its
+    evidence ID (``EVD-OQ-001.png``); an executed row's evidence ID resolves only to such a file."""
+    found: dict[str, list[dict]] = {}
+    if folder.is_dir():
+        for file in sorted(p for p in folder.iterdir() if p.is_file()):
+            found.setdefault(file.stem, []).append(
+                {"file": f"evidence/{file.name}", "sha256": hashlib.sha256(file.read_bytes()).hexdigest()}
+            )
+    return found
+
+
+PQ_COLUMNS = ["step", "executed_by", "second_person", "date_utc", "result", "evidence_id", "deviation_id"]
+
+
+def read_pq_steps(path: Path) -> dict[str, dict]:
+    """The steps of the MDARIX PQ protocol (MDX-VAL-008 section 3): step -> persona, action, expected, scenarios."""
+    steps: dict[str, dict] = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if re.match(r"^\| PQ-\d{3} \|", line):
+                cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+                steps[cells[0]] = {"persona": cells[1], "action": cells[2], "expected": cells[3], "scenarios": cells[4]}
+    return steps
+
+
+def read_pq_record(path: Path) -> list[dict]:
+    """``pq-record.csv`` of a release (MDX-VAL-008 section 5), written by the PQ executor; any other header is refused."""
+    reader = csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())
+    if reader.fieldnames != PQ_COLUMNS:
+        raise ValueError(f"{path.name}: the header is not {','.join(PQ_COLUMNS)}")
+    return list(reader)
+
+
+def _canonical_hash(content) -> str:
+    """The rule register's content hash (``backend/app/rule_register/register.py`` ``content_hash``), recomputed here
+    so the IQ record states what the files hold without importing the application."""
+    text = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def read_rule_register(folder: Path) -> list[dict]:
+    """Every rule version at this commit (rating-4 finding 5): code, version, period, recorded content hash, whether it
+    matches the content, and the file's SHA-256 (LF line endings, as git stores it)."""
+    rows = []
+    for file in sorted(folder.glob("*.json")) if folder.is_dir() else []:
+        raw = file.read_bytes()
+        try:
+            entry = json.loads(raw.decode("utf-8"))
+        except ValueError:
+            rows.append({"code": file.stem, "file": file.name, "unreadable": True})
+            continue
+        rows.append({
+            "code": entry.get("code", file.stem), "rule": entry.get("rule", ""), "version": entry.get("version", ""),
+            "effective_from": entry.get("effective_from") or "start", "effective_to": entry.get("effective_to") or "open",
+            "content_hash": entry.get("content_hash", ""),
+            "matches": entry.get("content_hash") == _canonical_hash(entry.get("content")),
+            "file_sha256": hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest(), "file": file.name,
+        })  # fmt: skip
+    return rows
+
+
+def read_signatures(path: Path) -> list[dict]:
+    return list(csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())) if path.exists() else []
 
 
 def read_junit_meta(path: Path) -> dict:
@@ -313,6 +421,19 @@ def check(sources: Sources, release: str) -> list[str]:
             row.get(k, "").strip() for k in ("executed_by", "date_utc", "evidence_id")
         ):
             problems.append(f"executed {step}: {result} without executor, date or evidence ID")
+        problems += _executed_row_problems(sources, row, f"executed {step}")
+    problems += _pq_problems(sources)
+    if not sources.rule_versions:
+        problems.append(
+            "rule register: no rule version found (backend/app/rule_register/data); the IQ record lists none"
+        )
+    for rule in sources.rule_versions:
+        if rule.get("unreadable"):
+            problems.append(f"rule register {rule['file']}: not readable JSON")
+        elif not rule["matches"]:
+            problems.append(f"rule register {rule['code']}: content_hash does not match its content")
+    for name, text in sorted(sources.count_documents.items()):
+        problems += counts_problems(name, text, counts_block(sources))
     for dev in release_deviations(sources, release):
         dev_id, status = dev["dev_id"], dev.get("status", "").strip().lower()
         if status not in DEV_STATUSES:
@@ -338,6 +459,202 @@ def check(sources: Sources, release: str) -> list[str]:
     for dev in open_critical(sources, release):
         problems.append(f"{dev['dev_id']}: critical deviation open; no release approval record can be produced")
     return problems
+
+
+def _moment(text: str, end_of_day: bool = False) -> datetime | None:
+    """A UTC moment from ``YYYY-MM-DD[THH:MM[:SS]][Z]``; a bare date is the start of the day, or with ``end_of_day``
+    its last second (an approval dated only by its day is never earlier than an execution on that day)."""
+    try:
+        moment = _utc(text)
+    except ValueError:
+        return None
+    if end_of_day and re.fullmatch(r"\d{4}-\d{2}-\d{2}", text.strip()):
+        moment = moment.replace(hour=23, minute=59, second=59)
+    return moment
+
+
+def _evidence_problems(sources: Sources, what: str, evidence_id: str) -> list[str]:
+    files = sources.evidence.get(evidence_id.strip(), [])
+    if not files:
+        return [f"{what}: evidence {evidence_id} is not a stored file in the release folder's evidence/ (VMP-R86)"]
+    if len(files) > 1:
+        return [f"{what}: evidence {evidence_id} names {len(files)} files; one evidence ID is one file"]
+    return []
+
+
+def _executed_row_problems(sources: Sources, row: dict, what: str) -> list[str]:
+    """Rating-4 finding 4: an executed row is checked, not trusted. The executor is a named person; the date is a date;
+    the evidence ID resolves to a stored file; an OQ step is executed after the protocol approval and not by its
+    approver; an IQ step is not executed by the IQ record's approver (VMP-R02, VMP-R86, VMP-R88)."""
+    step, result = row.get("step", "").strip(), row.get("result", "").strip()
+    executor, when = row.get("executed_by", "").strip(), row.get("date_utc", "").strip()
+    who = person(executor)
+    problems = []
+    if executor and who is None:
+        problems.append(f"{what}: executor '{executor}' is not a named person ({', '.join(PEOPLE)})")
+    moment = _moment(when) if when else None
+    if when and moment is None:
+        problems.append(f"{what}: date_utc '{when}' is not a date and time")
+    if result in ("PASS", "FAIL") and row.get("evidence_id", "").strip():
+        problems += _evidence_problems(sources, what, row["evidence_id"])
+    approval = sources.oq_approval
+    if step.startswith("OQ-") and approval and approval.approved:
+        if moment and approval.moment and moment <= approval.moment:
+            problems.append(
+                f"{what}: executed {when}, not after the OQ protocol approval of {approval.moment:%Y-%m-%d %H:%M} UTC; "
+                "expected results are approved before execution (O20, VMP-R88)"
+            )
+        if who and who == approval.signer:
+            problems.append(
+                f"{what}: executed by {who}, who approved the OQ protocol; executor and approver are two people (VMP-R02)"
+            )
+    if step.startswith("IQ-") and who and "quality approver" in PEOPLE[who]["roles"]:
+        problems.append(
+            f"{what}: executed by {who}, the IQ record's approver; executor and approver are two people (VMP-R02)"
+        )
+    return problems
+
+
+def _pq_problems(sources: Sources) -> list[str]:
+    """The release's PQ record against MDX-VAL-008: known steps, the five results, an executor who does not write the
+    code (PQ-R01), a second person who is someone else (PQ-R08), a deviation for a step not passed (PQ-R04), evidence
+    that resolves (PQ-R03)."""
+    if sources.pq_record is None:
+        return []
+    problems = []
+    logged = {d.get("dev_id", "").strip() for d in sources.deviations}
+    for row in sources.pq_record:
+        step, result = row.get("step", "").strip(), row.get("result", "").strip()
+        what = f"PQ {step or '(blank)'}"
+        if step not in sources.pq_steps:
+            problems.append(f"{what}: not a step of MDX-VAL-008")
+        if result not in FIVE:
+            problems.append(f"{what}: result '{result}' is not one of the five values")
+        if result in ("PASS", "FAIL") and not all(
+            row.get(k, "").strip() for k in ("executed_by", "date_utc", "evidence_id")
+        ):
+            problems.append(f"{what}: {result} without executor, date or evidence ID")
+        executor, second = row.get("executed_by", "").strip(), row.get("second_person", "").strip()
+        who = person(executor)
+        if executor and who is None:
+            problems.append(f"{what}: executor '{executor}' is not a named person ({', '.join(PEOPLE)})")
+        elif who and PEOPLE[who]["writes_code"]:
+            problems.append(f"{what}: executed by {who}, who writes the code under test (MDX-VAL-008 PQ-R01)")
+        if second and person(second) is None:
+            problems.append(f"{what}: second person '{second}' is not a named person ({', '.join(PEOPLE)})")
+        elif second and person(second) == who:
+            problems.append(f"{what}: the second person is the executor; four-eyes steps need two people (PQ-R08)")
+        when = row.get("date_utc", "").strip()
+        if when and _moment(when) is None:
+            problems.append(f"{what}: date_utc '{when}' is not a date and time")
+        if (
+            result in ("FAIL", "BLOCKED", "REQUIRES HUMAN DECISION")
+            and row.get("deviation_id", "").strip() not in logged
+        ):
+            problems.append(f"{what}: {result} without a deviation in deviation-log.csv (MDX-VAL-008 PQ-R04)")
+        if result in ("PASS", "FAIL") and row.get("evidence_id", "").strip():
+            problems += _evidence_problems(sources, what, row["evidence_id"])
+    return problems
+
+
+def pq_summary(sources: Sources) -> dict:
+    """The PQ outcome for the VSR (MDX-VAL-008 section 4): a step passes on its latest PASS row."""
+    if sources.pq_record is None:
+        return {"record": "no pq-record.csv in this release folder: the MDARIX PQ was not executed for this release"}
+    latest: dict[str, str] = {}
+    for row in sorted(sources.pq_record, key=lambda r: r.get("date_utc", "")):
+        latest[row.get("step", "").strip()] = row.get("result", "").strip()
+    steps = sorted(sources.pq_steps)
+    passed = [s for s in steps if latest.get(s) == "PASS"]
+    missing = [s for s in steps if s not in latest]
+    return {
+        "record": "pq-record.csv", "steps": len(steps), "rows": len(sources.pq_record), "passed": len(passed),
+        "not_passed": [s for s in steps if s in latest and latest[s] != "PASS"], "missing": missing,
+        "accepted": bool(steps) and len(passed) == len(steps),
+    }  # fmt: skip
+
+
+def protocol_approval(signatures: list[dict], release: str, sha256: str, root: Path) -> Approval:
+    """The OQ protocol approval of ``release`` for the protocol whose steps hash to ``sha256`` (``content_sha256``,
+    O31), checked, not trusted (rating-4 finding 4): the signer is a named quality approver holding the role on the
+    row, the date is a date, and the signed PDF exists with the row's SHA-256 (``sha256``)."""
+    rows = [
+        r for r in signatures
+        if r.get("document_id") == PROTOCOL_ID and r.get("version") == release and r.get("content_sha256") == sha256
+    ]  # fmt: skip
+    if not rows:
+        return Approval(False)
+    row = rows[-1]
+    what = f"OQ protocol approval ({PROTOCOL_ID} {release})"
+    problems = []
+    signer, role = person(row.get("signer", "")), row.get("role", "").strip()
+    if signer is None:
+        problems.append(f"{what}: signer '{row.get('signer')}' is not a named person ({', '.join(PEOPLE)})")
+    elif role != "quality approver" or role not in PEOPLE[signer]["roles"]:
+        problems.append(f"{what}: signer {signer} with role '{role}'; the quality approver approves the protocol (O20)")
+    moment = _moment(row.get("date_utc", ""), end_of_day=True)
+    if moment is None:
+        problems.append(f"{what}: date_utc '{row.get('date_utc')}' is not a date")
+    pdf = root / row.get("pdf_path", "").strip() if row.get("pdf_path", "").strip() else None
+    if pdf is None or not pdf.is_file():
+        problems.append(f"{what}: signed PDF '{row.get('pdf_path')}' is not stored")
+    elif hashlib.sha256(pdf.read_bytes()).hexdigest() != row.get("sha256", "").strip().lower():
+        problems.append(f"{what}: the SHA-256 of {row['pdf_path']} differs from its signatures.csv row")
+    return Approval(not problems, signer or "", moment, problems)
+
+
+COUNTS_BEGIN = (
+    "<!-- generated counts: begin (python scripts/validation_pack.py --release <release> --update-counts) -->"
+)
+COUNTS_END = "<!-- generated counts: end -->"
+
+
+def counts(s: Sources) -> list[list]:
+    """The counts the documents state, computed from their sources (rating-4 finding 9): never typed."""
+    reqs = s.requirements
+    class_a = [r for r in reqs if r["class"] == "A"]
+    oq = list(s.oq_expected.values())
+    future = [sid for sid in s.scenarios if is_future(s, sid)]
+    return [
+        ["Requirements (`requirements.csv`)", len(reqs)],
+        *[[f"Requirements, class {c}", sum(r["class"] == c for r in reqs)] for c in ("A", "B", "C")],
+        ["Class-A requirements without a negative scenario", sum(not r["negative_scenarios"] for r in class_a)],
+        ["Class-A requirements whose negative scenarios are all future",
+         sum(bool(r["negative_scenarios"]) and all(is_future(s, x) for x in r["negative_scenarios"]) for r in class_a)],
+        ["Scenarios in the register", len(s.scenarios)],
+        ["Scenarios marked future (not built)", len(future)],
+        ["Scripted class-A OQ steps", len(oq_tables(s)[0]) - 1],
+        ["Class-A scenarios without an OQ expected result",
+         sum(x not in s.oq_expected for x in class_a_scenarios(s) if not is_future(s, x))],
+        ["OQ expected results (`oq-expected-results.csv`)", len(oq)],
+        ["OQ expected results derived from the requirement", sum(r.get("source", "").strip() == "requirement" for r in oq)],
+        ["OQ expected results drafted from the code", sum(r.get("source", "").strip() == "code" for r in oq)],
+        ["OQ expected results confirmed by the owner", sum(bool(r.get("confirmed_by", "").strip()) for r in oq)],
+        ["OQ expected results whose text says TO CONFIRM", sum("TO CONFIRM" in r.get("expected_result", "") for r in oq)],
+        ["Deviations in `deviation-log.csv`", len(s.deviations)],
+        ["Deviations not closed", sum(d.get("status", "").strip().lower() != "closed" for d in s.deviations)],
+        ["Rows in `signatures.csv`", len(s.signatures)],
+        ["MDARIX PQ steps (MDX-VAL-008)", len(s.pq_steps)],
+    ]  # fmt: skip
+
+
+def counts_block(s: Sources) -> str:
+    return f"{COUNTS_BEGIN}\n\n{_table(['Count', 'Value'], counts(s))}\n{COUNTS_END}"
+
+
+def counts_problems(name: str, text: str, block: str) -> list[str]:
+    text = text.replace("\r\n", "\n")
+    if COUNTS_BEGIN not in text or COUNTS_END not in text:
+        return [f"{name}: no generated counts block"]
+    if block not in text:
+        return [f"{name}: the generated counts are stale; run scripts/validation_pack.py --update-counts"]
+    return []
+
+
+def with_counts(text: str, block: str) -> str:
+    """``text`` (LF line endings) with its generated counts block replaced by ``block``."""
+    start, end = text.index(COUNTS_BEGIN), text.index(COUNTS_END) + len(COUNTS_END)
+    return text[:start] + block + text[end:]
 
 
 def class_a_scenarios(sources: Sources) -> list[str]:
@@ -465,6 +782,7 @@ class Context:
     oq_approved: bool = (
         False  # signatures.csv holds this release's OQ protocol with the current content_sha256 (O20, O31)
     )
+    author: str = ""  # who ran the generator: --author, else the git author (rating-4 finding 6)
 
 
 def _header(ctx: Context, doc_id: str, title: str, author: str, approver: str) -> str:
@@ -480,7 +798,8 @@ def _header(ctx: Context, doc_id: str, title: str, author: str, approver: str) -
         f"| Date | {ctx.date} |", f"| Code baseline | commit `{ctx.commit}`, tag {ctx.tag or '(none yet)'}; `VERSION` {ctx.version_file} |",
         "", "Change history", "", "| Version | Date | Change | By |", "|---|---|---|---|",
         f"| release {ctx.release} | {ctx.date} | Generated from commit `{ctx.commit}`; a regeneration replaces this version "
-        "until it is signed, after which a correction is a new version (VMP-R39) | Sriharsha Telikicherla (generator run) |",
+        f"until it is signed, after which a correction is a new version (VMP-R39) | {_named(ctx.author) or 'not recorded'} "
+        "(generator run) |",
         "",
     ])  # fmt: skip
 
@@ -563,28 +882,61 @@ def iq(ctx: Context, s: Sources) -> str:
     checks = s.release_checks or {}
     tools = checks.get("tools") or {}
     clock = s.clock_check or {}
+    meta = s.junit_meta or {}
+    env = s.environment
+    rules = s.rule_versions
+    wrong = [r["code"] for r in rules if r.get("unreadable") or not r.get("matches")]
     rows = [
         ["IQ-001", "Release identity", f"release {ctx.release}; `VERSION` {ctx.version_file}; commit `{ctx.commit}`; tag {ctx.tag or '(none)'}",
          "match" if ctx.release == ctx.version_file else "MISMATCH: set at the release join"],
         ["IQ-002", "Migration head (one head)", ctx.head, "one head" if "," not in ctx.head else "MORE THAN ONE HEAD"],
-        ["IQ-003", "Python / Node", f"{tools.get('python') or 'not recorded'} / {tools.get('node') or 'not recorded'}", "recorded" if tools else "to record"],
+        ["IQ-003", "Python and key packages in the installed image", "to record at installation (`python --version`; `pip freeze` of the image)", "to record"],
         ["IQ-004", "PostgreSQL version", "to record at installation (`SELECT version()`)", "to record"],
         ["IQ-005", "Configuration check (`config_check`)", "to record at deploy", "to record"],
         ["IQ-006", "Deploy gate (`scripts/deploy_gate.py --release`)", "to record at deploy", "to record"],
         ["IQ-007", "Clock check (`scripts/clock_check.py`)", json.dumps(clock.get("status") or clock.get("result") or "not supplied"), "recorded" if clock else "to record"],
         ["IQ-008", "Release checks JSON", f"passed = {checks.get('passed')}, full suite = {checks.get('full_suite')}" if checks else "not supplied", "recorded" if checks else "to record"],
+        ["IQ-009", "Node of the front-end build image", "to record at installation (`node --version`)", "to record"],
+        ["IQ-010", "Rule register at this commit (section 3)", f"{len(rules)} versions; content hashes recomputed from the files",
+         "all match" if rules and not wrong else f"MISMATCH: {' '.join(wrong)}" if wrong else "NONE FOUND"],
+    ]  # fmt: skip
+    test_env = [
+        ["IQ-T01", "Commit and tree of the test run (JUnit)", f"`{meta.get('commit') or 'not recorded'}`, tree {meta.get('tree') or 'not recorded'}",
+         "recorded" if meta.get("commit") else "to record"],
+        ["IQ-T02", "Migration head of the test database", ctx.head, "to record (`alembic current` on the test database)"],
+        ["IQ-T03", "Python of the test run", meta.get("python") or "not recorded", "recorded" if meta.get("python") else "to record"],
+        ["IQ-T04", "Key packages of the test run (pytest included)", meta.get("packages") or "not recorded", "recorded" if meta.get("packages") else "to record"],
+        ["IQ-T05", "Node of the test run (release checks)", tools.get("node") or "not recorded", "recorded" if tools.get("node") else "to record"],
+        ["IQ-T06", "PostgreSQL of the test database", "to record (`SELECT version()` on the test database)", "to record"],
+        ["IQ-T07", "Test database built from the tagged commit", "to record (`scripts/prepare_test_environment.py --recreate`)", "to record"],
+        ["IQ-T08", "Requirement marker hook (`validation/pytest_requirements.py`)", f"hook_version {meta.get('hook_version') or 'not recorded'}",
+         "recorded" if meta.get("hook_version") else "to record"],
+        ["IQ-T09", "Validation-pack generator", "; ".join(f"`{k}` SHA-256 {v}" for k, v in sorted((env.get("generator") or {}).items())) or "not recorded",
+         "recorded" if env.get("generator") else "to record"],
     ]  # fmt: skip
     done = {r["step"].strip(): r for r in s.executed if r.get("step", "").startswith("IQ-")}
     keys = ("executed_by", "date_utc", "result", "evidence_id")
     rows = [row + [done.get(row[0], {}).get(k, "") for k in keys] for row in rows]
+    test_env = [row + [done.get(row[0], {}).get(k, "") for k in keys] for row in test_env]
+    header = ["Step", "Check", "Recorded", "Result", "Executed by", "Date (UTC)", "Executed result", "Evidence ID"]
+    register = [[r.get("code"), r.get("version", ""), f"{r.get('effective_from', '')} to {r.get('effective_to', '')}",
+                 f"`{r.get('content_hash', '')}`", "yes" if r.get("matches") else "NO", f"`{r.get('file_sha256', '')}`"]
+                for r in rules]  # fmt: skip
     return (
         _header(ctx, "MDX-VAL-006", "Installation qualification record", SYSTEM_OWNER, QUALITY_APPROVER)
         + _sources_section(ctx)
         + '## 2. Installation checks\n\nA check marked "to record" is executed at installation and written as a row of '
-        "`executed-results.csv` (step IQ-nnn); the next generation fills it in here, never by hand.\n\n"
-        + _table(
-            ["Step", "Check", "Recorded", "Result", "Executed by", "Date (UTC)", "Executed result", "Evidence ID"], rows
-        )
+        "`executed-results.csv` (step IQ-nnn) with its evidence file; the next generation fills it in here, never by hand. "
+        "The IQ record's approver does not execute it (VMP-R02).\n\n"
+        + _table(header, rows)
+        + "\n## 3. Rule register at this commit\n\nEvery rule version in `backend/app/rule_register/data/`, with its "
+        "recorded content hash, whether that hash matches the content (recomputed by the generator), and the file's "
+        "SHA-256 (LF line endings, as stored in git).\n\n"
+        + _table(["Code", "Version", "In force", "Content hash", "Matches", "File SHA-256"], register)
+        + "\n## 4. Test environment (VMP-R45, owner decision B6b-D16)\n\nUntil staging exists the controlled local "
+        "environment is qualified here: the values come from the JUnit of this release (the marker hook records the "
+        'commit, the tree, Python and the key packages) and the release-checks JSON; a row marked "to record" is '
+        "executed as step IQ-Tnn of `executed-results.csv`.\n\n" + _table(header, test_env)
     )
 
 
@@ -634,15 +986,14 @@ def protocol_sha256(scripted: list[list]) -> str:
     return hashlib.sha256(_csv(scripted)).hexdigest()
 
 
-def protocol_approved(signatures: Path, release: str, sha256: str) -> bool:
-    """``signatures.csv`` holds the signed OQ protocol of this release whose ``content_sha256`` (the steps table, not
-    the signed PDF, whose hash is ``sha256``) is exactly this SHA-256 (owner decision O31)."""
-    if not signatures.exists():
-        return False
-    return any(
-        row.get("document_id") == PROTOCOL_ID and row.get("version") == release and row.get("content_sha256") == sha256
-        for row in csv.DictReader(signatures.read_text(encoding="utf-8-sig").splitlines())
-    )
+def author_problems(author: str) -> list[str]:
+    """A generated document names the person who ran the generator (ALCOA: attributable), never a fixed name."""
+    if person(author):
+        return []
+    return [
+        f"the generator run is attributed to '{author or '(nobody)'}', not a named person: pass --author with one of "
+        f"{', '.join(PEOPLE)}"
+    ]
 
 
 def oq_protocol(ctx: Context, scripted: list[list], sha256: str) -> str:
@@ -757,12 +1108,34 @@ def vsr(ctx: Context, s: Sources, rows: list[dict], figures: dict, devs: list[di
         "- Most test tags are at file level. For class-A requirements only a test's own marker counts as verification; "
         'a file-level marker shows as "file-level only, not verification" in the RTM (owner decision O24).\n\n'
         + _vsr_required(rows)
+        + _pq_section(s)
         + "## 9. Independence statement\n\nReviewed by the quality approver, who did not write the code or the tests: "
         "name ________ date ________\n\n" + "## 10. Audit-finding self-check\n\n"
-        "- URS not written by engineering alone: ____\n- QA reviewed independently: ____\n- PQ executed by users: ____\n"
+        "- URS not written by engineering alone: ____\n- QA reviewed independently: ____\n"
+        f"- PQ executed by users: {_pq_self_check(s)}\n"
         "- Periodic-review owner named: ____\n- Security assessment (MDX-B10-006) linked into the risk assessment: ____\n"
         "- Every requirement traced to a test: ____\n\n" + f"## 11. Conclusion\n\n{conclusion}\n"
     )
+
+
+def _pq_self_check(s: Sources) -> str:
+    summary = pq_summary(s)
+    if "steps" not in summary:
+        return "no (no pq-record.csv for this release)"
+    return f"{'yes' if summary['accepted'] else 'not complete'} ({summary['passed']} of {summary['steps']} steps PASS)"
+
+
+def _pq_section(s: Sources) -> str:
+    summary = pq_summary(s)
+    if "steps" not in summary:
+        return f"## 8d. MDARIX PQ (MDX-VAL-008)\n\n{summary['record']}.\n\n"
+    rows = [
+        ["Steps in MDX-VAL-008", summary["steps"]], ["Rows in pq-record.csv", summary["rows"]],
+        ["Steps passed (latest row PASS)", summary["passed"]],
+        ["Steps not passed", " ".join(summary["not_passed"]) or "none"], ["Steps without a row", " ".join(summary["missing"]) or "none"],
+        ["Acceptance (MDX-VAL-008 section 4)", "every step PASS" if summary["accepted"] else "NOT MET"],
+    ]  # fmt: skip
+    return "## 8d. MDARIX PQ (MDX-VAL-008)\n\n" + _table(["PQ", "Value"], rows) + "\n"
 
 
 def _vsr_required(rows: list[dict]) -> str:
@@ -838,7 +1211,7 @@ def approval_markdown(ctx: Context, record: dict) -> str:
         + "## 1. Record\n\n"
         + _table(["Item", "Value"], rows)
         + "\n## 2. Criteria (the quality approver initials each)\n\n"
-        + _table(["#", "Criterion", "Met (yes / no / accepted)", "Initials"], CRITERIA_ROWS)
+        + _table(["#", "Criterion", "Met (yes / no / accepted)", "Initialled by (Srinivas T.)"], CRITERIA_ROWS)
         + "\n## 3. Signature\n\nName: ____________ Role: quality approver Date (UTC): ____________\n\n"
         "Meaning: I approve this release for production after the checks listed.\n"
         + f"\n## 4. Post-deploy record (after the signature; RA-T07)\n\nCommand: `python scripts/deploy_gate.py --release "
@@ -880,9 +1253,20 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
     files["rtm.xlsx"] = xlsx_write.write({"RTM": rtm_rows})
     files["oq-protocol.csv"] = _csv(scripted)
     with_results = ctx.oq_approved or ctx.dry_run  # O20: no OQ results without an approved protocol
-    if with_results:
-        steps = [scripted[0] + RESULT_HEADER] + [row + [""] * len(RESULT_HEADER) for row in scripted[1:]]
+    if with_results:  # the result columns come from executed-results.csv, as in MDX-VAL-007-R (never blank by design)
+        done = {r.get("scenario_id", "").strip(): r for r in s.executed if r.get("step", "").startswith("OQ-")}
+        keys = ("executed_by", "date_utc", "result", "evidence_id")
+        steps = [scripted[0] + RESULT_HEADER] + [
+            row + [done.get(row[2], {}).get(k, "") or ("NOT RUN" if k == "result" else "") for k in keys]
+            for row in scripted[1:]
+        ]
         files["oq-log.xlsx"] = xlsx_write.write({"Scripted OQ (class A)": steps, "Automated (tagged)": log})
+    if s.evidence:  # VMP-R86: each evidence file with its SHA-256, in the manifest of the release
+        index = [["evidence_id", "file", "sha256"]]
+        index += [[eid, f["file"], f["sha256"]] for eid, found in sorted(s.evidence.items()) for f in found]
+        files["evidence-index.csv"] = _csv(index)
+    if s.pq_raw is not None:
+        files["pq-record.csv"] = s.pq_raw
     dev_rows = [DEVIATION_COLUMNS] + [[d.get(c, "") for c in DEVIATION_COLUMNS] for d in devs]
     files["deviations.csv"] = _csv(dev_rows)
     files["deviations.xlsx"] = xlsx_write.write({"Deviations": dev_rows})

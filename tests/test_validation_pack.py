@@ -50,7 +50,21 @@ JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="py
 </testsuite></testsuites>"""
 
 
-PDF_SHA = "f" * 64  # the signed PDF's own hash (signatures.csv sha256), never the content hash (O31)
+PDF = b"%PDF-1.4 signed OQ protocol (test)"
+PDF_SHA = (
+    __import__("hashlib").sha256(PDF).hexdigest()
+)  # the signed PDF's own hash (sha256), never the content hash (O31)
+RULE = {"code": "T-floor-1", "rule": "T-floor", "version": 1, "effective_from": None, "effective_to": None,
+        "content": {"question": "Is it reportable?"}}  # fmt: skip
+
+
+def _content_hash(content) -> str:
+    """The rule register's content hash, as backend/app/rule_register/register.py computes it."""
+    from backend.app.rule_register.register import content_hash
+
+    return content_hash(content)
+
+
 RELEASE_CHECKS = (
     '{"release": "9.9.9", "commit": "abc12345", "dry_run": false, "full_suite": true, "passed": true,'
     ' "tools": {"python": "Python 3.x", "node": "v20"}, "steps": [{"step": "pytest", "result": "pass"}]}'
@@ -63,9 +77,10 @@ def _approve_protocol(root: Path, release: str = "9.9.9") -> str:
     sources = pack.Sources(pack.read_requirements(docs / "requirements.csv"), pack.read_register(docs / "scenario-register.md"),
                            oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"))  # fmt: skip
     sha = pack.protocol_sha256(pack.oq_tables(sources)[0])
+    (root / "p.pdf").write_bytes(PDF)  # the signed PDF the row names, with its SHA-256 (rating-4 finding 4)
     with open(docs / "signatures.csv", "a", encoding="utf-8") as signatures:
         signatures.write(
-            f"{pack.PROTOCOL_ID},{release},S. T.,quality approver,approval,2026-11-12,p.pdf,{PDF_SHA},{sha}\n"
+            f"{pack.PROTOCOL_ID},{release},Srinivas T.,quality approver,approval,2026-11-12,p.pdf,{PDF_SHA},{sha}\n"
         )
     return sha
 
@@ -89,6 +104,11 @@ def _root(
     (tmp_path / "junit.xml").write_text(junit, encoding="utf-8")
     (tmp_path / "release-checks.json").write_text(RELEASE_CHECKS, encoding="utf-8")
     (docs / "oq-expected-results.csv").write_text(OQ_EXPECTED, encoding="utf-8")
+    rules = tmp_path / "backend" / "app" / "rule_register" / "data"
+    rules.mkdir(parents=True)
+    (rules / "T-floor-1.json").write_text(
+        __import__("json").dumps({**RULE, "content_hash": _content_hash(RULE["content"])}), encoding="utf-8"
+    )
     if approve:
         _approve_protocol(tmp_path)
     return tmp_path
@@ -97,6 +117,7 @@ def _root(
 def _run(root: Path, *extra: str) -> int:
     args = ["--root", str(root), "--release", "9.9.9", "--junit", str(root / "junit.xml")]
     args += ["--release-checks", str(root / "release-checks.json")]
+    args += ["--author", "Sriharsha T."]
     return validation_pack.main(args + ["--commit", "abc12345", "--date", "2026-11-12", *extra])
 
 
@@ -170,7 +191,7 @@ def test_signed_release_folder_is_never_overwritten(tmp_path, capsys):
     assert [p.name for p in folder.iterdir()] == ["MDX-VAL-012-release-approval-signed.pdf"]
     (folder / "MDX-VAL-012-release-approval-signed.pdf").unlink()
     with open(root / "docs" / "validation" / "signatures.csv", "a") as signatures:
-        signatures.write("MDX-VAL-012-9.9.9,9.9.9,S. T.,quality approver,approval,2026-11-12,x.pdf,00,\n")
+        signatures.write("MDX-VAL-012-9.9.9,9.9.9,Srinivas T.,quality approver,approval,2026-11-12,x.pdf,00,\n")
     assert _run(root) == 2
 
 
@@ -268,7 +289,9 @@ def test_no_oq_results_without_an_approved_protocol(tmp_path, capsys):
     assert f"is not approved: no signatures.csv row with content_sha256 {sha}" in capsys.readouterr().err
     # O31: the protocol's hash in the signed-PDF column (sha256) never approves the content
     with open(root / "docs" / "validation" / "signatures.csv", "a", encoding="utf-8") as signatures:
-        signatures.write(f"{pack.PROTOCOL_ID},9.9.9,S. T.,quality approver,approval,2026-11-12,p.pdf,{sha},{PDF_SHA}\n")
+        signatures.write(
+            f"{pack.PROTOCOL_ID},9.9.9,Srinivas T.,quality approver,approval,2026-11-12,p.pdf,{sha},{PDF_SHA}\n"
+        )
     assert _run(root, "--out", str(tmp_path / "out")) == 1
     capsys.readouterr()
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
@@ -341,6 +364,7 @@ def test_release_identity_mismatch_is_refused_outside_a_dry_run(tmp_path, capsys
     root = _root(tmp_path)
     args = ["--root", str(root), "--release", "1.0.0", "--junit", str(root / "junit.xml")]
     args += ["--release-checks", str(root / "release-checks.json"), "--commit", "abc12345", "--date", "2026-11-12"]
+    args += ["--author", "Srinivas T."]
     assert validation_pack.main(args + ["--out", str(tmp_path / "out")]) == 1
     assert "REFUSED: release 1.0.0 differs from VERSION 9.9.9" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
@@ -457,7 +481,9 @@ def test_junit_is_bound_to_its_commit_clean_tree_and_hook(tmp_path, capsys, monk
     """Owner, 12 Nov 2026: a JUnit of another commit, of a changed tree or of an older marker hook is a check failure;
     the generator refuses a changed working tree outside a dry run."""
     junit = (
-        JUNIT.replace("abc12345ffffffffffffffffffffffffffffffff", "0123abcd").replace('"clean"', '"dirty"').replace('value="2"', 'value="1"')
+        JUNIT.replace("abc12345ffffffffffffffffffffffffffffffff", "0123abcd")
+        .replace('"clean"', '"dirty"')
+        .replace('value="2"', 'value="1"')
     )
     root = _root(tmp_path, junit=junit)
     assert _run(root) == 1
@@ -481,13 +507,21 @@ def test_junit_is_bound_to_its_commit_clean_tree_and_hook(tmp_path, capsys, monk
     meta = pack.read_junit_meta(junit_file)
     assert meta["hook_version"] == pytest_requirements.HOOK_VERSION and meta["tree"] in ("clean", "dirty")
     assert len(meta["commit"]) == 40
+    assert meta["python"].count(".") == 2 and "pytest " in meta["packages"]  # the test environment's IQ (VMP-R45)
 
 
 RESULTS = """step,scenario_id,executed_by,date_utc,result,evidence_id
-IQ-004,,S. T.,2026-11-30T09:00:00Z,PASS,EVD-IQ-004
-OQ-001,AA-01,S. T.,2026-11-30T10:00:00Z,PASS,EVD-OQ-001
-OQ-002,AA-02,S. T.,2026-11-30T10:05:00Z,PASS,EVD-OQ-002
+IQ-004,,Sriharsha T.,2026-11-30T09:00:00Z,PASS,EVD-IQ-004
+OQ-001,AA-01,Sriharsha T.,2026-11-30T10:00:00Z,PASS,EVD-OQ-001
+OQ-002,AA-02,Sriharsha T.,2026-11-30T10:05:00Z,PASS,EVD-OQ-002
 """
+
+
+def _store_evidence(root: Path, *ids: str) -> None:
+    folder = root / "evidence"  # beside the results CSV: one file per evidence ID (VMP-R86)
+    folder.mkdir(exist_ok=True)
+    for evidence_id in ids or ("EVD-IQ-004", "EVD-OQ-001", "EVD-OQ-002"):
+        (folder / f"{evidence_id}.png").write_bytes(evidence_id.encode())
 
 
 def test_executed_results_feed_the_iq_oq_rtm_and_vsr(tmp_path, capsys):
@@ -497,6 +531,7 @@ def test_executed_results_feed_the_iq_oq_rtm_and_vsr(tmp_path, capsys):
     junit = JUNIT.split("<testcase")[0] + untagged + "\n</testsuite></testsuites>"
     root = _root(tmp_path, junit=junit)
     (root / "results.csv").write_text(RESULTS, encoding="utf-8")
+    _store_evidence(root)
     assert _run(root, "--results", str(root / "results.csv"), "--out", str(tmp_path / "out")) == 0
     out = tmp_path / "out"
     body = {
@@ -505,11 +540,21 @@ def test_executed_results_feed_the_iq_oq_rtm_and_vsr(tmp_path, capsys):
     }
     assert body["REQ-T-001"]["status"] == "Verified" and body["REQ-T-001"]["coverage"] == "scripted OQ"
     assert "| 0 | 1 (from executed-results.csv) | 0 |" in (out / "MDX-VAL-011-VSR.md").read_text("utf-8")
-    assert "| S. T. | 2026-11-30T09:00:00Z | PASS | EVD-IQ-004 |" in (out / "MDX-VAL-006-IQ.md").read_text("utf-8")
+    assert "| Sriharsha T. | 2026-11-30T09:00:00Z | PASS | EVD-IQ-004 |" in (out / "MDX-VAL-006-IQ.md").read_text(
+        "utf-8"
+    )
     assert "| PASS | EVD-OQ-002 |" in (out / "MDX-VAL-007-R-OQ-results.md").read_text("utf-8")
     assert (out / "executed-results.csv").read_text("utf-8") == RESULTS
+    # The OQ log carries the executed results, never blank columns; each evidence file is listed with its SHA-256.
+    log = read_rows((out / "oq-log.xlsx").read_bytes(), sheet="Scripted OQ (class A)")
+    assert [row[-4:] for row in log[1:]] == [
+        ["Sriharsha T.", "2026-11-30T10:00:00Z", "PASS", "EVD-OQ-001"],
+        ["Sriharsha T.", "2026-11-30T10:05:00Z", "PASS", "EVD-OQ-002"],
+    ]
+    index = (out / "evidence-index.csv").read_text("utf-8")
+    assert "EVD-OQ-001,evidence/EVD-OQ-001.png," + __import__("hashlib").sha256(b"EVD-OQ-001").hexdigest() in index
     bad = RESULTS.replace("PASS,EVD-OQ-001", "PASS,").replace("10:05:00Z,PASS", "10:05:00Z,FAIL")
-    (root / "results.csv").write_text(bad + "XQ-1,,S. T.,2026-11-30T11:00:00Z,MAYBE,\n", encoding="utf-8")
+    (root / "results.csv").write_text(bad + "XQ-1,,Sriharsha T.,2026-11-30T11:00:00Z,MAYBE,\n", encoding="utf-8")
     assert _run(root, "--results", str(root / "results.csv"), "--out", str(tmp_path / "out2")) == 1
     said = capsys.readouterr().err
     for part in ("executed OQ-001: PASS without executor, date or evidence ID", "class-A scenario AA-02 FAIL",
@@ -521,3 +566,184 @@ def test_executed_results_feed_the_iq_oq_rtm_and_vsr(tmp_path, capsys):
         _run(unapproved, "--results", str(unapproved / "results.csv"), "--dry-run", "--out", str(tmp_path / "d")) == 1
     )
     assert "executed-results.csv holds OQ results but the OQ protocol is not approved" in capsys.readouterr().err
+
+
+def test_the_oq_protocol_approval_is_checked_against_the_signed_pdf_and_the_people(tmp_path, capsys):
+    """Rating-4 finding 4: a signatures.csv row approves the OQ protocol only when its signer is a named person who holds
+    the quality-approver role, and its signed PDF is stored with the row's SHA-256; a typed row is never trusted."""
+    root = _root(tmp_path)
+    docs = root / "docs" / "validation"
+    good = (docs / "signatures.csv").read_text(encoding="utf-8")
+    header, row = good.splitlines()[0], good.splitlines()[1]
+    for typed, said in {
+        "S. T.,quality approver": "signer 'S. T.' is not a named person",
+        "Sriharsha T.,system owner": "signer Sriharsha T. with role 'system owner'; the quality approver approves",
+        "Sriharsha T.,quality approver": "signer Sriharsha T. with role 'quality approver'; the quality approver approves",
+    }.items():
+        (docs / "signatures.csv").write_text(f"{header}\n{row.replace('Srinivas T.,quality approver', typed)}\n")
+        assert _run(root, "--out", str(tmp_path / "out")) == 1
+        err = capsys.readouterr().err
+        assert said in err and "is not approved" in err
+    (docs / "signatures.csv").write_text(good)
+    (root / "p.pdf").write_bytes(b"%PDF-1.4 another file")
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert "the SHA-256 of p.pdf differs from its signatures.csv row" in capsys.readouterr().err
+    (root / "p.pdf").unlink()
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert "signed PDF 'p.pdf' is not stored" in capsys.readouterr().err
+    (root / "p.pdf").write_bytes(PDF)
+    assert _run(root, "--out", str(tmp_path / "out")) == 0
+    assert pack.person("S. T.") is None and pack.person("Srinivas Telikicherla") == "Srinivas T."
+
+
+def test_executed_rows_are_checked_not_trusted(tmp_path, capsys):
+    """Rating-4 finding 4: an executed OQ step comes after the protocol approval (a date-only approval counts as the
+    end of its day) and not from its approver; the executor is a named person; an evidence ID resolves to a stored file;
+    an IQ step is not executed by the IQ record's approver (VMP-R02, VMP-R86, VMP-R88)."""
+    root = _root(tmp_path)
+    rows = RESULTS + (
+        "OQ-003,AA-01,Srinivas T.,2026-11-30T11:00:00Z,PASS,EVD-OQ-003\n"
+        "OQ-004,AA-02,Sriharsha T.,2026-11-12T08:00:00Z,PASS,EVD-OQ-004\n"
+        "OQ-005,AA-01,S. T.,2026-11-30T12:00:00Z,PASS,EVD-OQ-005\n"
+        "IQ-005,,Srinivas T.,2026-11-30T09:30:00Z,PASS,EVD-MISSING\n"
+    )
+    (root / "results.csv").write_text(rows, encoding="utf-8")
+    _store_evidence(root, "EVD-IQ-004", "EVD-OQ-001", "EVD-OQ-002", "EVD-OQ-003", "EVD-OQ-004", "EVD-OQ-005")
+    assert _run(root, "--results", str(root / "results.csv"), "--out", str(tmp_path / "out")) == 1
+    said = capsys.readouterr().err
+    for part in (
+        "executed OQ-003: executed by Srinivas T., who approved the OQ protocol; executor and approver are two people",
+        "executed OQ-004: executed 2026-11-12T08:00:00Z, not after the OQ protocol approval of 2026-11-12 23:59 UTC",
+        "executed OQ-005: executor 'S. T.' is not a named person (Srinivas T., Sriharsha T.)",
+        "executed IQ-005: evidence EVD-MISSING is not a stored file in the release folder's evidence/ (VMP-R86)",
+        "executed IQ-005: executed by Srinivas T., the IQ record's approver",
+    ):
+        assert part in said
+    for clean in ("executed OQ-001", "executed OQ-002", "executed IQ-004"):
+        assert clean not in said
+
+
+def test_the_iq_record_holds_the_rule_register_the_tools_and_the_test_environment(tmp_path, capsys):
+    """Rating-4 finding 5: the IQ record lists every rule version with its content hash (recomputed) and file hash, the
+    tool versions of the test run (Python, key packages, Node) and a test-environment section (VMP-R45, VMP-R77)."""
+    props = '<property name="python" value="3.13.1"/><property name="packages" value="fastapi 0.141.1; pytest 9.1.1"/>'
+    junit = JUNIT.replace(
+        '<property name="hook_version" value="2"/>', '<property name="hook_version" value="2"/>' + props
+    )
+    root = _root(tmp_path, junit=junit)
+    assert _run(root, "--out", str(tmp_path / "out")) == 0
+    iq = (tmp_path / "out" / "MDX-VAL-006-IQ.md").read_text("utf-8")
+    content_hash = _content_hash(RULE["content"])
+    assert f"| T-floor-1 | 1 | start to open | `{content_hash}` | yes |" in iq
+    assert "| IQ-010 | Rule register at this commit (section 3) | 1 versions; content hashes recomputed from the files | all match |" in iq  # fmt: skip
+    assert "## 4. Test environment (VMP-R45" in iq and "| IQ-T03 | Python of the test run | 3.13.1 | recorded |" in iq
+    assert (
+        "| IQ-T04 | Key packages of the test run (pytest included) | fastapi 0.141.1; pytest 9.1.1 | recorded |" in iq
+    )
+    assert "| IQ-T05 | Node of the test run (release checks) | v20 | recorded |" in iq
+    assert "`validation/pack.py` SHA-256 " in iq and "| IQ-T06 | PostgreSQL of the test database |" in iq
+    rule_file = root / "backend" / "app" / "rule_register" / "data" / "T-floor-1.json"
+    changed = {**RULE, "content": {"question": "changed"}, "content_hash": content_hash}
+    rule_file.write_text(__import__("json").dumps(changed), encoding="utf-8")
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
+    assert "rule register T-floor-1: content_hash does not match its content" in capsys.readouterr().err
+    assert "| MISMATCH: T-floor-1 |" in (tmp_path / "dry" / "MDX-VAL-006-IQ.md").read_text("utf-8")
+    rule_file.unlink()
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
+    assert "rule register: no rule version found" in capsys.readouterr().err
+
+
+def test_the_change_history_names_the_person_who_ran_the_generator(tmp_path, capsys):
+    """Rating-4 finding 6: the generated change history names who ran the generator (--author, else the git author),
+    never a fixed name; the shared initials "S. T." name nobody and are refused."""
+    root = _root(tmp_path)
+    assert _run(root, "--out", str(tmp_path / "one")) == 0
+    urs = (tmp_path / "one" / "MDX-VAL-004-URS.md").read_text("utf-8")
+    assert "| Sriharsha Telikicherla (Sriharsha T.) (generator run) |" in urs
+    assert _run(root, "--author", "Srinivas T.", "--out", str(tmp_path / "two")) == 0
+    urs = (tmp_path / "two" / "MDX-VAL-004-URS.md").read_text("utf-8")
+    assert (
+        "| Srinivas Telikicherla (Srinivas T.) (generator run) |" in urs and "Sriharsha T.) (generator run)" not in urs
+    )
+    assert _run(root, "--author", "S. T.", "--out", str(tmp_path / "three")) == 1
+    assert "the generator run is attributed to 'S. T.', not a named person" in capsys.readouterr().err
+
+
+PQ_PROTOCOL = """# MDX-VAL-008 PQ (test)
+
+| Step | Persona | Action | Expected result | Scenarios |
+|---|---|---|---|---|
+| PQ-001 | Complaint handler | Log a call | Case created | AA-01 |
+| PQ-002 | Quality approver | Approve a record made by the same person | Refused | AA-02 |
+"""
+PQ_HEADER = "step,executed_by,second_person,date_utc,result,evidence_id,deviation_id\n"  # MDX-VAL-008 section 5
+
+
+def test_the_pq_record_is_read_checked_and_summarised(tmp_path, capsys):
+    """Rating-4 finding 8: the generator reads pq-record.csv: the executor never writes the code (PQ-R01), the second
+    person is someone else (PQ-R08), a step not passed has a logged deviation (PQ-R04), steps and evidence resolve; the
+    VSR states the PQ outcome."""
+    root = _root(tmp_path)
+    (root / "docs" / "validation" / "MDX-VAL-008_PQ_PROTOCOL.md").write_text(PQ_PROTOCOL, encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    _store_evidence(out, "EVD-PQ-001", "EVD-PQ-002")
+    (out / "pq-record.csv").write_text(
+        PQ_HEADER
+        + "PQ-001,Sriharsha T.,,2026-11-30T09:00:00Z,PASS,EVD-PQ-001,\n"
+        + "PQ-002,Srinivas T.,Srinivas T.,2026-11-30T09:10:00Z,FAIL,EVD-PQ-002,DEV-9.9.9-099\n"
+        + "PQ-009,Srinivas T.,,2026-11-30T09:20:00Z,PASS,EVD-PQ-404,\n",
+        encoding="utf-8",
+    )
+    assert _run(root, "--out", str(out)) == 1
+    said = capsys.readouterr().err
+    for part in (
+        "PQ PQ-001: executed by Sriharsha T., who writes the code under test (MDX-VAL-008 PQ-R01)",
+        "PQ PQ-002: the second person is the executor; four-eyes steps need two people (PQ-R08)",
+        "PQ PQ-002: FAIL without a deviation in deviation-log.csv (MDX-VAL-008 PQ-R04)",
+        "PQ PQ-009: not a step of MDX-VAL-008",
+        "PQ PQ-009: evidence EVD-PQ-404 is not a stored file",
+    ):
+        assert part in said
+    good = (
+        PQ_HEADER
+        + "PQ-001,Srinivas T.,,2026-11-30T09:00:00Z,PASS,EVD-PQ-001,\n"
+        + "PQ-002,Srinivas T.,Sriharsha T.,2026-11-30T09:10:00Z,PASS,EVD-PQ-002,\n"
+    )
+    (out / "pq-record.csv").write_text(good, encoding="utf-8")
+    assert _run(root, "--out", str(out)) == 0
+    vsr = (out / "MDX-VAL-011-VSR.md").read_text("utf-8")
+    assert "| Acceptance (MDX-VAL-008 section 4) | every step PASS |" in vsr
+    assert "- PQ executed by users: yes (2 of 2 steps PASS)" in vsr
+    assert (out / "pq-record.csv").read_text("utf-8") == good
+    assert _run(root, "--out", str(tmp_path / "none")) == 0
+    assert "- PQ executed by users: no (no pq-record.csv for this release)" in (
+        tmp_path / "none" / "MDX-VAL-011-VSR.md"
+    ).read_text("utf-8")
+
+
+def test_counts_in_the_documents_are_generated_never_typed(tmp_path, capsys):
+    """Rating-4 finding 9: MDX-VAL-000 and MDX-VAL-001 state their counts in a generated block; a stale or missing
+    block is a check failure; --update-counts rewrites it from the sources, keeping the file's line endings."""
+    root = _root(tmp_path)
+    docs = root / "docs" / "validation"
+    stale = f"# Doc\r\n\r\nText.\r\n\r\n{pack.COUNTS_BEGIN}\r\n| Count | Value |\r\n{pack.COUNTS_END}\r\n"
+    for name in ("README.md", "MDX-VAL-001_VALIDATION_MASTER_PLAN.md"):
+        (docs / name).write_bytes(stale.encode("utf-8"))
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert "README.md: the generated counts are stale; run scripts/validation_pack.py --update-counts" in (
+        capsys.readouterr().err
+    )
+    assert _run(root, "--update-counts") == 0
+    readme = (docs / "README.md").read_bytes().decode("utf-8")
+    assert "| Requirements (`requirements.csv`) | 2 |\r\n" in readme and "| Requirements, class A | 1 |" in readme
+    assert "| OQ expected results confirmed by the owner | 2 |" in readme and "\r\r" not in readme
+    assert _run(root, "--out", str(tmp_path / "out")) == 0
+    (docs / "requirements.csv").write_text(
+        REQUIREMENTS + "REQ-T-003,A,The third shall hold.,A,spec,RSK-3,AA-01,AA-02,\n"
+    )
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
+    assert "MDX-VAL-001_VALIDATION_MASTER_PLAN.md: the generated counts are stale" in capsys.readouterr().err
+    (docs / "README.md").write_text("# no block\n", encoding="utf-8")
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
+    assert "README.md: no generated counts block" in capsys.readouterr().err
