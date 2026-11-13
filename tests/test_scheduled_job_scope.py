@@ -52,6 +52,7 @@ SCOPE_TESTS = {
     "signature-settlement": "test_signature_settlement_reads_each_receipt_only_in_the_signatures_organization",
     "readiness-digest": "test_readiness_digest_is_queued_and_sent_per_organization_to_its_own_leads",
     "audit-chain-verification": "test_audit_chain_verification_names_only_the_organization_whose_trail_broke",
+    "deadline-list": "test_deadline_list_is_queued_and_sent_per_organization_with_only_its_own_deadlines",
 }
 
 
@@ -936,3 +937,44 @@ def test_audit_chain_verification_names_only_the_organization_whose_trail_broke(
         assert str(second) in state["anchors"]
     named = " ".join(body for _subject, body in alerts)
     assert str(first) in named and str(second) not in named
+
+
+def test_deadline_list_is_queued_and_sent_per_organization_with_only_its_own_deadlines(pair, monkeypatch, mail):
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.oversight import deadline_list
+    from tests.test_reporting_capa_api import REASON, SETTINGS, _client, _complaint, _product
+
+    _serve_only(monkeypatch, *pair)
+    monkeypatch.setattr(deadline_list, "switched_on", lambda: True)
+    monkeypatch.setattr(deadline_list, "in_trial", lambda *_args: False)
+    monkeypatch.setattr(deadline_list, "SEND_FROM_HOUR", 0)
+    refs, leads = {}, {}
+    for tenant_id in pair:
+        reviewer = _client(tenant_id, "REGULATORY_REVIEWER")
+        chosen = reviewer.get(SETTINGS).json()["templates"][:2]
+        saved = reviewer.put(SETTINGS, json={"windows": chosen, "lookback_days": 365, "reason": REASON})
+        assert saved.status_code == 200, saved.text
+        complaint = _complaint(tenant_id, str(_product(tenant_id)), aware_days_ago=29, country="US", death=True)
+        leads[tenant_id] = _person(tenant_id, "LEADER")
+        with SessionLocal() as db:
+            bind_tenant(db, tenant_id)
+            refs[tenant_id] = db.get(Complaint, uuid.UUID(complaint)).complaint_identifier
+    try:
+        with _system(rollback=False) as db:
+            _job("deadline-list").run(db, {})
+            db.commit()
+        with _system() as db:
+            events = _events(db, event_name=deadline_list.EVENT, tenant_id=list(pair))
+            assert sorted(event.tenant_id for event in events) == sorted(pair)
+            for event in events:
+                own, other = event.tenant_id, next(item for item in pair if item != event.tenant_id)
+                _assert_event_scoped(event, own)
+                listed = {line["ref"] for line in event.payload["lines"]}
+                assert refs[own] in listed and refs[other] not in listed
+                recipients = mail(db, event)
+                lead = db.get(AuthUser, uuid.UUID(leads[own])).username
+                assert lead in recipients and recipients <= _usernames(db, own)
+    finally:
+        with _system(rollback=False) as db:
+            db.query(OutboxEvent).filter(OutboxEvent.tenant_id.in_(list(pair))).delete(synchronize_session=False)
+            db.commit()
