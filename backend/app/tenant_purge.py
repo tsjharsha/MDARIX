@@ -547,6 +547,14 @@ def purge_tenant(
     _require_no_legal_hold(tenant)
     if str(tenant.status).upper() == "PURGING" and _pending_purge(db, tenant_id) is not None:
         return complete_purge(db, tenant_id, actor_ref, storage=storage, now=now, attempts=attempts)
+    # RSK-066: the audit trail is deleted before its retention date only after a documented hand-back: the export
+    # (or a recorded waiver) of a customer organization, the trial terms of a free trial, or a recorded purge
+    # re-applied after a restore. Checked here, not only in the API, so no caller can skip it.
+    if not ({"export", "reapplied_log_id"} & set(evidence or {})):
+        from backend.app.tenant_export_api import is_free_trial
+
+        if not is_free_trial(db, tenant_id):
+            raise PurgeFailed("EXPORT_REQUIRED")
     tenant.status = "PURGING"
     tenant.updated_at = now
     db.flush()

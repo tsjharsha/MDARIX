@@ -278,7 +278,11 @@ describe("the per-market assessment rules", () => {
 
 describe("the assessment screen", () => {
   it("shows every question with its clause and the starter mark, the scale with its threshold, and the training", () => {
-    const html = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />);
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={{ ...workspace(["regulatory.review"]), isTrial: true }}>
+        <MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />
+      </WorkspaceContext.Provider>,
+    );
     expect(html).toContain("1.</strong> Did a death occur?");
     expect(html).not.toContain("US1.");
     expect(html).toContain("21 CFR 803.50(a)(2)");
@@ -362,12 +366,12 @@ describe("the assessment screen", () => {
     );
   });
 
-  it("lets a non-trial organization sign without the practice training, and still record it", () => {
-    const pilot = { ...detail(item()), training_required: false, practice_label: null };
+  it("asks a non-trial organization's signer for the training record too, without calling it practice (RSK-011)", () => {
+    const pilot = { ...detail(item()), training_required: true, practice_label: null };
     const html = render(<MarketPanel detail={pilot} item={item()} onSaved={vi.fn()} />);
-    expect(html).not.toContain("Before you sign");
-    expect(html).toContain("Training record on MDARIX starter, version 1");
-    expect(html).toContain("signing here does not wait for this one");
+    expect(html).toContain("Before you sign: training on MDARIX starter, version 1");
+    expect(html).toContain("your organization&#x27;s QMS keeps its full training records");
+    expect(html).not.toContain("practice");
   });
 
   it("is read-only without regulatory review or approval", () => {
