@@ -61,6 +61,20 @@ class WorkerMetrics:
         return asdict(self)
 
 
+PAYLOAD_TENANT_MISMATCH = "PAYLOAD_TENANT_MISMATCH"
+
+
+def payload_tenant_mismatch(row) -> bool:
+    """True when the payload names an organization (``tenant_id``) other than the event row's own. A payload without
+    ``tenant_id`` is not checked; an event without an organization may not carry one in its payload."""
+    payload = row.payload if isinstance(row.payload, dict) else {}
+    named = str(payload.get("tenant_id") or "").strip().lower()
+    # notifications._queue writes the text "None" for an event that belongs to no organization.
+    if named in ("", "none"):
+        return False
+    return row.tenant_id is None or named != str(row.tenant_id).lower()
+
+
 def _due_filter(now: datetime):
     return (
         OutboxEvent.published_at.is_(None),
@@ -151,6 +165,18 @@ class OutboxWorker:
             return
         row.claimed_by = self.worker_id
         row.claimed_at = now
+        if payload_tenant_mismatch(row):
+            # A handler finds its records in system scope and takes the recipients' organization from the payload:
+            # an event whose payload names another organization than its own row is never delivered, nor retried.
+            logger.error(
+                "outbox payload names another organization event=%s row_tenant=%s payload_tenant=%s",
+                row.id,
+                row.tenant_id,
+                str(row.payload.get("tenant_id")),
+            )
+            self._dead_letter(row, PAYLOAD_TENANT_MISMATCH, now, stats)
+            db.commit()
+            return
         try:
             self.publisher(row.event_name, row.payload)
         except Exception as exc:
@@ -174,6 +200,15 @@ class OutboxWorker:
         if row.attempts < self.max_attempts:
             row.next_attempt_at = now + self.retry_delay(row.attempts)
             return
+        self._dead_letter(row, row.last_error, now, stats, counted=True)
+
+    def _dead_letter(self, row, error: str, now: datetime, stats: dict, counted: bool = False) -> None:
+        """Take ``row`` out of the queue for good and alert once; ``counted`` when the failure is already counted."""
+        if not counted:
+            row.attempts += 1
+            row.last_error = error
+            stats["failed"] += 1
+            self.metrics.last_error = error
         row.dead_lettered_at = now
         row.next_attempt_at = None
         row.claimed_by = None
