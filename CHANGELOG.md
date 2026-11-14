@@ -40,6 +40,16 @@ only. No migration.
 - Plans & Licensing › Subscriptions applies the trial rules too: a trial's start does not move, its end stays within
   the original end + 30 days, and the Free Trial plan is never given to a customer (`TRIAL_PLAN_NOT_ASSIGNABLE`).
 - Identity & Access no longer has Onboarding; Customers & Tenants has Customers and Tenants only.
+- Run 2: **Run deletion now** (the retention run, `POST /platform-admin/trial-retention/run`, unchanged) moved from
+  the trial request queue to Trial organizations › Ending and deletion, beside the trials due for deletion.
+- Run 2: the **Ended early** filter of the Trials list is paged and sorted on the server like the other filters (it
+  read at most 200 ended trials before).
+- Run 2: a trial in a **grace period** (a grace end set on Plans & Licensing) shows as running, with its days left
+  counted to the grace end and "(grace period)" beside them; it counts as active in the strip and the dashboard tile,
+  and can be ended early. An extension given during the grace period counts from the grace end.
+- Run 2: the trial page has a slot for the AI and usage panel (part 4); until it is built the slot shows "AI is off
+  for free trials".
+- Run 2: user guide page `docs/user-guide/PLATFORM_ADMIN_TRIAL_ORGANIZATIONS.md`.
 
 ## [0.11.03] - not released yet
 
