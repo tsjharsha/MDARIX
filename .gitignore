@@ -46,6 +46,9 @@ artifacts/compliance/audit-archives/
 artifacts/audit-archives/
 artifacts/data-plane-backups/
 artifacts/automated-release-gate.md
+# Recovery-check records and monthly health reports name customer organisations: sent to them, never committed.
+artifacts/recovery-check/
+artifacts/health/
 # Local demo recordings and their injected recorder helpers are generated evidence, not application source.
 artifacts/demo/
 # B6a G7: each release check's full output (the summary artifacts/release-checks-<version>.json stays tracked).
