@@ -64,14 +64,18 @@ def plan_for(engine) -> tuple[list, list[tuple[str, str, str]]]:
 
 
 def grant_runtime_role(connection, role: str, password: str) -> None:
+    if not ROLE.match(role):
+        raise ValueError("The runtime role must be a plain lower-case role name")
     exists = connection.scalar(text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": role})
+    # PostgreSQL takes no bound parameters in CREATE/ALTER ROLE: the server quotes the password as a literal first,
+    # as scripts/configure_runtime_role.py does.
+    quoted = connection.scalar(text("SELECT quote_literal(:pw)"), {"pw": password})
     if not exists:
         connection.execute(
-            text(f'CREATE ROLE "{role}" LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD :pw'),
-            {"pw": password},
+            text(f'CREATE ROLE "{role}" LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD {quoted}')
         )
     else:
-        connection.execute(text(f'ALTER ROLE "{role}" NOSUPERUSER NOBYPASSRLS PASSWORD :pw'), {"pw": password})
+        connection.execute(text(f'ALTER ROLE "{role}" NOSUPERUSER NOBYPASSRLS PASSWORD {quoted}'))
     for statement in (
         f'GRANT USAGE ON SCHEMA public TO "{role}"',
         f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "{role}"',
@@ -80,6 +84,10 @@ def grant_runtime_role(connection, role: str, password: str) -> None:
         f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO "{role}"',
     ):
         connection.execute(text(statement))
+    # No row-level security on these, so read only (DB-1, tr21); a legacy plane may lack them.
+    for table in ("alembic_version", "business_id_counters"):
+        if connection.scalar(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}):
+            connection.execute(text(f'REVOKE INSERT, UPDATE, DELETE ON public."{table}" FROM "{role}"'))
 
 
 def main() -> int:

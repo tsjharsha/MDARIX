@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +25,15 @@ class AIInteractionSession(Base):
 
 class AIInteraction(Base):
     __tablename__ = "ai_interactions"
+    __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_ai_interactions_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
+    )
     id = uuid_pk()
     tenant_id = tenant_fk()
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
