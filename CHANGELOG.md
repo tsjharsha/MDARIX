@@ -131,6 +131,11 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
 - Connection pools (DB-04): one control pool when the runtime login is the owner's, and a data-plane engine pushed
   out of the cache (`MDARIX_DATA_PLANE_ENGINE_CACHE`, 32) closes its connections at once.
 
+- A date never chooses a product version (owner, 12 Nov 2026): Product 360 and its timeline read "as of" a date
+  without a version no longer pick the latest version released before that date, because a unit built earlier keeps
+  its own version. They show no version and the limitation "Version not known for this unit" with the candidate
+  versions; a chosen or recorded version is used as before.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
