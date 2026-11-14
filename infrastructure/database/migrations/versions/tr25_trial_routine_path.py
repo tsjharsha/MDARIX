@@ -2,9 +2,9 @@
 
 When DB-1 (tr24tenantindexes) lands, set down_revision to tr24tenantindexes.
 
-The twenty-fifth migration of the trial line, chained from ``tr19casesescalation`` (the single head on the B7 branch
-base; DB-1's tr21-tr24 are not built yet). Expand-only: two new tables, new nullable columns or columns with a default,
-one widened check constraint and one partial unique index. Nothing is dropped or renamed.
+The twenty-fifth migration of the trial line, chained from ``tr24tenantindexes`` (DB-1's last migration; before
+DB-1 it followed ``tr19casesescalation``). Expand-only: two new tables, new nullable columns or columns with a
+default, one widened check constraint and one partial unique index. Nothing is dropped or renamed.
 
 - ``inbound_messages`` (B7b): one e-mail received on an organization's intake address, waiting for a person to decide
   (make it a Case, add it to a Case, or not a case). An e-mail is never a complaint by itself.
@@ -28,7 +28,7 @@ from infrastructure.database.migrations.helpers import quoted
 from infrastructure.database.migrations.helpers import tenant_policy as _tenant_policy
 
 revision = "tr25routinepath"
-down_revision = "tr19casesescalation"
+down_revision = "tr24tenantindexes"
 branch_labels = None
 depends_on = None
 
@@ -170,9 +170,7 @@ def _settings() -> None:
     op.create_check_constraint(
         op.f("ck_oversight_settings_mail_limit_range"), table, "mail_daily_limit BETWEEN 1 AND 5000"
     )
-    op.add_column(
-        table, sa.Column("attachment_quota_mb", sa.Integer(), nullable=False, server_default=sa.text("100"))
-    )
+    op.add_column(table, sa.Column("attachment_quota_mb", sa.Integer(), nullable=False, server_default=sa.text("100")))
     op.create_check_constraint(
         op.f("ck_oversight_settings_attachment_quota_range"), table, "attachment_quota_mb BETWEEN 1 AND 10240"
     )

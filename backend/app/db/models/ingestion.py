@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import (
+    ForeignKeyConstraint,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -48,6 +49,8 @@ class IngestionRun(Base):
     provenance: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_ingestion_runs_tenant_id_id"),
         CheckConstraint(
             "status in ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED','ALREADY_INGESTED')",
             name="ingestion_run_status_allowed",
@@ -79,9 +82,7 @@ class StagedSourceRecord(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False
-    )
+    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     source_system: Mapped[str] = mapped_column(String(80), nullable=False)
     source_type: Mapped[str] = mapped_column(String(80), nullable=False)
     record_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -102,6 +103,13 @@ class StagedSourceRecord(Base):
     created_at = tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "ingestion_run_id"],
+            ["ingestion_runs.tenant_id", "ingestion_runs.id"],
+            name="fk_staged_source_records_ingestion_run_id_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_staged_source_records_tenant_id_id"),
         CheckConstraint(
             "data_quality_status in ('ACCEPTED','ACCEPTED_WITH_WARNINGS','REJECTED','SKIPPED_DUPLICATE_SOURCE')",
             name="staged_record_quality_status_allowed",
@@ -124,12 +132,8 @@ class DataQualityIssue(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False
-    )
-    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("staged_source_records.id")
-    )
+    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     issue_code: Mapped[str] = mapped_column(String(80), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     field: Mapped[str | None] = mapped_column(String(120))
@@ -139,6 +143,17 @@ class DataQualityIssue(Base):
     created_at = tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "ingestion_run_id"],
+            ["ingestion_runs.tenant_id", "ingestion_runs.id"],
+            name="fk_data_quality_issues_ingestion_run_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "staged_source_record_id"],
+            ["staged_source_records.tenant_id", "staged_source_records.id"],
+            name="fk_data_quality_issues_staged_source_record_id_tenant",
+        ),
         CheckConstraint("severity in ('INFO','WARNING','ERROR')", name="data_quality_issue_severity_allowed"),
     )
 

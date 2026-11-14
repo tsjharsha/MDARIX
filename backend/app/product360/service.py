@@ -277,6 +277,8 @@ class Product360Service:
                 light_counts.get("missing_lot", sum(1 for row in complaints if row["lot_batch_id"] is None)),
                 light_counts.get("late_evidence", self.late(evidence)),
             )
+            if as_of and not version_id and versions and pick_version:
+                limitations = [*limitations, self.version_not_known(versions, as_of)]
             provenance = [] if light else self.provenance(conn, tenant_id, product_id, selected_id)
             lot_details = self.lot_details(conn, tenant_id, lots)
         overview = {
@@ -356,10 +358,26 @@ class Product360Service:
                 (v for v in versions if str(v["id"]) == version_id or v["version_identifier"] == version_id), None
             )
         if as_of:
-            eligible = [v for v in versions if v["release_timestamp"] and v["release_timestamp"] <= as_of]
-            if eligible:
-                return eligible[-1]
+            # Owner, 12 Nov 2026 (DB-1): a date never chooses a version. A unit built before a later release still
+            # carries its own version, which only its record or its lot (device history) can tell.
+            return None
         return versions[-1] if versions else None
+
+    @staticmethod
+    def version_not_known(versions, as_of: datetime) -> dict[str, Any]:
+        """The limitation shown instead of a guessed version: the versions the unit could be (released by then)."""
+        candidates = [v for v in versions if v["release_timestamp"] is None or v["release_timestamp"] <= as_of]
+        return {
+            "code": "VERSION_NOT_KNOWN_FOR_UNIT",
+            "severity": "WARNING",
+            "description": (
+                "Version not known for this unit: the date alone does not tell which version was built into it. "
+                "Choose the version, or record the unit's lot so its version comes from the device history."
+            ),
+            "candidate_versions": [
+                {"id": str(v["id"]), "version_identifier": v["version_identifier"]} for v in candidates or versions
+            ],
+        }
 
     def components(self, conn, tenant_id: str, version_id: str | None):
         if not version_id:
