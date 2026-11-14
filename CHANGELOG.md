@@ -121,6 +121,16 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   with `tenant_id` on every organization table that lacked it (the organization filter of every request). The list
   is `infrastructure/database/migrations/tenant_indexes.py`; the schema drift check treats them as migration-owned.
 
+- Database timeouts (DB-03): the runtime and data-plane connections give up on a silent database after
+  `MDARIX_DB_SOCKET_TIMEOUT_SECONDS` (75 s by default; the owner connection for migrations and scripts has none), and
+  `scripts/configure_runtime_role.py` gives the runtime role a `statement_timeout` and an
+  `idle_in_transaction_session_timeout` (`MDARIX_DB_STATEMENT_TIMEOUT`, `MDARIX_DB_IDLE_IN_TRANSACTION_TIMEOUT`, 60 s
+  each). Operator step: run `scripts/configure_runtime_role.py` after the migration. A dedicated data plane that does
+  not answer is reported as `DATA_PLANE_UNAVAILABLE` (not "being upgraded"), and the failure is not cached, so the
+  plane serves again as soon as it is back.
+- Connection pools (DB-04): one control pool when the runtime login is the owner's, and a data-plane engine pushed
+  out of the cache (`MDARIX_DATA_PLANE_ENGINE_CACHE`, 32) closes its connections at once.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration

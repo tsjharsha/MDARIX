@@ -68,3 +68,35 @@ def test_the_deploy_grant_leaves_the_tables_without_row_level_security_read_only
                     {"t": f"public.{table}", "p": privilege},
                 )
                 assert not allowed, f"{privilege} on {table}"
+
+
+def test_the_runtime_role_gets_a_statement_and_an_idle_transaction_timeout(monkeypatch):
+    from configure_runtime_role import set_timeouts
+
+    from backend.app.db.session import engine
+
+    monkeypatch.setenv("MDARIX_DB_STATEMENT_TIMEOUT", "45s")
+    monkeypatch.delenv("MDARIX_DB_IDLE_IN_TRANSACTION_TIMEOUT", raising=False)
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            connection.execute(text(f'CREATE ROLE "{PROBE}" NOLOGIN'))
+            set_timeouts(connection, PROBE)
+            settings = connection.scalar(
+                text(
+                    "SELECT setconfig FROM pg_db_role_setting s JOIN pg_roles r ON r.oid = s.setrole "
+                    "WHERE r.rolname = :r AND s.setdatabase = 0"
+                ),
+                {"r": PROBE},
+            )
+            assert set(settings) == {"statement_timeout=45s", "idle_in_transaction_session_timeout=60s"}
+        finally:
+            transaction.rollback()
+
+
+def test_a_timeout_that_is_not_a_plain_duration_is_refused(monkeypatch):
+    from configure_runtime_role import set_timeouts
+
+    monkeypatch.setenv("MDARIX_DB_STATEMENT_TIMEOUT", "0; DROP TABLE x")
+    with pytest.raises(SystemExit):
+        set_timeouts(object(), PROBE)

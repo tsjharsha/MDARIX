@@ -9,8 +9,10 @@ password.
 from __future__ import annotations
 
 import os
+from collections import OrderedDict
 from contextlib import contextmanager
 from functools import lru_cache
+from threading import Lock
 from fastapi import Depends
 
 from sqlalchemy import create_engine
@@ -83,14 +85,18 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
         return
     try:
         factory = session_factory(row.database_ref, row.connection_secret_ref)
-        schema_ok = plane_schema_ok(row.database_ref, row.connection_secret_ref)
-        db = factory()
+        state = plane_schema_state(row.database_ref, row.connection_secret_ref)
     except Exception as exc:
+        state = UNREACHABLE
+        cause = exc
+    else:
+        cause = None
+    # DB-1 (DB-03): an outage is reported as an outage, never as an upgrade in progress.
+    if state == UNREACHABLE:
         raise HTTPException(
             503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "Tenant data plane is unavailable"}
-        ) from exc
-    if not schema_ok:
-        db.close()
+        ) from cause
+    if state == OUTDATED:
         raise HTTPException(
             503,
             detail={"code": "DATA_PLANE_SCHEMA_OUTDATED", "message": "Tenant data plane is being upgraded; try again"},
@@ -98,6 +104,7 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
     from backend.app.db.tenant_scope import bind_tenant
 
     # The plane enforces the same row-level security as the shared database, for this organization only.
+    db = factory()
     bind_tenant(db, UUID(str(ctx.tenant_id)))
     try:
         yield db
@@ -121,36 +128,75 @@ def schema_head() -> str:
     return ScriptDirectory.from_config(Config(str(root / "alembic.ini"))).get_current_head()
 
 
-def plane_schema_ok(database_ref: str, secret_ref: str) -> bool:
+OK, OUTDATED, UNREACHABLE = "OK", "OUTDATED", "UNREACHABLE"
+
+
+def plane_schema_state(database_ref: str, secret_ref: str) -> str:
     """A dedicated plane serves requests only at the code's migration head (scripts/migrate_data_planes.py).
 
-    A plane built by the older scripts records no revision; it is accepted in local development only. The answer is
-    cached for a minute per plane."""
+    OK, OUTDATED (another revision, or a plane built by the older scripts outside local development) or UNREACHABLE
+    (the plane did not answer). A revision answer is cached for a minute per plane; an outage never is, so a plane
+    serves again as soon as it is back (DB-1, DB-03)."""
     import time
 
     from sqlalchemy import text
 
     cached = _SCHEMA_CHECKED.get(database_ref)
     if cached and time.monotonic() - cached[0] < SCHEMA_CHECK_SECONDS:
-        return cached[1]
-    db = session_factory(database_ref, secret_ref)()
+        return OK if cached[1] else OUTDATED
     try:
-        revision = (
-            db.execute(text("SELECT to_regclass('public.alembic_version') IS NOT NULL")).scalar()
-            and db.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        )
-        ok = revision == schema_head() if revision else is_local()
+        db = session_factory(database_ref, secret_ref)()
+        try:
+            revision = (
+                db.execute(text("SELECT to_regclass('public.alembic_version') IS NOT NULL")).scalar()
+                and db.execute(text("SELECT version_num FROM alembic_version")).scalar()
+            )
+        finally:
+            db.close()
     except Exception:
-        ok = False
-    finally:
-        db.close()
+        return UNREACHABLE
+    ok = revision == schema_head() if revision else is_local()
     _SCHEMA_CHECKED[database_ref] = (time.monotonic(), ok)
-    return ok
+    return OK if ok else OUTDATED
 
 
-@lru_cache(maxsize=32)
+def plane_schema_ok(database_ref: str, secret_ref: str) -> bool:
+    return plane_schema_state(database_ref, secret_ref) == OK
+
+
+PLANE_ENGINE_CACHE = int(os.getenv("MDARIX_DATA_PLANE_ENGINE_CACHE", "32"))
+_FACTORIES: OrderedDict[tuple[str, str], sessionmaker[Session]] = OrderedDict()
+_FACTORIES_LOCK = Lock()
+
+
 def session_factory(database_ref: str, secret_ref: str) -> sessionmaker[Session]:
-    """Return a cached SQLAlchemy session factory for an approved data plane."""
+    """A cached session factory for an approved data plane. The least recently used plane beyond the cache size has
+    its engine disposed, so its pooled connections close at once instead of at garbage collection (DB-1, DB-04)."""
+    key = (database_ref, secret_ref)
+    with _FACTORIES_LOCK:
+        factory = _FACTORIES.get(key)
+        if factory is not None:
+            _FACTORIES.move_to_end(key)
+            return factory
+        factory = _new_session_factory(secret_ref)
+        _FACTORIES[key] = factory
+        while len(_FACTORIES) > PLANE_ENGINE_CACHE:
+            _key, evicted = _FACTORIES.popitem(last=False)
+            evicted.kw["bind"].dispose()
+        return factory
+
+
+def _session_factory_clear() -> None:
+    with _FACTORIES_LOCK:
+        while _FACTORIES:
+            _key, factory = _FACTORIES.popitem()
+            factory.kw["bind"].dispose()
+
+
+session_factory.cache_clear = _session_factory_clear  # the lru_cache interface callers and tests use
+
+
+def _new_session_factory(secret_ref: str) -> sessionmaker[Session]:
     url = _secret_url(secret_ref)
     engine = create_engine(
         url,
@@ -158,7 +204,7 @@ def session_factory(database_ref: str, secret_ref: str) -> sessionmaker[Session]
         pool_pre_ping=True,
         pool_size=int(os.getenv("MDARIX_DATA_PLANE_POOL_SIZE", "3")),
         max_overflow=int(os.getenv("MDARIX_DATA_PLANE_MAX_OVERFLOW", "5")),
-        connect_args=connect_args(),
+        connect_args=connect_args(request_path=True),
         # A failing statement is reported without its bound values: they are the customer's records, and the message
         # travels to logs and error reports (the control engine in session.py does the same).
         hide_parameters=True,
@@ -201,7 +247,10 @@ def open_tenant_data_session(tenant_id):
             bind_tenant(control, tenant_id)
             yield control
             return
-        if not plane_schema_ok(row.database_ref, row.connection_secret_ref):
+        state = plane_schema_state(row.database_ref, row.connection_secret_ref)
+        if state == UNREACHABLE:
+            raise RuntimeError(f"DATA_PLANE_UNAVAILABLE:{tenant_id}")
+        if state == OUTDATED:
             raise RuntimeError(f"DATA_PLANE_SCHEMA_OUTDATED:{tenant_id}")
         db = session_factory(row.database_ref, row.connection_secret_ref)()
         bind_tenant(db, tenant_id)
