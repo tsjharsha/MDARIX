@@ -150,7 +150,7 @@ def report_problem(
             event_name=EVENT_REPORTED,
             aggregate_type="SupportProblemReport",
             aggregate_id=row.id,
-            payload={"report_id": str(row.id)},
+            payload={"tenant_id": str(tenant_id), "report_id": str(row.id)},  # tenant: the worker's check (RSK-026)
             occurred_at=now,
         )
     )

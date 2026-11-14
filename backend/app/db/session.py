@@ -21,7 +21,7 @@ def database_url(username: str | None = None, password: str | None = None) -> UR
     )
 
 
-def _engine(url: URL):
+def _engine(url: URL, *, request_path: bool = False):
     return create_engine(
         url,
         future=True,
@@ -32,7 +32,7 @@ def _engine(url: URL):
         max_overflow=int(os.getenv("MDARIX_DB_MAX_OVERFLOW", "10")),
         pool_timeout=int(os.getenv("MDARIX_DB_POOL_TIMEOUT_SECONDS", "30")),
         pool_pre_ping=True,
-        connect_args=connect_args(),
+        connect_args=connect_args(request_path=request_path),
     )
 
 
@@ -43,8 +43,18 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 # API requests use the least-privilege runtime role when it is configured, so Postgres row-level security applies
 # to every request (see backend/app/db/tenant_scope.py). Without it, requests fall back to the owner connection.
 _runtime_user = os.getenv("MDARIX_DB_RUNTIME_USER", "").strip()
+
+
+def separate_runtime_engine(runtime_user: str, owner_user: str | None) -> bool:
+    """A second pool only for a runtime role that is not the owner: the same login twice would double the connections
+    a process may hold (db-audit N4, DB-04)."""
+    return bool(runtime_user) and runtime_user != (owner_user or "")
+
+
 runtime_engine = (
-    _engine(database_url(_runtime_user, os.environ.get("MDARIX_DB_RUNTIME_PASSWORD", ""))) if _runtime_user else engine
+    _engine(database_url(_runtime_user, os.environ.get("MDARIX_DB_RUNTIME_PASSWORD", "")), request_path=True)
+    if separate_runtime_engine(_runtime_user, os.environ.get("POSTGRES_USER"))
+    else engine
 )
 RuntimeSessionLocal = sessionmaker(bind=runtime_engine, autoflush=False, autocommit=False, future=True)
 

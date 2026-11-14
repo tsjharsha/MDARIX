@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import (
+    ForeignKeyConstraint,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -47,6 +48,8 @@ class NormalizationRun(Base):
     provenance: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_normalization_runs_tenant_id_id"),
         CheckConstraint(
             "status in ('RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED')",
             name="normalization_run_status_allowed",
@@ -80,12 +83,8 @@ class SourceCanonicalLink(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
-    )
-    staged_source_record_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("staged_source_records.id"), nullable=False
-    )
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    staged_source_record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     canonical_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
     canonical_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     canonical_business_identifier: Mapped[str | None] = mapped_column(String(255))
@@ -102,6 +101,18 @@ class SourceCanonicalLink(Base):
     updated_at = tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "normalization_run_id"],
+            ["normalization_runs.tenant_id", "normalization_runs.id"],
+            name="fk_source_canonical_links_normalization_run_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "staged_source_record_id"],
+            ["staged_source_records.tenant_id", "staged_source_records.id"],
+            name="fk_source_canonical_links_staged_source_record_id_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_source_canonical_links_tenant_id_id"),
         CheckConstraint(
             "resolution_status in ('MATCHED','NEW_CANONICAL_OBJECT','AMBIGUOUS','UNRESOLVED','CONFLICT','REQUIRES_HUMAN_REVIEW')",
             name="source_canonical_link_status_allowed",
@@ -127,12 +138,8 @@ class CanonicalRelationship(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
-    )
-    source_link_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("source_canonical_links.id")
-    )
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    source_link_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
     source_entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     target_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -146,6 +153,17 @@ class CanonicalRelationship(Base):
     created_at = tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "normalization_run_id"],
+            ["normalization_runs.tenant_id", "normalization_runs.id"],
+            name="fk_canonical_relationships_normalization_run_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "source_link_id"],
+            ["source_canonical_links.tenant_id", "source_canonical_links.id"],
+            name="fk_canonical_relationships_source_link_id_tenant",
+        ),
         CheckConstraint(
             "assertion_status in ('supported','contradicted','hypothesized','unknown')",
             name="canonical_relationship_assertion_allowed",
@@ -168,12 +186,8 @@ class NormalizationIssue(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
-    )
-    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("staged_source_records.id")
-    )
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     issue_code: Mapped[str] = mapped_column(String(80), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_type: Mapped[str | None] = mapped_column(String(80))
@@ -182,6 +196,17 @@ class NormalizationIssue(Base):
     created_at = tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "normalization_run_id"],
+            ["normalization_runs.tenant_id", "normalization_runs.id"],
+            name="fk_normalization_issues_normalization_run_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "staged_source_record_id"],
+            ["staged_source_records.tenant_id", "staged_source_records.id"],
+            name="fk_normalization_issues_staged_source_record_id_tenant",
+        ),
         CheckConstraint("severity in ('INFO','WARNING','ERROR')", name="normalization_issue_severity_allowed"),
         Index("ix_normalization_issues_run", "normalization_run_id"),
     )
