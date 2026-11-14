@@ -48,7 +48,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def stable_id(prefix: str, value: str) -> str:
-    digest = hashlib.sha1(f"{prefix}:{value}".encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha1(f"{prefix}:{value}".encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     return f"{prefix}-{digest}"
 
 
