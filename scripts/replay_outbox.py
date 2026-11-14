@@ -5,6 +5,10 @@
 The console (Platform Admin > Operations > Dead letters > Retry) is the normal path; this does the same thing for an
 operator without the console: the event gets a fresh set of retries, and an audit record in its organization names
 the event (not its payload) and the reason. Only an event that is actually dead-lettered is replayed.
+
+An event held after a restore (B6b-D10, marked by scripts/recovery_check.py) follows the console's rule: it is replayed
+only when a mail-log check recorded after the hold (POST /platform-admin/console/dead-letters/mail-log-check) says
+NOT_DELIVERED; otherwise it is refused with HELD_AFTER_RESTORE and the refusal is audited.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from backend.app.access.platform_console import HELD_AFTER_RESTORE, NOT_DELIVERED, mail_log_results  # noqa: E402
 from backend.app.db.models.stage2 import OutboxEvent  # noqa: E402
 from backend.app.db.session import SessionLocal  # noqa: E402
 from backend.app.db.tenant_scope import bind_system  # noqa: E402
@@ -32,6 +37,29 @@ def replay(db, event_id: uuid.UUID, reason: str, actor_ref: str = "operator:repl
     if row.dead_lettered_at is None:
         raise ValueError("OUTBOX_EVENT_NOT_DEAD_LETTERED")
     now = datetime.now(timezone.utc)
+    if row.last_error == HELD_AFTER_RESTORE:
+        mail_log = mail_log_results(db, [row]).get(str(row.id))
+        if mail_log != NOT_DELIVERED:
+            db.add(
+                make_audit_event(
+                    tenant_id=row.tenant_id,
+                    actor_ref=actor_ref,
+                    action="OUTBOX_RETRY_REFUSED",
+                    entity_type="OutboxEvent",
+                    entity_id=row.id,
+                    details={
+                        "source": "OPERATOR_SCRIPT",
+                        "code": "HELD_AFTER_RESTORE",
+                        "count": 1,
+                        "event_name": row.event_name,
+                        "mail_log": mail_log or "NOT_CHECKED",
+                    },
+                    reason=reason,
+                    created_at=now,
+                )
+            )
+            db.commit()
+            raise ValueError("HELD_AFTER_RESTORE")
     db.add(
         make_audit_event(
             tenant_id=row.tenant_id,

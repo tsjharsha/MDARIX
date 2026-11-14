@@ -137,6 +137,17 @@ code).
   its own code (a row without a valid scope refuses the report); Part C time limits confirmed as written; production
   two-factor roles are the standard list. A held notification is never sent with the console "Retry": planned code
   control (cut-off fixes, 14 Nov 2026), the restore runbook until it is merged.
+- **Held notifications after a restore:** with the cut-off fixes merged, the console Retry refuses an event held after
+  a restore (409 `HELD_AFTER_RESTORE`) unless a NOT_DELIVERED mail-log check recorded after the hold exists
+  (`POST /platform-admin/console/dead-letters/mail-log-check`), and `scripts/replay_outbox.py` now applies the same
+  rule and audits its refusal (`OUTBOX_RETRY_REFUSED`). RSK-056, MDX-OPS-001 RR-05/RR-05a and the restore runbook
+  (section 2, step 6) describe the built control; the console button to record the check is still to build.
+- **Backup retention (owner decision O39):** the data retention schedule and `legal/README.md` say 30 daily + 12
+  monthly, as the backup runbook and `retention.sh` since 0.10.88 (they said 14 days on the server and up to 90 days
+  off-site), so erased data stays in backups up to about 13 months; MDX-SUP-001 OP-4 closed.
+- **REQ-CLK-001's different-days case traced:** scenario PL-59 on
+  `tests/test_legal_deadlines.py::test_the_earlier_day_of_the_two_time_zones_is_the_latest_day`, which now also checks
+  the deadline's moment; its OQ expected result is drafted from the requirement and not confirmed.
 - **Run 7 documents:** RSK-036, RSK-066 and RSK-011 "Acceptable after verification" after the control-gap fixes
   (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 "Acceptable after
   verification" with its fix and tests, deviation DEV-0.11.04-002 open until the owner accepts it; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA

@@ -126,12 +126,15 @@ files are stored locally, and `MANIFEST.sha256`. Database connections use the ap
    record and one customer summary PDF per organisation (that organisation's lines only). Exit 0 PASS, 1 FAIL, 2
    usage error, 3 PASS WITH FLAGS. **A FAIL stops the recovery**; every FLAG gets a written explanation in the recovery record.
    `--dry-run` lists the events it would hold and changes nothing.
-6. **Held notifications.** For each held event, check the mail provider's log. Replay only those it shows as not
-   sent: `python scripts/replay_outbox.py <event id> --reason "<provider log reference>: not sent"`. A missed daily
-   deadline list is sent again by the next day's run; do not replay it. Never use the console "Retry"
-   (Platform Admin > Operations > Queues & jobs) for a held notification: it would send it without the mail-log
-   check. Control: planned code control (cut-off fixes, 14 Nov 2026), which makes Retry refuse a notification held
-   after a restore; this runbook until it is merged.
+6. **Held notifications.** For each held event, check the mail provider's log and record what it showed, as a
+   Platform Administrator: `POST /platform-admin/console/dead-letters/mail-log-check` with the event ids, `result`
+   `NOT_DELIVERED` (or `DELIVERED`) and the provider log reference as `reason` (audited as `OUTBOX_MAIL_LOG_CHECKED`;
+   the console has no button for it yet, so make the call with the signed-in session). Then replay only those
+   recorded as not delivered, with the console "Retry" (Platform Admin > Operations > Queues & jobs) or
+   `python scripts/replay_outbox.py <event id> --reason "<provider log reference>: not sent"`. Both refuse an event
+   held after a restore with `HELD_AFTER_RESTORE` unless a NOT_DELIVERED check recorded after the hold exists, and
+   audit the refusal (`OUTBOX_RETRY_REFUSED`). A missed daily deadline list is sent again by the next day's run; do
+   not replay it.
 7. A restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`).
 8. **Sign in with MFA once per role** used by customers (Platform Administrator, customer administrator, reviewer,
    regulatory reviewer), on the drill copy only.

@@ -4,14 +4,14 @@
 |---|---|
 | Document ID | MDX-OPS-001 (template); each executed record is MDX-OPS-001-&lt;YYYYMMDD&gt; |
 | Title | Recovery record: restore drill or recovery of production |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT (template; no record executed yet) |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (executes the recovery and fills the record) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver (signs each executed record) |
 | Drafting | Drafted with software assistance; every line to be reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 14 Nov 2026 |
-| Code baseline | Branch `feat/b6b-part-d` from `6b01eda5`; `scripts/recovery_check.py`; runbook `docs/runbooks/BACKUP_AND_RESTORE.md` sections 2 to 5 |
+| Code baseline | Branch `feat/b6b-part-d` from `6b01eda5`; `scripts/recovery_check.py`; the Retry block in `backend/app/access/platform_console.py` and `scripts/replay_outbox.py` (branch `feat/b6b-validation-pack`, 14 Nov 2026); runbook `docs/runbooks/BACKUP_AND_RESTORE.md` sections 2 to 5 |
 
 Change history
 
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part D, D5 template). The first executed record waits for the next quarterly drill on a production backup copy, with the owner | Sriharsha Telikicherla |
 | 0.2 | 14 Nov 2026 | RR-05a: no console "Retry" of a held notification; planned code control (cut-off fixes, 14 Nov 2026), runbook until merged | Sriharsha Telikicherla |
+| 0.3 | 14 Nov 2026 | RR-05 and RR-05a: the Retry block is built server-side; a recorded NOT_DELIVERED mail-log check comes before any replay, by the console or by `scripts/replay_outbox.py` | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -35,11 +36,15 @@ REQ-BAK-001, REQ-BAK-003 and REQ-BAK-004 in a release pack, and the source of ea
 - RR-03: A FAIL in the recovery check shall stop the recovery; the record states the failure and the deviation
   raised (MDX-VAL-010).
 - RR-04: Every FLAG shall have a written explanation in section 4 before the system opens.
-- RR-05: A held notification shall be replayed only when the mail provider's log shows it as not sent; each replay
-  shall be listed in section 5 with its log reference.
-- RR-05a: A held notification shall never be sent again with the console "Retry" (Platform Admin > Operations >
-  Queues & jobs), which skips the mail-log check. Control: planned code control (cut-off fixes, 14 Nov 2026), which
-  makes Retry refuse a notification held after a restore; the runbook (section 2, step 6) until it is merged.
+- RR-05: A held notification shall be replayed only when the mail provider's log shows it as not sent, and that
+  check is recorded first (`POST /platform-admin/console/dead-letters/mail-log-check`, result NOT_DELIVERED, with the
+  log reference as the reason); each replay shall be listed in section 5 with its log reference.
+- RR-05a: A held notification shall never be sent again without that recorded check. Control (built server-side,
+  14 Nov 2026): the console "Retry" (Platform Admin > Operations > Queues & jobs) refuses an event held after a
+  restore with 409 `HELD_AFTER_RESTORE` unless a NOT_DELIVERED mail-log check recorded after the hold exists, and
+  `scripts/replay_outbox.py` refuses it the same way; the check, each refusal and each retry are audited
+  (`tests/test_platform_dead_letters.py`, `tests/test_replay_outbox_script.py`). Open: the console has no button to
+  record the check yet (frontend); record it with the API call above.
 - RR-06: The GxP workflow check shall run on a scratch copy of the same backup, never as test data in production
   (owner decision B6b-D15).
 - RR-07: A drill with a missing or wrong backup key shall be recorded as FAIL with a deviation, never as a pass

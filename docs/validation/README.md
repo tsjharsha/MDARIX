@@ -11,7 +11,7 @@
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
 | Date | 14 Nov 2026 |
-| Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+| Code baseline | Product code at `628c624a`, plus these changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10), and the merge of `feat/b6a-speed-reviews` (cut-off fixes, 14 Nov 2026: the server-side Retry block for events held after a restore); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
 
@@ -26,7 +26,7 @@ Change history
 | 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
 | 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1; MDX-CUS-005 0.2 with the O34 checklist item); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
 | 0.9 | 14 Nov 2026 | Owner decisions of 14 Nov 2026 ("Approved your recommendation") recorded as O35 to O38 (section 4); index versions of MDX-VAL-002 0.11, -010 0.4, -013 0.6, MDX-SUP-001 0.2, MDX-OPS-001 0.2 and -002 0.2 | Srinivas Telikicherla |
-| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); index version of MDX-SUP-001 0.3 | Srinivas Telikicherla |
+| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); scenario PL-59 traces REQ-CLK-001's different-days case (owner request of 14 Nov 2026); the Retry block built server-side (MDX-VAL-002 RSK-056, MDX-OPS-001 RR-05a); index versions of MDX-VAL-002 0.12, MDX-SUP-001 0.3 and MDX-OPS-001 0.3; code baseline names the merged cut-off fixes | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -159,7 +159,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 |---|---|---|---|---|
 | MDX-VAL-000 | Validation document control and index | this file | 0.10 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.8 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.11 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.12 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
 | MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.6 | DRAFT |
@@ -183,7 +183,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-SOP-003 | Incident response and complaints about MDARIX | [MDX-SOP-003_INCIDENT_RESPONSE.md](MDX-SOP-003_INCIDENT_RESPONSE.md) | 0.1 | DRAFT |
 | MDX-SOP-004 | Backup, recovery and business continuity | [MDX-SOP-004_BACKUP_AND_BUSINESS_CONTINUITY.md](MDX-SOP-004_BACKUP_AND_BUSINESS_CONTINUITY.md) | 0.1 | DRAFT |
 | MDX-SOP-005 | Access control | [MDX-SOP-005_ACCESS_CONTROL.md](MDX-SOP-005_ACCESS_CONTROL.md) | 0.1 | DRAFT |
-| MDX-OPS-001 | Recovery record (template) | [MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md](MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md) | 0.2 | DRAFT; first executed record at the next quarterly drill |
+| MDX-OPS-001 | Recovery record (template) | [MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md](MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md) | 0.3 | DRAFT; first executed record at the next quarterly drill |
 | MDX-OPS-002 | Monthly service health report | [MDX-OPS-002_MONTHLY_HEALTH_REPORT.md](MDX-OPS-002_MONTHLY_HEALTH_REPORT.md) | 0.2 | DRAFT |
 | MDX-OPS-003 | Operational registers | [MDX-OPS-003_OPERATIONAL_REGISTERS.md](MDX-OPS-003_OPERATIONAL_REGISTERS.md); [registers/](registers/) | 0.1 | DRAFT |
 | MDX-CUS-001 | Customer UAT/PQ template | [MDX-CUS-001_UAT_PQ_TEMPLATE.md](MDX-CUS-001_UAT_PQ_TEMPLATE.md); Word and Excel log in `customer-templates/` | 0.1 | DRAFT |
