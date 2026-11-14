@@ -209,6 +209,12 @@ class IntakeEvent(Base):
         ForeignKeyConstraint(
             ["tenant_id", "complaint_id"], ["complaints.tenant_id", "complaints.id"], name="fk_intake_events_complaint"
         ),
+        # DB-1 (tr24a).
+        ForeignKeyConstraint(
+            ["tenant_id", "lot_batch_id"],
+            ["lot_batches.tenant_id", "lot_batches.id"],
+            name="fk_intake_events_lot_batch_id_tenant",
+        ),
         CheckConstraint(_in("kind", INTAKE_KINDS), name="kind_known"),
         CheckConstraint(_in("status", CASE_STATES), name="status_known"),
         CheckConstraint("version >= 1", name="version_positive"),
@@ -224,6 +230,7 @@ class IntakeEvent(Base):
         Index("ix_intake_events_tenant_status", "tenant_id", "status"),
         Index("ix_intake_events_tenant_owner", "tenant_id", "owner_id"),
         Index("ix_intake_events_tenant_complaint", "tenant_id", "complaint_id"),
+        Index("ix_intake_events_tenant_lot_batch", "tenant_id", "lot_batch_id"),
         Index(
             "ix_intake_events_request_key",
             "tenant_id",

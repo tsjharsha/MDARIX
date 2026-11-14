@@ -1,4 +1,4 @@
-"""DB-1's migrations (tr21-tr24) go down to tr19casesescalation and back up to head, leaving the same schema.
+"""DB-1's migrations (tr21-tr24a) go down to tr19casesescalation and back up to head, leaving the same schema.
 
 Runs Alembic against the test database (``POSTGRES_DB``), so it takes a few seconds and must not run beside another
 test run on the same database.
@@ -61,3 +61,10 @@ def test_db1_migrations_go_down_and_up_again_to_the_same_schema():
     assert "fk_complaints_version_of_product" not in names
     assert "mdarix_plane_insert" not in names
     assert "fk_complaints_source_record_id_source_records" in names
+    # tr24a: the lot and product references, the case context's check and the lot index.
+    assert "fk_intake_events_lot_batch_id_tenant" not in names
+    assert "fk_decisions_product_id_tenant" not in names
+    assert "ck_case_contexts_version_needs_product" not in names
+    assert "ix_intake_events_tenant_lot_batch" not in names
+    after = " ".join(item for _, item in at_head)
+    assert "fk_intake_events_lot_batch_id_tenant" in after and "ix_intake_events_tenant_lot_batch" in after
