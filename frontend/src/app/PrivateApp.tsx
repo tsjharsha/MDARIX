@@ -37,7 +37,7 @@ const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
   "admin-customer-360": "Customers",
   "admin-manage": "Identity & Access:Customer administrators",
   "admin-create-customer": "New customer",
-  "platform-onboarding": "Identity & Access:Onboarding",
+  "platform-onboarding": "Trial organizations:Requests",
   // Former full-screen registries now open their section of the console.
   "admin-integration-registry": "Data & Integrations:Connector catalog",
   "admin-api-registry": "Operations:Developer API",

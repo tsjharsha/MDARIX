@@ -2,7 +2,8 @@
 
 import { describeError } from "../../../app/apiClient";
 
-export const SECTIONS = ["Customers", "Tenants", "Trials", "Feedback"] as const;
+// Free trials, their requests and feedback are on Trial organizations (TO-1); this area holds customers only.
+export const SECTIONS = ["Customers", "Tenants"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export type CustomerAdmin = {

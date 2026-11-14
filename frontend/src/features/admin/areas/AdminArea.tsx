@@ -27,14 +27,11 @@ export function AdminArea({
   domain,
   section,
   onSection,
-  websiteDemos = false,
 }: {
   domain: string;
   section: string;
   /** Opens another section of the same area (the step guide's Previous and Next). */
   onSection?: (section: string) => void;
-  /** Whether the website offers demo requests (app/featureSet.ts websiteDemoRequestsOffered): Onboarding lists them. */
-  websiteDemos?: boolean;
 }) {
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const notify = (text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone });
@@ -48,7 +45,7 @@ export function AdminArea({
         <Integrations section={section} />
       )
     ) : domain === "Identity & Access" ? (
-      <IdentityAccess section={section} websiteDemos={websiteDemos} />
+      <IdentityAccess section={section} />
     ) : domain === "AI Control Center" ? (
       <AiControlCenter section={section} />
     ) : domain === "Security" ? (

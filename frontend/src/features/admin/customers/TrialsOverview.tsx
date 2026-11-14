@@ -93,12 +93,18 @@ export function supportStateText(state: TrialSupportState | undefined): string |
 export function TrialsOverview({
   onOpenTenant,
   onOpenWorkspace,
+  initialState = "",
+  showExitRequests = true,
 }: {
   onOpenTenant: (tenantId: string) => void;
   onOpenWorkspace?: (tenantId: string) => void;
+  /** The state filter to open with (a count of the Trial organizations strip). */
+  initialState?: string;
+  /** Requests to end early are shown here unless they have a section of their own (Ending and deletion). */
+  showExitRequests?: boolean;
 }) {
   const [page, setPage] = useState(1);
-  const [state, setState] = useState("");
+  const [state, setState] = useState(initialState);
   const [query, setQuery] = useState("");
   const { sort, onSort } = useServerSort(() => setPage(1));
   const overview = useResource<TrialOverview>(trialsPath({ page, sort, state, q: query }));
@@ -121,6 +127,7 @@ export function TrialsOverview({
           setRequesting(supportDraft(trial, support.data?.me));
         }}
         onOpenWorkspace={onOpenWorkspace}
+        showExitRequests={showExitRequests}
         table={{
           page,
           onPage: setPage,
@@ -175,7 +182,9 @@ export function TrialsOverviewView({
   support = {},
   onRequestSupport,
   onOpenWorkspace,
+  showExitRequests = true,
 }: {
+  showExitRequests?: boolean;
   overview: Resource<TrialOverview>;
   onOpenTenant: (tenantId: string) => void;
   table: TrialTableControls;
@@ -233,7 +242,7 @@ export function TrialsOverviewView({
         <StatTile
           label="Booked a demo"
           value={summary ? (summary.demo_requested ?? 0) : null}
-          detail="From Getting started; contact them under Onboarding"
+          detail="From Getting started; contact them under Requests"
           tone={summary?.demo_requested ? "good" : undefined}
           icon={<CalendarCheck size={18} />}
         />
@@ -268,7 +277,7 @@ export function TrialsOverviewView({
           {!attention.length && <p className="ac-muted">No active trial.</p>}
         </Panel>
       </div>
-      <TrialExitRequests onChanged={overview.reload} />
+      {showExitRequests && <TrialExitRequests onChanged={overview.reload} />}
       <Panel eyebrow="Every trial" title="Trials holding data" source={overview}>
         <div className="cc-toolbar">
           <SearchBox value={table.query} onChange={table.onQuery} label="Search organization, tenant or owner email" />
@@ -435,7 +444,7 @@ export function TrialsOverviewView({
               label: " ",
               render: (row) => (
                 <button type="button" className="ac-link" onClick={() => onOpenTenant(row.tenant_id)}>
-                  Open tenant
+                  Open trial
                 </button>
               ),
             },

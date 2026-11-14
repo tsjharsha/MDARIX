@@ -12,12 +12,16 @@ import {
   DATA_INTEGRATION_STAGES,
   DOMAIN_ALIASES,
   LEGACY_SECTIONS,
+  TRIAL_ORGANIZATIONS,
   dataIntegrationStep,
+  movedTarget,
+  sectionMatches,
   sectionGuide,
 } from "./areas/sections";
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
+import { TrialOrganizations, type TrialSection } from "./trials/TrialOrganizations";
 import "./console/admin-console.css";
 
 type Props = {
@@ -39,8 +43,10 @@ type Area = (typeof ALL_AREAS)[number];
 /** Where a target opens among the areas this feature set offers (a parked area opens the dashboard). */
 function locationFor(target: OverviewTarget | string, SECTIONS: readonly Area[]): Location {
   // A string is a domain, or "Domain:Section" for a deep link.
-  const [requestedDomain, deepItem] =
+  const [askedDomain, askedItem] =
     typeof target === "string" ? (target.split(":", 2) as [string, string | undefined]) : [target.domain, target.item];
+  // Sections that moved to another area (free trials, their requests and feedback: Trial organizations).
+  const { domain: requestedDomain, item: deepItem } = movedTarget(askedDomain, askedItem);
   // Former area names (Data & Configuration, Integrations) open the area that replaced them.
   const domainName = DOMAIN_ALIASES[requestedDomain] ?? requestedDomain;
   const domain = SECTIONS.find((entry) => entry[0] === domainName);
@@ -81,7 +87,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
     return SECTIONS.flatMap((domain) =>
       (domain[3] as readonly string[]).map((item) => ({ domain: domain[0], description: domain[1], item })),
     )
-      .filter(({ domain, description, item }) => `${domain} ${description} ${item}`.toLowerCase().includes(term))
+      .filter(({ domain, description, item }) => sectionMatches(term, domain, description, item))
       .slice(0, 8);
   }, [query, SECTIONS]);
 
@@ -327,13 +333,19 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                         startCreating={createCustomer}
                         onCreatingStarted={creatingStarted}
                       />
+                    ) : location.domain === TRIAL_ORGANIZATIONS ? (
+                      <TrialOrganizations
+                        section={location.item as TrialSection}
+                        onSection={(item) => setLocation({ domain: TRIAL_ORGANIZATIONS, item })}
+                        websiteDemos={websiteDemos}
+                        onOpenCustomers={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })}
+                      />
                     ) : isAreaDomain(location.domain) ? (
                       <AdminArea
                         key={`${location.domain}:${location.item}`}
                         domain={location.domain}
                         section={location.item}
                         onSection={(item) => setLocation({ domain: location.domain, item })}
-                        websiteDemos={websiteDemos}
                       />
                     ) : null}
                   </SectionErrorBoundary>

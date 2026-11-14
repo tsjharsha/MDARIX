@@ -9,11 +9,13 @@ export const DATA_SECTIONS = [
   "Customer configuration",
 ] as const;
 export const PLANS_SECTIONS = ["Plans", "Subscriptions", "Renewals", "Reminders"] as const;
+/** Trial organizations: every free-trial link in one place, and only those (TO-1). */
+export const TRIAL_ORGANIZATIONS = "Trial organizations";
+export const TRIAL_SECTIONS = ["Requests", "Trials", "Ending and deletion", "Feedback"] as const;
 export const IDENTITY_SECTIONS = [
   "Platform users",
   "Customer administrators",
   "Customer users",
-  "Onboarding",
   "Roles & permissions",
   "Effective access",
 ] as const;
@@ -92,7 +94,12 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
   "Customers & Tenants": {
     Customers: "Every customer organization and its status. Open one to see its tenants and administrators.",
     Tenants: "Each customer's separate workspaces: their plan, administrators, sign-in, AI use and data.",
-    Trials: "Every free trial: days left, usage, how far into the story it went and the chapter it should try next.",
+  },
+  [TRIAL_ORGANIZATIONS]: {
+    Requests:
+      "Free-trial requests to approve or decline, and the pilot and one-to-one demo requests made from free trials.",
+    Trials: "Every free trial: days left, usage and progress. Open one to extend, end, convert or delete its data.",
+    "Ending and deletion": "Requests to end a trial early, trials due for deletion, and the deletion run.",
     Feedback: "What trial users told us about MDARIX, and the quotes that may appear on the website.",
   },
   "Plans & Licensing": {
@@ -105,7 +112,6 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
     "Platform users": "MDARIX staff who administer the platform.",
     "Customer administrators": "The people who manage each customer's own users.",
     "Customer users": "Everyone else with an account in a customer's tenant (read-only here).",
-    Onboarding: "Free-trial requests, and the pilot and one-to-one demo requests made from free trials.",
     "Roles & permissions": "What each role is allowed to do.",
     "Effective access": "Everything one person can do, and why.",
   },
@@ -132,15 +138,43 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
   },
 };
 
-/** Onboarding's purpose while the website offers demo requests (app/featureSet.ts websiteDemoRequestsOffered). */
-const ONBOARDING_WITH_WEBSITE_DEMOS = "Demo and trial requests from prospective customers.";
+/** Requests' purpose while the website offers demo requests (app/featureSet.ts websiteDemoRequestsOffered). */
+const REQUESTS_WITH_WEBSITE_DEMOS = "Demo and trial requests from prospective customers.";
 
-/** The one-line purpose of a section, or "" when the area explains itself another way. Onboarding names the website's
+/** The one-line purpose of a section, or "" when the area explains itself another way. Requests names the website's
  * demo requests only while the website offers them (`websiteDemos`). */
 export const sectionGuide = (area: string, section: string, websiteDemos = false) =>
-  websiteDemos && area === "Identity & Access" && section === "Onboarding"
-    ? ONBOARDING_WITH_WEBSITE_DEMOS
+  websiteDemos && area === TRIAL_ORGANIZATIONS && section === "Requests"
+    ? REQUESTS_WITH_WEBSITE_DEMOS
     : (SECTION_GUIDE[area]?.[section] ?? "");
+
+/** Words the header search also finds a section by (what can be done there, not only its name). */
+export const SECTION_KEYWORDS: Record<string, string> = {
+  [`${TRIAL_ORGANIZATIONS}:Trials`]: "trial extend convert end early support access pilot",
+  [`${TRIAL_ORGANIZATIONS}:Requests`]: "trial approve decline onboarding demo",
+  [`${TRIAL_ORGANIZATIONS}:Ending and deletion`]: "trial end early delete purge retention",
+};
+
+/**
+ * Sections that moved to another area: "Area:Section" (or a bare section name) and where it opens now. Old links and
+ * bookmarks keep working.
+ */
+export const MOVED_SECTIONS: Record<string, { domain: string; item: string }> = {
+  "Customers & Tenants:Trials": { domain: TRIAL_ORGANIZATIONS, item: "Trials" },
+  "Customers & Tenants:Feedback": { domain: TRIAL_ORGANIZATIONS, item: "Feedback" },
+  "Identity & Access:Onboarding": { domain: TRIAL_ORGANIZATIONS, item: "Requests" },
+  Trials: { domain: TRIAL_ORGANIZATIONS, item: "Trials" },
+  Feedback: { domain: TRIAL_ORGANIZATIONS, item: "Feedback" },
+  Onboarding: { domain: TRIAL_ORGANIZATIONS, item: "Requests" },
+};
+
+/** Where an "Area:Section" (or a bare section name) opens now, following MOVED_SECTIONS; else unchanged. */
+export const movedTarget = (domain: string, item?: string): { domain: string; item?: string } =>
+  MOVED_SECTIONS[item ? `${domain}:${item}` : domain] ?? { domain, item };
+
+/** Whether the header search `term` (lower case) finds this section: its area, purpose, name or keywords. */
+export const sectionMatches = (term: string, domain: string, description: string, item: string) =>
+  `${domain} ${description} ${item} ${SECTION_KEYWORDS[`${domain}:${item}`] ?? ""}`.toLowerCase().includes(term);
 
 /** Area name -> its sections, for the areas this folder renders. */
 export const AREA_SECTIONS: Record<string, readonly string[]> = {

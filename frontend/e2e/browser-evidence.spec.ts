@@ -103,12 +103,11 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("navigation", { name: "Administrator navigation" });
-    // Customers & Tenants has its own sections, each with a clear heading (accounts and onboarding requests are
-    // under Identity & Access).
+    // Customers & Tenants has its own sections, each with a clear heading (accounts are under Identity & Access,
+    // free trials and their requests under Trial organizations).
     const customerSections: Record<string, string> = {
       Customers: "Customer directory",
       Tenants: "Tenant directory",
-      Feedback: "Trial feedback and website quotes",
     };
     await openAdminNavigation(page);
     await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
@@ -121,6 +120,12 @@ test.describe("MDARIX browser evidence", () => {
     }
     // Plans & Licensing … Operations: each section has its own page; checked by its main heading.
     const areas: Record<string, Record<string, string>> = {
+      "Trial organizations": {
+        Requests: "Trial requests",
+        Trials: "Free trials and how far into the story they went",
+        "Ending and deletion": "How trials end",
+        Feedback: "Trial feedback and website quotes",
+      },
       "Plans & Licensing": {
         Plans: "Plans",
         Subscriptions: "Subscriptions",
@@ -131,7 +136,6 @@ test.describe("MDARIX browser evidence", () => {
         "Platform users": "Platform users",
         "Customer administrators": "Customer administrators",
         "Customer users": "Customer users",
-        Onboarding: "Demo and trial requests",
         "Roles & permissions": "Roles",
         "Effective access": "Effective access",
       },

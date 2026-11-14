@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Database,
   FileClock,
+  Hourglass,
   KeyRound,
   Mail,
   Plug,
@@ -53,7 +54,25 @@ type DashboardTrends = {
   tenants_by_plan: Array<{ label: string; count: number }>;
   tenants_by_region: Array<{ label: string; count: number }>;
   licences_ending: Array<{ month: string; count: number }>;
+  /** Free trials, counted apart from the customer figures (Trial organizations). */
+  trials?: TrialFigures;
 };
+
+/** The dashboard's Free trials figures (backend/app/trial/admin_actions.py summary). */
+export type TrialFigures = {
+  waiting_for_review: number;
+  active: number;
+  ending_soon: number;
+  ended_data_kept?: number;
+  exit_requests_waiting?: number;
+  converted_this_month: number;
+};
+
+/** The Free trials tile's line under the number: what needs a person, in plain words. */
+export const trialTileDetail = (trials: TrialFigures | null | undefined) =>
+  trials
+    ? `${trials.ending_soon} ending within 7 days · ${trials.waiting_for_review} waiting for review · ${trials.converted_this_month} converted this month`
+    : "Free trials, shown apart from customers";
 
 const slices = (
   rows: Array<{ label: string; count: number }> | undefined,
@@ -203,7 +222,9 @@ export function AdminOverview({
     const ai = toPoints(trends?.ai_runs, "completed", "failed", true);
     const runs = toPoints(trends?.integration_runs, "completed", "failed", true, ["warnings"]);
     const events = toPoints(trends?.audit_events, "events", "refused");
-    const tenants = toPoints(trends?.new_tenants, "tenants");
+    // New organizations per day: customers, and free trials as their own series (never inside the customer figures).
+    const tenants = toPoints(trends?.new_tenants, "customers");
+    const trialStarts = toPoints(trends?.new_tenants, "trials");
     const sum = (points: TrendPoint[], key: "primary" | "secondary") =>
       points.reduce((total, point) => total + (point[key] ?? 0), 0);
     return {
@@ -216,6 +237,7 @@ export function AdminOverview({
       runs,
       events,
       tenants,
+      trialStarts,
       aiTotal: sum(ai, "primary"),
       aiFailed: sum(ai, "secondary"),
       runTotal: sum(runs, "primary"),
@@ -397,6 +419,16 @@ export function AdminOverview({
           onOpen={() => onOpen({ domain: "Customers & Tenants", item: "Customers" })}
         />
         <KpiTile
+          label="Free trials"
+          value={trendsReady && trends?.trials ? trends.trials.active : null}
+          detail={trialTileDetail(trends?.trials)}
+          tone={trendsReady && trends?.trials?.ending_soon ? "warning" : undefined}
+          icon={<Hourglass size={18} />}
+          series={model.trialStarts.map((point) => point.primary)}
+          seriesLabel={`New free trials per day, last ${days} days`}
+          onOpen={() => onOpen({ domain: "Trial organizations", item: "Trials" })}
+        />
+        <KpiTile
           label="Seats in use"
           value={sources.customers.state === "ready" ? model.seats : null}
           detail="Tenant memberships"
@@ -502,7 +534,7 @@ export function AdminOverview({
                 points: model.tenants,
                 primaryLabel: "new tenants",
                 unit: "new tenants",
-                explain: "Tenants created each day.",
+                explain: "Customer tenants created each day. Free trials are counted apart, on the Free trials tile.",
               },
             ]}
           />
