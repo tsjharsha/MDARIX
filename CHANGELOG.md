@@ -476,6 +476,13 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
 - The Cases update moves a service-only Case agreed in QA review but with no resolution summary to QA review
   (`IN_REVIEW`) instead of leaving it at "To check": it is never closed without its summary (S-2, owner, 14 Nov 2026).
   The move is listed, audited and made once.
+- The nine sample triage records the sample author finishes carry a severity (T-M13, owner, 14 Nov 2026): SAMPLE-RV-01
+  and RV-06 Critical; RV-02, RV-08 and CALL-03 Not known yet; RV-07 Negligible; RV-10, RT-05 and RJ-02 Serious (RT-05
+  agrees with SAMPLE-CALL-02, the same occurrence). A new trial has them from the start; the Cases update
+  (`scripts/cases_0_10_93.py --apply`) gives an existing trial the same values, one listed line per record, only
+  where no severity is set, each with a new triage version and an audit event, and a second run changes nothing. A
+  market assessment's harm level still starts from the same level (the quality system's severity, else the triage
+  record); "Not known yet" pre-fills nothing.
 - Subscription and trial reminders, reported problems, export requests and the simulator's provider records now name
   their organization in the event, so the worker's check against another organization's content covers them too
   (RSK-026).
@@ -502,6 +509,16 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   organization may be empty). Complaints, risks, requirements, signals, intake events, decisions, investigation
   briefs, assurance results and AI interactions may only carry a version of their own product, and never a version
   without a product: the master-data rule VERSION_BELONGS_TO_PRODUCT now has its enforcer.
+  Release note (owner decision 5, 14 Nov 2026): `tr23` replaces 40 single-column foreign keys with the composite
+  ones and drops the 40 it replaces; no column changes, and the 0.10.94 images still run on the new schema
+  (rollback).
+- Migration `tr24aproductreferences` (owner decisions 1 and 2, 14 Nov 2026), after `tr24tenantindexes`: a Case's
+  lot (`intake_events.lot_batch_id`) and the product of decisions, investigation briefs, assurance results and AI
+  interactions become composite references, so each must be a lot or product of the record's own organization; a
+  person's case context may no longer hold a version without its product. Its pre-check counts the rows that would
+  break a rule and stops the upgrade with the counts before anything changes (`scripts/check_tenant_references.py`
+  prints them too); the Case's lot index is built concurrently. The case context gets the check only, not the
+  reference to the version: it is kept in the control database, a dedicated tenant's products in its own plane.
 
 - Migration `tr24tenantindexes` (DB-05): 68 indexes, built with `CREATE INDEX CONCURRENTLY` so writes continue:
   one for each organization reference of `tr23` and for the most-used references that had none, and one starting
@@ -517,6 +534,14 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   plane serves again as soon as it is back.
 - Connection pools (DB-04): one control pool when the runtime login is the owner's, and a data-plane engine pushed
   out of the cache (`MDARIX_DATA_PLANE_ENGINE_CACHE`, 32) closes its connections at once.
+- Background jobs get 5 minutes per statement (owner decision 4): the scheduler and the outbox worker set
+  `statement_timeout` and `idle_in_transaction_session_timeout` on each of their connections to
+  `MDARIX_DB_JOB_STATEMENT_TIMEOUT` (300 s) and wait on the socket `MDARIX_DB_JOB_SOCKET_TIMEOUT_SECONDS` (330 s). The
+  API keeps 60 s.
+- Legacy dedicated databases (owner decision 6): `scripts/add_workflow_tables_to_legacy_planes.py` (a dry run unless
+  `--apply`) now also brings them `tr21`, `tr22` + `tr23`, `tr24` and `tr24a`, in one transaction per database; a
+  pre-check that finds rows breaking a rule refuses that database with the counts and changes nothing there. Run it
+  before any dedicated customer goes live.
 
 - A date never chooses a product version (owner, 12 Nov 2026): Product 360 and its timeline read "as of" a date
   without a version no longer pick the latest version released before that date, because a unit built earlier keeps
