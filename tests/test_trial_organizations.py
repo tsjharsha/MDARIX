@@ -588,3 +588,142 @@ def test_a_date_without_a_time_zone_is_read_as_utc_not_a_server_error():
     bad = _convert(admin, tenant_id, starts_at="2026-12-01T00:00:00")
     assert bad.status_code == 422 and _code(bad) == "INVALID_DATE"
     assert _events(tenant_id, "TRIAL_ACTION_REFUSED")[-1].details["code"] == "INVALID_DATE"
+
+
+# --------------------------------------------------------------------------------------------- run 2: grace period
+
+
+def _give_grace(tenant_id, *, ended_days_ago: float, grace_days_left: float) -> None:
+    """The trial ended, then Plans & Licensing gave it a grace period that is still running."""
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_system(db, "test: a grace period")
+        row = db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.tenant_id == tenant_id).one()
+        row.created_at = row.starts_at = now - timedelta(days=30 + ended_days_ago)
+        row.expires_at = now - timedelta(days=ended_days_ago)
+        row.grace_ends_at = now + timedelta(days=grace_days_left)
+        db.commit()
+
+
+def test_a_trial_in_its_grace_period_shows_as_running_and_can_be_ended_early():
+    from backend.app.trial import admin_actions
+
+    admin = authenticated_client()
+    owner, tenant_id, _, email = _trial()
+    with SessionLocal() as db:
+        before = admin_actions.summary(db)
+    _give_grace(tenant_id, ended_days_ago=2, grace_days_left=5)
+    # Its users can still sign in, so the page shows it running, counting the days to the grace end.
+    assert owner.get("/api/v1/trial/status").status_code == 200
+    detail = admin.get(f"{BASE}/{tenant_id}").json()
+    assert detail["state"] == "ENDING_SOON" and detail["dates"]["days_left"] == 5
+    assert detail["dates"]["in_grace"] is True and detail["dates"]["grace_ends_at"]
+    assert detail["dates"]["deletion"] is None
+    assert detail["actions"]["end"]["allowed"], detail["actions"]["end"]
+    row = next(item for item in admin.get(BASE, params={"q": email}).json()["items"])
+    assert row["tenant_id"] == str(tenant_id) and row["state"] == "ENDING_SOON" and row["in_grace"] is True
+    with SessionLocal() as db:
+        after = admin_actions.summary(db)
+    assert after["active"] == before["active"] and after["ending_soon"] == before["ending_soon"] + 1
+    assert after["ended_data_kept"] == before["ended_data_kept"]
+    # An extension counts from the grace end, never shortening the users' time.
+    grace_end = _subscription(tenant_id).grace_ends_at
+    extended = admin.post(f"{BASE}/{tenant_id}/extend", json={"days": 3, "reason": REASON})
+    assert extended.status_code == 200, extended.text
+    assert extended.json()["reopened"] is False
+    assert _subscription(tenant_id).expires_at == grace_end + timedelta(days=3)
+    # End early is no longer refused as "already ended".
+    _give_grace(tenant_id, ended_days_ago=2, grace_days_left=5)
+    ended = admin.post(f"{BASE}/{tenant_id}/end", json={"reason": "Evaluation finished, agreed by phone"})
+    assert ended.status_code == 200, ended.text
+    finished = admin.get(f"{BASE}/{tenant_id}").json()
+    assert finished["state"] == "ENDED_EARLY" and finished["dates"]["in_grace"] is False
+    assert owner.get("/api/v1/trial/status").status_code == 403
+
+
+# --------------------------------------------------------------------------------- run 2: the list at scale
+
+
+@pytest.fixture
+def scaled(monkeypatch):
+    """``(session, now)``: a rolled-back session in which the scale-test plan stands for the Free Trial plan, so the
+    other trials in the test database do not count."""
+    from backend.app.trial import admin_actions, service
+    from tests.trial_scale_seed import SCALE_PLAN, scale_session, utc_now
+
+    for module in (service, scope, admin_actions):
+        monkeypatch.setattr(module, "FREE_TRIAL_PLAN", SCALE_PLAN)
+    with scale_session() as session:
+        yield session, utc_now()
+
+
+def _end_early(session, tenant_ids, now) -> None:
+    for tenant_id in tenant_ids:
+        session.add(
+            TrialExitRequest(
+                id=uuid.uuid4(),
+                trial_tenant_id=tenant_id,
+                organization="Scale trial",
+                reason_code="ENDED_BY_MDARIX",
+                reason="Ended for the paging test",
+                delete_data=False,
+                status="APPROVED",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    session.flush()
+
+
+def test_the_ended_early_filter_pages_and_sorts_on_the_server(scaled):
+    from backend.app.trial import admin_actions
+    from tests.trial_scale_seed import seed_trials
+
+    session, now = scaled
+    tenant_ids = seed_trials(session, 45, "EARLY", now)
+    ended = tenant_ids[::5]  # trial n ends three days ago when n % 5 == 0: 9 trials
+    _end_early(session, ended[:7], now)
+    _end_early(session, tenant_ids[1:2], now)  # still running (an approved request on a running trial)
+    pages = [
+        admin_actions.trial_list(session, state="ENDED_EARLY", page=number, page_size=3, sort="name", order="desc")
+        for number in (1, 2, 3)
+    ]
+    assert [len(page["items"]) for page in pages] == [3, 3, 1]
+    assert {(page["total"], page["pages"], page["page_size"]) for page in pages} == {(7, 3, 3)}
+    names = [item["name"] for page in pages for item in page["items"]]
+    assert names == sorted(names, reverse=True) and len(set(names)) == 7
+    assert {item["tenant_id"] for page in pages for item in page["items"]} == {str(t) for t in ended[:7]}
+    assert {item["state"] for page in pages for item in page["items"]} == {"ENDED_EARLY"}
+    # A page past the end shows the last one; a search narrows within the ended-early trials.
+    assert admin_actions.trial_list(session, state="ENDED_EARLY", page=9, page_size=3)["page"] == 3
+    one = admin_actions.trial_list(session, state="ENDED_EARLY", q=names[0])
+    assert [item["name"] for item in one["items"]] == [names[0]] and one["total"] == 1
+
+
+def _list_statements(session, now, **filters) -> int:
+    from backend.app.trial import admin_actions
+    from tests.trial_scale_seed import QueryCounter
+
+    with QueryCounter() as counter:
+        admin_actions.trial_list(session, now=now, **filters)
+    return counter.count
+
+
+def test_the_trial_list_reads_5_or_45_trials_in_the_same_statements(scaled):
+    """Guards against reading trial by trial: the list (and its ended-early filter) sends the same statements for 5
+    trials as for 45."""
+    from backend.app.db.models.foundation import PlanDefinition
+    from tests.trial_scale_seed import SCALE_PLAN, seed_trials
+
+    session, now = scaled
+    few_ids = seed_trials(session, 5, "FEW", now)
+    _end_early(session, few_ids[:1], now)
+    few = _list_statements(session, now)
+    few_early = _list_statements(session, now, state="ENDED_EARLY")
+    plan = session.query(PlanDefinition).filter(PlanDefinition.code == SCALE_PLAN).one()
+    many_ids = seed_trials(session, 40, "MANY", now, plan=plan)
+    _end_early(session, many_ids[::5], now)
+    many = _list_statements(session, now)
+    many_early = _list_statements(session, now, state="ENDED_EARLY")
+    assert many == few, f"{few} statements for 5 trials, {many} for 45: something is read trial by trial"
+    assert many_early == few_early, f"ended early: {few_early} statements for 5 trials, {many_early} for 45"

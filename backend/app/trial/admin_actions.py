@@ -84,6 +84,16 @@ def extension_left(subscription: SubscriptionLifecycle) -> int:
     return max(0, math.floor((latest_end(subscription) - subscription.expires_at).total_seconds() / 86400))
 
 
+def running_until(subscription: SubscriptionLifecycle) -> datetime:
+    """When the trial's users can no longer sign in: its end, or the end of a grace period given on Plans & Licensing
+    (backend/app/trial/service.py treats a trial in its grace period as running)."""
+    return max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
+
+
+def in_grace(subscription: SubscriptionLifecycle, now: datetime) -> bool:
+    return subscription.expires_at <= now < running_until(subscription)
+
+
 def check_trial_end(subscription: SubscriptionLifecycle, starts_at: datetime, expires_at: datetime, grace) -> None:
     """The cap every route that changes a trial's subscription applies (the trial page and Plans & Licensing ›
     Subscriptions): the start never moves, and neither the end nor a grace end goes past original end + 30 days.
@@ -207,6 +217,11 @@ def summary(db: Session, now: datetime | None = None) -> dict:
     """The header strip and the dashboard's Free trials tile, one statement per figure."""
     now = now or datetime.now(timezone.utc)
     trials = scope.trial_tenant_ids()
+    # A trial in a grace period is still running (``running_until``).
+    ends = func.greatest(
+        SubscriptionLifecycle.expires_at,
+        func.coalesce(SubscriptionLifecycle.grace_ends_at, SubscriptionLifecycle.expires_at),
+    )
     live = (
         db.query(SubscriptionLifecycle.tenant_id)
         .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
@@ -217,16 +232,9 @@ def summary(db: Session, now: datetime | None = None) -> dict:
             Tenant.status.notin_(GONE_STATUSES),
         )
     )
-    active = live.filter(SubscriptionLifecycle.expires_at > now).distinct().count()
-    ending = (
-        live.filter(
-            SubscriptionLifecycle.expires_at > now,
-            SubscriptionLifecycle.expires_at <= now + timedelta(days=ENDING_SOON_DAYS),
-        )
-        .distinct()
-        .count()
-    )
-    ended_kept = live.filter(SubscriptionLifecycle.expires_at <= now).distinct().count()
+    active = live.filter(ends > now).distinct().count()
+    ending = live.filter(ends > now, ends <= now + timedelta(days=ENDING_SOON_DAYS)).distinct().count()
+    ended_kept = live.filter(ends <= now).distinct().count()
     waiting = db.query(func.count(OnboardingRequest.id)).filter(OnboardingRequest.status == "PENDING_REVIEW").scalar()
     exits = (
         db.query(func.count(TrialExitRequest.id)).filter(TrialExitRequest.status == early_exit.PENDING).scalar() or 0
@@ -259,11 +267,12 @@ def state_of(tenant: Tenant, subscription, requests, converted: bool, now: datet
         return "CONVERTED"
     if str(tenant.status or "").upper() in GONE_STATUSES:
         return "DATA_DELETED"
-    if _ended_early(requests) is not None and subscription.expires_at <= now:
+    end = running_until(subscription)
+    if _ended_early(requests) is not None and end <= now:
         return "ENDED_EARLY"
-    if subscription.expires_at <= now:
+    if end <= now:
         return "ENDED"
-    if subscription.expires_at - now <= timedelta(days=ENDING_SOON_DAYS):
+    if end - now <= timedelta(days=ENDING_SOON_DAYS):
         return "ENDING_SOON"
     return "ACTIVE"
 
@@ -307,19 +316,23 @@ def trial_list(db: Session, *, page=1, page_size=50, sort="", order="", state=""
     wanted = (state or "").strip().upper()
     if wanted in ("DATA_DELETED", "CONVERTED"):
         return _former_trials(db, wanted, page=page, page_size=page_size, q=q)
-    overview_state = "ENDED" if wanted == "ENDED_EARLY" else wanted
+    within = None
     if wanted == "ENDED_EARLY":
-        early_ids = {
+        # The ended trials with an approved exit request, narrowed before the overview sorts and pages them.
+        within = {
             row.trial_tenant_id for row in db.query(TrialExitRequest.trial_tenant_id).filter_by(status="APPROVED")
         }
-        result = story.trial_overview(db, now, page=1, page_size=story.OVERVIEW_PAGE_SIZE_MAX, state="ENDED", q=q)
-        items = [item for item in result["items"] if uuid.UUID(item["tenant_id"]) in early_ids]
-        size = min(story.OVERVIEW_PAGE_SIZE_MAX, max(1, int(page_size)))
-        result.update(items=items[:size], total=len(items), page=1, pages=1)
-    else:
-        result = story.trial_overview(
-            db, now, page=page, page_size=page_size, sort=sort, order=order, state=overview_state, q=q
-        )
+    result = story.trial_overview(
+        db,
+        now,
+        page=page,
+        page_size=page_size,
+        sort=sort,
+        order=order,
+        state="ENDED" if wanted == "ENDED_EARLY" else wanted,
+        q=q,
+        within=within,
+    )
     _decorate(db, result["items"], now)
     result["counts"] = summary(db, now)
     return result
@@ -464,13 +477,17 @@ def detail(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> di
         sample, own, uploaded = ({}, {}, 0) if gone else _data_counts(data, tenant_id)
     reached = story._reached(counts, story.remembered(request.profile if request else None), moment)
     deletion = None
-    if not converted and not gone and subscription.expires_at <= now:
+    if not converted and not gone and running_until(subscription) <= now:
         deletion = retention.plan_view(retention.projection(db, db, subscription, now))
+    graced = subscription is not None and running_until(subscription) > subscription.expires_at
     dates = {
         "starts_at": subscription.starts_at.isoformat() if subscription and subscription.starts_at else None,
         "ends_at": subscription.expires_at.isoformat() if subscription else None,
         "ends_words": long_moment(subscription.expires_at) if subscription else None,
-        "days_left": _days((subscription.expires_at - now).total_seconds()) if subscription else 0,
+        "days_left": _days((running_until(subscription) - now).total_seconds()) if subscription else 0,
+        "grace_ends_at": subscription.grace_ends_at.isoformat() if graced else None,
+        "grace_ends_words": long_moment(subscription.grace_ends_at) if graced else None,
+        "in_grace": not converted and subscription is not None and in_grace(subscription, now),
     }
     if not converted and subscription is not None:
         dates.update(
@@ -555,7 +572,7 @@ def actions_allowed(db: Session, tenant, subscription, requests, state: str, now
     elif extension_left(subscription) < 1:
         extend = f"All {EXTENSION_DAYS_MAX} extension days have been used"
     end = None
-    if subscription.expires_at <= now:
+    if running_until(subscription) <= now:
         end = "The trial has already ended"
     convert = "The trial owner asked to end the trial: decide on that request first" if pending is not None else None
     from backend.app.trial import retention
@@ -594,13 +611,14 @@ def extend(db: Session, tenant_id: uuid.UUID, admin: AuthUser, *, days: int, rea
     if _ended_early(requests) is not None and subscription.expires_at <= now:
         raise TrialRefused(409, "TRIAL_ENDED_EARLY", "A trial ended early cannot be extended")
     old_end = subscription.expires_at
-    new_end = old_end + timedelta(days=int(days))
+    # In a grace period the days count from the grace end, so an extension never shortens the users' time.
+    new_end = (running_until(subscription) if in_grace(subscription, now) else old_end) + timedelta(days=int(days))
     check_trial_end(subscription, subscription.starts_at, new_end, None)
     if new_end <= now:
         raise TrialRefused(
             409, "TRIAL_EXTENSION_TOO_SHORT", "The new end would still be in the past: extend by more days"
         )
-    reopened = subscription.expires_at <= now
+    reopened = running_until(subscription) <= now
     subscription.expires_at = new_end
     subscription.grace_ends_at = None
     subscription.status = "ACTIVE"
@@ -647,7 +665,7 @@ def end_early(db: Session, tenant_id: uuid.UUID, admin: AuthUser, *, reason: str
             "The trial owner has already asked to end the trial: approve or decline that request",
             request_id=str(pending.id),
         )
-    if subscription.expires_at <= now:
+    if running_until(subscription) <= now:
         raise TrialRefused(409, "TRIAL_ALREADY_ENDED", "The trial has already ended")
     row = TrialExitRequest(
         id=uuid.uuid4(),
