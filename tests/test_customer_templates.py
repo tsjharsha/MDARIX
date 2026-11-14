@@ -95,11 +95,18 @@ def test_the_uat_log_reads_back_with_every_case_and_empty_execution_columns():
 def test_the_same_sources_give_byte_identical_files_dated_from_the_header():
     first, second = customer_templates.build(), customer_templates.build()
     assert first == second
-    assert set(first) == {
-        *(f"{name.split('_')[0]}_v0.1.docx" for name in customer_templates.SOURCES),
-        "MDX-CUS-001_v0.1_uat-pq-log.xlsx",
+    versions = {
+        name.split("_")[0]: customer_templates.header(_source(name))["Version"] for name in customer_templates.SOURCES
     }
-    core = zipfile.ZipFile(io.BytesIO(first["MDX-CUS-006_v0.1.docx"])).read("docProps/core.xml").decode()
+    assert set(first) == {
+        *(f"{doc_id}_v{version}.docx" for doc_id, version in versions.items()),
+        f"MDX-CUS-001_v{versions['MDX-CUS-001']}_uat-pq-log.xlsx",
+    }
+    core = (
+        zipfile.ZipFile(io.BytesIO(first[f"MDX-CUS-006_v{versions['MDX-CUS-006']}.docx"]))
+        .read("docProps/core.xml")
+        .decode()
+    )
     assert "2026-11-14" in core
 
 
