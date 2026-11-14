@@ -261,9 +261,24 @@ def _acknowledgement_details(switching_on: bool) -> dict:
     return {"acknowledgement": True, "provider_name": _provider_name() or "none configured", "masking": pii.enabled()}
 
 
+def _settings_admin(request: Request, db: Session):
+    """A customer administrator, or in a free trial (which has no customer administrator) the person who started it
+    (decision T5: the trial's own administrator switches trial AI on)."""
+    from backend.app.access.authz import _authenticated_user
+    from backend.app.trial.team import is_trial_owner
+
+    try:
+        return _admin_tenant(request, db)
+    except HTTPException as refused:
+        user = _authenticated_user(request, db)
+        if governance.is_free_trial(db, user.tenant_id) and is_trial_owner(db, user.tenant_id, user):
+            return user
+        raise refused
+
+
 @router.get("/admin/ai-settings")
 def get_customer_ai_settings(request: Request, db: Session = Depends(get_db)):
-    admin = _admin_tenant(request, db)
+    admin = _settings_admin(request, db)
     return _settings(db, admin.tenant_id)
 
 
@@ -274,7 +289,7 @@ def update_customer_ai_settings(
     db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    admin = _admin_tenant(request, db)
+    admin = _settings_admin(request, db)
     tenant = db.get(Tenant, admin.tenant_id)
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
