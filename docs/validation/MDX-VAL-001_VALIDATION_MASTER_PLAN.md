@@ -331,7 +331,7 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 | MDX-SOP-001 to -005 | SDLC, change control, incident response, backup and business continuity, access control | Before the first paid pilot | C |
 | MDX-OPS-001 | Recovery record | At each quarterly restore drill | D |
 | MDX-OPS-002 | Health report per organisation | Monthly from one month after go-live | D |
-| MDX-CUS-001 to -006 | Customer templates (0.1 DRAFT, 14 Nov 2026; Word and Excel copies in customer-templates/, scripts/customer_templates.py) | Before the first paid pilot | E |
+| MDX-CUS-001 to -006 | Customer templates (DRAFT, 14 Nov 2026: 0.1, MDX-CUS-005 0.2; Word and Excel copies in customer-templates/, scripts/customer_templates.py) | Before the first paid pilot | E |
 
 ## 12. Acceptance criteria for a release
 

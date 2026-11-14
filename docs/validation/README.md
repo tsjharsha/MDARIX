@@ -24,7 +24,7 @@ Change history
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight") recorded as O17 to O24; section 4 marked to be signed by the owner before the big-bang deploy, with its PDF for signature; section 3.3 indexes the approved specs copied into `docs/specs/`; OQ expected results and the OQ protocol and results IDs (MDX-VAL-007-P, -007-R) in the index | Srinivas Telikicherla |
 | 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations") recorded as O25 to O31; section 4 co-signed by the system owner (O30); section 3.3 adds the B6b spec, the B3 plan and the W1 spec and the approval records (O29); index versions | Srinivas Telikicherla |
 | 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
-| 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
+| 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1; MDX-CUS-005 0.2 with the O34 checklist item); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -188,7 +188,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-CUS-002 | Data migration plan template | [MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md](MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
 | MDX-CUS-003 | Data migration report template | [MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md](MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
 | MDX-CUS-004 | Periodic review report template | [MDX-CUS-004_PERIODIC_REVIEW_TEMPLATE.md](MDX-CUS-004_PERIODIC_REVIEW_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
-| MDX-CUS-005 | Go-live checklist and support plan | [MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md](MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md); Word in `customer-templates/` | 0.1 | DRAFT |
+| MDX-CUS-005 | Go-live checklist and support plan | [MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md](MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md); Word in `customer-templates/` | 00.2 | DRAFT |
 | MDX-CUS-006 | Customer validation instructions | [MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md](MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md); Word in `customer-templates/` | 0.1 | DRAFT |
 | (generated) | Word and Excel copies of MDX-CUS-001 to -006 | `customer-templates/`, written by `scripts/customer_templates.py` (DC-R03, DC-R04; `--check` lists missing or stale copies) | per source | generated, never edited by hand |
 
