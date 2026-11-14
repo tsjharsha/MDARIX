@@ -1157,6 +1157,14 @@ def record_view(record: TriageRecord, names: dict) -> dict:
 # --------------------------------------------------------------------------------------------- possible duplicates
 
 
+def _country_key(value):
+    """A country as the duplicate check compares it: its ISO code when one is recognised (a Case holds "DE" since
+    0.10.93, an imported complaint may hold "Germany"), else the text as it is."""
+    from backend.app.countries import code_of
+
+    return code_of(value) or value
+
+
 def _duplicate_fields(kind: str, row, lots: dict) -> dict:
     if kind == INTAKE:
         moment = row.event_at or row.received_at
@@ -1165,7 +1173,7 @@ def _duplicate_fields(kind: str, row, lots: dict) -> dict:
             "lot_id": lots.get(row.lot_batch_id),
             "serial": row.serial_number,
             "site": row.reporter_site,
-            "country": row.country,
+            "country": _country_key(row.country),
             "event_on": rules.utc(moment).date() if moment else None,
         }
     moment = row.event_timestamp or row.complaint_timestamp
@@ -1174,7 +1182,7 @@ def _duplicate_fields(kind: str, row, lots: dict) -> dict:
         "lot_id": lots.get(row.lot_batch_id),
         "serial": row.serial_number,
         "site": None,
-        "country": row.country,
+        "country": _country_key(row.country),
         "event_on": rules.utc(moment).date() if moment else None,
     }
 
@@ -1639,12 +1647,14 @@ def escalate_case(
     flow: str = "ONE_RECORD",
     attach_to: Complaint | None = None,
     correlation_id=None,
+    why: str | None = None,
 ) -> Complaint:
     """D1: a Case signed a complaint becomes the Complaint at once, in the same transaction as the signature. "Create"
     copies each fact once (the Case keeps what came in; from now on the Complaint is where a shared fact is corrected);
     in one-record mode the Complaint takes the Case's reference. "Attach" joins an existing Complaint. Either way the
     Case and the Complaint are linked (one event, the earliest awareness) and the Case is ESCALATED. Idempotent: a Case
-    that already became a Complaint returns it and creates nothing (A4)."""
+    that already became a Complaint returns it and creates nothing (A4). ``why``: the state change's reason when it is
+    not the signature itself (the 0.10.93 upgrade, OD-3)."""
     if event.complaint_id is not None:
         existing = db.get(Complaint, event.complaint_id)
         if existing is not None:
@@ -1729,9 +1739,12 @@ def escalate_case(
         actor,
         now,
         correlation_id,
-        f"Signed {check.classification.lower()} (check version {check.version})"
-        if check
-        else "Urgent case: a complaint by definition",
+        why
+        or (
+            f"Signed {check.classification.lower()} (check version {check.version})"
+            if check
+            else "Urgent case: a complaint by definition"
+        ),
     )
     _audit(
         audit_db,
