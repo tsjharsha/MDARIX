@@ -93,6 +93,13 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   their organization in the event, so the worker's check against another organization's content covers them too
   (RSK-026).
 
+### Database hardening (DB-1)
+
+- `scripts/upgrade_data_planes.py` creates or updates a dedicated plane's runtime role again: the password is quoted
+  as a literal by the server, because PostgreSQL takes no bound parameter in `CREATE ROLE`/`ALTER ROLE` (it refused
+  every run with `MDARIX_DATA_PLANE_RUNTIME_USER` set). `scripts/migrate_data_planes.py` refuses a runtime role
+  name that is not a plain lower-case name, as the other role scripts do.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration

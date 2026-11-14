@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -38,6 +39,8 @@ from backend.app.db.models.customer_lifecycle import TenantDataPlane  # noqa: E4
 from backend.app.db.session import SessionLocal, engine as control_engine  # noqa: E402
 from backend.app.db.tenant_scope import bind_connection_system, bind_system  # noqa: E402
 from backend.app.db.tls import connect_args  # noqa: E402
+
+ROLE = re.compile(r"^[a-z][a-z0-9_]{2,62}$")
 
 # Tables that belong to the control database. They exist on a plane (same migrations) but stay empty there, and the
 # application role may not write them on a plane.
@@ -143,6 +146,9 @@ def _has_trigger(connection, table_name: str, trigger: str) -> bool:
 
 def _grants(plane_engine) -> None:
     runtime = os.getenv("MDARIX_DB_RUNTIME_USER", "").strip() or "mdarix_runtime"
+    # The role is written into GRANT/REVOKE text, so it must be a plain name, as in the other role scripts.
+    if not ROLE.match(runtime):
+        raise SystemExit("MDARIX_DB_RUNTIME_USER must be a plain lower-case role name")
     with plane_engine.begin() as connection:
         exists = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": runtime}).first()
         if not exists:
