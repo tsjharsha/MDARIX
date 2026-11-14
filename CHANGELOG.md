@@ -10,6 +10,34 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Unreleased: AI ready
+
+AI built behind switches that are all off by default; off means zero model calls (owner approval of the AI-R spec,
+11 Nov 2026, and the free-trial amendment of 14 Nov 2026). Branch `feat/ai-trial-chain`; merges after the 4-12 Dec
+freeze. Migration `tr32_trial_ai_ready` (revision `tr32aiready`, re-attached at merge): `tenants.ai_features`,
+`auth_users.ai_access`, `ai_calls`, `ai_output_reviews`.
+
+- Every AI request names its feature (Ask, summaries, case analysis, drafting, evidence extraction, code suggestions,
+  decision advisory); none may decide. A server lists the features it allows (`MDARIX_AI_FEATURES`, empty by
+  default); an administrator turns each feature on for the organization with a reason and a re-authentication. The
+  decision advisory is not offered.
+- Free trials may use AI on the sample data only, through the free-trial chain `MDARIX_AI_TRIAL_CHAIN` (empty by
+  default; intended FreeLLMAPI, then OmniRoute, then Groq), once the trial's owner switches it on with an
+  acknowledgement. On a trial's own records AI says "AI available on paid plans" and sends nothing. Paid organizations
+  never use the free chain. Only providers recorded in the vetted-provider register may answer.
+- A Platform Administrator can switch AI off for one person, or many, in a free trial ("AI is not enabled for your
+  account"); new people have it on. Audited with the reason.
+- Every request sent to a model is recorded: feature, hashes of what was sent (never the content), the service and
+  the model that actually answered, tokens, time and outcome.
+- A person accepts, edits or rejects an AI result; the Decision Center uses a model's result only after that.
+  Opening a case no longer starts an AI analysis by itself.
+- Staging and production refuse moving model names (`-latest`, `auto`) and an unrecorded model version for the paid
+  provider; Gemini on Vertex AI (Mumbai) is available as the paid provider.
+- No request can mark a record as MDARIX sample data (`MDARIX_SAMPLE` is refused on mappings, connectors and
+  connector runs).
+- The live AI evaluation in CI runs by hand only, with a typed spend confirmation and a token cap.
+
+
 ## [0.11.03] - not released yet
 
 B6a: deadline protection, speed, reviews and trace. Part A (deadline protection, G18 and G19): legal reporting clocks

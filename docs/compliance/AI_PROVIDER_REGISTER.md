@@ -35,6 +35,28 @@ Replace every `TBD` before the provider goes live. An entry without a contract r
 Providers that are **never** listed for customer content: free tiers of any service (they may keep requests or use
 them to train models), OpenRouter `:free` models, and GitHub Models (retired 30 July 2026).
 
+## Free-trial chain (sample data only)
+
+Owner amendment of 14 Nov 2026 (decisions AI-D14a, AI-D2a, AI-D19, T1-T8): an organization on the Free Trial plan
+may use AI **on the sample data only** (a trial's own records get "AI available on paid plans" and no call), through
+`MDARIX_AI_TRIAL_CHAIN` (empty by default = off; intended `freellmapi,omniroute,groq`). Paid organizations and pilots
+never use this chain, and the chain never holds a paid provider. Sample data may leave India here (decision T7).
+
+The machine-readable register is `genai/vetted_providers.json` (read by the code, under AI change control: a new or
+changed row is a Major change). An upstream may answer only when commercial use is allowed, it does not train on the
+data (or an opt-out is confirmed), and its terms were checked less than 12 months ago (a warning from 6 months,
+decision T8). A reply whose actual upstream (FreeLLMAPI's `X-Routed-Via`, OmniRoute's `model` field) is not vetted is
+discarded unread. Free-model results never count as qualification.
+
+| Provider | Kind | Terms link | Commercial use | Trains on data | Region | Date checked | Checked by |
+|---|---|---|---|---|---|---|---|
+| FreeLLMAPI (`freellmapi`) | Gateway on the MDARIX server, 127.0.0.1 only; only vetted upstream keys entered; MDARIX's key scoped to vetted models | Not applicable (self-hosted software; pinned version, dependency review at each upgrade) | n/a | n/a | Loopback | TBD | TBD |
+| OmniRoute (`omniroute`) | Gateway on the MDARIX server, 127.0.0.1 only; only vetted upstreams in its combo | Not applicable (self-hosted) | n/a | n/a | Loopback | TBD | TBD |
+| Groq free tier (`groq`), last in the chain | Upstream, called directly | TBD | TBD | TBD | TBD | TBD | TBD |
+| Each upstream behind FreeLLMAPI or OmniRoute | Upstream | TBD (one row each, added before its key is entered) | TBD | TBD | TBD | TBD | TBD |
+
+Until the owner fills a row (link, date, yes/no answers), that provider is not vetted and the code refuses it.
+
 ## Review procedure
 
 1. Before go-live, and at least every 12 months or when the provider changes its terms: confirm the contract and
