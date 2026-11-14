@@ -16,7 +16,7 @@ EXEMPT = {
     "auth_sessions": "resolved from the session cookie before the organization is known (auth/durable.py, "
     "request_context.py); listings filter by organization in code",
     "tenant_data_planes": "routing: read to choose the organization's database before a request is bound "
-    "(backend/app/db/data_plane.py)",
+    "(backend/app/db/data_plane.py); its own forced policies let only system scope write it (tr21)",
     "onboarding_requests": "website demo and trial requests, made before any organization exists (tenant_id is "
     "empty until approval); platform administration and the trial flow only",
     "platform_incidents": "platform operations records; no organization-facing route",
