@@ -145,6 +145,20 @@ TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
 
 
+def _product_of_question(db: Session, tenant_id, payload: InteractionRequest):
+    """The product an interaction is stored with: the one named, else the chosen version's (a version is never stored
+    without its product: DB-1, tr23's check). A question asked on a case with only a version chosen names none."""
+    from backend.app.db.models.foundation import ProductVersion
+
+    if payload.product_id is not None or payload.product_version_id is None:
+        return payload.product_id
+    return (
+        db.query(ProductVersion.product_id)
+        .filter(ProductVersion.tenant_id == tenant_id, ProductVersion.id == payload.product_version_id)
+        .scalar()
+    )
+
+
 def _ensure_own_records(db: Session, tenant_id, payload: InteractionRequest) -> None:
     """The case, product and version a question refers to must belong to the signed-in tenant (404 otherwise, the
     same answer as for an id that does not exist)."""
@@ -437,7 +451,7 @@ def create_interaction(
         tenant_id=ctx.tenant_id,
         session_id=session.id,
         user_id=ctx.user_id,
-        product_id=payload.product_id,
+        product_id=_product_of_question(db, ctx.tenant_id, payload),
         product_version_id=payload.product_version_id,
         investigation_id=payload.investigation_id,
         user_prompt=payload.prompt,
