@@ -45,9 +45,10 @@ def test_the_legacy_steps_give_the_same_schema_as_the_db1_migrations():
         _alembic("downgrade", "tr19casesescalation")
         _legacy, todo, problems = script.state(url)
         assert problems == []
-        assert [step.name for step in todo] == DB1_STEPS
-        script.apply(url, todo)
-        assert script.state(url)[1] == []  # a second run has nothing to do
+        db1 = [step for step in todo if step.name in DB1_STEPS]  # a later branch's steps follow; not run here
+        assert [step.name for step in todo][: len(DB1_STEPS)] == DB1_STEPS == [step.name for step in db1]
+        script.apply(url, db1)
+        assert not {step.name for step in script.state(url)[1]} & set(DB1_STEPS)  # a second run has nothing to do
         assert _fingerprint() == after_migrations
         _alembic("stamp", "tr24aproductreferences")
     finally:
