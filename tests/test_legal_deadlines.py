@@ -73,11 +73,16 @@ def test_great_britain_counts_day_1_across_the_start_of_british_summer_time():
     assert found.at == datetime(2026, 4, 7, 22, 59, 59, tzinfo=UTC)
 
 
+@pytest.mark.requirement("PL-59")
 def test_the_earlier_day_of_the_two_time_zones_is_the_latest_day():
-    # 00:30 in Brussels on Tue 10 Mar is still Mon 9 Mar in New York: the organization's day comes first.
+    # REQ-CLK-001 rev B, the different-days case (PL-59). 00:30 in Brussels on Tue 10 Mar is still Mon 9 Mar in New
+    # York (19:30 EDT): the organization's day comes first. Counted from the day after awareness, 15 days end on 25 Mar
+    # in Brussels and on 24 Mar in New York; the latest day is the earlier, 24 Mar. Its end in Brussels (23:59:59 CET
+    # = 22:59:59 UTC) comes before its end in New York (23:59:59 EDT = 03:59:59 UTC on 25 Mar), so it is the deadline.
     aware = datetime(2026, 3, 9, 23, 30, tzinfo=UTC)
     found = deadlines.count(aware, 15, rules.CALENDAR, "EU_NI", "America/New_York")
     assert found.day == date(2026, 3, 24) and found.zone == "Europe/Brussels"
+    assert found.at == datetime(2026, 3, 24, 22, 59, 59, tzinfo=UTC)
 
 
 def test_work_days_and_a_market_without_an_authority_zone():
