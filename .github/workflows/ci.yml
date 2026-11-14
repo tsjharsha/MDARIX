@@ -614,6 +614,9 @@ jobs:
       # The browser suite signs the same fixture accounts in many times; sign-in limits are covered by
       # tests/test_auth_hardening.py and the production-mode job (production refuses this setting).
       MDARIX_RATE_LIMITS_ENABLED: 'false'
+      # The trial journey signs up with a made-up company domain that never resolves; the e-mail domain check is
+      # covered by the backend tests (tests/conftest.py switches it off the same way, development only).
+      MDARIX_TRIAL_DOMAIN_CHECK: 'off'
       DAY35_FIXTURE_APPLY: '1'
       # Disposable per-run password for the seeded fixture accounts (never a shared or real password).
       DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!

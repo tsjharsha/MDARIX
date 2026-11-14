@@ -131,7 +131,7 @@ test.describe("MDARIX browser evidence", () => {
         "Platform users": "Platform users",
         "Customer administrators": "Customer administrators",
         "Customer users": "Customer users",
-        Onboarding: "Demo and trial requests",
+        Onboarding: "Trial requests",
         "Roles & permissions": "Roles",
         "Effective access": "Effective access",
       },
