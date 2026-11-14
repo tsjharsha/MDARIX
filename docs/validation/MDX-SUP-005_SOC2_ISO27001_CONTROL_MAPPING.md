@@ -83,7 +83,7 @@ Common evidence references used below: **SOP-1** to **SOP-5** = MDX-SOP-001 to -
 | 5.27 | Learning from information security incidents | MDARIX control | Review within 5 business days (SOP-3 IR-R12); trend review (IR-R19) |
 | 5.28 | Collection of evidence | Partly | Incident record with UTC times (SOP-3 IR-R01, IR-R02); hash-chained audit trail (`backend/app/audit_chain.py:1-12`); no forensic procedure |
 | 5.29 | Information security during disruption | Partly | SOP-4; no disruption exercise yet |
-| 5.30 | ICT readiness for business continuity | Partly | Restore drills (`docs/runbooks/BACKUP_AND_RESTORE.md:121-128`); single VM (HA H-2) |
+| 5.30 | ICT readiness for business continuity | Partly | Restore drills (`docs/runbooks/BACKUP_AND_RESTORE.md:149-157`); single VM (HA H-2) |
 | 5.31 | Legal, statutory, regulatory and contractual requirements | Partly | Regulatory applicability matrix (MDX-B10-002); legal texts with the lawyer |
 | 5.32 | Intellectual property rights | Gap | none |
 | 5.33 | Protection of records | MDARIX control | Audit trail kept 7 years, immutable (P11 row 11.10(c)); legal hold (`backend/app/legal_hold_api.py:1-10`) |
@@ -138,7 +138,7 @@ Common evidence references used below: **SOP-1** to **SOP-5** = MDX-SOP-001 to -
 | 8.15 | Logging | MDARIX control | Audit trail (`backend/app/db/models/foundation.py:676-696`); request logs (`docs/compliance/DATA_RETENTION_SCHEDULE.md:41`) |
 | 8.16 | Monitoring activities | MDARIX control | Uptime check every 5 minutes (`docs/runbooks/GCP_DEPLOYMENT.md:25`); daily audit-chain verification (`backend/app/audit_chain.py:54`) |
 | 8.17 | Clock synchronization | MDARIX control | chrony (`docs/runbooks/DEPLOYMENT.md:57`); clock check, 1 s limit (`scripts/clock_check.py:1-8`) |
-| 8.18 | Use of privileged utility programs | Partly | Scripts that change data need owner credentials and are recorded in the operations log (`docs/runbooks/BACKUP_AND_RESTORE.md:141,165`) |
+| 8.18 | Use of privileged utility programs | Partly | Scripts that change data need owner credentials and are recorded in the operations log (`docs/runbooks/BACKUP_AND_RESTORE.md:178,202`) |
 | 8.19 | Installation of software on operational systems | MDARIX control | Release images from a tagged build only (SOP-1 SDLC-R17; SOP-2) |
 | 8.20 | Networks security | MDARIX control | Firewall: web ports only; SSH through the proxy (`docs/runbooks/GCP_DEPLOYMENT.md:23,50-52`) |
 | 8.21 | Security of network services | Partly | HTTPS with certificates renewed automatically (`infrastructure/docker/Caddyfile:1-2`); database over TLS `verify-full` (`docs/runbooks/GCP_DEPLOYMENT.md:19`) |

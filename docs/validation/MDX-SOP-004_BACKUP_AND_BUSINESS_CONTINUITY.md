@@ -55,7 +55,7 @@ fails (`docs/runbooks/GCP_DEPLOYMENT.md:170-171`). Until a check is added, BC-R0
 - **BC-R08** A restore drill shall run every 3 months, and before the first design partner, as
   `docs/runbooks/BACKUP_AND_RESTORE.md` section 2 describes.
 - **BC-R09** Each drill shall be recorded with its date, backup timestamp, duration and results
-  (`docs/runbooks/BACKUP_AND_RESTORE.md:116,121-128`).
+  (`docs/runbooks/BACKUP_AND_RESTORE.md:140-143,149-157`).
 - **BC-R10** A drill whose duration exceeds the recovery time objective, or whose backup is older than the recovery
   point, shall be logged as a deviation (MDX-VAL-010).
 
@@ -64,7 +64,7 @@ fails (`docs/runbooks/GCP_DEPLOYMENT.md:170-171`). Until a check is added, BC-R0
 - **BC-R11** Production shall be recovered as `docs/runbooks/BACKUP_AND_RESTORE.md` section 3 describes for the
   situation.
 - **BC-R12** After any restore, erasures and purges made after the backup shall be re-applied before anyone signs in
-  (`docs/runbooks/BACKUP_AND_RESTORE.md:146-148`).
+  (`docs/runbooks/BACKUP_AND_RESTORE.md:183-185`).
 - **BC-R13** After any restore, every outbox event not delivered at the backup time and older than the restore point
   shall be held (dead-lettered, audited), and only those the mail provider's log shows as not sent shall be replayed
   (owner decision B6b-D10). The automated control is the recovery check of B6b Part D; until it exists, a person

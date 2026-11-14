@@ -81,7 +81,7 @@ manufacturer that uses it. "Both" means each party does its own part, as the row
 | Hosting and infrastructure security | Runs the service on one cloud virtual machine in Mumbai, India; firewall allows web traffic only; administrator access through the cloud provider's identity-aware proxy | `docs/runbooks/GCP_DEPLOYMENT.md:4-6,23`; hosting assessment MDX-SUP-004 |
 | Patching | Security updates install themselves on the server; kernel reboots by hand | `docs/runbooks/DEPLOYMENT.md:58-59` |
 | Backups | Daily encrypted backup of every database and of the stored files, copied off-site; daily disk snapshot | `docs/runbooks/BACKUP_AND_RESTORE.md:10-15`; `docs/runbooks/GCP_DEPLOYMENT.md:21-22` |
-| Restore drills and recovery validation | Quarterly restore drill with a written record; recovery validation of the GxP process after a restore (B6b Part D, record MDX-OPS-001) | `docs/runbooks/BACKUP_AND_RESTORE.md:91-128`; SOP MDX-SOP-004 |
+| Restore drills and recovery validation | Quarterly restore drill with a written record; recovery validation of the GxP process after a restore (B6b Part D, record MDX-OPS-001) | `docs/runbooks/BACKUP_AND_RESTORE.md:91-157`; SOP MDX-SOP-004 |
 | Time synchronisation | Server clock kept by NTP (chrony); clock check against a 1 s limit at each release, after a server change and in the restore drill | `docs/runbooks/DEPLOYMENT.md:57`; `scripts/clock_check.py:1-8` |
 | Application validation per release | Validates each release for MDARIX's own intended use (the release pack) | MDX-VAL-001 section 9; release approval record MDX-VAL-012 |
 | Sub-processor control | Keeps the list of providers that receive customer data; a new provider is added before it receives data | `legal/SUBPROCESSORS.md:3-6`; MDX-SUP-004 |

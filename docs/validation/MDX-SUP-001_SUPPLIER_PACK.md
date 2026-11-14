@@ -105,7 +105,7 @@ about 11 Jan 2027 (MDX-SUP-004, H-1).
 | Backup | Daily encrypted backup of every database and of stored files, copied off-site; daily disk snapshot kept 14 days | `docs/runbooks/BACKUP_AND_RESTORE.md:10-15`; `docs/runbooks/GCP_DEPLOYMENT.md:21-22` |
 | Recovery point | 24 hours today (daily encrypted backup, no point-in-time recovery); target 15 minutes with point-in-time recovery on pilot hosting | Owner decision B6b-D8; `docs/runbooks/BACKUP_AND_RESTORE.md:3-5` |
 | Recovery time | 4 hours | `docs/runbooks/BACKUP_AND_RESTORE.md:5` |
-| Restore drills | Quarterly. Production backups restored on 16 Oct 2026 and 3 Nov 2026; the 3 Nov drill took 7 min 19 s | `docs/runbooks/BACKUP_AND_RESTORE.md:121-128` |
+| Restore drills | Quarterly. Production backups restored on 16 Oct 2026 and 3 Nov 2026; the 3 Nov drill took 7 min 19 s | `docs/runbooks/BACKUP_AND_RESTORE.md:149-157` |
 | Recovery validation | After a restore, a recovery check and a signed recovery record (MDX-OPS-001) covering the audit chain, configuration, held e-mail events and the recovery window per customer | MDX-SOP-004 section 5; built in B6b Part D (not yet in this baseline) |
 
 ## 9. Incident handling and notification
@@ -137,7 +137,7 @@ not used: AI is off for every organisation (`legal/SUBPROCESSORS.md:18`).
 | Hand-back before purge | A customer organisation is purged only after the export was handed back or a waiver recorded | `backend/app/tenant_purge.py:550-557` |
 | Audit trail retention | Audit events and signatures are kept at least 7 years after each event while the account exists, never changed or deleted; at exit the whole trail goes to the customer in the export, and the customer keeps it for its own regulatory period | `docs/compliance/DATA_RETENTION_SCHEDULE.md:17` |
 | Legal hold | While a legal hold is set, nothing of the organisation is purged, erased or retired | `backend/app/legal_hold_api.py:1-10`; `tests/test_legal_hold.py::test_a_hold_stops_the_purge_and_the_erasure_and_records_the_refusal` |
-| Backups after purge | Purged data remains in encrypted backups for up to 90 days; a restore re-applies every purge before anyone signs in | `docs/compliance/DATA_RETENTION_SCHEDULE.md:51-55`; `docs/runbooks/BACKUP_AND_RESTORE.md:146-148` |
+| Backups after purge | Purged data remains in encrypted backups for up to 90 days; a restore re-applies every purge before anyone signs in | `docs/compliance/DATA_RETENTION_SCHEDULE.md:51-55`; `docs/runbooks/BACKUP_AND_RESTORE.md:183-185` |
 
 ## 13. Audit support
 
