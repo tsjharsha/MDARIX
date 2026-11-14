@@ -32,6 +32,12 @@ class AIInteraction(Base):
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_ai_interactions_version_of_product",
         ),
+        # DB-1 (tr24a).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id"],
+            ["products.tenant_id", "products.id"],
+            name="fk_ai_interactions_product_id_tenant",
+        ),
         CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
     )
     id = uuid_pk()

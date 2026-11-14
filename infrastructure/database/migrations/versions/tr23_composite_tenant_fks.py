@@ -41,7 +41,10 @@ def _on_delete(ondelete: str | None) -> str:
     return f" ON DELETE {ondelete}" if ondelete else ""
 
 
-def upgrade():
+def add_composite_references(legacy: bool = False) -> None:
+    """Every change of this migration. ``legacy``: a legacy organization database may lack a single-column reference
+    under its usual name, so it is dropped only if it is there."""
+    exists = " IF EXISTS" if legacy else ""
     for table in NEW_TARGET_UNIQUES:
         op.execute(f"ALTER TABLE public.{table} ADD CONSTRAINT {unique_name(table)} UNIQUE (tenant_id, id)")
     op.execute(
@@ -54,7 +57,7 @@ def upgrade():
         )
         op.execute(f"ALTER TABLE public.{ref.child} VALIDATE CONSTRAINT {ref.new_name}")
         if ref.old_name not in KEEP_SINGLE_COLUMN:
-            op.execute(f"ALTER TABLE public.{ref.child} DROP CONSTRAINT {ref.old_name}")
+            op.execute(f"ALTER TABLE public.{ref.child} DROP CONSTRAINT{exists} {ref.old_name}")
     for table in PRODUCT_VERSION_TABLES:
         op.execute(
             f"ALTER TABLE public.{table} ADD CONSTRAINT {version_fk_name(table)} FOREIGN KEY {_VERSION_COLUMNS} "
@@ -66,6 +69,22 @@ def upgrade():
             "CHECK (product_version_id IS NULL OR product_id IS NOT NULL) NOT VALID"
         )
         op.execute(f"ALTER TABLE public.{table} VALIDATE CONSTRAINT {version_check_name(table)}")
+
+
+def upgrade():
+    add_composite_references()
+
+
+def apply_to_legacy_plane(system_scope: bool = True) -> None:
+    """tr22's pre-check, then this migration's changes, in the caller's transaction (legacy organization database)."""
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    spec = spec_from_file_location("tr22_tenant_fk_check", Path(__file__).with_name("tr22_tenant_fk_check.py"))
+    check = module_from_spec(spec)
+    spec.loader.exec_module(check)
+    check.check_rows(system_scope)
+    add_composite_references(legacy=True)
 
 
 def downgrade():

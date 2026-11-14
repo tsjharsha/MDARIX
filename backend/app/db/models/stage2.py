@@ -392,7 +392,12 @@ class MDARIXCaseContext(Base):
     last_page: Mapped[str | None] = mapped_column(String(160))
     created_at = _ts(False)
     updated_at = _ts(False)
-    __table_args__ = (UniqueConstraint("tenant_id", "user_id", name="uq_case_context_tenant_user"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", name="uq_case_context_tenant_user"),
+        # DB-1 (tr24a): no version without its product. No reference to product_versions: the context lives in the
+        # control database, a dedicated tenant's products in its own plane.
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
+    )
 
 
 class OutboxEvent(Base):
