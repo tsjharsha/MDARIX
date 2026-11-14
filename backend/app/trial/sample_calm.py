@@ -81,7 +81,7 @@ def stage_calm_story(db: Session, tenant_id, now: datetime | None = None) -> dic
 
 def _finish_triage(db: Session, tenant_id, now: datetime) -> int:
     from backend.app.db.models.intake import TriageRecord
-    from backend.app.intake import rules, service
+    from backend.app.intake import rules, service, triage_rules
     from backend.app.trial.sample_decision import sample_author
 
     author = str(sample_author(db, tenant_id, now).id)
@@ -113,6 +113,13 @@ def _finish_triage(db: Session, tenant_id, now: datetime) -> int:
             "Sample: triaged by the MDARIX sample author; no immediate action needed beyond the complaint's own steps."
         )
         record.completed_by, record.completed_at, record.updated_at = author, now, now
+        # 0.10.93 (B2 spec 9.2): a finished sample triage is fast-track and keeps its first version, as the upgrade
+        # gives the triage of a trial created before it (scripts/cases_0_10_93.py lists nothing for a new trial).
+        record.speed = record.speed or triage_rules.FAST
+        db.flush()
+        service.add_triage_version(
+            db, tenant_id, record, None, author, now, "Sample: triaged by the MDARIX sample author"
+        )
         done += 1
     db.flush()
     return done

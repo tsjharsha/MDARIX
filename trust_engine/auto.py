@@ -400,7 +400,8 @@ def _case_evidence(db, tenant_id, investigation_id) -> set[str]:
 
     linked = (
         text(
-            "SELECT evidence_id FROM investigation_evidence WHERE tenant_id=:tenant_id AND investigation_id=:investigation_id"
+            "SELECT evidence_id FROM investigation_evidence "
+            "WHERE tenant_id=CAST(:tenant_id AS uuid) AND investigation_id=CAST(:investigation_id AS uuid)"
         )
         .bindparams(tenant_id=tenant_id, investigation_id=investigation_id)
         .columns(evidence_id=Evidence.id.type)

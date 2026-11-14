@@ -1,3 +1,4 @@
+import uuid
 from collections import deque
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -102,6 +103,11 @@ class RealityGraphService:
 
     def get_node(self, entity_type: str, entity_id: str, tenant_id: str | None = None) -> GraphNode:
         entity_type = self.clean_entity_type(entity_type)
+        try:
+            uuid.UUID(str(entity_id))
+        except ValueError:
+            # A malformed id names no node (404, as an unknown one), never a database error (500).
+            raise GraphError("NODE_NOT_FOUND", f"{entity_type} node not found") from None
         tenant_id = tenant_id or self.tenant_id()
         table, business_col, label_col = NODE_TYPES[entity_type]
         with self.connection() as conn:
