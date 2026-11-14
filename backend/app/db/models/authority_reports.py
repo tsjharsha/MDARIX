@@ -99,10 +99,8 @@ class ReportObligation(Base):
     complaint_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     market: Mapped[str] = mapped_column(String(10), nullable=False)
     kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="INITIAL")
-    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("report_obligations.id"))
-    assessment_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("complaint_market_assessments.id")
-    )
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    assessment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     form_code: Mapped[str] = mapped_column(String(40), nullable=False)
     form_version: Mapped[str] = mapped_column(String(40), nullable=False)
     report_type: Mapped[str | None] = mapped_column(String(40))
@@ -120,6 +118,18 @@ class ReportObligation(Base):
     updated_at = _tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "assessment_id"],
+            ["complaint_market_assessments.tenant_id", "complaint_market_assessments.id"],
+            name="fk_report_obligations_assessment_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "parent_id"],
+            ["report_obligations.tenant_id", "report_obligations.id"],
+            name="fk_report_obligations_parent_id_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_report_obligations_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "complaint_id"],
             ["complaints.tenant_id", "complaints.id"],
@@ -160,9 +170,14 @@ class ReportSnapshot(Base):
     source_system: Mapped[str | None] = mapped_column(String(40))
 
     __table_args__ = (
+        # DB-1 (tr23).
         ForeignKeyConstraint(
-            ["obligation_id"], ["report_obligations.id"], name="fk_report_snapshots_obligation", ondelete="CASCADE"
+            ["tenant_id", "obligation_id"],
+            ["report_obligations.tenant_id", "report_obligations.id"],
+            name="fk_report_snapshots_obligation_id_tenant",
+            ondelete="CASCADE",
         ),
+        UniqueConstraint("tenant_id", "id", name="uq_report_snapshots_tenant_id_id"),
         UniqueConstraint("obligation_id", "version", name="uq_report_snapshots_version"),
         CheckConstraint(_in("state", SNAPSHOT_STATES), name="state_known"),
         CheckConstraint(
@@ -179,7 +194,7 @@ class ReportSubmission(Base):
     id = _pk()
     tenant_id: Mapped[uuid.UUID] = _tenant()
     obligation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("report_snapshots.id"))
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     attempt: Mapped[int] = mapped_column(Integer, nullable=False)
     route: Mapped[str] = mapped_column(String(40), nullable=False)
     submitted_at = _tz(False)
@@ -194,9 +209,19 @@ class ReportSubmission(Base):
     source_system: Mapped[str | None] = mapped_column(String(40))
 
     __table_args__ = (
+        # DB-1 (tr23).
         ForeignKeyConstraint(
-            ["obligation_id"], ["report_obligations.id"], name="fk_report_submissions_obligation", ondelete="CASCADE"
+            ["tenant_id", "obligation_id"],
+            ["report_obligations.tenant_id", "report_obligations.id"],
+            name="fk_report_submissions_obligation_id_tenant",
+            ondelete="CASCADE",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "snapshot_id"],
+            ["report_snapshots.tenant_id", "report_snapshots.id"],
+            name="fk_report_submissions_snapshot_id_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_report_submissions_tenant_id_id"),
         UniqueConstraint("obligation_id", "attempt", name="uq_report_submissions_attempt"),
         CheckConstraint(_in("result", SUBMISSION_RESULTS), name="result_known"),
         Index("ix_report_submissions_tenant_obligation", "tenant_id", "obligation_id"),
@@ -222,8 +247,12 @@ class ReportEvidence(Base):
     source_system: Mapped[str | None] = mapped_column(String(40))
 
     __table_args__ = (
+        # DB-1 (tr23).
         ForeignKeyConstraint(
-            ["submission_id"], ["report_submissions.id"], name="fk_report_evidence_submission", ondelete="CASCADE"
+            ["tenant_id", "submission_id"],
+            ["report_submissions.tenant_id", "report_submissions.id"],
+            name="fk_report_evidence_submission_id_tenant",
+            ondelete="CASCADE",
         ),
         CheckConstraint(_in("outcome", EVIDENCE_OUTCOMES), name="outcome_known"),
         CheckConstraint("note IS NOT NULL OR content IS NOT NULL", name="note_or_file"),

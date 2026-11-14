@@ -73,7 +73,7 @@ class UserAdditionalRole(Base):
     __tablename__ = "user_additional_roles"
     id = _pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("auth_users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     role_code: Mapped[str] = mapped_column(String(60), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="ACTIVE")
     reason: Mapped[str | None] = mapped_column(Text)
@@ -83,6 +83,12 @@ class UserAdditionalRole(Base):
     revoked_at = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"],
+            ["auth_users.tenant_id", "auth_users.id"],
+            name="fk_user_additional_roles_user_id_tenant",
+        ),
         UniqueConstraint("tenant_id", "user_id", "role_code", name="uq_user_additional_roles_user_role"),
         CheckConstraint("status IN ('ACTIVE', 'REVOKED')", name="status_known"),
         Index("ix_user_additional_roles_tenant_user", "tenant_id", "user_id"),
@@ -97,7 +103,7 @@ class SigningGrant(Base):
     __tablename__ = "signing_grants"
     id = _pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("auth_users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     role_code: Mapped[str] = mapped_column(String(60), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="PENDING")
     requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -107,6 +113,10 @@ class SigningGrant(Base):
     decision_reason: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "user_id"], ["auth_users.tenant_id", "auth_users.id"], name="fk_signing_grants_user_id_tenant"
+        ),
         UniqueConstraint("tenant_id", "user_id", "role_code", name="uq_signing_grants_user_role"),
         CheckConstraint("status IN ('PENDING', 'CONFIRMED', 'REFUSED')", name="status_known"),
         Index("ix_signing_grants_tenant_status", "tenant_id", "status"),

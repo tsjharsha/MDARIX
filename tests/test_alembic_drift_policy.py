@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from infrastructure.database.migrations.business_ids import COUNTER_TABLE, INDEX_NAMES
+from infrastructure.database.migrations.tenant_indexes import INDEX_NAMES as TENANT_INDEX_NAMES
 from infrastructure.database.migrations.drift_policy import (
     MIGRATION_OWNED_INDEXES,
     MIGRATION_OWNED_TABLES,
@@ -36,7 +37,10 @@ def test_drift_allowlist_objects_are_owned_by_versioned_migrations():
     business_id_migration = (versions / "md26_business_ids.py").read_text(encoding="utf-8")
     assert "from infrastructure.database.migrations.business_ids import COUNTER_TABLE" in business_id_migration
     assert "CREATE UNIQUE INDEX {item.index_name}" in business_id_migration
-    generated = {COUNTER_TABLE} | INDEX_NAMES
+    # tr24's indexes are listed in tenant_indexes.py, which tr24 imports to build them (DB-1).
+    tenant_index_migration = (versions / "tr24_tenant_indexes.py").read_text(encoding="utf-8")
+    assert "from infrastructure.database.migrations.tenant_indexes import INDEXES" in tenant_index_migration
+    generated = {COUNTER_TABLE} | INDEX_NAMES | TENANT_INDEX_NAMES
     for name in (MIGRATION_OWNED_TABLES | MIGRATION_OWNED_INDEXES) - generated:
         assert name in migration_text, f"{name} is allowlisted but is not created by a migration"
 
