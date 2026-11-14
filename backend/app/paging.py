@@ -11,13 +11,15 @@ from fastapi import Query, Response
 from sqlalchemy import case, false, func, not_
 
 MAX_PAGE = 1000
+# An offset past any real list: a larger one is refused (422) before it reaches the database, which fails on it.
+MAX_OFFSET = 10_000_000
 
 
 class Page:
     def __init__(
         self,
         limit: int = Query(MAX_PAGE, ge=1, le=MAX_PAGE, description="Rows per page (at most 1000)"),
-        offset: int = Query(0, ge=0, description="Rows to skip"),
+        offset: int = Query(0, ge=0, le=MAX_OFFSET, description="Rows to skip (at most 10,000,000)"),
     ):
         self.limit = limit
         self.offset = offset

@@ -45,6 +45,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app.oversight.service import calendar_of
+from backend.app.paging import MAX_OFFSET
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.business_ids import complaint_ref
 
@@ -300,7 +301,7 @@ PAGE_DEFAULT, PAGE_MAX = 200, 500
 @router.get("")
 def communications(
     complaint_id: uuid.UUID | None = Query(default=None),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=MAX_OFFSET),
     limit: int = Query(default=PAGE_DEFAULT, ge=1, le=PAGE_MAX),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),

@@ -1,6 +1,7 @@
 """Add the rest of the sample story to free trials approved before it existed.
 
     python scripts/refresh_trial_story.py            # list what would be added, change nothing
+    python scripts/refresh_trial_story.py --counts   # the same, counts only: trials numbered, no name or reference
     python scripts/refresh_trial_story.py --apply    # add it
 
 New trials get the whole story at approval (backend/app/trial/sample_data.py). A trial approved earlier holds the
@@ -144,7 +145,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             # 0.10.81: every trial, sample or not (backend/app/trial/open_deadlines.py).
             fixes = open_deadlines.refresh(session, tenant_id, apply)
             if fixes:
-                results.append({"tenant": tenant_key, "name": name, "result": "; ".join(fixes)})
+                results.append(
+                    {"tenant": tenant_key, "name": name, "result": "; ".join(fixes), "deadlines": len(fixes)}
+                )
                 if apply:
                     session.commit()
             if not has_sample_data(session, tenant_id):
@@ -303,7 +306,14 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *([f"{supply_owed} sample supply-chain rows (0.10.94)"] if supply_owed else []),
                     *(["the shipments to SAMPLE-CASE-11's hospital (0.10.93)"] if lakeside_missing else []),
                 ]
-                results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
+                results.append(
+                    {
+                        "tenant": tenant_key,
+                        "name": name,
+                        "result": f"would add {' and '.join(wanted)}",
+                        "sample": wanted,
+                    }
+                )
                 continue
             now = datetime.now(timezone.utc)
             added = seed_story_examples(session, tenant_id, now) if story_missing else {"created": False}
@@ -398,10 +408,31 @@ def refresh_plan(db: Session, apply: bool) -> list[str]:
     return changes
 
 
-def main() -> int:
+def count_lines(results: list[dict]) -> list[str]:
+    """``--counts``: each trial by its number in the list, never its key or name; the deadline changes (they name
+    the trial's own complaints) as a count; the sample items by name (the sample is synthetic). Pure."""
+    numbers: dict[str, int] = {}
+    for item in results:
+        numbers.setdefault(item["tenant"], len(numbers) + 1)
+    lines = []
+    for item in results:
+        label = f"Trial {numbers[item['tenant']]} of {len(numbers)}:"
+        if "deadlines" in item:
+            lines.append(f"{label} {item['deadlines']} deadline-rule change(s) to the trial's own records (0.10.81)")
+        elif "sample" in item:
+            lines.append(f"{label} would add {len(item['sample'])} sample item(s): {'; '.join(item['sample'])}")
+        else:
+            lines.append(f"{label} {item['result']}")
+    return lines
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="add the story (without it, only list what would change)")
-    args = parser.parse_args()
+    parser.add_argument("--counts", action="store_true", help="list only, counts only: no trial name or reference")
+    args = parser.parse_args(argv)
+    if args.apply and args.counts:
+        parser.error("--counts lists only; it cannot be used with --apply")
     db = SessionLocal()
     try:
         plan = refresh_plan(db, args.apply)
@@ -413,8 +444,12 @@ def main() -> int:
         if plan
         else "Free Trial plan: already reads the user cap"
     )
-    for item in results:
-        print(f"{item['tenant']:<40} {item['name'][:40]:<40} {item['result']}")
+    if args.counts:
+        for line in count_lines(results):
+            print(line)
+    else:
+        for item in results:
+            print(f"{item['tenant']:<40} {item['name'][:40]:<40} {item['result']}")
     if not results:
         print("No free trial holds data.")
     elif not args.apply:
