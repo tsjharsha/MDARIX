@@ -246,17 +246,24 @@ def parse_zap(folder: str, tool: str, filename: str) -> list[Finding]:
     return found
 
 
-def _junit_failures(path: str) -> list[tuple[str, str]]:
+def _junit_problems(path: str) -> list[tuple[str, str, str]]:
+    """(test name, "failure" or "error", message): a failure is a check that did not hold; an error is a test that
+    could not run (for example its setup broke)."""
     try:
         root = ET.parse(path).getroot()
     except (OSError, ET.ParseError):
         return []
-    failures = []
+    problems = []
     for case in root.iter("testcase"):
-        for problem in list(case.findall("failure")) + list(case.findall("error")):
-            message = (problem.get("message") or problem.text or "").strip()
-            failures.append((case.get("name") or case.get("classname") or "?", message))
-    return failures
+        for kind in ("failure", "error"):
+            for problem in case.findall(kind):
+                message = (problem.get("message") or problem.text or "").strip()
+                problems.append((case.get("name") or case.get("classname") or "?", kind, message))
+    return problems
+
+
+def _junit_failures(path: str) -> list[tuple[str, str]]:
+    return [(name, message) for name, _kind, message in _junit_problems(path)]
 
 
 # One JUnit failure holds every failed check of an operation: "1. Test Case ID: abc  - <check>  Received: ...".
@@ -316,11 +323,16 @@ def parse_nuclei(folder: str) -> list[Finding]:
 
 
 def parse_cross_tenant(folder: str) -> list[Finding]:
-    # A failed cross-tenant test may mean one organization reads another's data: High, blocks the deploy.
-    return [
-        Finding("cross-tenant", "High", name, "tests", message.splitlines()[0][:160] if message else "failed")
-        for name, message in _junit_failures(os.path.join(folder, "cross-tenant.xml"))
-    ]
+    # A failed cross-tenant test may mean one organization reads another's data: High, blocks the deploy. A test that
+    # could not run (setup error) proves nothing either way: Medium, so the gap in coverage is still reported.
+    found = []
+    for name, kind, message in _junit_problems(os.path.join(folder, "cross-tenant.xml")):
+        first = message.splitlines()[0][:160] if message else kind
+        if kind == "failure":
+            found.append(Finding("cross-tenant", "High", name, "tests", first))
+        else:
+            found.append(Finding("cross-tenant", "Medium", name, "tests", f"did not run: {first}"))
+    return found
 
 
 def parse_testssl(folder: str) -> list[Finding]:

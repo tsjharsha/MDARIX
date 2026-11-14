@@ -128,3 +128,23 @@ def test_schemathesis_server_errors_are_high_and_undocumented_status_codes_low(t
         ("Medium", "Response violates schema", "GET /api/v1/other"),
     ]
     assert "| schemathesis | ran | 0 | 1 | 1 | 1 | 0 | 0 | 0 |" in summary
+
+
+def test_a_failed_cross_tenant_test_is_high_and_one_that_could_not_run_is_medium(tmp_path):
+    folder = tmp_path / "rel"
+    folder.mkdir()
+    (folder / "cross-tenant.xml").write_text(
+        """<testsuites><testsuite name="pytest">
+<testcase name="test_tenant_a_never_sees_tenant_b"><failure message="AssertionError: Tenant B record returned"/></testcase>
+<testcase name="test_suspension"><error message="failed on setup with AttributeError"/></testcase>
+<testcase name="test_ok"/>
+</testsuite></testsuites>""",
+        encoding="utf-8",
+    )
+
+    _summary, record = build_summary(str(folder), [], "rel")
+
+    assert sorted((r["severity"], r["rule"]) for r in record) == [
+        ("High", "test_tenant_a_never_sees_tenant_b"),
+        ("Medium", "test_suspension"),
+    ]

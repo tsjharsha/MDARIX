@@ -327,9 +327,10 @@ run_nuclei() {
   # Download or refresh the community templates (from the template project on GitHub) into a named volume first.
   docker run --rm -v mdarix-scan-nuclei-templates:/root/nuclei-templates "${IMG_NUCLEI}" -ut -duc \
     > "${REPORTS}/nuclei-templates.log" 2>&1
+  # -pt http: HTTP templates only (the target is an HTTP API; the full set took over an hour in the trial run).
   # -ni: no out-of-band interaction server, so no request leaves the machine to a third-party callback host.
   docker run --rm --network "${SCAN_NETWORK}" -v mdarix-scan-nuclei-templates:/root/nuclei-templates \
-    -v "${REPORTS_HOST}/nuclei:/out" "${IMG_NUCLEI}" -u "${SCAN_TARGET}" -ni -duc -silent -etags dos \
+    -v "${REPORTS_HOST}/nuclei:/out" "${IMG_NUCLEI}" -u "${SCAN_TARGET}" -pt http -ni -duc -silent -etags dos \
     -rate-limit 50 -jsonl -o /out/nuclei.jsonl > "${REPORTS}/nuclei.log" 2>&1
   local rc=$?
   if [ ${rc} -eq 0 ]; then touch "${REPORTS}/nuclei/nuclei.jsonl"; record nuclei ran "community templates, dos excluded"; else record nuclei failed "exit ${rc}, see nuclei.log"; fi
