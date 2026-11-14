@@ -105,6 +105,7 @@ def enqueue_provider_records(
                 event_name=event_name,
                 aggregate_type=f"{provider}:{entity}",
                 payload={
+                    "tenant_id": str(tenant_id),  # the worker checks it against the row (RSK-026) and routes by it
                     "tenant_key": tenant_key,
                     "provider": provider,
                     "entity": entity,
