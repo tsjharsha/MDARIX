@@ -100,7 +100,28 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     sample["product_facts"] = seed_product_facts(db, tenant_id)
     # Day 0 is calm: what the story does not need open is finished (sample_calm.py). Last: it reads the triage list.
     sample["calm"] = stage_calm_story(db, tenant_id, now)
+    # 0.10.93 (B2 spec 9.2): the sample's complaints are owned in MDARIX from the start, as the upgrade sets them in a
+    # trial created before it (scripts/cases_0_10_93.py then lists nothing for a new trial).
+    sample["record_owner"] = own_sample_complaints(db, tenant_id)
     return sample
+
+
+def own_sample_complaints(db: Session, tenant_id) -> int:
+    """Every sample complaint with no record owner yet: MDARIX (the sample is MDARIX's own). Flushes; returns how many."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    rows = (
+        db.query(Complaint)
+        .filter(
+            Complaint.tenant_id == tenant_id, Complaint.source_system == SAMPLE_SOURCE, Complaint.record_owner.is_(None)
+        )
+        .all()
+    )
+    for row in rows:
+        row.record_owner = "MDARIX"
+    db.flush()
+    return len(rows)
 
 
 def anchor_of(request) -> datetime | None:

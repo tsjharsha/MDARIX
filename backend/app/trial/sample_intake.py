@@ -39,6 +39,7 @@ from backend.app.trial.sample_data import SAMPLE_SOURCE
 logger = logging.getLogger("mdarix.trial.sample_intake")
 
 MARKER = "SAMPLE-CALL-01"
+CHANNEL_OF_KIND = {"CONTACT": "PHONE", "URGENT": "PHONE"}  # as scripts/cases_0_10_93.py sets a trial's older Cases
 RT05_EVENT_DAYS = 33  # sample_dispositions.LATE_EVENT_DAYS["SAMPLE-RT-05"]
 STORY_CASE = "SAMPLE-CASE-11"
 # "More cases to try" on Getting started (spec 4.8), in order; each is shown with its own outcome as the record says.
@@ -90,7 +91,7 @@ def _contacts(now: datetime) -> list[dict]:
             "patient by hand. They want the battery pack checked and replaced.",
             "reporter_type": "Hospital",
             "site": "Sample Klinikum Nord (Sample)",
-            "country": "Germany",
+            "country": "DE",
             "requested": "REPAIR",
             "environment": "AMBULANCE",
             "user": "HEALTHCARE_PROFESSIONAL",
@@ -176,7 +177,7 @@ def stage_sample_intake(db: Session, tenant_id, now: datetime | None = None) -> 
     from backend.app.db.models.foundation import LotBatch, Product, SignedApprovalRecord
     from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, TriageRecord
     from backend.app.human_decision.rules import fingerprint, signature_hash
-    from backend.app.intake import rules, service
+    from backend.app.intake import case_rules, rules, service, triage_rules
     from backend.app.reportability import markets
     from backend.app.standards import STARTER_MARK
     from backend.app.trial.sample_decision import SAMPLE_AUTHOR_ROLE, sample_author
@@ -217,7 +218,7 @@ def stage_sample_intake(db: Session, tenant_id, now: datetime | None = None) -> 
                 use_environment=item["environment"],
                 user_type=item["user"],
                 event_at=item.get("event"),
-                event_zone="Europe/Berlin" if item["country"] == "Germany" else "UTC" if item.get("event") else None,
+                event_zone="Europe/Berlin" if item["country"] == "DE" else "UTC" if item.get("event") else None,
                 first_knowledge_at=item.get("first_knowledge"),
                 first_knowledge_zone="America/Chicago" if item.get("first_knowledge") else None,
                 first_knowledge_party="DISTRIBUTOR" if item.get("first_knowledge") else None,
@@ -226,6 +227,11 @@ def stage_sample_intake(db: Session, tenant_id, now: datetime | None = None) -> 
                 awareness_at=received if item["kind"] == "CONTACT" else None,
                 awareness_zone="UTC" if item["kind"] == "CONTACT" else None,
                 service_ticket=item.get("ticket"),
+                # 0.10.93 (B2 spec 9.2): the Case fields a new trial reads correctly from the start. Each Case still
+                # open is its logger's; a signed Case's state is set where it is signed below.
+                channel=CHANNEL_OF_KIND[item["kind"]],
+                record_owner="MDARIX",
+                owner_id=author if item.get("signed") is None else None,
                 source_system=SAMPLE_SOURCE,
                 created_by=author,
                 created_at=received,
@@ -305,29 +311,41 @@ def stage_sample_intake(db: Session, tenant_id, now: datetime | None = None) -> 
             check.signed_by, check.signed_at, check.updated_at = author, signed_at, signed_at
             counts["signed"] += 1
             if classification == rules.SERVICE_ONLY:
+                # Signed service only, its QA review open: "QA review", never "To check" (spec 9.2).
+                event.status = case_rules.IN_REVIEW
                 service.ensure_review_task(db, tenant_id, event, check, author, signed_at)
             else:
                 service.ensure_qms_task(db, tenant_id, event, author, signed_at)
                 _queue(db, tenant_id, event, service.QMS)
             if item.get("triaged"):
-                db.add(
-                    TriageRecord(
-                        tenant_id=tenant_id,
-                        subject_kind=service.INTAKE,
-                        subject_id=event.id,
-                        opened_at=received,
-                        target_hours=rules.TRIAGE_TARGET_HOURS,
-                        severity=markets.SERIOUS,
-                        event_owner=author,
-                        triage_owner=author,
-                        immediate_action="Battery pack replaced on site; the removed pack kept for evaluation.",
-                        completed_by=author,
-                        completed_at=received + timedelta(hours=3),
-                        source_system=SAMPLE_SOURCE,
-                        created_by=author,
-                        created_at=received,
-                        updated_at=received + timedelta(hours=3),
-                    )
+                record = TriageRecord(
+                    tenant_id=tenant_id,
+                    subject_kind=service.INTAKE,
+                    subject_id=event.id,
+                    opened_at=received,
+                    target_hours=rules.TRIAGE_TARGET_HOURS,
+                    severity=markets.SERIOUS,
+                    speed=triage_rules.FAST,
+                    event_owner=author,
+                    triage_owner=author,
+                    immediate_action="Battery pack replaced on site; the removed pack kept for evaluation.",
+                    completed_by=author,
+                    completed_at=received + timedelta(hours=3),
+                    source_system=SAMPLE_SOURCE,
+                    created_by=author,
+                    created_at=received,
+                    updated_at=received + timedelta(hours=3),
+                )
+                db.add(record)
+                db.flush()
+                service.add_triage_version(
+                    db,
+                    tenant_id,
+                    record,
+                    None,
+                    author,
+                    record.completed_at,
+                    "Sample: triaged by the MDARIX sample author",
                 )
                 counts["triage_records"] += 1
         db.flush()
@@ -387,6 +405,8 @@ def stage_story_case(db: Session, tenant_id, author: str | None = None) -> int:
         use_environment="HOSPITAL_WARD",
         user_type="HEALTHCARE_PROFESSIONAL",
         channel="PHONE",
+        record_owner="MDARIX",
+        owner_id=author,
         event_at=flagship.event_timestamp,
         event_zone="UTC",
         received_at=received,

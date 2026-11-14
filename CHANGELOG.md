@@ -1201,6 +1201,24 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   it is dead-lettered at once (`PAYLOAD_TENANT_MISMATCH`), without retries, and the log names the event and both
   organizations, never the content. Every scheduled job now has a test with two organizations proving that its
   writes, e-mails and queued events stay in the organization each record belongs to (RSK-026).
+- The Cases update for trials created before 0.10.93 now writes: `scripts/cases_0_10_93.py --apply` does exactly what
+  its list shows (channel, country code, record owner, linked complaint, state, owner, the OD-3 escalations, triage
+  version rows and speed), per trial in that trial's own session, in batches, each change audited; it asks for the
+  typed confirmation "APPLY 0.10.93" and prints counts only. A second run changes nothing. Two kinds of record are
+  listed but left for the owner's decision: service-only Cases agreed in QA review with no resolution summary, and
+  sample triage records with no severity (F1, B2 spec 9.2).
+- A new trial's sample needs nothing from that update: its calls have their channel, owner and record owner,
+  SAMPLE-CALL-01 (signed service only) reads "QA review", finished sample triage records are fast-track with their
+  first version, and sample complaints are owned in MDARIX. The duplicate check compares countries by code, so a
+  Case's "DE" still matches a complaint's "Germany" (F2).
+- Bad input gets a 4xx instead of a server error: a malformed id on the product and investigation graphs and on a
+  product's investigations is not found (404); an offset past 10,000,000 on the product, supplier and communications
+  lists is refused (422); a retrieval query filtered by a record id runs (the ids were sent to the database as text),
+  and one naming an unknown investigation is not found (404); a malformed mapping rule in a preview is refused (422).
+- Platform Admin › Dead letters: an event the recovery check held after a restore is retried only after the mail
+  provider's log, recorded with `POST .../dead-letters/mail-log-check`, shows it was not delivered; otherwise the Retry
+  is refused (`HELD_AFTER_RESTORE`) and the refusal audited (B6b-D10). The console control to record the check is
+  still to come.
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 

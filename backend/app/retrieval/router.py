@@ -32,8 +32,20 @@ def query_retrieval(
 ) -> RetrievalResponse:
     from backend.app.rate_limit import enforce
 
+    from backend.app.db.models.foundation import Investigation
+
     enforce("search:user", ctx.user_id, SEARCH_LIMIT_MESSAGE)
     tenant_id = ctx.tenant_id
+    # The query is logged against its investigation: an unknown one is not found (404), never a database error.
+    if request.investigation_id is not None and (
+        db.query(Investigation.id)
+        .filter(Investigation.tenant_id == tenant_id, Investigation.id == request.investigation_id)
+        .first()
+        is None
+    ):
+        raise HTTPException(
+            status_code=404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation not found"}
+        )
     scoped_request = request.model_copy(update={"tenant_id": tenant_id})
     try:
         return service.retrieve(db, scoped_request)
