@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.7 |
+| Version | 0.8 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
-| Date | 13 Nov 2026 |
+| Date | 14 Nov 2026 |
 | Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
 
 Change history
@@ -24,6 +24,7 @@ Change history
 | 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight"): O17 big-bang gate (VMP-R50b, R50c); O18 a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test blocks (VMP-R49 split into R49 and R49a-c, VMP-R50 into R50 and R50a); O20 concrete OQ expected results and an OQ protocol approved before execution (lifecycle step 5; deliverables MDX-VAL-007-P and -007-R). After the second rating: VMP-R23 split into R23 and R23a-c | Sriharsha Telikicherla |
 | 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations"): VMP-R42a settles VMP-R42 against VMP-R49a for the first pack; OQ expected results derived from the requirement and confirmed (O27); content hash in `signatures.csv` (O31) | Sriharsha Telikicherla |
 | 0.7 | 13 Nov 2026 | Rating-4 finding 9: the counts of section 16.1 are a generated block (`scripts/validation_pack.py --update-counts`), never typed; the dated figures of the 12 Nov 2026 dry run are no longer restated | Sriharsha Telikicherla |
+| 0.8 | 14 Nov 2026 | B6b Parts C to E integrated: VMP-R38 cites MDX-SOP-002 CC-R17 (within 1 working day after the deploy); reference R17 (customer templates MDX-CUS-001 to -006); section 11 row for the customer templates (0.1 DRAFT, Word and Excel copies) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -65,6 +66,7 @@ B6b Part E). No document produced under this plan states that MDARIX is validate
 | R14 | 21 CFR Part 11; EU GMP Annex 11 | Assessed in MDX-SUP-003. Annex 11 is used as a benchmark only (owner decision B6b-D9) |
 | R15 | MDX-VAL-000 section 4 (owner decisions) and section 5 (codes) | This folder |
 | R16 | MDX-VAL-013 Consultant brief and question pack | This folder |
+| R17 | MDX-CUS-001 to -006 Customer templates | This folder; Word and Excel copies in customer-templates/ |
 
 - **VMP-R01** R4 to R7 shall be under document control in this folder and approved before this plan is approved as
   version 1.0 (they were moved here on 12 Nov 2026, owner decision O2).
@@ -256,7 +258,7 @@ validation at the end (section 9.4 sets when this starts).
 - **VMP-R37** A change to a class-A function, a rule floor or a sub-processor shall be notified to customers at least
   10 working days before the deploy (owner decision B6b-D14).
 - **VMP-R38** An emergency security fix shall be notified to customers after the deploy, within the period the
-  change-control SOP (MDX-SOP-002) sets. (Testable once MDX-SOP-002 is written, B6b Part C.)
+  change-control SOP (MDX-SOP-002) sets. (MDX-SOP-002 CC-R17 sets the period: within 1 working day after the deploy.)
 - **VMP-R39** A release folder holding a signed approval shall not be overwritten.
 - **VMP-R40** A correction to a signed release record shall be a new version that names the one it replaces.
 
@@ -329,7 +331,7 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 | MDX-SOP-001 to -005 | SDLC, change control, incident response, backup and business continuity, access control | Before the first paid pilot | C |
 | MDX-OPS-001 | Recovery record | At each quarterly restore drill | D |
 | MDX-OPS-002 | Health report per organisation | Monthly from one month after go-live | D |
-| MDX-CUS-001 to -006 | Customer templates | Before the first paid pilot | E |
+| MDX-CUS-001 to -006 | Customer templates (0.1 DRAFT, 14 Nov 2026; Word and Excel copies in customer-templates/, scripts/customer_templates.py) | Before the first paid pilot | E |
 
 ## 12. Acceptance criteria for a release
 
