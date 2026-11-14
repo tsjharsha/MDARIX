@@ -125,3 +125,201 @@ def test_a_business_identifier_is_still_assigned_under_the_runtime_role():
             {"t": tenant_a, "code": f"DB1-{uuid.uuid4().hex[:8]}"},
         )
         assert business_id and business_id.startswith("PROD")
+
+
+# --- DB-01 and PV-1 F1: references between organization tables (tr22, tr23) -------------------------------------
+
+# A reference between two organization tables that may leave out tenant_id, with the reason (DB-15).
+SINGLE_COLUMN_ALLOWED = {
+    "fk_provisioning_job_steps_provisioning_job_id_provisioning_jobs": "a step's tenant_id may be empty; the "
+    "composite reference stands beside it",
+}
+
+
+def test_every_reference_between_organization_tables_includes_the_organization():
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                """
+                WITH owned AS (SELECT attrelid FROM pg_attribute WHERE attname = 'tenant_id' AND NOT attisdropped)
+                SELECT con.conname,
+                       EXISTS (SELECT 1 FROM unnest(con.conkey) k JOIN pg_attribute a
+                               ON a.attrelid = con.conrelid AND a.attnum = k WHERE a.attname = 'tenant_id'),
+                       EXISTS (SELECT 1 FROM unnest(con.confkey) k JOIN pg_attribute a
+                               ON a.attrelid = con.confrelid AND a.attnum = k WHERE a.attname = 'tenant_id')
+                FROM pg_constraint con JOIN pg_class parent ON parent.oid = con.confrelid
+                JOIN pg_namespace n ON n.oid = parent.relnamespace
+                WHERE con.contype = 'f' AND n.nspname = 'public' AND parent.relname <> 'tenants'
+                  AND con.conrelid IN (SELECT attrelid FROM owned) AND con.confrelid IN (SELECT attrelid FROM owned)
+                """
+            )
+        ).all()
+    assert len(rows) > 100, "the catalogue was not read from a migrated database"
+    missing = sorted(
+        name for name, child, parent in rows if not (child and parent) and name not in SINGLE_COLUMN_ALLOWED
+    )
+    assert not missing, "Make these references composite (tenant_id, x_id): " + ", ".join(missing)
+
+
+def _copy_row(connection, table: str, changes: dict) -> uuid.UUID | None:
+    """Insert a copy of one existing row of ``table`` with ``changes`` (business_id is reassigned); None without one."""
+    columns = list(
+        connection.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :t "
+                "AND column_name NOT IN ('id', 'business_id') AND is_generated = 'NEVER' ORDER BY ordinal_position"
+            ),
+            {"t": table},
+        ).scalars()
+    )
+    if not connection.execute(text(f"SELECT 1 FROM {table} LIMIT 1")).first():
+        return None
+    values = ", ".join(f":{name}" if name in changes else name for name in columns)
+    return connection.execute(
+        text(
+            f"INSERT INTO {table} (id, {', '.join(columns)}) SELECT gen_random_uuid(), {values} FROM {table} "
+            "LIMIT 1 RETURNING id"
+        ),
+        changes,
+    ).scalar()
+
+
+def test_an_organization_cannot_reference_another_organizations_row_even_under_the_runtime_role():
+    """The reverse of db-audit t_crossfk.sql: tenant A's staged record pointing at B's ingestion run is refused."""
+    with engine.connect() as connection:
+        tenant_a, tenant_b = _two_tenants(connection)
+        connection.rollback()
+        with connection.begin():
+            run_b = _copy_row(connection, "ingestion_runs", {"tenant_id": tenant_b})
+    if run_b is None:
+        pytest.skip("the test database has no ingestion run to copy")
+    try:
+        with as_runtime(system=True) as connection:
+            # Copy as system scope (every row visible), then act as tenant A for the insert itself.
+            source = connection.execute(text("SELECT * FROM staged_source_records LIMIT 1")).mappings().one()
+        with as_runtime(tenant_a) as connection:
+            columns = [c for c in source.keys() if c not in ("id", "business_id")]
+            row = {
+                **source,
+                "tenant_id": tenant_a,
+                "ingestion_run_id": run_b,
+                "source_record_id": f"DB1-{uuid.uuid4()}",
+            }
+            with pytest.raises(DBAPIError) as refused:
+                connection.execute(
+                    text(
+                        f"INSERT INTO staged_source_records ({', '.join(columns)}) "
+                        f"VALUES ({', '.join(':' + c for c in columns)})"
+                    ),
+                    {c: row[c] for c in columns},
+                )
+            assert "fk_staged_source_records_ingestion_run_id_tenant" in str(refused.value)
+    finally:
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM ingestion_runs WHERE id = :id"), {"id": run_b})
+
+
+def _versions_of_two_products(connection):
+    """(tenant, product A, product B, a version of B), created in the caller's transaction."""
+    tenant, _ = _two_tenants(connection)
+    stamp = uuid.uuid4().hex[:8]
+    products = [
+        connection.scalar(
+            text(
+                "INSERT INTO products (id, tenant_id, product_identifier, name, created_at, updated_at) "
+                "VALUES (gen_random_uuid(), :t, :code, :code, now(), now()) RETURNING id"
+            ),
+            {"t": tenant, "code": f"DB1-{stamp}-{suffix}"},
+        )
+        for suffix in ("A", "B")
+    ]
+    version_b = connection.scalar(
+        text(
+            "INSERT INTO product_versions (id, tenant_id, product_id, version_identifier, created_at, updated_at) "
+            "VALUES (gen_random_uuid(), :t, :p, 'Rev B1', now(), now()) RETURNING id"
+        ),
+        {"t": tenant, "p": products[1]},
+    )
+    return tenant, products[0], products[1], version_b
+
+
+def _row_of(connection, table: str, tenant) -> uuid.UUID:
+    """A row of ``table`` moved to ``tenant`` with no product (checks off for the move), in the open transaction."""
+    row = connection.scalar(text(f"SELECT id FROM {table} LIMIT 1"))
+    if row is None:
+        pytest.skip(f"the test database has no {table} row")
+    connection.execute(text("SET LOCAL session_replication_role = replica"))
+    connection.execute(
+        text(f"UPDATE {table} SET tenant_id = :t, product_id = NULL, product_version_id = NULL WHERE id = :id"),
+        {"t": tenant, "id": row},
+    )
+    connection.execute(text("SET LOCAL session_replication_role = origin"))
+    return row
+
+
+@pytest.mark.parametrize("table", ["complaints", "risks", "requirements"])
+def test_a_records_version_must_be_a_version_of_its_product(table):
+    with engine.connect() as connection:
+        connection.begin()
+        try:
+            tenant, product_a, _product_b, version_b = _versions_of_two_products(connection)
+            row = _row_of(connection, table, tenant)
+            with pytest.raises(DBAPIError) as other_product, connection.begin_nested():
+                connection.execute(
+                    text(f"UPDATE {table} SET product_id = :p, product_version_id = :v WHERE id = :id"),
+                    {"p": product_a, "v": version_b, "id": row},
+                )
+            assert f"fk_{table}_version_of_product" in str(other_product.value)
+            with pytest.raises(DBAPIError) as no_product, connection.begin_nested():
+                connection.execute(
+                    text(f"UPDATE {table} SET product_id = NULL, product_version_id = :v WHERE id = :id"),
+                    {"v": version_b, "id": row},
+                )
+            assert f"ck_{table}_version_needs_product" in str(no_product.value)
+        finally:
+            connection.rollback()
+
+
+def test_every_table_with_a_product_and_a_version_has_the_version_rule():
+    from infrastructure.database.migrations.tenant_references import PRODUCT_VERSION_TABLES
+
+    with engine.connect() as connection:
+        tables = set(
+            connection.execute(
+                text(
+                    "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' "
+                    "AND column_name = 'product_version_id' AND table_name IN (SELECT table_name FROM "
+                    "information_schema.columns WHERE table_schema = 'public' AND column_name = 'product_id')"
+                )
+            ).scalars()
+        )
+        names = set(connection.execute(text("SELECT conname FROM pg_constraint")).scalars())
+    # case_contexts is outside PV-1 F1's list (DB-1 open question to the owner).
+    assert tables - {"case_contexts"} == set(PRODUCT_VERSION_TABLES)
+    missing = [
+        t for t in PRODUCT_VERSION_TABLES if {f"fk_{t}_version_of_product", f"ck_{t}_version_needs_product"} - names
+    ]
+    assert not missing, missing
+
+
+def test_the_pre_check_counts_rows_that_break_the_rules():
+    """tr22's count, on a row written with the reference checks switched off (as old data may be)."""
+    from infrastructure.database.migrations.tenant_references import refusal, violation_counts
+
+    with engine.connect() as connection:
+        connection.begin()
+        try:
+            assert refusal(violation_counts(connection)) is None
+            tenant, product_a, _product_b, version_b = _versions_of_two_products(connection)
+            complaint = _row_of(connection, "complaints", tenant)
+            connection.execute(text("SET LOCAL session_replication_role = replica"))
+            connection.execute(
+                text("UPDATE complaints SET product_id = :p, product_version_id = :v WHERE id = :id"),
+                {"p": product_a, "v": version_b, "id": complaint},
+            )
+            counts = dict(violation_counts(connection))
+            assert counts["complaints: a version of another product or organization, or none"] == 1
+            message = refusal(list(counts.items()))
+            assert message and "complaints: a version of another product" in message
+        finally:
+            connection.rollback()

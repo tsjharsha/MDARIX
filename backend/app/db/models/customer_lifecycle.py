@@ -248,13 +248,19 @@ class CellHeartbeat(Base):
     __tablename__ = "cell_heartbeats"
     id = uuid_pk()
     tenant_id = tenant_fk()
-    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)
+    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     received_at = tz(False)
     software_version: Mapped[str | None] = mapped_column(String(80))
     schema_version: Mapped[str | None] = mapped_column(String(80))
     health: Mapped[str | None] = mapped_column(String(30))
     metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_cell_heartbeats_tenant_id"),)
+    __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "cell_id"], ["cells.tenant_id", "cells.id"], name="fk_cell_heartbeats_cell_id_tenant"
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_cell_heartbeats_tenant_id"),
+    )
 
 
 class Package(Base):
@@ -501,6 +507,10 @@ class CustomerOnboardingDraft(Base):
 
 class ProvisioningJob(Base):
     __tablename__ = "provisioning_jobs"
+    __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_provisioning_jobs_tenant_id_id"),
+    )
     id = uuid_pk()
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
@@ -531,7 +541,15 @@ class ProvisioningJobStep(Base):
     completed_at = tz()
     created_at = tz(False)
     updated_at = tz(False)
-    __table_args__ = (UniqueConstraint("provisioning_job_id", "step_code", name="uq_provisioning_job_step"),)
+    __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "provisioning_job_id"],
+            ["provisioning_jobs.tenant_id", "provisioning_jobs.id"],
+            name="fk_provisioning_job_steps_provisioning_job_id_tenant",
+        ),
+        UniqueConstraint("provisioning_job_id", "step_code", name="uq_provisioning_job_step"),
+    )
 
 
 class ConfigurationBaseline(Base):

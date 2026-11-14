@@ -133,7 +133,8 @@ class SourceRecord(Base):
 class TenantOwned:
     id = uuid_pk()
     tenant_id = tenant_fk()
-    source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_records.id"))
+    # DB-1 (tr23): the source record is the organization's own, so the reference is composite (added below).
+    source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_system: Mapped[str | None] = mapped_column(String(120))
     source_identifier: Mapped[str | None] = mapped_column(String(255))
     source_timestamp = tz()
@@ -142,6 +143,16 @@ class TenantOwned:
     ingestion_timestamp = tz()
     created_at = tz(False)
     updated_at = tz(False)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.__table__.append_constraint(
+            ForeignKeyConstraint(
+                ["tenant_id", "source_record_id"],
+                ["source_records.tenant_id", "source_records.id"],
+                name=f"fk_{cls.__tablename__}_source_record_id_tenant",
+            )
+        )
 
 
 class Product(TenantOwned, Base):
@@ -180,6 +191,8 @@ class ProductVersion(TenantOwned, Base):
     lifecycle_status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
     release_timestamp = tz()
     __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "product_id", "id", name="uq_product_versions_tenant_product_id"),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         UniqueConstraint(
             "tenant_id", "product_id", "version_identifier", name="uq_product_versions_tenant_product_version"
@@ -262,6 +275,13 @@ class Requirement(TenantOwned, Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_requirements_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]
@@ -326,6 +346,13 @@ class Complaint(TenantOwned, Base):
     last_synced_at = tz()
     record_owner: Mapped[str | None] = mapped_column(String(10))
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_complaints_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         CheckConstraint(
             "service_status IS NULL OR service_status IN ('OPEN','IN_PROGRESS','COMPLETE')",
             name="complaint_service_status_known",
@@ -411,6 +438,13 @@ class Risk(TenantOwned, Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_risks_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]
@@ -633,6 +667,13 @@ class Decision(Base):
     root_cause_attribution: Mapped[str | None] = mapped_column(String(30))
     attribution_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_decisions_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "decision_identifier", name="uq_decisions_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_decisions_tenant_id_id"),
@@ -712,6 +753,13 @@ class InvestigationBrief(Base):
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_investigation_briefs_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint(
             "tenant_id", "investigation_id", "brief_version", name="uq_briefs_tenant_investigation_version"
@@ -742,6 +790,13 @@ class AssuranceResult(Base):
     configuration_hash: Mapped[str | None] = mapped_column(String(64))
     created_at = tz(False)
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_assurance_results_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "ai_execution_id"], ["ai_executions.tenant_id", "ai_executions.id"]),
         UniqueConstraint("tenant_id", "id", name="uq_assurance_results_tenant_id_id"),
     )

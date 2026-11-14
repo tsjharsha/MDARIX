@@ -105,6 +105,17 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   forced row-level security: everyone reads it, only system scope writes it. `scripts/grant_runtime_privileges.py`,
   `upgrade_data_planes.py` and `migrate_data_planes.py` revoke the same writes, so a deploy does not give them back.
 
+- Migration `tr22tenantfkcheck` (DB-01 pre-check, changes nothing): counts the rows that point at another
+  organization's row, or whose product version is set without a product or is not a version of that product, and
+  stops the upgrade with the counts if any is above zero. `scripts/check_tenant_references.py` prints the same
+  counts, read only, for a copy of a production backup.
+- Migration `tr23compositetenantfks` (DB-01, PV-1 F1 and F15): the 41 single-column references between
+  organization tables become composite `(tenant_id, x_id)`, so the database refuses a row that points at another
+  organization's row even when a code path forgets the check (the provisioning job step keeps both, its
+  organization may be empty). Complaints, risks, requirements, signals, intake events, decisions, investigation
+  briefs, assurance results and AI interactions may only carry a version of their own product, and never a version
+  without a product: the master-data rule VERSION_BELONGS_TO_PRODUCT now has its enforcer.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration

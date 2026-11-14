@@ -189,6 +189,13 @@ class IntakeEvent(Base):
     record_owner: Mapped[str | None] = mapped_column(String(10))
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_intake_events_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         UniqueConstraint("tenant_id", "reference", name="uq_intake_events_reference"),
         UniqueConstraint("tenant_id", "id", name="uq_intake_events_tenant_id_id"),
         ForeignKeyConstraint(
@@ -252,8 +259,12 @@ class FirstContactCheck(Base):
     history = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
 
     __table_args__ = (
+        # DB-1 (tr23).
         ForeignKeyConstraint(
-            ["intake_event_id"], ["intake_events.id"], name="fk_first_contact_checks_event", ondelete="CASCADE"
+            ["tenant_id", "intake_event_id"],
+            ["intake_events.tenant_id", "intake_events.id"],
+            name="fk_first_contact_checks_intake_event_id_tenant",
+            ondelete="CASCADE",
         ),
         UniqueConstraint("intake_event_id", "version", name="uq_first_contact_checks_version"),
         CheckConstraint(_in("suggestion", (*FIRST_CONTACT_OUTCOMES, UNANSWERED)), name="suggestion"),
