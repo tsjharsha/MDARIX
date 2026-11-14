@@ -99,6 +99,24 @@ def test_allow_list_line_without_a_reason_is_refused(tmp_path):
         load_allowlist(str(allow))
 
 
+def test_shipped_allow_list_covers_reviewed_sql_files_only():
+    """The reviewed hand-written SQL is allow-listed per file, so the same rule in an unreviewed file still counts."""
+    from scripts.security_scan_summary import Finding
+
+    entries = load_allowlist("infrastructure/security-scan/allowlist.txt")
+    rule = "python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text"
+
+    def allowed(tool, rule_id, location):
+        finding = Finding(tool, "Medium", rule_id, location, "")
+        return any(entry.matches(finding) for entry in entries)
+
+    assert allowed("semgrep", rule, "backend/app/tenant_purge.py:118")
+    assert allowed("bandit", "B608", "backend/app/tenant_purge.py:118")
+    assert not allowed("semgrep", rule, "backend/app/new_module.py:1")
+    assert not allowed("bandit", "B608", "backend/app/new_module.py:1")
+    assert all("2026-" in entry.reason for entry in entries)
+
+
 def test_main_writes_summary_and_findings(reports):
     assert main([str(reports), "--allowlist", ""]) == 0
 
