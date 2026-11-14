@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKeyConstraint, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,6 +11,10 @@ from .foundation import tenant_fk, tz, uuid_pk
 
 class ConnectorRun(Base):
     __tablename__ = "connector_runs"
+    __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_connector_runs_tenant_id_id"),
+    )
     id = uuid_pk()
     tenant_id = tenant_fk()
     connection_id: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -36,9 +40,7 @@ class ConnectorSourceRecord(Base):
     __tablename__ = "connector_source_records"
     id = uuid_pk()
     tenant_id = tenant_fk()
-    connector_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("connector_runs.id"), nullable=False
-    )
+    connector_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     source_system: Mapped[str] = mapped_column(String(120), nullable=False)
     source_record_id: Mapped[str] = mapped_column(String(255), nullable=False)
     source_record_version: Mapped[str | None] = mapped_column(String(120))
@@ -49,6 +51,12 @@ class ConnectorSourceRecord(Base):
     ingested_at = tz(False)
     created_at = tz(False)
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "connector_run_id"],
+            ["connector_runs.tenant_id", "connector_runs.id"],
+            name="fk_connector_source_records_connector_run_id_tenant",
+        ),
         UniqueConstraint(
             "tenant_id",
             "source_system",
@@ -61,11 +69,17 @@ class ConnectorSourceRecord(Base):
 
 class ReconciliationRecord(Base):
     __tablename__ = "connector_reconciliations"
+    __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "connector_run_id"],
+            ["connector_runs.tenant_id", "connector_runs.id"],
+            name="fk_connector_reconciliations_connector_run_id_tenant",
+        ),
+    )
     id = uuid_pk()
     tenant_id = tenant_fk()
-    connector_run_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("connector_runs.id"), nullable=False
-    )
+    connector_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     expected_count: Mapped[int] = mapped_column(nullable=False)
     received_count: Mapped[int] = mapped_column(nullable=False)
     accepted_count: Mapped[int] = mapped_column(nullable=False)
