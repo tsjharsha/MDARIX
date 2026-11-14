@@ -99,7 +99,7 @@ Requirement wording is a first draft from the specs and code; each will be confi
 | REQ-RPT-003 | Floor questions cannot be removed, reworded or lowered by organisation rules | A | 003, 006 | DT-01, DT-02, DT-03, DT-36 | (B4b, not built) |
 | REQ-RPT-004 | A signed conclusion names the rule version used; a later version never changes it | A | 004 | RG-12, DT-17, DT-18, DT-20 | `tests/test_release_0_10_88_resign.py` |
 | REQ-RPT-005 | Floor rules give the same outcome and report type as 0.10.92 for every Yes/No/Unknown combination | A | 003 | DT-37, DT-33 | (B4, to add) |
-| REQ-CLK-001 | Deadlines are counted in the authority's time zone and the organisation's, taking the earlier | A | 002 | RG-10, RG-11, DT-16 | `tests/test_legal_deadlines.py` |
+| REQ-CLK-001 | Deadlines are counted in the authority's time zone and the organisation's: the earlier of the two latest days, ending at the earlier end, also when awareness falls on different days in the two zones (rev B, owner decision O35, 14 Nov 2026; text in `requirements.csv`) | A | 002 | RG-10, RG-11, DT-16 | `tests/test_legal_deadlines.py` |
 | REQ-CLK-002 | Every screen, export and reminder uses the same deadline | A | 002 | TR-12, RG-10 | `tests/test_one_deadline_api.py` |
 | REQ-CLK-003 | No country known: every market's shortest clock applies | A | 005 | RG-06, TR-40 | `tests/test_intake_triage_api.py` |
 | REQ-AWR-001 | Awareness is the earliest known first knowledge; linking keeps the earliest | A | 007 | RG-09, CI-06, TR-04 | `tests/test_intake_rules.py` |

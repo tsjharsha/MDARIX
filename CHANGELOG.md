@@ -130,6 +130,13 @@ code).
   `scripts/customer_templates.py` into `docs/validation/customer-templates/` (`--check` for stale copies);
   `tests/test_customer_templates.py`.
 ### Changed
+- **Owner decisions of 14 Nov 2026 (O35 to O38):** REQ-CLK-001 revision B states what the code does (the earlier of
+  the two latest days when awareness falls on different days in the two time zones, ending at the earlier end), with
+  consultant question 18a; the deviation log gains `customer_scope` (`all` or a customer code), checked by
+  `scripts/validation_pack.py`, and `scripts/health_report.py` shows a customer only the deviations scoped `all` or to
+  its own code (a row without a valid scope refuses the report); Part C time limits confirmed as written; production
+  two-factor roles are the standard list. A held notification is never sent with the console "Retry": planned code
+  control (cut-off fixes, 14 Nov 2026), the restore runbook until it is merged.
 - **Run 7 documents:** RSK-036, RSK-066 and RSK-011 "Acceptable after verification" after the control-gap fixes
   (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 "Acceptable after
   verification" with its fix and tests, deviation DEV-0.11.04-002 open until the owner accepts it; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA

@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-013 |
 | Title | Consultant brief and question pack |
-| Version | 0.5 |
+| Version | 0.6 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42: the quality approver is the author) |
 | Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 14 Nov 2026 |
 | Code baseline | Product code at `628c624a`, plus three changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10) |
 
 Change history
@@ -22,6 +22,7 @@ Change history
 | 0.3 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): question 24 on the interim release approval record (O13); MDX-VAL-008, -010 and the -012 template added to the documents to review | Srinivas Telikicherla |
 | 0.4 | 12 Nov 2026 | Section 6 states exactly what a signer re-enters at each signing (password and a fresh authenticator code), after the second rating | Srinivas Telikicherla |
 | 0.5 | 12 Nov 2026 | Question 25 on the back-fill recorded as DEV-0.11.04-001 (owner, 12 Nov 2026) | Srinivas Telikicherla |
+| 0.6 | 14 Nov 2026 | Question 18a, next to the RSK-002 counting-rule question 18: REQ-CLK-001 rev B, the earlier of the two latest days when awareness falls on different days in the two time zones (owner decision O35) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -130,6 +131,7 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 16 | An Open class-A failure mode that a release relies on is accepted by the quality approver with an interim control and a due date: acceptable, and what limits would you set? | MDX-VAL-002 RA-R07 |
 | 17 | Retention of validation records: 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices. Acceptable? | MDX-VAL-001 section 16.4 (owner decision O1) |
 | 18 | The starter question sets and floor rules per market: who should check them against the regulations, and how often? Please also check the GB, India day-1 and Canada counting rules | MDX-VAL-002 RSK-002, RSK-003 |
+| 18a | REQ-CLK-001 rev B (owner decision O35): when the moment of awareness falls on different days in the organisation's time zone and the authority's, the latest day is the earlier of the two latest days, ending at the earlier end; the earlier deadline wins (the safer side). Example: awareness 23:30 UTC on Mon 9 Mar 2026, EU authority (Brussels, already Tue 10 Mar) and organisation in New York (still Mon 9 Mar), 15 calendar days: 24 Mar, ending at 23:59 Brussels time. Is that counting rule acceptable to the authorities, or must the authority's own day always be used? | MDX-VAL-002 RSK-002; `requirements.csv` REQ-CLK-001; `tests/test_legal_deadlines.py::test_the_earlier_day_of_the_two_time_zones_is_the_latest_day` |
 | 19 | Customer-written organisation rules can only raise an outcome. Do they need any customer test beyond the UAT/PQ template? | MDX-VAL-003 OP-2 |
 | 20 | Should a customer's ISO 14971 risk management file reference MDARIX's product risk assessment? | MDX-VAL-002 OP-4 |
 | 21 | Two founders, who are related (father and son), cover system owner and quality approver, with each approving the other's documents. Mitigations: the segregation-of-duties rules (MDX-VAL-001 section 6; the approver is never the author, DC-R40) and your review of the first full release pack. Is that segregation of duties enough for the first pilots, and when should a third person be added? | MDX-VAL-001 section 6 |

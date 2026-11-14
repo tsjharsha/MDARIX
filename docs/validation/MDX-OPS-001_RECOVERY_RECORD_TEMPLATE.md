@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-OPS-001 (template); each executed record is MDX-OPS-001-&lt;YYYYMMDD&gt; |
 | Title | Recovery record: restore drill or recovery of production |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT (template; no record executed yet) |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (executes the recovery and fills the record) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part D, D5 template). The first executed record waits for the next quarterly drill on a production backup copy, with the owner | Sriharsha Telikicherla |
+| 0.2 | 14 Nov 2026 | RR-05a: no console "Retry" of a held notification; planned code control (cut-off fixes, 14 Nov 2026), runbook until merged | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -36,6 +37,9 @@ REQ-BAK-001, REQ-BAK-003 and REQ-BAK-004 in a release pack, and the source of ea
 - RR-04: Every FLAG shall have a written explanation in section 4 before the system opens.
 - RR-05: A held notification shall be replayed only when the mail provider's log shows it as not sent; each replay
   shall be listed in section 5 with its log reference.
+- RR-05a: A held notification shall never be sent again with the console "Retry" (Platform Admin > Operations >
+  Queues & jobs), which skips the mail-log check. Control: planned code control (cut-off fixes, 14 Nov 2026), which
+  makes Retry refuse a notification held after a restore; the runbook (section 2, step 6) until it is merged.
 - RR-06: The GxP workflow check shall run on a scratch copy of the same backup, never as test data in production
   (owner decision B6b-D15).
 - RR-07: A drill with a missing or wrong backup key shall be recorded as FAIL with a deviation, never as a pass

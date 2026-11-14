@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-SUP-001 |
 | Title | MDARIX supplier pack for customers' supplier qualification |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver |
 | Reviewer | Independent CSV consultant (not engaged yet) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part C, item C1) | Srinivas Telikicherla |
+| 0.2 | 14 Nov 2026 | OP-5 closed: SP-R02 and the emergency-notice period confirmed as written (owner decision O37) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -159,7 +160,7 @@ not used: AI is off for every organisation (`legal/SUBPROCESSORS.md:18`).
 | OP-2 | Obtain the provider audit reports and terms (MDX-SUP-004 section 3) | Owner |
 | OP-3 | Fill the named roles of `docs/handover/52_SUPPORT_AND_OWNERSHIP_HANDOVER.md` before the first pilot | Owner |
 | OP-4 | `docs/compliance/DATA_RETENTION_SCHEDULE.md:48` states 14 days for local backups; `docs/runbooks/BACKUP_AND_RESTORE.md:15-21` states 30 daily and 12 monthly (owner decision, 5 Nov 2026). Correct the retention schedule | System owner |
-| OP-5 | The questionnaire response time (SP-R02) and the emergency-notice period (section 5) are first set here and in MDX-SOP-002; owner to confirm | Owner |
+| OP-5 | Closed: the questionnaire response time (SP-R02, 10 working days) and the emergency-notice period (section 5; MDX-SOP-002 CC-R17, 1 working day) confirmed as written by the owner, 14 Nov 2026 (MDX-VAL-000 owner decision O37) | Owner |
 
 ## Signatures
 

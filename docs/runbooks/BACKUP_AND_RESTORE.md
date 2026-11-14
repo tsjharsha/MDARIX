@@ -128,7 +128,10 @@ files are stored locally, and `MANIFEST.sha256`. Database connections use the ap
    `--dry-run` lists the events it would hold and changes nothing.
 6. **Held notifications.** For each held event, check the mail provider's log. Replay only those it shows as not
    sent: `python scripts/replay_outbox.py <event id> --reason "<provider log reference>: not sent"`. A missed daily
-   deadline list is sent again by the next day's run; do not replay it.
+   deadline list is sent again by the next day's run; do not replay it. Never use the console "Retry"
+   (Platform Admin > Operations > Queues & jobs) for a held notification: it would send it without the mail-log
+   check. Control: planned code control (cut-off fixes, 14 Nov 2026), which makes Retry refuse a notification held
+   after a restore; this runbook until it is merged.
 7. A restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`).
 8. **Sign in with MFA once per role** used by customers (Platform Administrator, customer administrator, reviewer,
    regulatory reviewer), on the drill copy only.
