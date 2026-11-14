@@ -20,7 +20,7 @@ from auth.emailer import smtp_configuration_status
 from backend.app import support_access
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
-from backend.app.access.schemas import QueueItemsAction
+from backend.app.access.schemas import MailLogCheck, QueueItemsAction
 from backend.app.access.trends import daily as _daily, per_day as _per_day, run_outcome, window
 from backend.app.business_ids import wanted_ids
 from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
@@ -731,6 +731,12 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
 # Work that gave up after its retries ---------------------------------------------------------------------------
 
 DEAD_LETTER_LIMIT = 500
+# The marker scripts/recovery_check.py (B6b Part D, D1 step 6) leaves on every event a restored copy had not sent:
+# dead-lettered with this last_error and an OUTBOX_EVENTS_HELD_AFTER_RESTORE audit record. Production may already have
+# sent it, so it is retried only when the mail provider's log, checked and recorded here, shows it was not delivered.
+HELD_AFTER_RESTORE = "held after restore"
+MAIL_LOG_CHECKED = "OUTBOX_MAIL_LOG_CHECKED"
+NOT_DELIVERED = "NOT_DELIVERED"
 
 
 def _dead_letter_summary(row: OutboxEvent) -> dict:
@@ -781,6 +787,8 @@ def _act_on_dead_letters(request: Request, body: QueueItemsAction, db: Session, 
     by_tenant: dict = {}
     for row in rows:
         by_tenant.setdefault(row.tenant_id, []).append(row)
+    if not discard:
+        _refuse_held_unless_not_delivered(request, db, admin, rows, body.reason, now)
     action = "OUTBOX_EVENTS_DISCARDED" if discard else "OUTBOX_EVENTS_RETRIED"
     # One audit record per tenant, written before the change, naming every item (without its payload) and the reason.
     for tenant_id, items in by_tenant.items():
@@ -813,6 +821,124 @@ def _act_on_dead_letters(request: Request, body: QueueItemsAction, db: Session, 
             row.claimed_at = None
     db.commit()
     return {"count": len(rows), "action": "DISCARDED" if discard else "RETRIED"}
+
+
+def mail_log_results(db: Session, held: list[OutboxEvent]) -> dict[str, str]:
+    """The latest recorded mail-log check of each held event, made after it was held: event id -> result."""
+    if not held:
+        return {}
+    wanted = {str(row.id) for row in held}
+    found: dict[str, str] = {}
+    records = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.action == MAIL_LOG_CHECKED,
+            AuditEvent.tenant_id.in_({row.tenant_id for row in held}),
+            AuditEvent.created_at >= min(row.dead_lettered_at for row in held),
+        )
+        .order_by(AuditEvent.created_at.desc())
+    )
+    held_at = {str(row.id): row.dead_lettered_at for row in held}
+    for record in records:
+        for item in (record.details or {}).get("items", []):
+            event_id = item.get("id")
+            if event_id in wanted and event_id not in found and record.created_at >= held_at[event_id]:
+                found[event_id] = item.get("result")
+    return found
+
+
+def _refuse_held_unless_not_delivered(request: Request, db: Session, admin, rows, reason: str, now) -> None:
+    """B6b-D10: an event held after a restore is retried only when its recorded mail-log check says NOT_DELIVERED.
+    Otherwise the whole selection is refused (409 HELD_AFTER_RESTORE) and the refusal is audited."""
+    held = [row for row in rows if row.last_error == HELD_AFTER_RESTORE]
+    results = mail_log_results(db, held)
+    blocked = [row for row in held if results.get(str(row.id)) != NOT_DELIVERED]
+    if not blocked:
+        return
+    by_tenant: dict = {}
+    for row in blocked:
+        by_tenant.setdefault(row.tenant_id, []).append(row)
+    for tenant_id, items in by_tenant.items():
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=str(admin.id),
+                action="OUTBOX_RETRY_REFUSED",
+                entity_type="OutboxEvent",
+                details={
+                    "source": "PLATFORM_ADMIN",
+                    "code": "HELD_AFTER_RESTORE",
+                    "count": len(items),
+                    "items": [
+                        {**_dead_letter_summary(row), "mail_log": results.get(str(row.id)) or "NOT_CHECKED"}
+                        for row in items
+                    ],
+                },
+                request=request,
+                reason=reason,
+                created_at=now,
+            )
+        )
+    db.commit()
+    raise HTTPException(
+        409,
+        detail={
+            "code": "HELD_AFTER_RESTORE",
+            "message": f"{len(blocked)} of these items were held after a restore and may already have been sent. "
+            "Retry one only after the mail provider's log, recorded here, shows it was not delivered.",
+            "ids": [str(row.id) for row in blocked],
+        },
+    )
+
+
+@router.post("/platform-admin/console/dead-letters/mail-log-check")
+def record_mail_log_check(request: Request, body: MailLogCheck, db: Session = Depends(get_db)):
+    """Record what the mail provider's log showed for events held after a restore (B6b-D10), with where it was
+    checked. One audit record per tenant; only events held after a restore can be recorded."""
+    admin = _require_platform_admin(request, db)
+    ids = set(body.ids)
+    rows = (
+        db.query(OutboxEvent)
+        .filter(
+            OutboxEvent.id.in_(ids),
+            OutboxEvent.dead_lettered_at.is_not(None),
+            OutboxEvent.last_error == HELD_AFTER_RESTORE,
+        )
+        .all()
+    )
+    if len(rows) != len(ids):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "NOT_HELD_AFTER_RESTORE",
+                "message": "Only events held after a restore are checked against the mail provider's log.",
+            },
+        )
+    now = datetime.now(timezone.utc)
+    by_tenant: dict = {}
+    for row in rows:
+        by_tenant.setdefault(row.tenant_id, []).append(row)
+    for tenant_id, items in by_tenant.items():
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=str(admin.id),
+                action=MAIL_LOG_CHECKED,
+                entity_type="OutboxEvent",
+                details={
+                    "source": "PLATFORM_ADMIN",
+                    "count": len(items),
+                    "items": [
+                        {"id": str(row.id), "event_name": row.event_name, "result": body.result} for row in items
+                    ],
+                },
+                request=request,
+                reason=body.reason,
+                created_at=now,
+            )
+        )
+    db.commit()
+    return {"count": len(rows), "result": body.result}
 
 
 @router.post("/platform-admin/console/dead-letters/retry")

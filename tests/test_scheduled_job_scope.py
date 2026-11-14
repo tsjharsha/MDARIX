@@ -163,10 +163,25 @@ def _user_ids(db, tenant_id) -> set[str]:
     return {str(user_id) for (user_id,) in db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id)}
 
 
+# Events of one organization that name it in their payload, so the outbox worker's check covers them (RSK-026).
+NAMES_ITS_ORGANIZATION = frozenset(
+    {
+        "SUBSCRIPTION_REMINDER",
+        "TRIAL_REMINDER",
+        "PROVIDER_RECORD_RECEIVED",
+        "TENANT_EXPORT_REQUESTED",
+        "SUPPORT_PROBLEM_REPORTED",
+    }
+)
+
+
 def _assert_event_scoped(event: OutboxEvent, owner) -> None:
-    """The event belongs to ``owner``, and a payload naming an organization names the same one."""
+    """The event belongs to ``owner``, and a payload naming an organization names the same one (the events in
+    NAMES_ITS_ORGANIZATION must name it)."""
     assert event.tenant_id == owner, (event.event_name, event.tenant_id, owner)
     named = (event.payload or {}).get("tenant_id")
+    if event.event_name in NAMES_ITS_ORGANIZATION:
+        assert named == str(owner), (event.event_name, named, owner)
     assert named in (None, str(owner)), (event.event_name, named, owner)
 
 
