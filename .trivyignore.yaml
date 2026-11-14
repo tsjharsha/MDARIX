@@ -126,6 +126,14 @@ vulnerabilities:
       functions: Python's gzip and zipfile modules use zlib's deflate/inflate stream objects. Reviewed 14 Nov 2026
       (owner sign-off); reassess when Debian publishes a fix.
     expired_at: 2027-01-06
+  - id: CVE-2026-116587
+    statement: >-
+      go-jose v3 (v3.0.5) inside the Caddy binary of mdarix/web, denial of service from crafted RSA parameters in a
+      JWK, with no fixed v3 release. v3 reaches Caddy only through its internal certificate-authority module (caddypki,
+      smallstep); MDARIX's Caddyfile configures no internal CA, ACME server or PKI app and obtains its certificate from a
+      public ACME CA, so no JWK is parsed by that module. go-jose v4 is already raised to the fixed 4.1.6. Reviewed 14 Nov
+      2026 (owner sign-off); remove once Caddy no longer pulls go-jose v3 or a fixed v3 ships.
+    expired_at: 2027-01-06
   - id: CVE-2026-88648
     statement: >-
       GnuTLS cross-domain certificate-restriction bypass with no Debian-fixed version available. The MDARIX API does
