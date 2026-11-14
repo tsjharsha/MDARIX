@@ -20,12 +20,14 @@ tenant-bound session (row-level security), this sets (no judgement is made for a
   created, actor "system: 0.10.93 upgrade"); its open QMS task completed "Not needed: owned in MDARIX" (or, where the
   organization keeps complaints in its QMS, replaced by the escalation's QMS complaint ID task, as the "Signed before
   0.10.93: escalate" action does). The sample's SAMPLE-CALL-02 is never escalated here (spec 9.3);
-- triage records: one "as recorded before 0.10.93" version row each (version 1); speed FAST when completed.
+- triage records: one "as recorded before 0.10.93" version row each (version 1); speed FAST when completed;
+- T-M13 (owner, 14 Nov 2026): the nine sample triage records the sample author finished get its severity
+  (backend/app/trial/sample_calm.py ``SAMPLE_TRIAGE_SEVERITY``, as a new trial has them), only where none is set, each
+  with a new triage version and an audit event (``TRIAGE_SEVERITY_SET_BY_UPGRADE``).
 
 A service-only Case whose QA review was agreed but which has no resolution summary moves to QA review (IN_REVIEW),
 never to CLOSED: S-2 closes a service-only Case only with its summary (owner, 14 Nov 2026). Left as they are and
-listed as such (an owner choice still open): the sample triage records with no severity (T-M13: the story author's
-severity is not written down anywhere).
+listed as such: any other sample triage record with no severity (none is expected; T-M13 names the nine).
 
 Unflagged open complaints need no row: the routine triage queue reads them by query. Only Cases still at the default
 state (OPEN) are touched, so Cases 0.10.93 itself moved are never changed; every change fills a field that is empty or
@@ -51,6 +53,7 @@ from backend.app.db.session import SessionLocal  # noqa: E402
 CHANNEL_OF_KIND = {"CONTACT": "PHONE", "URGENT": "PHONE", "SERVICE_RECORD": "SERVICE_RECORD_IMPORT"}
 NEVER_ESCALATED = ("SAMPLE-CALL-02",)
 UPGRADE_ACTOR = "system: 0.10.93 upgrade"
+SEVERITY_REASON = "T-M13: the sample author's severity (owner, 14 Nov 2026)"
 CONFIRMATION = "APPLY 0.10.93"
 BATCH = 200
 QMS_SOURCE = "QMS"  # triage taken over from a QMS import is 0.10.93's own (T-D9): it is never "before 0.10.93"
@@ -125,6 +128,7 @@ def plan_tenant(db: Session, tenant_id, now: datetime | None = None) -> list[Cha
     from backend.app.intake import case_rules, service
     from backend.app.intake.service import COMPLAINT, INTAKE, QMS, SOURCE_TYPE
     from backend.app.trial.imports import UPLOAD_SOURCE
+    from backend.app.trial.sample_calm import SAMPLE_TRIAGE_SEVERITY, triage_record_names
     from backend.app.trial.sample_source import SAMPLE_SOURCE
     from backend.app.db.tenant_scope import scope_of
     from backend.app.workflow.tasks import OPEN_TASK_STATUSES, complete_tasks
@@ -215,6 +219,29 @@ def plan_tenant(db: Session, tenant_id, now: datetime | None = None) -> list[Cha
 
         return do
 
+    def rate(row, name: str, severity: str):
+        def do():
+            from backend.app.enterprise_audit import make_audit_event
+
+            before = service.triage_snapshot(row)
+            row.severity, row.updated_at = severity, now
+            db.flush()  # the version-1 row added above first: this one is the next version
+            service.add_triage_version(db, tenant_id, row, before, UPGRADE_ACTOR, now, SEVERITY_REASON)
+            db.add(
+                make_audit_event(
+                    tenant_id=tenant_id,
+                    actor_ref=UPGRADE_ACTOR,
+                    action="TRIAGE_SEVERITY_SET_BY_UPGRADE",
+                    entity_type="TriageRecord",
+                    entity_id=row.id,
+                    reason=SEVERITY_REASON,
+                    details={"record": name, "severity": severity, "version": row.version},
+                    created_at=now,
+                )
+            )
+
+        return do
+
     # Triage first: an escalation below hands a finished triage to its new complaint as it then stands.
     records = db.query(TriageRecord).filter(TriageRecord.tenant_id == tenant_id).all()
     versioned = {
@@ -255,13 +282,25 @@ def plan_tenant(db: Session, tenant_id, now: datetime | None = None) -> list[Cha
             )
         )
     unrated = [row for row in records if row.source_system == SAMPLE_SOURCE and row.severity is None]
-    if unrated:
+    names = triage_record_names(db, tenant_id, unrated)
+    for row in unrated:
+        name = names.get(row.id)
+        if name not in SAMPLE_TRIAGE_SEVERITY:
+            continue
         lines.append(
             Change(
-                f"{len(unrated)} sample triage record(s) with no severity: LEFT AS THEY ARE (T-M13: the story author's "
-                "severity is not written down; owner choice)",
-                "sample triage record with no severity left as it is (owner choice, T-M13)",
-                len(unrated),
+                f"{name}: triage severity -> {SAMPLE_TRIAGE_SEVERITY[name]} (T-M13, the sample author's)",
+                "sample triage record severity set to the sample author's (T-M13)",
+                do=rate(row, name, SAMPLE_TRIAGE_SEVERITY[name]),
+            )
+        )
+    left = [row for row in unrated if names.get(row.id) not in SAMPLE_TRIAGE_SEVERITY]
+    if left:
+        lines.append(
+            Change(
+                f"{len(left)} other sample triage record(s) with no severity: LEFT AS THEY ARE (not one of T-M13's nine)",
+                "other sample triage record with no severity left as it is (not one of T-M13's nine)",
+                len(left),
                 held=True,
             )
         )
