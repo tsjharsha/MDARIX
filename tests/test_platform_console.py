@@ -271,7 +271,8 @@ def test_the_dashboard_shows_daily_activity_and_the_customer_base(platform, cust
         assert len(dates) == 14 and dates == sorted(dates) and dates[-1] == now.date().isoformat()
     today = dashboard["ai_runs"][-1]
     assert today.get("failed", 0) >= 1
-    assert dashboard["new_tenants"][-1].get("tenants", 0) >= 1
+    # New organizations per day are two series: customers, and free trials apart (TO-1).
+    assert dashboard["new_tenants"][-1].get("customers", 0) >= 1
     assert any(row["count"] >= 1 for row in dashboard["tenants_by_plan"])
     assert sum(row["count"] for row in dashboard["tenants_by_region"]) >= 1
     assert len(dashboard["licences_ending"]) == 12

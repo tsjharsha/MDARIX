@@ -152,7 +152,12 @@ def test_only_platform_administrators_manage_customer_administrators(customer):
 def test_a_subscription_change_takes_effect(platform, customer):
     plans = platform.get("/api/v1/platform-admin/plans").json()
     plans = plans.get("items", plans) if isinstance(plans, dict) else plans
-    target = next(plan for plan in plans if plan["code"] != "STARTER" and plan.get("status", "ACTIVE") == "ACTIVE")
+    # Any other active plan; the Free Trial plan is never given to a customer (TO-1, TO-D11).
+    target = next(
+        plan
+        for plan in plans
+        if plan["code"] not in ("STARTER", "FREE_TRIAL") and plan.get("status", "ACTIVE") == "ACTIVE"
+    )
     changed = platform.post(
         f"/api/v1/platform/customers/{customer['id']}/subscription",
         json={

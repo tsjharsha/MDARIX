@@ -23,6 +23,7 @@ from backend.app.access import (
     platform_reference_data,
     platform_subscriptions,
     platform_tenants,
+    platform_trials,
     session,
     tenant_settings,
 )
@@ -45,6 +46,7 @@ for _module in (
     platform_subscriptions,
     platform_reference,
     platform_reference_data,
+    platform_trials,
     catalog,
 ):
     router.include_router(_module.router)

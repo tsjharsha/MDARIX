@@ -590,11 +590,17 @@ def test_an_ended_trial_shows_as_ended_not_suspended_and_an_extension_reopens_it
         db.commit()
     assert user.get("/api/v1/session/context").json()["detail"]["code"] == "TRIAL_ENDED"
     now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_system(db, "test: read the trial's start")
+        started = (
+            db.query(SubscriptionLifecycle.starts_at).filter(SubscriptionLifecycle.tenant_id == tenant_id).scalar()
+        )
+    # A trial's start never moves (TO-1); only its end is extended.
     extended = authenticated_client().post(
         f"/api/v1/platform/customers/{tenant_id}/subscription",
         json={
             "plan_id": plan_id,
-            "starts_at": (now - timedelta(days=30)).isoformat(),
+            "starts_at": started.isoformat(),
             "expires_at": (now + timedelta(days=7)).isoformat(),
             "reason": "Trial extended by a week for the evaluation",
         },

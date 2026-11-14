@@ -124,9 +124,17 @@ def _tenant_name_of(model):
 @router.get("/platform-admin/console/renewals")
 def subscription_renewals(request: Request, db: Session = Depends(get_db)):
     """Every licence with an end date, soonest first, with its tenant, plan and the reminders queued for it."""
+    from backend.app.trial.scope import not_trial_clause
+
     _require_platform_admin(request, db)
     now = datetime.now(timezone.utc)
-    rows = db.query(SubscriptionLifecycle).order_by(SubscriptionLifecycle.expires_at.asc()).all()
+    # Free trials end on Trial organizations (TO-1), not among the renewals.
+    rows = (
+        db.query(SubscriptionLifecycle)
+        .filter(not_trial_clause(SubscriptionLifecycle.tenant_id))
+        .order_by(SubscriptionLifecycle.expires_at.asc())
+        .all()
+    )
     names = _tenant_names(db, [row.tenant_id for row in rows])
     plans = dict(db.query(PlanDefinition.id, PlanDefinition.name).all())
     queued = Counter(
@@ -982,18 +990,24 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
     audit_rows = [(day, "events", count) for day, _, count in audit_total] + [
         (day, "refused", count) for day, _, count in audit_refused
     ]
-    tenant_rows = [(day, "tenants", count) for day, _, count in per_day(Tenant.created_at)]
+    from backend.app.trial import admin_actions
+    from backend.app.trial.scope import not_trial_clause, trial_tenant_clause
+
+    # Customers and free trials are counted apart (TO-1): two series of new organizations per day.
+    tenant_rows = [
+        (day, "customers", count) for day, _, count in per_day(Tenant.created_at, not_trial_clause(Tenant.id))
+    ] + [(day, "trials", count) for day, _, count in per_day(Tenant.created_at, trial_tenant_clause(Tenant.id))]
 
     plans: Counter = Counter()
     latest: dict = {}
     for tenant_id, name, effective in (
         db.query(TenantPlanAssignment.tenant_id, PlanDefinition.name, TenantPlanAssignment.effective_from)
         .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
-        .filter(TenantPlanAssignment.status == "ACTIVE")
+        .filter(TenantPlanAssignment.status == "ACTIVE", not_trial_clause(TenantPlanAssignment.tenant_id))
     ):
         if tenant_id not in latest or (effective and latest[tenant_id][1] and effective > latest[tenant_id][1]):
             latest[tenant_id] = (name, effective)
-    tenant_count = db.query(func.count(Tenant.id)).scalar() or 0
+    tenant_count = db.query(func.count(Tenant.id)).filter(not_trial_clause(Tenant.id)).scalar() or 0
     for name, _ in latest.values():
         plans[name] += 1
     if tenant_count > len(latest):
@@ -1001,6 +1015,7 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
     regions = [
         {"label": row[0] or "Not specified", "count": row[1]}
         for row in db.query(Tenant.residency_region, func.count(Tenant.id))
+        .filter(not_trial_clause(Tenant.id))
         .group_by(Tenant.residency_region)
         .order_by(func.count(Tenant.id).desc())
         .all()
@@ -1012,7 +1027,9 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
         months.append(date(first.year + year, month + 1, 1))
     ending = Counter(
         row.expires_at.date().replace(day=1)
-        for row in db.query(SubscriptionLifecycle.expires_at).filter(SubscriptionLifecycle.expires_at.is_not(None))
+        for row in db.query(SubscriptionLifecycle.expires_at).filter(
+            SubscriptionLifecycle.expires_at.is_not(None), not_trial_clause(SubscriptionLifecycle.tenant_id)
+        )
         if row.expires_at and months[0] <= row.expires_at.date().replace(day=1) <= months[-1]
     )
     return {
@@ -1024,4 +1041,6 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
         "tenants_by_plan": [{"label": label, "count": count} for label, count in plans.most_common()],
         "tenants_by_region": regions,
         "licences_ending": [{"month": month.isoformat(), "count": ending.get(month, 0)} for month in months],
+        # Free trials, shown apart from the customer figures (TO-1).
+        "trials": admin_actions.summary(db),
     }

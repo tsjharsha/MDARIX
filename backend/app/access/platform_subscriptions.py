@@ -358,8 +358,48 @@ def set_platform_subscription(
         raise HTTPException(
             422, detail={"code": "INVALID_SUBSCRIPTION_WINDOW", "message": "Expiry must be after start"}
         )
+    grace = datetime.fromisoformat(payload.grace_ends_at.replace("Z", "+00:00")) if payload.grace_ends_at else None
+    from backend.app.trial import admin_actions, scope
+    from backend.app.trial.service import FREE_TRIAL_PLAN
+
+    if plan.code == FREE_TRIAL_PLAN:
+        # The trial rules hold here too (TO-1): a customer is never moved onto the Free Trial plan (it would vanish
+        # from the main lists), a trial's start never moves, and its end stays within original end + 30 days.
+        try:
+            if not scope.is_trial(db, tenant_id):
+                raise admin_actions.TrialRefused(
+                    409,
+                    "TRIAL_PLAN_NOT_ASSIGNABLE",
+                    "The Free Trial plan is given only when a trial request is approved",
+                )
+            trial = admin_actions.subscription_of(db, tenant_id)
+            admin_actions.check_trial_end(trial, starts, expires, grace)
+        except admin_actions.TrialRefused as refusal:
+            admin_actions.audit_refusal(db, tenant_id, admin, "SUBSCRIPTION_CHANGE", refusal)
+            raise
+        starts = trial.starts_at
+    result = change_subscription(db, tenant, plan, starts, expires, grace, payload.reason, admin, now)
+    db.commit()
+    return result
+
+
+def change_subscription(
+    db: Session,
+    tenant: Tenant,
+    plan: PlanDefinition,
+    starts: datetime,
+    expires: datetime,
+    grace: datetime | None,
+    reason: str,
+    admin,
+    now: datetime,
+) -> dict:
+    """Put the tenant's subscription on ``plan`` for these dates (the shared change behind Plans & Licensing and the
+    trial page's Convert): plan history kept (``SUPERSEDED``), an expired organization reactivated, a converted trial's
+    owner promoted, audited ``SUBSCRIPTION_CHANGED``. Does not commit."""
     from backend.app.trial.service import FREE_TRIAL_PLAN, trial_subscription
 
+    tenant_id = tenant.id
     # A Free Trial moving to any other plan is a conversion: decided before the subscription row changes plan.
     converting = plan.code != FREE_TRIAL_PLAN and trial_subscription(db, tenant_id) is not None
     current = (
@@ -369,6 +409,7 @@ def set_platform_subscription(
             SubscriptionLifecycle.status.in_(["ACTIVE", "GRACE", "EXPIRED"]),
         )
         .order_by(SubscriptionLifecycle.created_at.desc())
+        .with_for_update()
         .first()
     )
     reactivated = False
@@ -383,9 +424,7 @@ def set_platform_subscription(
         current.plan_version = plan.version
         current.starts_at = starts
         current.expires_at = expires
-        current.grace_ends_at = (
-            datetime.fromisoformat(payload.grace_ends_at.replace("Z", "+00:00")) if payload.grace_ends_at else None
-        )
+        current.grace_ends_at = grace
         current.expiry_version += 1
         current.status = "ACTIVE"
         current.renewal_state = "RENEWED"
@@ -399,14 +438,12 @@ def set_platform_subscription(
             plan_version=plan.version,
             starts_at=starts,
             expires_at=expires,
-            grace_ends_at=datetime.fromisoformat(payload.grace_ends_at.replace("Z", "+00:00"))
-            if payload.grace_ends_at
-            else None,
+            grace_ends_at=grace,
             created_at=now,
             updated_at=now,
         )
         db.add(row)
-    previous_plan = _assign_plan(db, tenant_id, plan, now, payload.reason)
+    previous_plan = _assign_plan(db, tenant_id, plan, now, reason)
     promoted = _promote_trial_owner(db, tenant_id, admin, plan, now) if converting else None
     db.add(
         AuditEvent(
@@ -417,7 +454,7 @@ def set_platform_subscription(
             entity_type="SubscriptionLifecycle",
             entity_id=row.id,
             details={
-                "reason": payload.reason,
+                "reason": reason,
                 "plan_version": plan.version,
                 "plan_code": plan.code,
                 "previous_plan_code": previous_plan,
@@ -426,7 +463,7 @@ def set_platform_subscription(
             created_at=now,
         )
     )
-    db.commit()
+    db.flush()
     return {
         "subscription_id": str(row.id),
         "business_id": row.business_id,
@@ -493,10 +530,18 @@ def _promote_trial_owner(db: Session, tenant_id: uuid.UUID, admin, plan: PlanDef
 
 @router.get("/platform/subscriptions/expiring")
 def expiring_subscriptions(request: Request, db: Session = Depends(get_db)):
+    from backend.app.trial.scope import not_trial_clause
+
     _require_platform_admin(request, db)
     now = datetime.now(timezone.utc)
+    # A free trial's end is on Trial organizations (TO-1), not in this list.
     rows = (
-        db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.status.in_(["ACTIVE", "GRACE", "EXPIRED"])).all()
+        db.query(SubscriptionLifecycle)
+        .filter(
+            SubscriptionLifecycle.status.in_(["ACTIVE", "GRACE", "EXPIRED"]),
+            not_trial_clause(SubscriptionLifecycle.tenant_id),
+        )
+        .all()
     )
     tenant_business_ids = business_id_map(db, Tenant, (row.tenant_id for row in rows))
     return [
