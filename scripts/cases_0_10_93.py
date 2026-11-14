@@ -561,7 +561,7 @@ def main(argv: list[str] | None = None, ask=input) -> int:
             typed = ask(f'\nType "{CONFIRMATION}" to change the records counted above: ')
         except EOFError:
             typed = ""
-        if typed.strip() != CONFIRMATION:
+        if typed.strip().lstrip("\ufeff") != CONFIRMATION:  # a Windows pipe may put a byte-order mark first
             print("Refused: the confirmation was not typed. Nothing was changed.")
             return 2
         done = apply(db)
