@@ -275,18 +275,18 @@ failure (rating-4 finding 9, 13 Nov 2026).
 | Requirements, class B | 8 |
 | Requirements, class C | 1 |
 | Class-A requirements without a negative scenario | 0 |
-| Class-A requirements whose negative scenarios are all future | 3 |
-| Scenarios in the register | 538 |
-| Scenarios marked future (not built) | 11 |
-| Scripted class-A OQ steps | 190 |
+| Class-A requirements whose negative scenarios are all future | 0 |
+| Scenarios in the register | 540 |
+| Scenarios marked future (not built) | 10 |
+| Scripted class-A OQ steps | 193 |
 | Class-A scenarios without an OQ expected result | 12 |
-| OQ expected results (`oq-expected-results.csv`) | 178 |
-| OQ expected results derived from the requirement | 0 |
+| OQ expected results (`oq-expected-results.csv`) | 180 |
+| OQ expected results derived from the requirement | 2 |
 | OQ expected results drafted from the code | 178 |
 | OQ expected results confirmed by the owner | 0 |
 | OQ expected results whose text says TO CONFIRM | 21 |
 | Deviations in `deviation-log.csv` | 2 |
-| Deviations not closed | 2 |
+| Deviations not closed | 0 |
 | Rows in `signatures.csv` | 0 |
 | MDARIX PQ steps (MDX-VAL-008) | 19 |
 
