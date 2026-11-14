@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RoleSwitch(BaseModel):
@@ -318,9 +318,24 @@ class ConnectorRunRequest(BaseModel):
     required_fields: list[str] = []
 
 
+class MappingRule(BaseModel):
+    """One source field's mapping rule. Typed, so a malformed rule is refused (422) rather than failing the preview."""
+
+    model_config = ConfigDict(extra="allow")
+
+    target_field: str = Field("", max_length=200)
+    transform: str | None = Field(None, max_length=40)
+    required: bool = False
+
+
+def mapping_rules(rules: dict[str, MappingRule]) -> dict[str, dict]:
+    """The rules as the mapping gateway reads them (plain dicts)."""
+    return {source: rule.model_dump() for source, rule in rules.items()}
+
+
 class MappingPreviewRequest(BaseModel):
     records: list[dict]
-    rules: dict
+    rules: dict[str, MappingRule]
     source_object: str
     target_entity: str
     mapping_version: str
