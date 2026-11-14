@@ -290,12 +290,14 @@ def test_every_table_with_a_product_and_a_version_has_the_version_rule():
             ).scalars()
         )
         names = set(connection.execute(text("SELECT conname FROM pg_constraint")).scalars())
-    # case_contexts is outside PV-1 F1's list (DB-1 open question to the owner).
+    # case_contexts (control database) has the check only (tr24a, infrastructure/database/migrations/
+    # product_references.py says why there is no reference).
     assert tables - {"case_contexts"} == set(PRODUCT_VERSION_TABLES)
     missing = [
         t for t in PRODUCT_VERSION_TABLES if {f"fk_{t}_version_of_product", f"ck_{t}_version_needs_product"} - names
     ]
     assert not missing, missing
+    assert "ck_case_contexts_version_needs_product" in names
 
 
 def test_the_pre_check_counts_rows_that_break_the_rules():
@@ -317,6 +319,87 @@ def test_the_pre_check_counts_rows_that_break_the_rules():
             assert counts["complaints: a version of another product or organization, or none"] == 1
             message = refusal(list(counts.items()))
             assert message and "complaints: a version of another product" in message
+        finally:
+            connection.rollback()
+
+
+# --- DB-1 owner decisions 1 and 2: the lot and product references and the case context's check (tr24a) ---------
+
+
+def _other_row(connection, parent: str, tenant) -> uuid.UUID:
+    """A ``parent`` row of another organization, or (none there) an id that is no row at all."""
+    other = connection.scalar(text(f"SELECT id FROM {parent} WHERE tenant_id <> :t LIMIT 1"), {"t": tenant})
+    return other or uuid.uuid4()
+
+
+@pytest.mark.parametrize(
+    "child,column,parent",
+    [
+        ("intake_events", "lot_batch_id", "lot_batches"),
+        ("decisions", "product_id", "products"),
+        ("investigation_briefs", "product_id", "products"),
+        ("assurance_results", "product_id", "products"),
+        ("ai_interactions", "product_id", "products"),
+    ],
+)
+def test_a_lot_or_product_must_be_a_row_of_the_records_own_organization(child, column, parent):
+    with engine.connect() as connection:
+        connection.begin()
+        try:
+            found = connection.execute(text(f"SELECT id, tenant_id FROM {child} LIMIT 1")).first()
+            if found is None:
+                pytest.skip(f"the test database has no {child} row")
+            if column == "product_id":  # the version rule would refuse first
+                connection.execute(
+                    text(f"UPDATE {child} SET product_version_id = NULL WHERE id = :id"), {"id": found[0]}
+                )
+            with pytest.raises(DBAPIError) as refused, connection.begin_nested():
+                connection.execute(
+                    text(f"UPDATE {child} SET {column} = :other WHERE id = :id"),
+                    {"other": _other_row(connection, parent, found[1]), "id": found[0]},
+                )
+            assert f"fk_{child}_{column}_tenant" in str(refused.value)
+        finally:
+            connection.rollback()
+
+
+def test_a_case_context_never_holds_a_version_without_its_product():
+    with engine.connect() as connection:
+        connection.begin()
+        try:
+            tenant, _other = _two_tenants(connection)
+            with pytest.raises(DBAPIError) as refused, connection.begin_nested():
+                connection.execute(
+                    text(
+                        "INSERT INTO case_contexts (id, tenant_id, user_id, product_version_id, created_at, updated_at) "
+                        "VALUES (gen_random_uuid(), :t, gen_random_uuid(), gen_random_uuid(), now(), now())"
+                    ),
+                    {"t": tenant},
+                )
+            assert "ck_case_contexts_version_needs_product" in str(refused.value)
+        finally:
+            connection.rollback()
+
+
+def test_the_tr24a_pre_check_counts_a_lot_of_no_row_of_the_organization():
+    from infrastructure.database.migrations.product_references import violation_counts
+    from infrastructure.database.migrations.tenant_references import refusal
+
+    label = "intake_events.lot_batch_id -> lot_batches: no such row in the same organization"
+    with engine.connect() as connection:
+        connection.begin()
+        try:
+            assert refusal(violation_counts(connection)) is None
+            found = connection.execute(text("SELECT id FROM intake_events LIMIT 1")).first()
+            if found is None:
+                pytest.skip("the test database has no intake event")
+            connection.execute(text("SET LOCAL session_replication_role = replica"))
+            connection.execute(
+                text("UPDATE intake_events SET lot_batch_id = gen_random_uuid() WHERE id = :id"), {"id": found[0]}
+            )
+            counts = dict(violation_counts(connection))
+            assert counts[label] == 1
+            assert label in (refusal(list(counts.items())) or "")
         finally:
             connection.rollback()
 
