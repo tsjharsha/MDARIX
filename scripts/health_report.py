@@ -35,7 +35,7 @@ REGISTERS = ROOT / "docs" / "validation" / "registers"
 DEVIATION_LOG = ROOT / "docs" / "validation" / "deviation-log.csv"
 SLO_PERCENT = 99.5  # owner-approved uptime target (3 Nov 2026)
 CODE = re.compile(r"^CUS-\d{3}$")
-ANY_CODE = re.compile(r"\bCUS-\d{3}\b")
+ANY_CODE = re.compile(r"\bCUS-\d{3}\b", re.IGNORECASE)
 CHAIN_LINE = (
     "Verified daily by the scheduler for every organisation; your organisation's result is available on request "
     "(no production data is read for this report, owner decision B6b-D11)."
@@ -46,18 +46,42 @@ class Refused(Exception):
     """The report would show another organisation's data, or an input is not valid."""
 
 
-def _rows(path: Path) -> list[dict]:
+def _rows(path: Path, required: bool = True) -> list[dict]:
+    """A register's rows; a missing register is refused (a wrong folder must never give a clean report). A file saved
+    by a spreadsheet keeps working (byte-order mark); a row with more fields than the header is refused."""
     if not path.is_file():
+        if required:
+            raise Refused(f"register {path.name} not found in {path.parent}")
         return []
-    with path.open(encoding="utf-8", newline="") as handle:
-        return [{k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(handle)]
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        rows = []
+        for number, row in enumerate(csv.DictReader(handle), start=2):
+            if None in row:
+                raise Refused(f"{path.name} line {number}: more fields than the header")
+            rows.append({k: (v or "").strip() for k, v in row.items()})
+        return rows
 
 
 def _day(value: str) -> date | None:
     """A register date: ``YYYY-MM-DD`` or an ISO time in UTC (only its day is used)."""
     if not value:
         return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).date() if "T" in value else date.fromisoformat(value)
+    try:
+        if "T" not in value:
+            return date.fromisoformat(value)
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise Refused(f"date {value!r}: expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ") from exc
+    if moment.tzinfo is None:
+        raise Refused(f"time {value!r}: needs its zone (UTC: end it with Z)")
+    return moment.astimezone(timezone.utc).date()
+
+
+def _minutes(row: dict) -> int:
+    value = row["minutes_down"] or "0"
+    if not value.isdigit():
+        raise Refused(f"{row['incident_id']}: minutes_down {value!r} is not a whole number of minutes")
+    return int(value)
 
 
 def concerns(customers: str, code: str) -> bool:
@@ -98,13 +122,14 @@ def build(
                 "severity": row["severity"],
                 "reach": _scope(row["customers"]),
                 # shortcut: an incident's minutes count in the month it opened (a cross-month outage is not split)
-                "minutes_down": int(row["minutes_down"] or 0) if start <= opened <= end else 0,
+                "minutes_down": _minutes(row) if start <= opened <= end else 0,
                 "summary": row["summary"],
                 "customer_notice": row["customer_notice"],
                 "status": row["status"],
             }
         )
-    down = sum(item["minutes_down"] for item in incidents)
+    # shortcut: overlapping incidents add up; the total is capped at the month's minutes
+    down = min(sum(item["minutes_down"] for item in incidents), minutes_in_month)
     uptime = round(100 * (1 - down / minutes_in_month), 3)
 
     log = [row for row in _rows(registers / "operations-log.csv") if concerns(row["customers"], code)]
@@ -160,7 +185,7 @@ def build(
         "audit_chain": CHAIN_LINE,
         "planned_changes": entries("PLANNED_CHANGE", after=end),
     }
-    others = sorted(set(ANY_CODE.findall(json.dumps(report))) - {code})
+    others = sorted({found.upper() for found in ANY_CODE.findall(json.dumps(report))} - {code})
     if others:
         # Register text names another customer: the report is not produced (B6-56); the register row is corrected.
         raise Refused(f"the report would name {len(others)} other customer code(s); correct the register text")

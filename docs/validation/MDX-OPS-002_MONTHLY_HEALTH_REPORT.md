@@ -46,11 +46,11 @@ comes from and who checks it. The report is first needed one month after the fir
 
 | Line | Source | Note |
 |---|---|---|
-| Uptime against 99.5 % | Incident register, `minutes_down` of incidents with `ALL` or the customer's code, opened in the month | Shortcut: an incident's minutes count in the month it opened (`scripts/health_report.py`, `shortcut:` comment). The 99.5 % target is the owner-approved SLO of 3 Nov 2026 |
+| Uptime against 99.5 % | Incident register, `minutes_down` of incidents with `ALL` or the customer's code, opened in the month | Shortcuts (`scripts/health_report.py`, `shortcut:` comments): an incident's minutes count in the month it opened; overlapping incidents add up, capped at the month's minutes. A missing register, a time without its zone or minutes that are not whole numbers refuse the report. The 99.5 % target is the owner-approved SLO of 3 Nov 2026 |
 | Downtime minutes | Same | |
 | Incidents | Incident register, rows open at any time in the month | Shown as reaching "all customers" or "your organisation", never with other codes |
 | Releases and change notices | Operations log, `RELEASE` rows in the month | The change notice reference is in `reference` |
-| Open deviations | `deviation-log.csv`, rows not closed | Deviations are product-level: every open one is listed, with ID, classification, GxP risk and status only |
+| Open deviations | `deviation-log.csv`, rows not closed | Deviations are product-level and the log has no customer column: every open one is listed, with ID, classification, GxP risk and status only (to be narrowed to customer-affecting ones when the log records it) |
 | Backups | Incident register, `BACKUP` rows; the fixed text on the daily backup and the 26-hour age alert | No backup log is read (HR-02) |
 | Last restore drill, last recovery record, last clock check | Operations log, latest `RESTORE_DRILL`, `RECOVERY_RECORD`, `CLOCK_CHECK` row up to the month's end | |
 | Audit trail chain | Fixed line: verified daily by the scheduler, result on request | B6b-D11 default; the scheduler's daily verification is `backend/app/audit_chain.py` (`verify_all`) |

@@ -62,7 +62,7 @@ REQ-BAK-001, REQ-BAK-003 and REQ-BAK-004 in a release pack, and the source of ea
 
 ## 4. Recovery check
 
-Command: `python scripts/recovery_check.py --database ________ --backup-dir ________ --erasure-log ________`
+Command: `python scripts/recovery_check.py --database ________ --restored-copy --backup-dir ________ --erasure-log ________`
 Attach `recovery-check-<UTC>.json` and `.pdf`. Result (PASS / PASS WITH FLAGS / FAIL): ________
 
 | Step | State | Explanation of every FLAG; deviation ID of every FAIL |
@@ -74,6 +74,7 @@ Attach `recovery-check-<UTC>.json` and `.pdf`. Result (PASS / PASS WITH FLAGS / 
 | row_counts | | |
 | audit_chain (every organisation) | | |
 | configuration (against the latest signed snapshot) | | |
+| dedicated_databases (each one checked on its own restored copy: yes / no) | | |
 | outbox_hold (events held: ____) | | |
 | clock | | |
 | erasures (pending: ____; re-applied with runbook section 4: yes / no) | | |

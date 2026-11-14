@@ -4,7 +4,7 @@ Run it on the RESTORED database with the outbox worker and the scheduler stopped
 
     python scripts/recovery_check.py --database mdarix_restore_drill --restore-point 20261113T021500Z \
         [--backup-dir /backups/20261113T021500Z] [--source-counts counts.json] [--erasure-log erasure_log.jsonl] \
-        [--dry-run] [--out artifacts/recovery-check]
+        --restored-copy [--dry-run] [--out artifacts/recovery-check]
 
 and, read only, on the source database to record what the restore must bring back:
 
@@ -20,10 +20,12 @@ database the operator did not name. The steps:
 4. the audit chain of every organisation, recomputed from its first event (``verify_tenant_chain``);
 5. each organisation's configuration against its latest signed G21 snapshot: every difference must be explained by
    a change event after the snapshot (``compare``, ``events_between``), otherwise it is flagged;
-6. outbox hold (owner decision B6b-D10): every event not yet published that occurred at or before the restore point
-   is dead-lettered with the reason "held after restore" and one audit record per organisation, so nothing is sent
-   twice. A person replays only those the mail provider's log shows as not sent (``scripts/replay_outbox.py``).
-   ``--dry-run`` lists them and changes nothing;
+6. outbox hold (owner decision B6b-D10): every event of the copy not yet published is dead-lettered with the reason
+   "held after restore" and one audit record per organisation, so nothing is sent twice; those that occurred after
+   the restore point (written while the backup was taken) are counted apart and flagged. Only with
+   ``--restored-copy``, and never when a background service runs against the database. A person replays only those
+   the mail provider's log shows as not sent (``scripts/replay_outbox.py``). ``--dry-run`` lists them and changes
+   nothing; organisations on a dedicated database are listed as not checked (run the check on each restored copy);
 7. clock check (B6a G19);
 8. erasure dry-run (``reapply_erasures`` with ``dry_run``; ``--erasure-log`` adds the newer log rows first, in a
    transaction that is rolled back);
@@ -32,8 +34,8 @@ database the operator did not name. The steps:
 Writes ``recovery-check-<UTC time>.json`` and ``.pdf`` (the record for MDX-OPS-001) and one customer summary PDF
 per organisation, holding that organisation's lines only. Only the outbox hold writes to the database.
 
-Exit status: 0 PASS; 1 FAIL (do not open the system); 2 PASS WITH FLAGS (each flag needs a written explanation in
-the signed recovery record before the system opens).
+Exit status: 0 PASS; 1 FAIL (do not open the system); 2 usage error; 3 PASS WITH FLAGS (each flag needs a written
+explanation in the signed recovery record before the system opens).
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 PASS, FAIL, FLAG, INFO = "PASS", "FAIL", "FLAG", "INFO"
+EXIT_FLAGS = 3  # PASS WITH FLAGS (2 is a usage error, from argparse)
 HELD_REASON = "held after restore"
 HOLD_ACTION = "OUTBOX_EVENTS_HELD_AFTER_RESTORE"
 ACTOR = "operator:recovery_check"
@@ -109,9 +112,16 @@ def check_manifest(backup_dir: Path) -> dict:
 # ------------------------------------------------------------------------------- 2. nothing ran on the copy
 
 
-def check_quiet(db, restore_point: datetime) -> dict:
-    """The worker and the scheduler must stay stopped until the check is signed: a heartbeat written after the
-    restore point means one of them ran against the restored database."""
+QUIET_MINUTES = 15  # a running worker or scheduler writes its heartbeat every cycle (seconds)
+
+
+def check_quiet(db, restore_point: datetime, now: datetime) -> dict:
+    """The worker and the scheduler must stay stopped until the check is signed. A heartbeat of the last
+    ``QUIET_MINUTES`` means one of them runs against this database: FAIL. A heartbeat after the restore point but
+    older than that is flagged: the backup's folder time is taken before the dump reads the data, so production's
+    own heartbeats of the dump's minutes come back with the copy (explain it from the backup log)."""
+    from datetime import timedelta
+
     from sqlalchemy import text
 
     rows = db.execute(
@@ -121,13 +131,23 @@ def check_quiet(db, restore_point: datetime) -> dict:
         ),
         {"point": restore_point},
     ).all()
-    if rows:
+    services = [{"service": r.service, "instance": r.instance_id, "at": r.updated_at.isoformat()} for r in rows]
+    recent = [item for row, item in zip(rows, services) if row.updated_at > now - timedelta(minutes=QUIET_MINUTES)]
+    if recent:
         return step(
             "worker_stopped",
             FAIL,
-            "A background service wrote a heartbeat after the restore point: stop the worker and the scheduler, "
-            "then restore again",
-            services=[{"service": r.service, "instance": r.instance_id, "at": r.updated_at.isoformat()} for r in rows],
+            f"A background service wrote a heartbeat in the last {QUIET_MINUTES} minutes: stop the worker and the "
+            "scheduler, then restore again",
+            services=recent,
+        )
+    if rows:
+        return step(
+            "worker_stopped",
+            FLAG,
+            "Heartbeats after the restore point, none recent: written while the backup was being taken? Check the "
+            "backup log's dump times",
+            services=services,
         )
     return step("worker_stopped", PASS, "No background service ran after the restore point")
 
@@ -174,7 +194,7 @@ def check_security(facts: dict, source: dict | None) -> dict:
     if not facts["policies"] or not facts["forced_rls_tables"]:
         return step("row_level_security", FAIL, "No row-level-security policies or no forced tables", **found)
     if source is None:
-        return step("row_level_security", INFO, "Recorded; no source counts given to compare", **found)
+        return step("row_level_security", FLAG, "No source counts given (--source-counts): not compared", **found)
     expected = {key: source.get(key) for key in found}
     if found != expected:
         return step(
@@ -187,7 +207,12 @@ def check_counts(facts: dict, source: dict | None) -> dict:
     counts = facts["row_counts"]
     total = sum(counts.values())
     if source is None:
-        return step("row_counts", INFO, f"{len(counts)} tables, {total} rows; no source counts given", tables=counts)
+        return step(
+            "row_counts",
+            FLAG,
+            f"{len(counts)} tables, {total} rows; no source counts given: not compared",
+            tables=counts,
+        )
     theirs = source.get("row_counts") or {}
     differences = [
         {"table": name, "restored": counts.get(name), "source": theirs.get(name)}
@@ -323,26 +348,45 @@ def check_configuration(db, tenant_ids: list, now: datetime) -> dict:
     return step("configuration", state, summary, organisations=results)
 
 
+def check_dedicated(db) -> dict:
+    """Organisations on a dedicated database: their chain, counts and configuration live in that database, which
+    this run does not read. Each is listed, so the check is run again against its restored copy."""
+    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE
+    from backend.app.db.models.customer_lifecycle import TenantDataPlane
+
+    rows = (
+        db.query(TenantDataPlane.tenant_id, TenantDataPlane.database_ref)
+        .filter(TenantDataPlane.status == "ACTIVE", TenantDataPlane.connection_secret_ref != SHARED_CONTROL_DATA_PLANE)
+        .all()
+    )
+    if rows:
+        return step(
+            "dedicated_databases",
+            FLAG,
+            f"{len(rows)} organisation(s) on a dedicated database: not checked here; run this check against each "
+            "restored dedicated database too",
+            organisations=[{"tenant_id": str(row.tenant_id), "database": row.database_ref} for row in rows],
+        )
+    return step("dedicated_databases", PASS, "Every organisation is on this database")
+
+
 # ------------------------------------------------------------------------------------------- 6. outbox hold
 
 
 def hold_outbox(db, restore_point: datetime, now: datetime, *, apply: bool, tenant_ids: list | None = None) -> dict:
-    """Dead-letter every unpublished event that occurred at or before the restore point (B6b-D10), with one audit
-    record per organisation naming the events (never their payload). Does not commit. ``tenant_ids`` limits it to
-    those organisations (tests); the script always holds every organisation's events."""
+    """Dead-letter every unpublished event of the restored copy (B6b-D10), with one audit record per organisation
+    naming the events (never their payload). Does not commit. The events that occurred after the restore point are
+    held too and counted apart: the backup's folder time is taken before the dump reads the data, so events of the
+    dump's minutes come back unsent and may already have been sent by production. ``tenant_ids`` limits it to those
+    organisations (tests); the script always holds every organisation's events."""
     from backend.app.db.models.stage2 import OutboxEvent
     from backend.app.enterprise_audit import make_audit_event
 
     unsent = db.query(OutboxEvent).filter(OutboxEvent.published_at.is_(None), OutboxEvent.dead_lettered_at.is_(None))
     if tenant_ids is not None:
         unsent = unsent.filter(OutboxEvent.tenant_id.in_(tenant_ids))
-    pending = (
-        unsent.filter(OutboxEvent.occurred_at <= restore_point)
-        .order_by(OutboxEvent.tenant_id, OutboxEvent.occurred_at)
-        .with_for_update()
-        .all()
-    )
-    later = unsent.filter(OutboxEvent.occurred_at > restore_point).count()
+    pending = unsent.order_by(OutboxEvent.tenant_id, OutboxEvent.occurred_at).with_for_update().all()
+    later = sum(row.occurred_at > restore_point for row in pending)
     by_tenant: dict = {}
     for row in pending:
         by_tenant.setdefault(row.tenant_id, []).append(row)
@@ -358,6 +402,7 @@ def hold_outbox(db, restore_point: datetime, now: datetime, *, apply: bool, tena
                     details={
                         "source": "RECOVERY_CHECK",
                         "count": len(rows),
+                        "listed": min(len(rows), ITEMS_PER_AUDIT),
                         "restore_point": restore_point.isoformat(),
                         "items": [
                             {
@@ -387,7 +432,8 @@ def hold_outbox(db, restore_point: datetime, now: datetime, *, apply: bool, tena
         return step(
             "outbox_hold",
             FLAG,
-            f"{later} unsent event(s) occurred after the restore point: something wrote to the restored database",
+            f"{later} unsent event(s) occurred after the restore point ({'held' if apply else 'to hold'}): written "
+            "while the backup was taken, or something wrote to the restored database; explain from the backup log",
             **details,
         )
     if pending and not apply:
@@ -503,8 +549,8 @@ def customer_summary(record: dict, org: dict) -> bytes:
         ),
         ("Checks of your organisation", "heading"),
         *(_org_lines(record, org["tenant_id"]) or [("No organisation-specific finding.", "body")]),
-        ("Overall result of the recovery check", "heading"),
-        (record["result"], "body"),
+        ("Signed record", "heading"),
+        ("The full recovery record is signed by MDARIX's quality approver before the system is reopened.", "body"),
     ]
     return pdf.render(
         "MDARIX recovery summary",
@@ -595,15 +641,19 @@ def run(
     read = session_factory("recovery check: read the restored database")
     try:
         database = read.execute(text("SELECT current_database()")).scalar()
-        steps.append(check_quiet(read, restore_point))
+        quiet = check_quiet(read, restore_point, started)
+        steps.append(quiet)
         facts = database_facts(read)
         steps += [check_schema(facts, schema_head()), check_security(facts, source), check_counts(facts, source)]
         steps.append(check_chains(read))
         orgs = organisations(read, restore_point, started)
         steps.append(check_configuration(read, [org["tenant_id"] for org in orgs], started))
+        steps.append(check_dedicated(read))
     finally:
         read.rollback()
         read.close()
+    if quiet["state"] == FAIL:
+        apply = False  # a service runs against this database: never hold its live events (list them only)
     hold = session_factory("recovery check: hold unsent outbox events (B6b-D10)")
     try:
         steps.append(hold_outbox(hold, restore_point, started, apply=apply))
@@ -641,6 +691,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-counts", type=Path, help="counts JSON written by --write-counts on the source")
     parser.add_argument("--erasure-log", type=Path, help="erasure log (JSON Lines) from the newest copy")
     parser.add_argument("--dry-run", action="store_true", help="list the outbox events to hold; change nothing")
+    parser.add_argument(
+        "--restored-copy",
+        action="store_true",
+        help="confirm this database is a restored copy (needed to hold its outbox events)",
+    )
     parser.add_argument("--write-counts", type=Path, help="write this database's counts (read only) and stop")
     parser.add_argument("--out", type=Path, default=ROOT / "artifacts" / "recovery-check", help="folder for the record")
     args = parser.parse_args(argv)
@@ -666,6 +721,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         probe.rollback()
         probe.close()
+    if not args.dry_run and not args.restored_copy:
+        parser.error("holding outbox events needs --restored-copy (or use --dry-run)")
     if not args.restore_point and args.backup_dir is None:
         parser.error("give --restore-point (or --backup-dir named by the backup's time)")
     try:
@@ -673,6 +730,11 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(f"--restore-point: {exc}")
     source = json.loads(args.source_counts.read_text(encoding="utf-8")) if args.source_counts else None
+    if source and source.get("database") == args.database and not args.dry_run:
+        print(
+            "Refused: the source counts were taken on this same database; is this the restored copy?", file=sys.stderr
+        )
+        return 1
     log_rows = None
     if args.erasure_log:
         with args.erasure_log.open(encoding="utf-8") as handle:
@@ -687,7 +749,7 @@ def main(argv: list[str] | None = None) -> int:
     for path in written[:2]:
         print(f"Saved {path}")
     print(f"Saved {len(written) - 2} customer summary PDF(s) in {args.out}")
-    return {"PASS": 0, "FAIL": 1}.get(record["result"], 2)
+    return {"PASS": 0, "FAIL": 1}.get(record["result"], EXIT_FLAGS)
 
 
 if __name__ == "__main__":

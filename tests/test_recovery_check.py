@@ -271,26 +271,31 @@ def test_an_unsent_event_older_than_the_restore_point_is_held_audited_and_sent_o
 
 @pytest.mark.db
 @requirement("B6-55")
-def test_an_unsent_event_after_the_restore_point_is_flagged_and_left_alone(db, org):
+def test_an_unsent_event_after_the_restore_point_is_held_too_and_flagged(db, org):
+    # The backup's folder time is taken before the dump reads the data: an event of those minutes may already have
+    # been sent by production, so it is held like the older ones, and flagged for the person to explain.
     now = datetime.now(timezone.utc)
     later = _event(db, org["tenant_id"], now - timedelta(minutes=10))
     result = recovery_check.hold_outbox(db, now - timedelta(hours=1), now, apply=True, tenant_ids=[org["tenant_id"]])
-    assert result["state"] == "FLAG" and result["after_restore_point"] == 1 and result["held"] == 0
-    assert later.dead_lettered_at is None
+    assert result["state"] == "FLAG" and result["after_restore_point"] == 1 and result["held"] == 1
+    assert later.dead_lettered_at is not None and later.last_error == "held after restore"
 
 
 @pytest.mark.db
 def test_a_worker_that_ran_on_the_restored_copy_fails_the_check(db):
     now = datetime.now(timezone.utc)
-    assert recovery_check.check_quiet(db, now + timedelta(days=1))["state"] == "PASS"
+    assert recovery_check.check_quiet(db, now + timedelta(days=1), now)["state"] == "PASS"
     db.add(
         WorkerHeartbeat(
             service="recovery-test", instance_id=uuid.uuid4().hex, started_at=now, updated_at=now, metrics={}
         )
     )
     db.flush()
-    result = recovery_check.check_quiet(db, now - timedelta(minutes=1))
+    result = recovery_check.check_quiet(db, now - timedelta(minutes=1), now)
     assert result["state"] == "FAIL" and any(item["service"] == "recovery-test" for item in result["services"])
+    # The same heartbeat seen an hour later (written while the backup was taken): flagged, not failed.
+    later = recovery_check.check_quiet(db, now - timedelta(minutes=1), now + timedelta(hours=1))
+    assert later["state"] == "FLAG"
 
 
 @pytest.mark.db
@@ -301,6 +306,8 @@ def test_schema_and_row_level_security_are_compared_with_the_source(db):
     assert recovery_check.check_schema(facts, schema_head())["state"] == "PASS"
     assert recovery_check.check_schema(facts, "not_the_head")["state"] == "FAIL"
     assert recovery_check.check_security(facts, dict(facts))["state"] == "PASS"
+    assert recovery_check.check_security(facts, None)["state"] == "FLAG"  # not compared is never a pass
+    assert recovery_check.check_counts(facts, None)["state"] == "FLAG"
     fewer = {**facts, "policies": facts["policies"] + 1}
     assert recovery_check.check_security(facts, fewer)["state"] == "FAIL"
     assert recovery_check.check_counts(facts, dict(facts))["state"] == "PASS"
@@ -326,3 +333,49 @@ def test_the_clock_step_keeps_the_clock_checks_own_state(monkeypatch):
     result = recovery_check.check_clock()
     assert result["state"] == "FAIL" and result["clock_state"] == clock_check.DEGRADED
     assert result["database_offset_seconds"] == 2.5
+
+
+@pytest.mark.db
+def test_holding_needs_the_restored_copy_confirmation(db, capsys):
+    current = db.execute(text("SELECT current_database()")).scalar()
+    with pytest.raises(SystemExit) as stopped:
+        recovery_check.main(["--database", current, "--restore-point", "20261113T021500Z"])
+    assert stopped.value.code == 2 and "--restored-copy" in capsys.readouterr().err
+
+
+@pytest.mark.db
+def test_a_dry_run_writes_the_record_and_one_summary_per_organisation_and_changes_nothing(org, tmp_path):
+    tenant_id = org["tenant_id"]
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as session:
+        bind_system(session, "test")
+        pending = _event(session, tenant_id, now - timedelta(hours=2))
+        session.commit()
+        pending_id = pending.id
+
+    def no_clock():
+        return recovery_check.step("clock", "PASS", "not measured in this test")
+
+    try:
+        record = recovery_check.run(restore_point=now - timedelta(hours=1), apply=False, clock=no_clock)
+        assert record["outbox_hold_applied"] is False
+        hold = next(item for item in record["steps"] if item["step"] == "outbox_hold")
+        assert hold["state"] == "FLAG" and hold["per_organisation"][str(tenant_id)] == 1
+        names = {item["step"] for item in record["steps"]}
+        assert {"worker_stopped", "schema_head", "audit_chain", "configuration", "dedicated_databases"} <= names
+        written = recovery_check.write_record(record, tmp_path)
+        assert written[0].suffix == ".json" and written[1].suffix == ".pdf"
+        assert len(written) == 2 + len(record["organisations"])
+        ours = next(org_ for org_ in record["organisations"] if org_["tenant_id"] == str(tenant_id))
+        summary = next(path for path in written[2:] if ours["key"] in path.name)
+        shown = pdf.text_of(summary.read_bytes())
+        assert "1 notification(s) held" in shown
+        assert not any(other["key"] in shown for other in record["organisations"] if other["key"] != ours["key"])
+        with SessionLocal() as session:
+            bind_system(session, "test")
+            assert session.get(OutboxEvent, pending_id).dead_lettered_at is None  # the dry run changed nothing
+    finally:
+        with SessionLocal() as session:
+            bind_system(session, "test cleanup")
+            session.query(OutboxEvent).filter(OutboxEvent.id == pending_id).delete()
+            session.commit()

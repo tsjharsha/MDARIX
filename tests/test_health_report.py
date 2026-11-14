@@ -162,3 +162,42 @@ def test_the_same_registers_and_date_give_the_same_files(registers, tmp_path):
 def test_the_repository_registers_build_a_report():
     report = health_report.build("CUS-001", "2026-11", GENERATED)
     assert report["last_restore_drill"]["entry_id"] == "OPS-2026-004"
+
+
+def test_a_missing_register_or_a_bad_value_is_refused_never_a_clean_report(registers, tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(health_report.Refused, match="incidents.csv not found"):
+        health_report.build("CUS-001", "2026-11", GENERATED, empty, registers / "deviation-log.csv")
+    rows = list(csv.DictReader((registers / "incidents.csv").open(encoding="utf-8")))
+    rows[1]["minutes_down"] = "45.5"
+    _write(registers / "incidents.csv", rows)
+    with pytest.raises(health_report.Refused, match="whole number"):
+        _build(registers)
+    rows[1]["minutes_down"] = "30"
+    rows[1]["opened_utc"] = "2026-11-10T04:00:00"  # no zone
+    _write(registers / "incidents.csv", rows)
+    with pytest.raises(health_report.Refused, match="needs its zone"):
+        _build(registers)
+
+
+def test_a_spreadsheet_saved_register_a_local_time_and_a_lower_case_code(registers):
+    rows = list(csv.DictReader((registers / "incidents.csv").open(encoding="utf-8")))
+    # 02:00 IST on 1 Dec is 20:30 UTC on 30 Nov: a November incident.
+    rows[1]["opened_utc"] = "2026-12-01T02:00:00+05:30"
+    _write(registers / "incidents.csv", rows)
+    text = (registers / "incidents.csv").read_text(encoding="utf-8")
+    (registers / "incidents.csv").write_text("﻿" + text, encoding="utf-8")
+    assert "INC-2026-002" in [item["incident_id"] for item in _build(registers)["incidents"]]
+    rows[0]["summary"] = "first reported by cus-002"
+    _write(registers / "incidents.csv", rows)
+    with pytest.raises(health_report.Refused, match="other customer code"):
+        _build(registers)
+
+
+def test_downtime_never_exceeds_the_month(registers):
+    rows = list(csv.DictReader((registers / "incidents.csv").open(encoding="utf-8")))
+    rows[0]["minutes_down"] = "50000"
+    _write(registers / "incidents.csv", rows)
+    uptime = _build(registers)["uptime"]
+    assert uptime["minutes_down"] == 43200 and uptime["percent"] == 0.0
