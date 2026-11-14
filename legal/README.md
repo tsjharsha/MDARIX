@@ -74,7 +74,8 @@ in the footer, on `/contact` and in every email.
 - Erasure leaves some things behind, and the documents should say so: audit rows keep the person's account id (which
   no longer identifies them) and the network address and browser recorded at the time; free text that colleagues
   typed into quality records or reasons (for example a name in a complaint description) is not searched out.
-- Backups: encrypted; 14 days on the server (`MDARIX_BACKUP_KEEP_DAYS`), up to 90 days in the off-site copy, plus
+- Backups: encrypted; 30 daily + 12 monthly on the server (`MDARIX_BACKUP_KEEP_DAYS`, `MDARIX_BACKUP_KEEP_MONTHS`)
+  and the same in the off-site copy (bucket lifecycle rule), so up to about 13 months, plus
   the server disk's daily snapshots (14 days, kept in Mumbai). During the validation phase the database runs on the
   server itself, with no point-in-time recovery. Erased data stays in backups for that period;
   after any restore the erasures are repeated from the erasure log before the system is used.

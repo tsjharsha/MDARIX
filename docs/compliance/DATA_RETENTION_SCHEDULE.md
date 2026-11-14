@@ -45,10 +45,11 @@ handed back or a waiver recorded, and never while a legal hold is set.
 | Layer | Kept |
 |---|---|
 | Daily snapshot of the server's disk (database and uploaded files; validation phase, stored in Mumbai) | **14 days** (snapshot schedule `mdarix-daily`, docs/runbooks/GCP_DEPLOYMENT.md) |
-| MDARIX encrypted backup (all databases and uploaded files) | **14 days** on the server (`MDARIX_BACKUP_KEEP_DAYS`) and **up to 90 days** off-site (bucket lifecycle rule) |
+| MDARIX encrypted backup (all databases and uploaded files) | **30 daily + 12 monthly** on the server: every backup of the last **30 days** (`MDARIX_BACKUP_KEEP_DAYS`), then the newest backup of each of the **12 months** before those days (`MDARIX_BACKUP_KEEP_MONTHS`), and always the newest backup (`infrastructure/docker/backup/retention.sh`, since 0.10.88; owner decision, 5 Nov 2026, confirmed 14 Nov 2026). Off-site: the bucket lifecycle rule set to the same, 30 days of daily copies and one copy a month for 12 months (`docs/runbooks/BACKUP_AND_RESTORE.md` section 1 step 3) |
 | Uploaded files on a versioned bucket | Deleted files keep a noncurrent version until the bucket's noncurrent-version expiry rule removes it (set it to 30 days) |
 
-Erased or purged data therefore **remains in backups for up to 90 days** after the erasure. Backups are encrypted,
+Erased or purged data therefore **remains in backups for up to about 13 months** after the erasure (the 30 daily
+backups and then the 12 monthly ones; the newest backup is always kept, however old). Backups are encrypted,
 never read for any other purpose, and a backup is never restored into production without re-applying the erasures:
 every erasure and purge is written to `erasure_log`, and after a restore `scripts/reapply_erasures.py` (first
 importing the log rows newer than the backup) repeats each one whose subject has personal data again

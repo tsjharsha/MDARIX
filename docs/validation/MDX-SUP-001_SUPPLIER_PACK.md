@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-SUP-001 |
 | Title | MDARIX supplier pack for customers' supplier qualification |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver |
 | Reviewer | Independent CSV consultant (not engaged yet) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part C, item C1) | Srinivas Telikicherla |
 | 0.2 | 14 Nov 2026 | OP-5 closed: SP-R02 and the emergency-notice period confirmed as written (owner decision O37) | Srinivas Telikicherla |
+| 0.3 | 14 Nov 2026 | OP-4 closed: backup retention 30 daily + 12 monthly (owner decision O39); purged data stays in backups up to about 13 months | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -138,7 +139,7 @@ not used: AI is off for every organisation (`legal/SUBPROCESSORS.md:18`).
 | Hand-back before purge | A customer organisation is purged only after the export was handed back or a waiver recorded | `backend/app/tenant_purge.py:550-557` |
 | Audit trail retention | Audit events and signatures are kept at least 7 years after each event while the account exists, never changed or deleted; at exit the whole trail goes to the customer in the export, and the customer keeps it for its own regulatory period | `docs/compliance/DATA_RETENTION_SCHEDULE.md:17` |
 | Legal hold | While a legal hold is set, nothing of the organisation is purged, erased or retired | `backend/app/legal_hold_api.py:1-10`; `tests/test_legal_hold.py::test_a_hold_stops_the_purge_and_the_erasure_and_records_the_refusal` |
-| Backups after purge | Purged data remains in encrypted backups for up to 90 days; a restore re-applies every purge before anyone signs in | `docs/compliance/DATA_RETENTION_SCHEDULE.md:51-55`; `docs/runbooks/BACKUP_AND_RESTORE.md:183-185` |
+| Backups after purge | Purged data remains in encrypted backups for up to about 13 months (30 daily + 12 monthly, owner decision O39); a restore re-applies every purge before anyone signs in | `docs/compliance/DATA_RETENTION_SCHEDULE.md:51-55`; `docs/runbooks/BACKUP_AND_RESTORE.md:183-185` |
 
 ## 13. Audit support
 
@@ -159,7 +160,7 @@ not used: AI is off for every organisation (`legal/SUBPROCESSORS.md:18`).
 | OP-1 | Name the legal entity and its signatory (section 2) | Owner |
 | OP-2 | Obtain the provider audit reports and terms (MDX-SUP-004 section 3) | Owner |
 | OP-3 | Fill the named roles of `docs/handover/52_SUPPORT_AND_OWNERSHIP_HANDOVER.md` before the first pilot | Owner |
-| OP-4 | `docs/compliance/DATA_RETENTION_SCHEDULE.md:48` states 14 days for local backups; `docs/runbooks/BACKUP_AND_RESTORE.md:15-21` states 30 daily and 12 monthly (owner decision, 5 Nov 2026). Correct the retention schedule | System owner |
+| OP-4 | Closed: backup retention is 30 daily + 12 monthly (owner, 14 Nov 2026; MDX-VAL-000 owner decision O39); `docs/compliance/DATA_RETENTION_SCHEDULE.md` (the backup row and the erasure period) and `legal/README.md` corrected to match `docs/runbooks/BACKUP_AND_RESTORE.md` | System owner |
 | OP-5 | Closed: the questionnaire response time (SP-R02, 10 working days) and the emergency-notice period (section 5; MDX-SOP-002 CC-R17, 1 working day) confirmed as written by the owner, 14 Nov 2026 (MDX-VAL-000 owner decision O37) | Owner |
 
 ## Signatures

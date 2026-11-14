@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-000 |
 | Title | Validation document control and index |
-| Version | 0.9 |
+| Version | 0.10 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
@@ -26,6 +26,7 @@ Change history
 | 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
 | 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1; MDX-CUS-005 0.2 with the O34 checklist item); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
 | 0.9 | 14 Nov 2026 | Owner decisions of 14 Nov 2026 ("Approved your recommendation") recorded as O35 to O38 (section 4); index versions of MDX-VAL-002 0.11, -010 0.4, -013 0.6, MDX-SUP-001 0.2, MDX-OPS-001 0.2 and -002 0.2 | Srinivas Telikicherla |
+| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); index version of MDX-SUP-001 0.3 | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -156,7 +157,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
-| MDX-VAL-000 | Validation document control and index | this file | 0.8 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
+| MDX-VAL-000 | Validation document control and index | this file | 0.10 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
 | MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.8 | DRAFT |
 | MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.11 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
@@ -171,7 +172,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, source (`requirement` / `code`), confirmed by | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT: every row drafted from the code (`source` `code`; the counts, including the rows that say TO CONFIRM, are in section 3.4); each to be re-derived from its requirement by Sriharsha Telikicherla and confirmed by the owner (O27) |
 | (data, per release) | Executed IQ and scripted OQ results: step, scenario, executed by, date (UTC), result, evidence ID; the generator feeds them into the IQ record, the OQ results, the RTM and the VSR (no generated document is edited by hand) | `releases/<release>/executed-results.csv` | per release | none yet |
 | (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; counts in section 3.4 |
-| MDX-SUP-001 | Supplier pack | [MDX-SUP-001_SUPPLIER_PACK.md](MDX-SUP-001_SUPPLIER_PACK.md) | 0.2 | DRAFT |
+| MDX-SUP-001 | Supplier pack | [MDX-SUP-001_SUPPLIER_PACK.md](MDX-SUP-001_SUPPLIER_PACK.md) | 0.3 | DRAFT |
 | MDX-SUP-002 | GxP impact assessment and shared-responsibility matrix | [MDX-SUP-002_GXP_IMPACT_AND_SHARED_RESPONSIBILITY.md](MDX-SUP-002_GXP_IMPACT_AND_SHARED_RESPONSIBILITY.md) | 0.1 | DRAFT |
 | MDX-SUP-003 | 21 CFR Part 11 assessment and EU GMP Annex 11 benchmark | [MDX-SUP-003_PART11_ANNEX11_ASSESSMENT.md](MDX-SUP-003_PART11_ANNEX11_ASSESSMENT.md) | 0.1 | DRAFT |
 | MDX-SUP-004 | Hosting-provider assessment (G8) | [MDX-SUP-004_HOSTING_PROVIDER_ASSESSMENT.md](MDX-SUP-004_HOSTING_PROVIDER_ASSESSMENT.md) | 0.1 | DRAFT |
@@ -365,6 +366,7 @@ also questions in MDX-VAL-013.
 | O36 | The deviation log has a `customer_scope` column: `all` for a deviation that concerns every customer (MDARIX-wide), or one customer code; the two existing rows are `all`. The generator checks the value and the monthly health report shows a customer only the deviations scoped `all` or to its own code (owner, 14 Nov 2026; MDX-VAL-010 DL-R01, DL-R08; MDX-OPS-002; `validation/pack.py`; `scripts/health_report.py`) |
 | O37 | The Part C time limits are confirmed as written: MDX-SOP-002 CC-R17 1 working day; MDX-SUP-001 SP-R02 10 working days; MDX-SOP-003 IR-R10 4 hours, IR-R15 1 working day from receipt and IR-R16 the same working day as that assessment ("IR-R15/16: 1 working day"), IR-R19 3 months; MDX-SOP-005 AC-R05 the last working day, AC-R06 3 months; MDX-SOP-004 BC-R19 monthly, with a trial or credit end within 60 days raised (owner, 14 Nov 2026; MDX-SUP-001 OP-5 closed) |
 | O38 | The roles that need two-factor sign-in in production are the standard list (Platform Administrator, Customer Administrator, Leader, Approver), with no production override of the list (owner, 14 Nov 2026) |
+| O39 | Backup retention is 30 daily + 12 monthly, as `docs/runbooks/BACKUP_AND_RESTORE.md` section 1 and `infrastructure/docker/backup/retention.sh` (since 0.10.88); `docs/compliance/DATA_RETENTION_SCHEDULE.md` (which said 14 days) and `legal/README.md` corrected, so erased data stays in backups up to about 13 months (owner, 14 Nov 2026; MDX-SUP-001 OP-4 closed) |
 
 ## 5. Codes used in these documents
 
@@ -378,7 +380,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6, PL followed by a number | Scenario IDs in the scenario register |
-| O1 to O38, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O39, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 
