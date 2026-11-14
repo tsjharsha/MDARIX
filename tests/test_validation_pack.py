@@ -374,7 +374,7 @@ def test_release_identity_mismatch_is_refused_outside_a_dry_run(tmp_path, capsys
     assert "differs from VERSION" not in capsys.readouterr().err
 
 
-DEV = "DEV-9.9.9-{n},2026-11-10T09:00:00Z,SH,OQ,AA-02,REQ-T-001,refused,saved,2026-11-10T09:05:00Z,none,{risk},{cls},,,{retest},{result},no,,{approver},{closed},{status}\n"
+DEV = "DEV-9.9.9-{n},2026-11-10T09:00:00Z,SH,OQ,AA-02,REQ-T-001,refused,saved,2026-11-10T09:05:00Z,none,{risk},{cls},,,{retest},{result},no,,{approver},{closed},{status},all\n"
 
 
 @pytest.mark.requirement("B6-57")
@@ -404,6 +404,20 @@ def test_deviation_cannot_close_without_retest_and_approver(tmp_path, capsys):
     assert (
         "DEV-9.9.9-004: open deviation with GxP risk high; it blocks the release (VMP-R50a)" in capsys.readouterr().err
     )
+
+
+def test_every_deviation_names_its_customer_scope(tmp_path, capsys):
+    """MDX-VAL-010 DL-R08 (owner decision O36): customer_scope is `all` or one customer code CUS-nnn."""
+    row = DEV.format(n="{n}", risk="low", cls="minor", retest="", result="", approver="", closed="", status="open")
+    deviations = row.format(n="001") + row.format(n="002").replace(",all\n", ",CUS-002\n")
+    for n, scope in (("003", ""), ("004", "ALL"), ("005", "CUS-1"), ("006", "CUS-001 CUS-002")):
+        deviations += row.format(n=n).replace(",all\n", f",{scope}\n")
+    assert _run(_root(tmp_path, deviations=deviations)) == 1
+    err = capsys.readouterr().err
+    assert "DEV-9.9.9-001: customer_scope" not in err and "DEV-9.9.9-002: customer_scope" not in err
+    for n in ("003", "004", "005", "006"):
+        assert f"DEV-9.9.9-{n}: customer_scope" in err and "is not 'all' or a customer code CUS-nnn" in err
+    assert pack.DEVIATION_COLUMNS[-1] == "customer_scope"
 
 
 @pytest.mark.requirement("B6-58")

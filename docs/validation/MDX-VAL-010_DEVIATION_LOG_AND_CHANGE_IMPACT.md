@@ -4,13 +4,13 @@
 |---|---|
 | Document ID | MDX-VAL-010 |
 | Title | Deviation log and change-impact template |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Drafting | Drafted with software assistance; every line reviewed by Sriharsha Telikicherla (MDX-VAL-000, DC-R43) |
-| Date | 12 Nov 2026 |
+| Date | 14 Nov 2026 |
 | Code baseline | Branch `feat/b6b-validation-pack`; generator `scripts/validation_pack.py` |
 
 Change history
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B10) | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | Owner decision O11: each change carries its own risk, which sets its re-test rule (MDX-VAL-001 VMP-R23); DL-R06 keeps every version of a row in git; re-run scope as MDX-VAL-001 section 9.3; signature block | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | DL-R07 allowed `found_in` values, checked by the generator (owner, 12 Nov 2026) | Sriharsha Telikicherla |
+| 0.4 | 14 Nov 2026 | Owner decision O36: column `customer_scope` (DL-R01) and rule DL-R08, checked by the generator and used by the health report | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -33,7 +34,7 @@ definitions are those of MDX-VAL-001 section 13 and Annex C; they are not repeat
   with the columns of MDX-VAL-001 Annex C in this order: `dev_id`, `raised_utc`, `raised_by`, `found_in`,
   `test_or_scenario`, `req_id`, `expected`, `seen`, `documented_first_utc`, `impact`, `gxp_risk`, `classification`,
   `root_cause`, `correction`, `retest_id`, `retest_result`, `change_control`, `capa_ref`, `approved_by`, `closed_utc`,
-  `status`.
+  `status`, then `customer_scope` (DL-R08).
 - **DL-R02** `dev_id` shall be `DEV-<release>-nnn`; the generator reads the rows of the release it builds by that
   prefix.
 - **DL-R03** `status` shall be one of open, corrected, retested, closed.
@@ -45,6 +46,9 @@ definitions are those of MDX-VAL-001 section 13 and Annex C; they are not repeat
   the row, so git history keeps every earlier version of it; a row is never deleted.
 - **DL-R07** `found_in` shall be one of IQ, OQ, PQ, automated suite, production (MDX-VAL-001 Annex C); a finding
   made while preparing a protocol is recorded under that protocol. The generator lists any other value.
+- **DL-R08** `customer_scope` shall be `all` for a deviation that concerns every customer (MDARIX-wide), or the one
+  customer code (`CUS-nnn`) it concerns (owner decision O36). The generator lists any other value, and the monthly
+  health report (MDX-OPS-002) shows a customer only the deviations scoped `all` or to its own code.
 
 ## 3. Change-impact assessment (template, one per release)
 

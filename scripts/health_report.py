@@ -9,7 +9,7 @@ name is kept outside the repository.
 
 The report holds: uptime against the 99.5 % target with its source (the incident register's minutes down), downtime
 minutes, the incidents that touched this organisation, the releases deployed with their change notices, the open
-deviations, backups (failures recorded as incidents), the last restore drill and recovery record, the last clock
+deviations scoped ``all`` or to this customer (``customer_scope``, MDX-VAL-010 DL-R08), backups (failures recorded as incidents), the last restore drill and recovery record, the last clock
 check, the audit chain line, and the planned changes. A register row is used only when its ``customers`` field is
 ``ALL`` or names this customer; every other organisation's rows are left out, and the report is refused (exit 1) if
 any text in it names another customer code (B6-56). The quality approver reviews the PDF before it is sent.
@@ -95,6 +95,16 @@ def _scope(customers: str) -> str:
     return "all customers" if "ALL" in re.split(r"[\s;,]+", customers.strip().upper()) else "your organisation"
 
 
+def deviation_concerns(row: dict, code: str) -> bool:
+    """A deviation is shown to this customer only when its ``customer_scope`` is ``all`` or this customer's code
+    (owner decision O36). Every row is checked, closed ones too: a row without a valid scope (or a log without the
+    column) refuses the report, never shows the row to everyone."""
+    scope = (row.get("customer_scope") or "").strip()
+    if scope != "all" and not CODE.match(scope):
+        raise Refused(f"{row.get('dev_id') or 'a deviation'}: customer_scope {scope!r}: expected all or CUS-nnn")
+    return scope in ("all", code)
+
+
 def build(
     code: str, month: str, generated: date, registers: Path = REGISTERS, deviations: Path = DEVIATION_LOG
 ) -> dict:
@@ -153,7 +163,7 @@ def build(
     open_deviations = [
         {key: row[key] for key in ("dev_id", "classification", "gxp_risk", "status")}
         for row in _rows(deviations)
-        if row.get("status", "").lower() != "closed"
+        if deviation_concerns(row, code) and row.get("status", "").lower() != "closed"
     ]
     backup_failures = [item["incident_id"] for item in incidents if item["category"].upper() == "BACKUP"]
     report = {

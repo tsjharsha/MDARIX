@@ -86,8 +86,34 @@ def registers(tmp_path):
     _write(
         tmp_path / "deviation-log.csv",
         [
-            {"dev_id": "DEV-0.11.04-009", "classification": "minor", "gxp_risk": "low", "status": "open"},
-            {"dev_id": "DEV-0.11.04-001", "classification": "major", "gxp_risk": "high", "status": "closed"},
+            {
+                "dev_id": "DEV-0.11.04-009",
+                "classification": "minor",
+                "gxp_risk": "low",
+                "status": "open",
+                "customer_scope": "all",
+            },
+            {
+                "dev_id": "DEV-0.11.04-001",
+                "classification": "major",
+                "gxp_risk": "high",
+                "status": "closed",
+                "customer_scope": "all",
+            },
+            {
+                "dev_id": "DEV-0.11.04-010",
+                "classification": "major",
+                "gxp_risk": "medium",
+                "status": "open",
+                "customer_scope": "CUS-002",
+            },
+            {
+                "dev_id": "DEV-0.11.04-011",
+                "classification": "minor",
+                "gxp_risk": "low",
+                "status": "corrected",
+                "customer_scope": "CUS-001",
+            },
         ],
     )
     return tmp_path
@@ -137,9 +163,31 @@ def test_the_report_lists_drills_clock_backups_deviations_and_the_chain_line(reg
     assert report["last_recovery_record"] is None
     assert report["backups"]["failures_this_month"] == ["INC-2026-004"]
     assert report["open_deviations"] == [
-        {"dev_id": "DEV-0.11.04-009", "classification": "minor", "gxp_risk": "low", "status": "open"}
+        {"dev_id": "DEV-0.11.04-009", "classification": "minor", "gxp_risk": "low", "status": "open"},
+        {"dev_id": "DEV-0.11.04-011", "classification": "minor", "gxp_risk": "low", "status": "corrected"},
     ]
     assert "result is available on request" in report["audit_chain"]
+
+
+@pytest.mark.requirement("B6-56")
+def test_a_customer_sees_only_the_deviations_scoped_all_or_to_its_own_code(registers):
+    """Owner decision O36: a health report for customer A never shows a deviation scoped to customer B."""
+    first = _build(registers, "CUS-001")
+    other = _build(registers, "CUS-002")
+    assert [d["dev_id"] for d in first["open_deviations"]] == ["DEV-0.11.04-009", "DEV-0.11.04-011"]
+    assert [d["dev_id"] for d in other["open_deviations"]] == ["DEV-0.11.04-009", "DEV-0.11.04-010"]
+    text = json.dumps(first) + pdf.text_of(health_report.as_pdf(first))
+    assert "DEV-0.11.04-010" not in text and "DEV-0.11.04-011" in text
+    assert "DEV-0.11.04-011" not in json.dumps(other)
+
+
+@pytest.mark.parametrize("scope", ["", "ALL CUSTOMERS", "CUS-1", "CUS-001 CUS-002"])
+def test_a_deviation_without_a_valid_customer_scope_refuses_the_report(registers, scope):
+    rows = list(csv.DictReader((registers / "deviation-log.csv").open(encoding="utf-8")))
+    rows[1]["customer_scope"] = scope  # a closed row too: never shown to everyone by default
+    _write(registers / "deviation-log.csv", rows)
+    with pytest.raises(health_report.Refused, match="customer_scope"):
+        _build(registers)
 
 
 def test_bad_inputs_are_refused(registers):

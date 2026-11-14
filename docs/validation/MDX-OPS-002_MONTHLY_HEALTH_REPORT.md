@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-OPS-002 |
 | Title | Monthly service health report: content, sources and review |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (generates the report) |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part D, item D3) | Sriharsha Telikicherla |
+| 0.2 | 14 Nov 2026 | Owner decision O36: open deviations are those scoped `all` or to the customer's code (`customer_scope`); the old limit (every open deviation shown, no customer column) removed | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -50,7 +51,7 @@ comes from and who checks it. The report is first needed one month after the fir
 | Downtime minutes | Same | |
 | Incidents | Incident register, rows open at any time in the month | Shown as reaching "all customers" or "your organisation", never with other codes |
 | Releases and change notices | Operations log, `RELEASE` rows in the month | The change notice reference is in `reference` |
-| Open deviations | `deviation-log.csv`, rows not closed | Deviations are product-level and the log has no customer column: every open one is listed, with ID, classification, GxP risk and status only (to be narrowed to customer-affecting ones when the log records it) |
+| Open deviations | `deviation-log.csv`, rows not closed whose `customer_scope` is `all` or the customer's code (MDX-VAL-010 DL-R08, owner decision O36) | Listed with ID, classification, GxP risk and status only. A deviation scoped to another customer is never shown; a row without a valid `customer_scope` (closed rows included) refuses the report (`tests/test_health_report.py::test_a_customer_sees_only_the_deviations_scoped_all_or_to_its_own_code`, `::test_a_deviation_without_a_valid_customer_scope_refuses_the_report`) |
 | Backups | Incident register, `BACKUP` rows; the fixed text on the daily backup and the 26-hour age alert | No backup log is read (HR-02) |
 | Last restore drill, last recovery record, last clock check | Operations log, latest `RESTORE_DRILL`, `RECOVERY_RECORD`, `CLOCK_CHECK` row up to the month's end | |
 | Audit trail chain | Fixed line: verified daily by the scheduler, result on request | B6b-D11 default; the scheduler's daily verification is `backend/app/audit_chain.py` (`verify_all`) |
