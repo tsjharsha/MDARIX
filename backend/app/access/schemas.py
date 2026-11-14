@@ -522,6 +522,15 @@ class QueueItemsAction(BaseModel):
     reason: str = Field(min_length=10, max_length=1000)
 
 
+class MailLogCheck(BaseModel):
+    """What the mail provider's log showed for events held after a restore (B6b-D10), checked by a person: only an
+    event it shows as NOT_DELIVERED may be retried; a DELIVERED one was sent before the restore and is discarded."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    result: str = Field(pattern="^(NOT_DELIVERED|DELIVERED)$")
+    reason: str = Field(min_length=10, max_length=1000, description="Where and how the log was checked")
+
+
 class TenantLimitsRequest(BaseModel):
     """A customer tenant's own limits; omitted ones stay as they are."""
 

@@ -111,10 +111,99 @@ def test_a_selection_that_changed_meanwhile_is_refused_whole(platform, gave_up):
     assert _row(ids[1]) is not None and _row(ids[2]) is not None
 
 
-@pytest.mark.parametrize("path", [BASE, f"{BASE}/retry", f"{BASE}/discard"])
+@pytest.mark.parametrize("path", [BASE, f"{BASE}/retry", f"{BASE}/discard", f"{BASE}/mail-log-check"])
 def test_only_a_platform_administrator_may_see_or_act(path, gave_up):
     ids, _ = gave_up
     client = _client_with_role("CUSTOMER_ADMIN")
-    response = client.get(path) if path == BASE else client.post(path, json={"ids": ids, "reason": REASON})
+    body = {"ids": ids, "reason": REASON, "result": "NOT_DELIVERED"}
+    response = client.get(path) if path == BASE else client.post(path, json=body)
     assert response.status_code == 403
     assert all(_row(item) is not None for item in ids)
+
+
+# ------------------------------------------------------------------------------- held after a restore (B6b-D10)
+
+HELD = "held after restore"  # scripts/recovery_check.py's marker (B6b Part D, D1 step 6)
+CHECKED = "Resend log searched for the event's recipient and time: no delivery found"
+
+
+@pytest.fixture
+def held():
+    """Two events a restored copy had not sent, held by the recovery check, in one tenant."""
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_system(db, "test: events held after a restore")
+        tenant = db.query(Tenant.id).order_by(Tenant.created_at).first()[0]
+        rows = [
+            OutboxEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant,
+                event_name="TEST_HELD",
+                aggregate_type="Test",
+                payload={"narrative": SECRET},
+                occurred_at=now,
+                attempts=0,
+                last_error=HELD,
+                dead_lettered_at=now,
+            )
+            for _ in range(2)
+        ]
+        db.add_all(rows)
+        db.commit()
+        ids = [str(row.id) for row in rows]
+    yield ids, tenant
+    with SessionLocal() as db:
+        bind_system(db, "test cleanup")
+        db.query(OutboxEvent).filter(OutboxEvent.id.in_([uuid.UUID(i) for i in ids])).delete(synchronize_session=False)
+        db.commit()
+
+
+def test_an_event_held_after_a_restore_is_not_retried_without_a_mail_log_check(platform, held):
+    ids, tenant = held
+    refused = platform.post(f"{BASE}/retry", json={"ids": ids, "reason": REASON})
+    assert refused.status_code == 409, refused.text
+    detail = refused.json()["detail"]
+    assert detail["code"] == "HELD_AFTER_RESTORE" and set(detail["ids"]) == set(ids)
+    assert all(_row(item).dead_lettered_at is not None for item in ids)  # nothing was put back in the queue
+    record = _audit("OUTBOX_RETRY_REFUSED", tenant)
+    assert record.reason == REASON and record.details["code"] == "HELD_AFTER_RESTORE"
+    assert {item["mail_log"] for item in record.details["items"]} == {"NOT_CHECKED"}
+    assert SECRET not in str(record.details)
+
+
+def test_a_held_event_the_mail_log_shows_delivered_is_still_refused(platform, held):
+    ids, _ = held
+    checked = platform.post(f"{BASE}/mail-log-check", json={"ids": ids[:1], "result": "DELIVERED", "reason": CHECKED})
+    assert checked.status_code == 200, checked.text
+    refused = platform.post(f"{BASE}/retry", json={"ids": ids[:1], "reason": REASON})
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "HELD_AFTER_RESTORE"
+
+
+def test_only_the_held_events_the_mail_log_shows_not_delivered_are_retried(platform, held):
+    ids, tenant = held
+    checked = platform.post(
+        f"{BASE}/mail-log-check", json={"ids": ids[:1], "result": "NOT_DELIVERED", "reason": CHECKED}
+    )
+    assert checked.status_code == 200, checked.text
+    record = _audit("OUTBOX_MAIL_LOG_CHECKED", tenant)
+    assert record.reason == CHECKED and record.details["items"][0] == {
+        "id": ids[0],
+        "event_name": "TEST_HELD",
+        "result": "NOT_DELIVERED",
+    }
+    # The whole selection is refused while one of it is unchecked; the checked one alone is retried.
+    assert platform.post(f"{BASE}/retry", json={"ids": ids, "reason": REASON}).status_code == 409
+    assert _row(ids[0]).dead_lettered_at is not None
+    retried = platform.post(f"{BASE}/retry", json={"ids": ids[:1], "reason": REASON})
+    assert retried.status_code == 200, retried.text
+    assert _row(ids[0]).dead_lettered_at is None and _row(ids[0]).last_error is None
+    assert _row(ids[1]).dead_lettered_at is not None
+
+
+def test_a_mail_log_check_is_recorded_only_for_held_events(platform, gave_up):
+    ids, _ = gave_up
+    body = {"ids": ids[:1], "result": "NOT_DELIVERED", "reason": CHECKED}
+    refused = platform.post(f"{BASE}/mail-log-check", json=body)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "NOT_HELD_AFTER_RESTORE"
+    # Work that gave up for any other reason is retried as before.
+    assert platform.post(f"{BASE}/retry", json={"ids": ids[:1], "reason": REASON}).status_code == 200
