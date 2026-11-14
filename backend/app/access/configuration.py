@@ -644,6 +644,15 @@ def update_control_plane_resource(
     unknown = set(payload.values) - allowed_fields
     if unknown:
         raise HTTPException(422, detail={"code": "FIELD_NOT_ALLOWED", "message": "One or more fields cannot be edited"})
+    from backend.app.trial.sample_marker import RESERVED_MESSAGE, is_reserved
+
+    # The sample marker is reserved for MDARIX's own sample data (backend/app/trial/sample_marker.py).
+    configuration_value = payload.values.get("configuration")
+    if is_reserved(payload.values.get("source_system")) or (
+        isinstance(configuration_value, dict)
+        and any(is_reserved(configuration_value.get(key)) for key in ("source_object", "source_system"))
+    ):
+        raise HTTPException(422, detail={"code": "SAMPLE_SOURCE_RESERVED", "message": RESERVED_MESSAGE})
     row = db.query(model).filter(model.id == resource_id, model.tenant_id == admin.tenant_id).first()
     if row is not None and resource == "persona-assignments":
         # A platform account's assignments are not the customer's to see or change.

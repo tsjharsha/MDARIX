@@ -36,7 +36,8 @@ def record_ai_execution(
         requestor_ref=requestor_ref,
         provider=provider,
         model_name=model_name,
-        model_version=model_version or "latest",
+        # Never "latest": a result names the model version it came from, or says it was not recorded (AI-R step 2).
+        model_version=model_version or "unrecorded",
         prompt_template_version=prompt_template_version,
         orchestration_version=orchestration_version,
         context_refs=context_refs,

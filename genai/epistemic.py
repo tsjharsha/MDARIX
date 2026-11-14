@@ -66,7 +66,15 @@ def reason_code_for(refusal_code: str | None) -> str | None:
     if not refusal_code:
         return None
     code = str(refusal_code).split(":", 1)[0].strip().upper()
-    if code in ("GENAI_DISABLED_FOR_ORGANIZATION", "GENAI_OFF_FOR_FREE_TRIAL"):
+    if code in (
+        "GENAI_DISABLED_FOR_ORGANIZATION",
+        "GENAI_OFF_FOR_FREE_TRIAL",
+        "GENAI_FEATURE_OFF_FOR_ORGANIZATION",
+        "GENAI_FEATURE_OFF_ON_PLATFORM",
+        "GENAI_FEATURE_NOT_OFFERED",
+        "GENAI_USER_AI_INACTIVE",
+        "GENAI_TRIAL_SAMPLE_ONLY",
+    ):
         return AI_DISABLED
     if code == "GENAI_MONTHLY_BUDGET_REACHED":
         return BUDGET_EXHAUSTED

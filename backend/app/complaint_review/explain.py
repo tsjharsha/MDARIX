@@ -142,6 +142,7 @@ def explain(db: Session, tenant_id: uuid.UUID, record: dict, flagged: dict, *, a
         result = provider.complete(
             "Explain what in this record looks like a complaint allegation.",
             {"flagged_because": reasons, "complaint_signs": signs},
+            feature="summaries",
             system=SYSTEM,
             json_output=True,
             max_output_tokens=600,

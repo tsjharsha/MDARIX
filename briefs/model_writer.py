@@ -119,7 +119,12 @@ class ModelBriefWriter:
             ]
         try:
             result = self.provider.complete(
-                "Draft the investigation brief.", context, system=SYSTEM, json_output=True, max_output_tokens=3000
+                "Draft the investigation brief.",
+                context,
+                feature="drafting",
+                system=SYSTEM,
+                json_output=True,
+                max_output_tokens=3000,
             )
         except GenAIUnavailable as exc:
             raise ModelAnalysisUnavailable("MODEL_CALL_FAILED", {"error": str(exc)}) from exc

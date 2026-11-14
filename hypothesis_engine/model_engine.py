@@ -90,7 +90,9 @@ class ModelHypothesisEngine:
         if investigator_question:
             prompt += f"\nThe investigator asks: {investigator_question[:1000]}\nTest the premise; do not adopt it."
         try:
-            result = self.provider.complete(prompt, context, system=SYSTEM, json_output=True, max_output_tokens=3000)
+            result = self.provider.complete(
+                prompt, context, feature="case_analysis", system=SYSTEM, json_output=True, max_output_tokens=3000
+            )
         except GenAIUnavailable as exc:
             raise ModelAnalysisUnavailable("MODEL_CALL_FAILED", {"error": str(exc)}) from exc
         parsed = parse_json_reply(result.output.get("answer"))

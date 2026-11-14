@@ -352,7 +352,15 @@ def create_interaction(
         model_context = grounded
         if len(json.dumps(grounded, default=str)) > budget:
             model_context = compact_context(grounded, budget)
-        result = provider.complete(prompt, model_context, max_output_tokens=ASK_MAX_OUTPUT_TOKENS)
+        result = provider.complete(
+            prompt,
+            model_context,
+            feature="ask",
+            # The records whose text is sent; a case's own context is not listed, so a trial is refused for it.
+            records=None if payload.investigation_id else search.get("records"),
+            user_text=payload.prompt,
+            max_output_tokens=ASK_MAX_OUTPUT_TOKENS,
+        )
         from genai.ask import normalize_answer
         from genai.structured_answer import evidence_texts, render_markdown
 

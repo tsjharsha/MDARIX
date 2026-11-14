@@ -16,6 +16,15 @@ from genai.pii import mask, mask_text
 from genai.provider import GenAIProvider, GenAIUnavailable
 from tests.conftest import authenticated_client
 
+
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 # ------------------------------------------------------------------------------------------------ masking
 
 
@@ -117,7 +126,7 @@ def tenant():
     bind_system(db, "test")
     row = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
     tenant_id = row.id
-    saved = (row.ai_processing_allowed, row.ai_monthly_token_budget)
+    saved = (row.ai_processing_allowed, row.ai_monthly_token_budget, dict(row.ai_features or {}))
     db.close()
     _set(tenant_id, ai_processing_allowed=False)  # so the switch below is a real "on" that needs the acknowledgement
     from tests.support_grants import grant_support_access
@@ -133,13 +142,15 @@ def tenant():
         },
     )
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
+    # The organization's switch for the feature these tests use (tenants.ai_features, genai/features.py).
+    _set(tenant_id, ai_features={"ask": True})
     try:
         yield tenant_id
     finally:
         db = SessionLocal()
         bind_system(db, "test")
         db.query(Tenant).filter(Tenant.id == tenant_id).update(
-            {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1]}
+            {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1], "ai_features": saved[2]}
         )
         db.commit()
         db.close()
@@ -165,7 +176,9 @@ def _usage(tenant_id) -> dict:
 def test_the_model_never_receives_personal_information(groq, tenant):
     with governance.tenant_scope(tenant):
         GenAIProvider().complete(
-            "Summarize: reported by Jane Doe, jane.doe@hospital.org.", {"reporter_phone": "617 555 0100", "lot": "L-7"}
+            "Summarize: reported by Jane Doe, jane.doe@hospital.org.",
+            {"reporter_phone": "617 555 0100", "lot": "L-7"},
+            feature="ask",
         )
     body = json.dumps(groq[-1])
     assert "Jane Doe" not in body and "jane.doe@hospital.org" not in body and "617 555 0100" not in body
@@ -175,7 +188,7 @@ def test_the_model_never_receives_personal_information(groq, tenant):
 def test_usage_is_counted_per_organization_and_month(groq, tenant):
     before = _usage(tenant)
     with governance.tenant_scope(tenant):
-        GenAIProvider().complete("Summarize the record.", {"lot": "L-1"})
+        GenAIProvider().complete("Summarize the record.", {"lot": "L-1"}, feature="ask")
     after = _usage(tenant)
     assert after["requests"] == before["requests"] + 1
     assert after["tokens_used"] == before["tokens_used"] + 47
@@ -185,23 +198,26 @@ def test_an_organization_with_ai_switched_off_gets_no_model_call(groq, tenant):
     _set(tenant, ai_processing_allowed=False)
     before = _usage(tenant)["refused"]
     with governance.tenant_scope(tenant), pytest.raises(GenAIUnavailable, match="GENAI_DISABLED_FOR_ORGANIZATION"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == [] and _usage(tenant)["refused"] == before + 1
 
 
 def test_the_monthly_budget_stops_model_calls(groq, tenant):
     _set(tenant, ai_monthly_token_budget=_usage(tenant)["tokens_used"] + 10)
     with governance.tenant_scope(tenant), pytest.raises(GenAIUnavailable, match="GENAI_MONTHLY_BUDGET_REACHED"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == []
 
 
 def test_production_refuses_a_model_call_without_an_organization(groq, monkeypatch):
     monkeypatch.setenv("MDARIX_ENV", "production")
-    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "groq")
-    monkeypatch.setenv("MDARIX_GENAI_GROQ_ZDR", "true")
+    # Groq is registered for the free-trial chain only (genai/vetted_providers.json), so the paid provider here is
+    # another contracted one; the fixture still captures any request.
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "cerebras")
+    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "cerebras")
+    monkeypatch.setenv("MDARIX_GENAI_CEREBRAS_ZDR", "true")
     with pytest.raises(GenAIUnavailable, match="GENAI_NO_TENANT_SCOPE"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == []
 
 
@@ -528,5 +544,5 @@ def test_a_model_call_past_80_percent_tells_the_administrators(groq, tenant, mon
     )
     monkeypatch.setattr(governance, "_record_thresholds", lambda tenant_id, refused, now: [(80, {})])
     with governance.tenant_scope(tenant):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert notices == [80]

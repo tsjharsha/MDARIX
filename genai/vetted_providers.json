@@ -1,0 +1,43 @@
+{
+  "about": "Vetted AI providers for the free-trial chain (owner decision AI-D19). Read by genai/vetted.py; people read docs/compliance/AI_PROVIDER_REGISTER.md. A new or changed row is a Major AI change. An upstream may answer only when commercial_use is true, trains_on_data is 'no' or 'opt_out_confirmed', and date_checked is under 12 months old (a warning from 6 months). Rows with nulls are not vetted yet: the owner fills them after reading each provider's terms.",
+  "version": 1,
+  "warn_after_days": 183,
+  "refuse_after_days": 365,
+  "providers": [
+    {
+      "provider": "freellmapi",
+      "kind": "gateway",
+      "chain": "trial",
+      "upstream_from": "header:x-routed-via",
+      "terms_link": null,
+      "date_checked": null,
+      "region": "loopback on the MDARIX server",
+      "checked_by": null,
+      "notes": "Self-hosted router, bound to 127.0.0.1. Only vetted upstream keys are entered in it; its key for MDARIX is scoped to vetted models."
+    },
+    {
+      "provider": "omniroute",
+      "kind": "gateway",
+      "chain": "trial",
+      "upstream_from": "body:model",
+      "terms_link": null,
+      "date_checked": null,
+      "region": "loopback on the MDARIX server",
+      "checked_by": null,
+      "notes": "Self-hosted gateway; only vetted upstreams in its combo."
+    },
+    {
+      "provider": "groq",
+      "kind": "upstream",
+      "chain": "trial",
+      "direct": true,
+      "terms_link": null,
+      "date_checked": null,
+      "region": null,
+      "commercial_use": null,
+      "trains_on_data": null,
+      "checked_by": null,
+      "notes": "Called directly as the last provider of the trial chain. Not vetted until the owner records its terms."
+    }
+  ]
+}

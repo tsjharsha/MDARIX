@@ -71,7 +71,7 @@ def validate_multi_instance(*, provider: GenAIProvider | None = None, workers: i
     safe_context = {"tenant_id": "tenant-validation", "password": "must-not-leak", "status": "open"}
 
     def run(_):
-        result = provider.complete("Summarize the authorized record.", safe_context)
+        result = provider.complete("Summarize the authorized record.", safe_context, feature="summaries")
         serialized = json.dumps(result.output)
         return {
             "provider": result.provider,

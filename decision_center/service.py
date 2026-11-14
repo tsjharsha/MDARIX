@@ -215,6 +215,8 @@ class DecisionCenterService:
             deterministic_result=output,
             grounded_context=grounded,
             question=request.decision_question,
+            # Not offered (owner decision AI-D5): refused before any model call, whatever the switches say.
+            feature="decision_advisory",
         )
         row = AIExecution(
             id=uuid.uuid4(),

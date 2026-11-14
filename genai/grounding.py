@@ -222,6 +222,7 @@ def advisory(
     grounded_context: dict[str, Any],
     question: str | None = None,
     provider: GenAIProvider | None = None,
+    feature: str = "case_analysis",
 ) -> dict[str, Any]:
     """Return a clearly separated advisory; deterministic output remains authoritative.
 
@@ -254,6 +255,7 @@ def advisory(
         result = client.complete(
             prompt,
             {"grounded_context": model_context, "controlled_result": deterministic_result},
+            feature=feature,
             system=ADVISORY_SYSTEM,
             evidence=evidence,
         )

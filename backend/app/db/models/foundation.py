@@ -71,6 +71,8 @@ class Tenant(Base):
     # Off for new organizations (md23): an administrator switches it on with a recorded reason (ai_settings.py).
     ai_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     ai_monthly_token_budget: Mapped[int | None] = mapped_column(BigInteger)
+    # Per-feature AI switches ({"ask": true, ...}, genai/features.py); absent = off (migration tr32).
+    ai_features: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     # While a legal hold is set, nothing of this organization is purged or retired (tenant_purge.py, trial/retention.py).
     legal_hold: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     legal_hold_reason: Mapped[str | None] = mapped_column(Text)
@@ -840,6 +842,9 @@ class AuthUser(Base):
     # tr13: the workspace persona ("Viewing as", access_control/personas.py WORKSPACE_PERSONAS); a view, never a
     # permission. Empty: it follows the role.
     view_persona: Mapped[str | None] = mapped_column(String(40))
+    # tr32: the person's own AI flag, set by a Platform Administrator only; it applies to free trials only
+    # (genai/governance.py). New people are ACTIVE.
+    ai_access: Mapped[str] = mapped_column(String(10), nullable=False, server_default="ACTIVE")
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)

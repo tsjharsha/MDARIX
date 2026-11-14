@@ -228,6 +228,7 @@ class ModelInvestigatorProvider:
             result = self.provider.complete(
                 prompt,
                 context,
+                feature="case_analysis",
                 system=SYSTEM,
                 json_output=True,
                 response_schema=ANALYSIS_RESPONSE_SCHEMA,

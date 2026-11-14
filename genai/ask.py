@@ -103,7 +103,7 @@ def search_evidence(
         )
         texts = {str(row.id): row.text_content or "" for row in rows}
 
-    evidence, sources, seen, used = [], [], set(), 0
+    evidence, sources, records, seen, used = [], [], [], set(), 0
     for result in response.results:
         if not result.evidence_available or "ground_truth" in (result.evidence_identifier or "").lower():
             continue  # evaluation ground truth never reaches the model
@@ -125,6 +125,8 @@ def search_evidence(
                 "text": text,
             }
         )
+        # The record whose text is sent, for the free-trial sample-data check (genai/sample_gate.py).
+        records.append({"table": "evidence", "id": str(result.evidence_id), "evidence_id": result.evidence_identifier})
         sources.append(
             {
                 "evidence_identifier": result.evidence_identifier,
@@ -142,6 +144,7 @@ def search_evidence(
         "embedding_model": response.results[0].provenance.get("embedding_model") if response.results else None,
         "evidence": evidence,
         "sources": sources,
+        "records": records,
         "limitations": list(response.limitations),
         # Records whose text reads like an instruction to a model: sent as data only, and named to the reader.
         "instruction_like": instructions_in_evidence(evidence),

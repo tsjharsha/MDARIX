@@ -210,6 +210,8 @@ def draft_with_model(
             grounded_context=context,
             question=drafting_question(document_type, title),
             provider=provider,
+            # Regulatory drafting sits beside a reporting decision: the advisory feature, not offered (AI-D5).
+            feature="decision_advisory",
         )
     except GenAIUnavailable as exc:  # an advisory that lets a refusal through
         refusal = exc.refusal() if callable(getattr(exc, "refusal", None)) else {"code": "GENAI_UNAVAILABLE"}

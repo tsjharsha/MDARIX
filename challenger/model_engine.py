@@ -93,7 +93,9 @@ class ModelChallenger:
         if user_question:
             prompt += f"\nThe reviewer asks: {user_question[:1000]}"
         try:
-            result = self.provider.complete(prompt, context, system=SYSTEM, json_output=True, max_output_tokens=2500)
+            result = self.provider.complete(
+                prompt, context, feature="case_analysis", system=SYSTEM, json_output=True, max_output_tokens=2500
+            )
         except GenAIUnavailable as exc:
             raise ModelAnalysisUnavailable("MODEL_CALL_FAILED", {"error": str(exc)}) from exc
         parsed = parse_json_reply(result.output.get("answer"))

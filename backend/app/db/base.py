@@ -42,4 +42,5 @@ from backend.app.db.models.authority_reports import *
 from backend.app.db.models.guides_communications import *
 from backend.app.db.models.oversight import *
 from backend.app.db.models.case_ai import *
+from backend.app.db.models.ai_records import *
 from backend.app.db.models.lot_impact import *
