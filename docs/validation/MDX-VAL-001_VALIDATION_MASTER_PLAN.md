@@ -438,12 +438,12 @@ yet tagged.
 | Requirements, class C | 1 |
 | Class-A requirements without a negative scenario | 0 |
 | Class-A requirements whose negative scenarios are all future | 0 |
-| Scenarios in the register | 540 |
+| Scenarios in the register | 541 |
 | Scenarios marked future (not built) | 10 |
-| Scripted class-A OQ steps | 193 |
+| Scripted class-A OQ steps | 194 |
 | Class-A scenarios without an OQ expected result | 12 |
-| OQ expected results (`oq-expected-results.csv`) | 180 |
-| OQ expected results derived from the requirement | 2 |
+| OQ expected results (`oq-expected-results.csv`) | 181 |
+| OQ expected results derived from the requirement | 3 |
 | OQ expected results drafted from the code | 178 |
 | OQ expected results confirmed by the owner | 0 |
 | OQ expected results whose text says TO CONFIRM | 21 |
