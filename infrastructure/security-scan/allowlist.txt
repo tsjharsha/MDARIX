@@ -1,0 +1,13 @@
+# Findings of scripts/security_scan.sh reviewed as false positives (or accepted), so they do not return in each run.
+# One finding pattern per line, four fields separated by " | ":
+#
+#   tool | rule id | location contains (or *) | reason
+#
+# tool:      semgrep, bandit, pip-audit, npm-audit, gitleaks, trivy, zap-baseline, zap-api, schemathesis, nuclei,
+#            cross-tenant, testssl, observatory
+# rule id:   the id the summary prints (check id, test id, CVE/GHSA, ZAP plugin id, template id)
+# location:  part of the file:line, URL, package or image the summary prints; * matches every location
+# reason:    required; why it is not a real problem here. Name who reviewed it and the date.
+#
+# The summary counts matched findings as "allow-listed" instead of under their severity, and refuses a line without
+# a reason. Remove a line once the finding no longer appears or the reason no longer holds.

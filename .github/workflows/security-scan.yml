@@ -1,0 +1,49 @@
+# Free security scans for a test release (scripts/security_scan.sh; runbook: docs/runbooks/SECURITY_SCANS.md).
+# Manual only, on the self-hosted laptop runner: no GitHub-hosted minutes, no run on push or pull request. The reports
+# stay on the runner in security-reports/<release>/ and are never uploaded as artifacts.
+name: Security scans (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release name for the report folder (letters, digits, dot, dash, underscore), e.g. 0.10.96
+        required: true
+      steps:
+        description: Steps to run (all, static, dynamic, public, summary or single tools)
+        required: false
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: mdarix-linux
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Gitleaks reads the history of every branch.
+          fetch-depth: 0
+      - name: Run the scans one at a time
+        env:
+          RELEASE: ${{ inputs.release }}
+          STEPS: ${{ inputs.steps }}
+        run: |
+          # shellcheck disable=SC2086
+          bash scripts/security_scan.sh --release "$RELEASE" $STEPS summary
+      - name: Keep the reports on the runner, outside the workspace
+        if: always()
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          case "$RELEASE" in *[!A-Za-z0-9._-]*) exit 1 ;; esac
+          mkdir -p "$HOME/security-reports"
+          cp -r "security-reports/$RELEASE" "$HOME/security-reports/" 2>/dev/null || true
+          # Only the folder's location is printed: findings stay on the laptop, not in GitHub's logs or job summary.
+          echo "Reports: $HOME/security-reports/$RELEASE (SUMMARY.md is the one-page summary)"

@@ -65,3 +65,6 @@ artifacts/demo/
 # Free-trial video files are copied to the server, not committed (videos/README.md).
 videos/*
 !videos/README.md
+
+# Security scan reports (scripts/security_scan.sh): local evidence only, never committed or uploaded.
+/security-reports/
