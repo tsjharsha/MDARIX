@@ -219,9 +219,8 @@ def test_an_organization_cannot_reference_another_organizations_row_even_under_t
             connection.execute(text("DELETE FROM ingestion_runs WHERE id = :id"), {"id": run_b})
 
 
-def _versions_of_two_products(connection):
-    """(tenant, product A, product B, a version of B), created in the caller's transaction."""
-    tenant, _ = _two_tenants(connection)
+def _versions_of_two_products(connection, tenant):
+    """(product A, product B, a version of B) of ``tenant``, created in the caller's transaction."""
     stamp = uuid.uuid4().hex[:8]
     products = [
         connection.scalar(
@@ -240,21 +239,18 @@ def _versions_of_two_products(connection):
         ),
         {"t": tenant, "p": products[1]},
     )
-    return tenant, products[0], products[1], version_b
+    return products[0], products[1], version_b
 
 
-def _row_of(connection, table: str, tenant) -> uuid.UUID:
-    """A row of ``table`` moved to ``tenant`` with no product (checks off for the move), in the open transaction."""
-    row = connection.scalar(text(f"SELECT id FROM {table} LIMIT 1"))
-    if row is None:
+def _row_of(connection, table: str) -> tuple[uuid.UUID, uuid.UUID]:
+    """(id, tenant) of an existing ``table`` row, its product and version cleared in the open transaction."""
+    found = connection.execute(text(f"SELECT id, tenant_id FROM {table} LIMIT 1")).first()
+    if found is None:
         pytest.skip(f"the test database has no {table} row")
-    connection.execute(text("SET LOCAL session_replication_role = replica"))
     connection.execute(
-        text(f"UPDATE {table} SET tenant_id = :t, product_id = NULL, product_version_id = NULL WHERE id = :id"),
-        {"t": tenant, "id": row},
+        text(f"UPDATE {table} SET product_id = NULL, product_version_id = NULL WHERE id = :id"), {"id": found[0]}
     )
-    connection.execute(text("SET LOCAL session_replication_role = origin"))
-    return row
+    return found[0], found[1]
 
 
 @pytest.mark.parametrize("table", ["complaints", "risks", "requirements"])
@@ -262,8 +258,8 @@ def test_a_records_version_must_be_a_version_of_its_product(table):
     with engine.connect() as connection:
         connection.begin()
         try:
-            tenant, product_a, _product_b, version_b = _versions_of_two_products(connection)
-            row = _row_of(connection, table, tenant)
+            row, tenant = _row_of(connection, table)
+            product_a, _product_b, version_b = _versions_of_two_products(connection, tenant)
             with pytest.raises(DBAPIError) as other_product, connection.begin_nested():
                 connection.execute(
                     text(f"UPDATE {table} SET product_id = :p, product_version_id = :v WHERE id = :id"),
@@ -310,8 +306,8 @@ def test_the_pre_check_counts_rows_that_break_the_rules():
         connection.begin()
         try:
             assert refusal(violation_counts(connection)) is None
-            tenant, product_a, _product_b, version_b = _versions_of_two_products(connection)
-            complaint = _row_of(connection, "complaints", tenant)
+            complaint, tenant = _row_of(connection, "complaints")
+            product_a, _product_b, version_b = _versions_of_two_products(connection, tenant)
             connection.execute(text("SET LOCAL session_replication_role = replica"))
             connection.execute(
                 text("UPDATE complaints SET product_id = :p, product_version_id = :v WHERE id = :id"),
