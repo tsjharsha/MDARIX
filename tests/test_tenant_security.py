@@ -34,6 +34,30 @@ def _set(model, row_id, **values):
         db.close()
 
 
+SECURITY_PLAN = "TENANT_SECURITY_TEST"
+
+
+def _security_plan(db, now):
+    """The fixture's own active plan, made when missing: no feature listed, so the core features (controlled
+    signatures) come with it. Never another test's plan, which may be inactive or switch a core feature off."""
+    plan = db.query(PlanDefinition).filter(PlanDefinition.code == SECURITY_PLAN).one_or_none()
+    if plan is None:
+        plan = PlanDefinition(
+            id=uuid.uuid4(),
+            code=SECURITY_PLAN,
+            name="Tenant security test plan",
+            version="v1",
+            status="ACTIVE",
+            effective_from=now,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(plan)
+    plan.status, plan.effective_from = "ACTIVE", min(plan.effective_from or now, now)
+    db.flush()
+    return plan
+
+
 @pytest.fixture
 def org():
     """A fresh tenant with a viewer, two approvers and one investigation."""
@@ -68,7 +92,7 @@ def org():
         )
         db.add(investigation)
         # A real customer tenant is on a plan; controlled signatures come with every active plan.
-        plan = db.query(PlanDefinition).filter(PlanDefinition.status == "ACTIVE").order_by(PlanDefinition.code).first()
+        plan = _security_plan(db, now)
         db.add(
             TenantPlanAssignment(
                 id=uuid.uuid4(),
