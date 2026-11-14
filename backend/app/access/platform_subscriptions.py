@@ -374,10 +374,23 @@ def set_platform_subscription(
                 )
             trial = admin_actions.subscription_of(db, tenant_id)
             admin_actions.check_trial_end(trial, starts, expires, grace)
+            admin_actions.check_trial_change(db, tenant, trial, converting=False, now=now)
         except admin_actions.TrialRefused as refusal:
             admin_actions.audit_refusal(db, tenant_id, admin, "SUBSCRIPTION_CHANGE", refusal)
             raise
         starts = trial.starts_at
+        if grace is not None and grace.tzinfo is None:
+            grace = grace.replace(tzinfo=timezone.utc)
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+    elif scope.is_trial(db, tenant_id):
+        # Converting a trial here follows the trial page's rules (no pending exit request, data still there).
+        try:
+            trial = admin_actions.subscription_of(db, tenant_id)
+            admin_actions.check_trial_change(db, tenant, trial, converting=True, now=now)
+        except admin_actions.TrialRefused as refusal:
+            admin_actions.audit_refusal(db, tenant_id, admin, "SUBSCRIPTION_CHANGE", refusal)
+            raise
     result = change_subscription(db, tenant, plan, starts, expires, grace, payload.reason, admin, now)
     db.commit()
     return result

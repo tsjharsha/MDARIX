@@ -49,9 +49,9 @@ def _moment(value: str, field: str) -> datetime:
     try:
         moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        raise HTTPException(422, detail={"code": "INVALID_DATE", "message": f"{field} must be an ISO date and time"})
+        raise admin_actions.TrialRefused(422, "INVALID_DATE", f"{field} must be an ISO date and time")
     if moment.tzinfo is None:
-        raise HTTPException(422, detail={"code": "INVALID_DATE", "message": f"{field} must carry its time zone"})
+        raise admin_actions.TrialRefused(422, "INVALID_DATE", f"{field} must carry its time zone")
     return moment
 
 
@@ -135,8 +135,6 @@ def end_trial(
 @router.post(BASE + "/{tenant_id}/convert")
 def convert_trial(tenant_id: uuid.UUID, payload: ConvertRequest, request: Request, db: Session = Depends(get_db)):
     admin = _require_platform_admin(request, db)
-    starts = _moment(payload.starts_at, "starts_at")
-    expires = _moment(payload.expires_at, "expires_at")
     return _audited(
         db,
         tenant_id,
@@ -148,8 +146,8 @@ def convert_trial(tenant_id: uuid.UUID, payload: ConvertRequest, request: Reques
             admin,
             kind=payload.kind,
             plan_id=payload.plan_id,
-            starts_at=starts,
-            expires_at=expires,
+            starts_at=_moment(payload.starts_at, "starts_at"),
+            expires_at=_moment(payload.expires_at, "expires_at"),
             reason=payload.reason,
         ),
     )

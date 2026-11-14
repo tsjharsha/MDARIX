@@ -525,3 +525,66 @@ def test_an_actor_named_in_the_body_is_ignored():
     assert response.status_code == 200, response.text
     event = _events(tenant_id, "TRIAL_EXTENDED")[-1]
     assert event.actor_ref != someone and someone not in str(event.details)
+
+
+# --------------------------------------------------------------------------------------------- review fixes
+
+
+def test_plans_and_licensing_never_reopens_a_trial_ended_early_nor_converts_one_with_a_pending_request():
+    admin = authenticated_client()
+    _, tenant_id, _, _ = _trial()
+    before = _subscription(tenant_id)
+    assert (
+        admin.post(f"{BASE}/{tenant_id}/end", json={"reason": "Evaluation finished, agreed by phone"}).status_code
+        == 200
+    )
+    generic = f"/api/v1/platform/customers/{tenant_id}/subscription"
+    reopen = admin.post(
+        generic,
+        json={
+            "plan_id": _plan_id(True),
+            "starts_at": before.starts_at.isoformat(),
+            "expires_at": (before.expires_at + timedelta(days=5)).isoformat(),
+            "reason": REASON,
+        },
+    )
+    assert reopen.status_code == 409 and _code(reopen) == "TRIAL_ENDED_EARLY"
+    assert _subscription(tenant_id).expires_at <= datetime.now(timezone.utc)
+
+    owner, pending_id, _, _ = _trial()
+    asked = owner.post("/api/v1/trial/exit-request", json={"reason_code": "FINISHED", "delete_data": False})
+    assert asked.status_code == 200
+    now = datetime.now(timezone.utc)
+    convert = admin.post(
+        f"/api/v1/platform/customers/{pending_id}/subscription",
+        json={
+            "plan_id": _plan_id(False),
+            "starts_at": now.isoformat(),
+            "expires_at": (now + timedelta(days=90)).isoformat(),
+            "reason": REASON,
+        },
+    )
+    assert convert.status_code == 409 and _code(convert) == "TRIAL_EXIT_PENDING"
+    with SessionLocal() as db:
+        bind_system(db, "test: still a trial")
+        assert scope.is_trial(db, pending_id)
+
+
+def test_a_date_without_a_time_zone_is_read_as_utc_not_a_server_error():
+    admin = authenticated_client()
+    _, tenant_id, _, _ = _trial()
+    before = _subscription(tenant_id)
+    naive = (before.expires_at + timedelta(days=40)).replace(tzinfo=None).isoformat()
+    response = admin.post(
+        f"/api/v1/platform/customers/{tenant_id}/subscription",
+        json={
+            "plan_id": _plan_id(True),
+            "starts_at": before.starts_at.replace(tzinfo=None).isoformat(),
+            "expires_at": naive,
+            "reason": REASON,
+        },
+    )
+    assert response.status_code == 409 and _code(response) == "TRIAL_EXTENSION_LIMIT"
+    bad = _convert(admin, tenant_id, starts_at="2026-12-01T00:00:00")
+    assert bad.status_code == 422 and _code(bad) == "INVALID_DATE"
+    assert _events(tenant_id, "TRIAL_ACTION_REFUSED")[-1].details["code"] == "INVALID_DATE"

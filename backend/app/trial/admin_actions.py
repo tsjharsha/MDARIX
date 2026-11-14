@@ -86,13 +86,19 @@ def extension_left(subscription: SubscriptionLifecycle) -> int:
 
 def check_trial_end(subscription: SubscriptionLifecycle, starts_at: datetime, expires_at: datetime, grace) -> None:
     """The cap every route that changes a trial's subscription applies (the trial page and Plans & Licensing ›
-    Subscriptions): the start never moves, and neither the end nor a grace end goes past original end + 30 days."""
-    if starts_at.date() != subscription.starts_at.date():
+    Subscriptions): the start never moves, and neither the end nor a grace end goes past original end + 30 days.
+    A moment without a time zone is read as UTC. A screen that sends only the start's date (midnight) is accepted: the
+    start is refused only when it moves by a day or more."""
+
+    def aware(moment):
+        return moment.replace(tzinfo=timezone.utc) if moment is not None and moment.tzinfo is None else moment
+
+    if abs(aware(starts_at) - subscription.starts_at) >= timedelta(days=1):
         raise TrialRefused(
             409, "TRIAL_START_FIXED", "A free trial's start date cannot be changed; extend its end instead"
         )
     limit = latest_end(subscription)
-    for moment in (expires_at, grace):
+    for moment in (aware(expires_at), aware(grace)):
         if moment is not None and moment > limit + timedelta(seconds=1):
             left = extension_left(subscription)
             raise TrialRefused(
@@ -102,6 +108,18 @@ def check_trial_end(subscription: SubscriptionLifecycle, starts_at: datetime, ex
                 days_left=left,
                 latest_end=limit.isoformat(),
             )
+
+
+def check_trial_change(db: Session, tenant: Tenant, subscription, *, converting: bool, now: datetime) -> None:
+    """What the trial page refuses, refused on Plans & Licensing › Subscriptions too: no change after the data was
+    deleted or while an exit request is pending; no reopening after an early end (a conversion is allowed then)."""
+    if str(tenant.status or "").upper() in GONE_STATUSES:
+        raise TrialRefused(409, "TRIAL_DATA_DELETED", "The trial's data has been deleted")
+    requests = _exit_requests(db, tenant.id)
+    if _pending_exit(requests) is not None:
+        raise TrialRefused(409, "TRIAL_EXIT_PENDING", "The trial owner asked to end the trial: decide on that first")
+    if not converting and _ended_early(requests) is not None and subscription.expires_at <= now:
+        raise TrialRefused(409, "TRIAL_ENDED_EARLY", "A trial ended early cannot be extended")
 
 
 def _exit_requests(db: Session, tenant_id: uuid.UUID) -> list[TrialExitRequest]:
@@ -738,7 +756,8 @@ def delete_data(db: Session, tenant_id: uuid.UUID, admin: AuthUser, *, confirm_n
         raise TrialRefused(
             409, "TRIAL_MOVE_REQUEST_OPEN", "An open request to move the data into the pilot keeps it for now"
         )
-    db.commit()
+    # No commit before the purge: the row lock taken above is held until the purge commits, so a concurrent extend or
+    # a second deletion waits and then sees the archived trial.
     try:
         outcome = retention.purge_trial(db, tenant_id, str(admin.id), now)
     except PurgeFailed as exc:
