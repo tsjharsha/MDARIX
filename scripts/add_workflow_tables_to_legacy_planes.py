@@ -5,8 +5,14 @@ tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
 row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
 a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment), tr16 (a product's Basic UDI-DI and EMDN code, a
-registration's risk class, a responsible party's SRN), tr18 (a re-signed market conclusion's change reason) and
-tr19 (Cases, escalation to a Complaint, triage at two speeds) and tr25 (the routine path, Case attachments,
+registration's risk class, a responsible party's SRN), tr18 (a re-signed market conclusion's change reason),
+tr19 (Cases, escalation to a Complaint, triage at two speeds), the DB-1 database hardening: tr21 (the runtime role
+only reads the schema stamp and the business-ID counters), tr22 + tr23 (the pre-check, then references between
+organization tables that include the organization, a version always a version of its product), tr24 (indexes on the
+organization filter and references, built inside the transaction) and tr24a (a Case's lot and the product of
+decisions, briefs, assurance results and AI interactions; a case context's version needs its product; the tr22 and
+tr24a pre-checks refuse a database with rows that break a rule, with the counts, and nothing is changed there),
+and tr25 (the routine path, Case attachments,
 e-mail intake) and tr26 (a hypothesis's drafting rule, a follow-up's field action or product change) and tr27 (the
 reportability floor a market conclusion used).
 
@@ -42,6 +48,7 @@ from backend.app.db.models.customer_lifecycle import TenantDataPlane  # noqa: E4
 from backend.app.db.session import SessionLocal  # noqa: E402
 from backend.app.db.tenant_scope import bind_system  # noqa: E402
 from backend.app.db.tls import connect_args  # noqa: E402
+from infrastructure.database.migrations import product_references, tenant_references, tenant_indexes  # noqa: E402
 
 VERSIONS = ROOT / "infrastructure" / "database" / "migrations" / "versions"
 
@@ -56,6 +63,28 @@ class Step:
     # For a step that creates no table: SQL answering "is this step already applied?" (true/false).
     done_sql: str | None = None
 
+
+def _has_constraint(name: str) -> str:
+    return f"SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{name}')"
+
+
+# tr21 is in place when the runtime role (if any) cannot insert business-ID counters and the plane registry (if the
+# database has one and system scope) has its policies.
+_TR21_DONE = (
+    "SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mdarix_runtime') "
+    "OR to_regclass('public.business_id_counters') IS NULL THEN true "
+    "ELSE NOT has_table_privilege('mdarix_runtime', 'public.business_id_counters', 'INSERT') END "
+    "AND (to_regproc('public.mdarix_system_scope') IS NULL OR to_regclass('public.tenant_data_planes') IS NULL "
+    "OR EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND policyname = 'mdarix_plane_read'))"
+)
+_TR23_TABLES = tuple(
+    sorted(
+        {ref.child for ref in tenant_references.REFERENCES}
+        | {ref.parent for ref in tenant_references.REFERENCES}
+        | set(tenant_references.PRODUCT_VERSION_TABLES)
+        | {"product_versions"}
+    )
+)
 
 # In migration order: a later step may reference an earlier step's tables.
 STEPS = (
@@ -324,6 +353,39 @@ STEPS = (
             "oversight_settings",
             "due_alerts",
         ),
+    ),
+    # DB-1 (owner decision 6, 14 Nov 2026): the database hardening, before any dedicated customer goes live.
+    Step(
+        "tr21",
+        "tr21_runtime_privileges.py",
+        "restrict_runtime_writes",
+        (),
+        (),
+        done_sql=_TR21_DONE,
+    ),
+    Step(
+        "tr22+tr23",
+        "tr23_composite_tenant_fks.py",
+        "apply_to_legacy_plane",
+        (),
+        _TR23_TABLES,
+        done_sql=_has_constraint(tenant_references.version_check_name(tenant_references.PRODUCT_VERSION_TABLES[-1])),
+    ),
+    Step(
+        "tr24",
+        "tr24_tenant_indexes.py",
+        "create_tenant_indexes",
+        (),
+        tuple(sorted({table for _name, table, _columns in tenant_indexes.INDEXES})),
+        done_sql=f"SELECT to_regclass('public.{tenant_indexes.INDEXES[-1][0]}') IS NOT NULL",
+    ),
+    Step(
+        "tr24a",
+        "tr24a_product_references.py",
+        "apply_to_legacy_plane",
+        (),
+        tuple(product_references.tables_read()),
+        done_sql=_has_constraint(product_references.REFERENCES[-1].name),
     ),
     Step(
         "tr25",
