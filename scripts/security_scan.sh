@@ -235,6 +235,8 @@ SCAN_SIGNING_SECRET=$(random_hex 32)
 ENV
     )
   fi
+  # The API runs as the least-privilege runtime role, as in production (row-level security applies).
+  grep -q '^SCAN_RUNTIME_PASSWORD=' "${STACK_ENV}" || echo "SCAN_RUNTIME_PASSWORD=runtime-$(random_hex 18)" >> "${STACK_ENV}"
   docker image inspect "${API_IMAGE}" > /dev/null 2>&1 || compose_scan build scan-seed > "${REPORTS}/stack-build.log" 2>&1
   if compose_scan up -d --wait --wait-timeout 1200 scan-api > "${REPORTS}/stack-up.log" 2>&1; then
     record stack-up ran "local test copy on 127.0.0.1:${SCAN_API_PORT:-18000}, project ${SCAN_PROJECT}"
@@ -255,9 +257,15 @@ stack_stop() {
 # is in scan.env) so the API scans also reach signed-in routes. The session cookie is never printed. Requests that
 # would end or change that session are left out of the API scans (AUTH_EXCLUDE).
 AUTH_EXCLUDE='/api/v1/auth/(signout|session|change-password|mfa/)'
+SCAN_OWN_SESSION=0
 scan_auth() {
+  # A fresh session for each tool: an earlier tool's session may have expired (idle limit) or been ended by its requests.
+  if [ ${SCAN_OWN_SESSION} -eq 0 ] && [ -n "${ZAP_AUTH_HEADER_VALUE:-}" ]; then
+    SCAN_AUTH_NOTE="authenticated (${ZAP_AUTH_HEADER:-Authorization} header)"
+    return 0
+  fi
   SCAN_AUTH_NOTE="unauthenticated"
-  if [ -n "${ZAP_AUTH_HEADER_VALUE:-}" ]; then SCAN_AUTH_NOTE="authenticated (${ZAP_AUTH_HEADER:-Authorization} header)"; return 0; fi
+  unset ZAP_AUTH_HEADER ZAP_AUTH_HEADER_VALUE
   [ -s "${STACK_ENV}" ] || return 0
   local jar="${REPORTS_REL}/stack/session.cookies" body="${REPORTS_REL}/stack/signin.json" password port token
   password="$(sed -n 's/^SCAN_FIXTURE_PASSWORD=//p' "${STACK_ENV}")"
@@ -269,6 +277,7 @@ scan_auth() {
   token="$(awk '$6 == "mdarix_session" {print $7}' "${jar}" 2> /dev/null)"
   if [ -n "${token}" ]; then
     export ZAP_AUTH_HEADER=Cookie ZAP_AUTH_HEADER_VALUE="mdarix_session=${token}"
+    SCAN_OWN_SESSION=1
     SCAN_AUTH_NOTE="signed in as a synthetic Investigator"
   fi
 }
@@ -315,6 +324,9 @@ run_schemathesis() {
 run_nuclei() {
   assert_local_target "${SCAN_TARGET}"
   mkdir -p "${REPORTS}/nuclei" && chmod 777 "${REPORTS}/nuclei" 2> /dev/null
+  # Download or refresh the community templates (from the template project on GitHub) into a named volume first.
+  docker run --rm -v mdarix-scan-nuclei-templates:/root/nuclei-templates "${IMG_NUCLEI}" -ut -duc \
+    > "${REPORTS}/nuclei-templates.log" 2>&1
   # -ni: no out-of-band interaction server, so no request leaves the machine to a third-party callback host.
   docker run --rm --network "${SCAN_NETWORK}" -v mdarix-scan-nuclei-templates:/root/nuclei-templates \
     -v "${REPORTS_HOST}/nuclei:/out" "${IMG_NUCLEI}" -u "${SCAN_TARGET}" -ni -duc -silent -etags dos \
@@ -336,8 +348,10 @@ run_cross_tenant() {
     export POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="${SCAN_DB_PORT}" POSTGRES_DB="${SCAN_POSTGRES_DB}" \
       POSTGRES_USER=mdarix_app POSTGRES_PASSWORD="${SCAN_POSTGRES_PASSWORD}" MDARIX_RLS_SYSTEM_TOKEN="${SCAN_RLS_SYSTEM_TOKEN}" \
       MDARIX_MFA_ENCRYPTION_KEY="${SCAN_MFA_KEY}" MDARIX_CONNECTOR_ENCRYPTION_KEY="${SCAN_CONNECTOR_KEY}" \
-      MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY="${SCAN_OBJECT_KEY}" MDARIX_OBJECT_STORAGE_SIGNING_SECRET="${SCAN_SIGNING_SECRET}"
-    "${py}" -m pytest -q -p no:cacheprovider tests/test_cross_tenant_routes.py tests/test_tenant_security.py \
+      MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY="${SCAN_OBJECT_KEY}" MDARIX_OBJECT_STORAGE_SIGNING_SECRET="${SCAN_SIGNING_SECRET}" \
+      MDARIX_DB_RUNTIME_USER=mdarix_runtime MDARIX_DB_RUNTIME_PASSWORD="${SCAN_RUNTIME_PASSWORD}"
+    # Every tests/test_cross_tenant*.py (the runtime-role suite too, once merged) plus the tenant isolation suites.
+    "${py}" -m pytest -q -p no:cacheprovider tests/test_cross_tenant*.py tests/test_tenant_security.py \
       tests/test_tenant_data.py tests/test_rls_coverage.py tests/test_outbox_payload_tenant.py \
       --junitxml "${REPORTS_REL}/cross-tenant.xml"
   ) > "${REPORTS}/cross-tenant.log" 2>&1

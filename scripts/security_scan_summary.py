@@ -13,6 +13,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
@@ -258,14 +259,34 @@ def _junit_failures(path: str) -> list[tuple[str, str]]:
     return failures
 
 
+# One JUnit failure holds every failed check of an operation: "1. Test Case ID: abc  - <check>  Received: ...".
+_SCHEMATHESIS_CHECK = re.compile(r"\d+\. Test Case ID: \S+\s+-\s+(.+?)(?:\s{2,}|$)", re.MULTILINE)
+# Server errors and authentication that was not enforced block the deploy (plan row 2); documentation mismatches
+# (status codes or methods the OpenAPI file does not list) are Low; every other failed check is Medium.
+_SCHEMATHESIS_HIGH = ("server error", "ignored auth", "without authentication", "authentication bypass")
+_SCHEMATHESIS_LOW = (
+    "undocumented http status code",
+    "unsupported method incorrect response",
+    "undocumented content-type",
+)
+
+
+def _schemathesis_severity(check: str) -> str:
+    lowered = check.lower()
+    if any(word in lowered for word in _SCHEMATHESIS_HIGH):
+        return "High"
+    if any(word in lowered for word in _SCHEMATHESIS_LOW):
+        return "Low"
+    return "Medium"
+
+
 def parse_schemathesis(folder: str) -> list[Finding]:
-    # Server errors (500) block the deploy (plan row 2), so they are High; other failed checks are Medium.
     found = []
     for path in sorted(glob.glob(os.path.join(folder, "schemathesis", "*.xml"))):
-        for name, message in _junit_failures(path):
-            first = message.splitlines()[0] if message else "check failed"
-            server_error = "server error" in message.lower() or " 500" in message
-            found.append(Finding("schemathesis", "High" if server_error else "Medium", first[:80], name, first[:160]))
+        for operation, message in _junit_failures(path):
+            checks = sorted(set(_SCHEMATHESIS_CHECK.findall(message))) or ["check failed"]
+            for check in checks:
+                found.append(Finding("schemathesis", _schemathesis_severity(check), check.strip(), operation, check))
     return found
 
 

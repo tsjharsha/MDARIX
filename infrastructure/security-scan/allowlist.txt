@@ -11,3 +11,4 @@
 #
 # The summary counts matched findings as "allow-listed" instead of under their severity, and refuses a line without
 # a reason. Remove a line once the finding no longer appears or the reason no longer holds.
+semgrep | python.lang.security.use-defused-xml-parse.use-defused-xml-parse | scripts/security_scan_summary.py | parses only the JUnit XML that the scan tools wrote on this machine, never uploaded or remote input; stdlib only by design (build run, 2026-11-14)

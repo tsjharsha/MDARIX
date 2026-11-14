@@ -21,7 +21,16 @@ refuses any other target. `stack-stop` runs `docker compose stop`; nothing is re
 dynamic range on purpose: Windows reserves blocks there (`netsh interface ipv4 show excludedportrange protocol=tcp`)
 and Docker cannot publish a reserved port; set `SCAN_DB_PORT` / `SCAN_API_PORT` if one is taken.
 
+The API runs as the least-privilege runtime role (row-level security on), as in production. The ZAP API scan and
+Schemathesis each sign in a fresh session as a synthetic Investigator (`SCAN_USER`), and leave out the sign-out,
+session, password and MFA routes so the scan does not end its own session. Nuclei downloads its community templates
+into the Docker volume `mdarix-scan-nuclei-templates` and runs without an out-of-band callback server.
+
 Semgrep, Bandit and the Trivy config scan read a snapshot of the committed HEAD (`git archive`), so commit before a run.
+
+Known limits: the web front door (Caddy and the built screens) is not part of the test copy, so ZAP baseline covers
+the API origin only (the public headers are checked by Observatory and testssl.sh); a few tenant-security tests need a
+plan definition that the synthetic fixtures do not create, and error in the scan copy.
 
 ## How to run
 
@@ -37,8 +46,8 @@ bash scripts/security_scan.sh --release 0.10.96 zap-api summary   # single steps
 On the self-hosted runner: Actions -> "Security scans (manual)" -> Run workflow, with the release name. The reports
 stay on the runner in `~/security-reports/<release>/`.
 
-Optional settings: `ZAP_AUTH_HEADER` and `ZAP_AUTH_HEADER_VALUE` for an authenticated API scan (also used by
-Schemathesis), `ZAP_MAX_MINUTES` (30), `SCHEMATHESIS_MAX_EXAMPLES` (10), `SCAN_EXTRA_IMAGES` (more images for Trivy,
+Optional settings: `SCAN_USER` (the synthetic user the API scans sign in as), `ZAP_AUTH_HEADER` and
+`ZAP_AUTH_HEADER_VALUE` (an auth header to use instead, also used by Schemathesis), `ZAP_MAX_MINUTES` (30), `SCHEMATHESIS_MAX_EXAMPLES` (10), `SCAN_EXTRA_IMAGES` (more images for Trivy,
 e.g. a built `mdarix/web` image), `PYTHON` (interpreter for the cross-tenant tests and the summary).
 
 ## After the run

@@ -104,3 +104,27 @@ def test_main_writes_summary_and_findings(reports):
 
     assert (reports / "SUMMARY.md").read_text(encoding="utf-8").startswith("# Security scan summary: 0.0.0-test")
     assert len(json.loads((reports / "findings.json").read_text(encoding="utf-8"))) == 4
+
+
+def test_schemathesis_server_errors_are_high_and_undocumented_status_codes_low(tmp_path):
+    folder = tmp_path / "rel"
+    (folder / "schemathesis").mkdir(parents=True)
+    (folder / "schemathesis" / "junit.xml").write_text(
+        """<testsuites><testsuite name="schemathesis">
+<testcase name="POST /api/v1/things"><failure message="1. Test Case ID: aB1  - Server error  Received: 500
+2. Test Case ID: cD2  - Undocumented HTTP status code      Received: 401"/></testcase>
+<testcase name="GET /api/v1/other"><failure message="1. Test Case ID: eF3  - Response violates schema  x"/></testcase>
+<testcase name="GET /api/v1/fine"/>
+</testsuite></testsuites>""",
+        encoding="utf-8",
+    )
+    (folder / "status.tsv").write_text("schemathesis\tran\t\n", encoding="utf-8")
+
+    summary, record = build_summary(str(folder), [], "rel")
+
+    assert sorted((r["severity"], r["rule"], r["location"]) for r in record) == [
+        ("High", "Server error", "POST /api/v1/things"),
+        ("Low", "Undocumented HTTP status code", "POST /api/v1/things"),
+        ("Medium", "Response violates schema", "GET /api/v1/other"),
+    ]
+    assert "| schemathesis | ran | 0 | 1 | 1 | 1 | 0 | 0 | 0 |" in summary

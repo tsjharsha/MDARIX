@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Added
+
+- **Free security scans for the test release** (`scripts/security_scan.sh`, runbook `docs/runbooks/SECURITY_SCANS.md`):
+  static checks of the code, libraries, images and git history, and attack-style API scans against a local test copy
+  only, with a one-page summary per release and an allow-list for reviewed false positives. Manual job on the
+  self-hosted runner; reports stay on the laptop. No product change.
+
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
 Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The API and web images change. Operator step:
