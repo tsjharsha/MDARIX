@@ -323,3 +323,38 @@ def test_the_pre_check_counts_rows_that_break_the_rules():
             assert message and "complaints: a version of another product" in message
         finally:
             connection.rollback()
+
+
+# --- DB-05: indexes for the organization filter and references (tr24) ------------------------------------------
+
+
+def test_the_organization_and_reference_indexes_exist_and_are_valid():
+    from infrastructure.database.migrations.tenant_indexes import INDEXES
+
+    with engine.connect() as connection:
+        valid = dict(
+            connection.execute(
+                text(
+                    "SELECT indexrelid::regclass::text, indisvalid FROM pg_index WHERE indexrelid::regclass::text = ANY(:n)"
+                ),
+                {"n": [name for name, _, _ in INDEXES]},
+            ).all()
+        )
+    assert {name: valid.get(name) for name, _, _ in INDEXES if not valid.get(name)} == {}
+
+
+def test_every_organization_table_has_an_index_that_starts_with_the_organization():
+    with engine.connect() as connection:
+        missing = (
+            connection.execute(
+                text(
+                    "SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r' "
+                    "AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id') "
+                    "AND NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid "
+                    "AND a.attnum = i.indkey[0] WHERE i.indrelid = c.oid AND a.attname = 'tenant_id') ORDER BY 1"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert not missing, "Add an index starting with tenant_id on: " + ", ".join(missing)

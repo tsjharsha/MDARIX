@@ -116,6 +116,11 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   briefs, assurance results and AI interactions may only carry a version of their own product, and never a version
   without a product: the master-data rule VERSION_BELONGS_TO_PRODUCT now has its enforcer.
 
+- Migration `tr24tenantindexes` (DB-05): 68 indexes, built with `CREATE INDEX CONCURRENTLY` so writes continue:
+  one for each organization reference of `tr23` and for the most-used references that had none, and one starting
+  with `tenant_id` on every organization table that lacked it (the organization filter of every request). The list
+  is `infrastructure/database/migrations/tenant_indexes.py`; the schema drift check treats them as migration-owned.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
