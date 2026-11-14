@@ -149,8 +149,9 @@ def _as_0_10_92(db, tenant_id) -> None:
             complaint.record_owner = None
 
 
-def _own_signed_complaint_case(db, tenant_id, reference: str):
-    """A Case of the trial's own, signed "complaint" before 0.10.93 and never linked, with its open QMS task."""
+def _own_signed_complaint_case(db, tenant_id, reference: str, classification="COMPLAINT", review=None):
+    """A Case of the trial's own, signed "complaint" before 0.10.93 and never linked, with its open QMS task (or,
+    with ``classification``/``review``, signed as that and reviewed by QA with that outcome)."""
     from backend.app.db.models.intake import FirstContactCheck, IntakeEvent
     from backend.app.intake import case_rules, service
 
@@ -177,17 +178,21 @@ def _own_signed_complaint_case(db, tenant_id, reference: str):
             version=1,
             guide_version=case_rules.GUIDE_VERSION,
             answers={},
-            suggestion="COMPLAINT",
-            classification="COMPLAINT",
+            suggestion=classification,
+            classification=classification,
             reason="A malfunction during use.",
             signed_by="tester",
             signed_at=now,
+            review_outcome=review,
+            reviewed_by="qa-reviewer" if review else None,
+            reviewed_at=now if review else None,
             created_by="tester",
             created_at=now,
             updated_at=now,
         )
     )
-    service.ensure_qms_task(db, tenant_id, event, "tester", now)
+    if classification == "COMPLAINT":
+        service.ensure_qms_task(db, tenant_id, event, "tester", now)
     db.flush()
     return event.id
 
@@ -305,6 +310,52 @@ def test_apply_does_exactly_what_the_list_says_audited_and_a_second_run_changes_
         assert _fingerprint(db, tenant_id) == after
     # Signed checks and their signatures are never changed.
     assert after["checks"] == before["checks"] and after["signatures"] == before["signatures"]
+
+
+@pytest.mark.db
+def test_an_agreed_service_only_case_with_no_summary_moves_to_qa_review_audited_once(old_trials):
+    """S-2 (owner, 14 Nov 2026): a service-only Case agreed in QA review but with no resolution summary is listed and
+    moved to QA review (IN_REVIEW), never closed and never left at "To check"; the move is audited and a second run
+    changes nothing."""
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+
+    script = _script()
+    (tenant_id, _other), _own = old_trials
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        case_id = _own_signed_complaint_case(db, tenant_id, "CALL-0094", classification="SERVICE_ONLY", review="AGREED")
+        db.commit()
+        listed = script.plan_tenant(db, tenant_id)
+        db.rollback()
+    line = next(line for line in listed if line.startswith("CALL-0094: QA review agreed"))
+    assert "state OPEN -> IN_REVIEW" in line and not line.held
+    assert script.counts(listed)["Case agreed in QA review with no resolution summary: state OPEN -> IN_REVIEW (S-2)"]
+    assert not script.counts(listed, held=True).get(
+        "Case agreed in QA review but with no resolution summary left as it is (owner choice, S-2)"
+    )
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        script.apply_tenant(db, tenant_id)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        case = db.get(IntakeEvent, case_id)
+        assert case.status == "IN_REVIEW" and not case.resolution_summary
+        moves = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.tenant_id == tenant_id,
+                AuditEvent.actor_ref == script.UPGRADE_ACTOR,
+                AuditEvent.action == "CASE_STATE_CHANGED",
+                AuditEvent.entity_id == case_id,
+            )
+            .count()
+        )
+        assert moves == 1
+        assert not any(line.startswith("CALL-0094") for line in script.plan_tenant(db, tenant_id))
+        db.rollback()
 
 
 @pytest.mark.db

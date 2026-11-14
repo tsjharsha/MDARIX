@@ -749,8 +749,8 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   its list shows (channel, country code, record owner, linked complaint, state, owner, the OD-3 escalations, triage
   version rows and speed), per trial in that trial's own session, in batches, each change audited; it asks for the
   typed confirmation "APPLY 0.10.93" and prints counts only. A second run changes nothing. Two kinds of record are
-  listed but left for the owner's decision: service-only Cases agreed in QA review with no resolution summary, and
-  sample triage records with no severity (F1, B2 spec 9.2).
+  listed but left for the owner's decision: sample triage records with no severity, and (until the S-2 line below)
+  service-only Cases agreed in QA review with no resolution summary (F1, B2 spec 9.2).
 - A new trial's sample needs nothing from that update: its calls have their channel, owner and record owner,
   SAMPLE-CALL-01 (signed service only) reads "QA review", finished sample triage records are fast-track with their
   first version, and sample complaints are owned in MDARIX. The duplicate check compares countries by code, so a
@@ -763,6 +763,12 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   provider's log, recorded with `POST .../dead-letters/mail-log-check`, shows it was not delivered; otherwise the Retry
   is refused (`HELD_AFTER_RESTORE`) and the refusal audited (B6b-D10). The console control to record the check is
   still to come.
+- The Cases update moves a service-only Case agreed in QA review but with no resolution summary to QA review
+  (`IN_REVIEW`) instead of leaving it at "To check": it is never closed without its summary (S-2, owner, 14 Nov 2026).
+  The move is listed, audited and made once.
+- Subscription and trial reminders, reported problems, export requests and the simulator's provider records now name
+  their organization in the event, so the worker's check against another organization's content covers them too
+  (RSK-026).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 

@@ -22,9 +22,10 @@ tenant-bound session (row-level security), this sets (no judgement is made for a
   0.10.93: escalate" action does). The sample's SAMPLE-CALL-02 is never escalated here (spec 9.3);
 - triage records: one "as recorded before 0.10.93" version row each (version 1); speed FAST when completed.
 
-Left as they are and listed as such (an owner choice the spec leaves open): a service-only Case whose QA review was
-agreed but which has no resolution summary (S-2 closes a service-only Case only with one), and the sample triage
-records with no severity (T-M13: the story author's severity is not written down anywhere).
+A service-only Case whose QA review was agreed but which has no resolution summary moves to QA review (IN_REVIEW),
+never to CLOSED: S-2 closes a service-only Case only with its summary (owner, 14 Nov 2026). Left as they are and
+listed as such (an owner choice still open): the sample triage records with no severity (T-M13: the story author's
+severity is not written down anywhere).
 
 Unflagged open complaints need no row: the routine triage queue reads them by query. Only Cases still at the default
 state (OPEN) are touched, so Cases 0.10.93 itself moved are never changed; every change fills a field that is empty or
@@ -382,12 +383,13 @@ def plan_tenant(db: Session, tenant_id, now: datetime | None = None) -> list[Cha
                 )
             )
         elif state == case_rules.CLOSED and case_rules.close_problem(check.classification, event.resolution_summary):
+            # S-2 closes a service-only Case only with its resolution summary: the owner's choice (14 Nov) is QA review.
             lines.append(
                 Change(
-                    f"{ref}: QA review agreed, no resolution summary: LEFT 'To check' (S-2 closes a service-only Case "
-                    "only with its resolution summary; owner choice)",
-                    "Case agreed in QA review but with no resolution summary left as it is (owner choice, S-2)",
-                    held=True,
+                    f"{ref}: QA review agreed, no resolution summary: state OPEN -> {case_rules.IN_REVIEW} (QA review; "
+                    "S-2 closes a service-only Case only with its resolution summary)",
+                    f"Case agreed in QA review with no resolution summary: state OPEN -> {case_rules.IN_REVIEW} (S-2)",
+                    do=move(event, (case_rules.IN_REVIEW,), check.classification),
                 )
             )
         elif state != case_rules.OPEN:
