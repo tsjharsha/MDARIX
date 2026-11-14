@@ -1141,6 +1141,7 @@ def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
                 aggregate_type="SubscriptionLifecycle",
                 aggregate_id=row.id,
                 payload={
+                    "tenant_id": str(row.tenant_id),  # checked against the row by the worker (RSK-026)
                     "subscription_id": str(row.id),
                     "stage": stage,
                     "expires_at": trial_reminder_end(row.expires_at),
