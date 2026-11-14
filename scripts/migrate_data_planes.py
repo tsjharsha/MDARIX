@@ -157,6 +157,9 @@ def _grants(plane_engine) -> None:
         connection.execute(text(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "{runtime}"'))
         connection.execute(text(f'GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO "{runtime}"'))
         connection.execute(text(f'REVOKE ALL ON public.mdarix_rls_secret FROM "{runtime}"'))
+        # No row-level security on these, so read only (DB-1, tr21).
+        connection.execute(text(f'REVOKE INSERT, UPDATE, DELETE ON public.alembic_version FROM "{runtime}"'))
+        connection.execute(text(f'REVOKE INSERT, UPDATE, DELETE ON public.business_id_counters FROM "{runtime}"'))
         present = set(inspect(connection).get_table_names(schema="public"))
         for table in CONTROL_ONLY:
             if table in present:

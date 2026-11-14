@@ -84,6 +84,10 @@ def grant_runtime_role(connection, role: str, password: str) -> None:
         f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO "{role}"',
     ):
         connection.execute(text(statement))
+    # No row-level security on these, so read only (DB-1, tr21); a legacy plane may lack them.
+    for table in ("alembic_version", "business_id_counters"):
+        if connection.scalar(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}):
+            connection.execute(text(f'REVOKE INSERT, UPDATE, DELETE ON public."{table}" FROM "{role}"'))
 
 
 def main() -> int:

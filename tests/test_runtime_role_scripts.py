@@ -51,3 +51,20 @@ def test_migrate_data_planes_refuses_a_runtime_role_name_that_is_not_plain(monke
 
     with pytest.raises(SystemExit):
         _grants(NoEngine())
+
+
+def test_the_deploy_grant_leaves_the_tables_without_row_level_security_read_only():
+    """grant_runtime_privileges.py runs on every deploy; its broad grant must not give back what tr21 revoked."""
+    from grant_runtime_privileges import main
+
+    from backend.app.db.session import engine
+
+    assert main() == 0
+    with engine.connect() as connection:
+        for table in ("alembic_version", "business_id_counters"):
+            for privilege in ("INSERT", "UPDATE", "DELETE"):
+                allowed = connection.scalar(
+                    text("SELECT has_table_privilege('mdarix_runtime', :t, :p)"),
+                    {"t": f"public.{table}", "p": privilege},
+                )
+                assert not allowed, f"{privilege} on {table}"

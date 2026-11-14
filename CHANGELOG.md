@@ -100,6 +100,11 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   every run with `MDARIX_DATA_PLANE_RUNTIME_USER` set). `scripts/migrate_data_planes.py` refuses a runtime role
   name that is not a plain lower-case name, as the other role scripts do.
 
+- Migration `tr21runtimeprivileges` (DB-02): the application's runtime role may only read `alembic_version` and
+  `business_id_counters` (business identifiers are still assigned by the database), and `tenant_data_planes` gets
+  forced row-level security: everyone reads it, only system scope writes it. `scripts/grant_runtime_privileges.py`,
+  `upgrade_data_planes.py` and `migrate_data_planes.py` revoke the same writes, so a deploy does not give them back.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
