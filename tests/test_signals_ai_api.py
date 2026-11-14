@@ -424,13 +424,17 @@ def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org, monkey
     # AI off, not available or used up: opening the case page starts nothing and writes nothing.
     quiet = client.post(path, json={"trigger": "AUTO"})
     assert quiet.status_code == 200 and quiet.json()["started"] is False, quiet.text
-    assert quiet.json()["reason"] == "AI_NOT_READY"
+    assert quiet.json()["reason"] == "ON_REQUEST_ONLY"
     assert client.get(path).json()["run"] is None
 
     monkeypatch.setattr("backend.app.ai_settings.ai_ready", lambda db, tenant_id: True)
-    started = client.post(path, json={"trigger": "AUTO"})
+    # AI-D6: opening the case page never starts a run, even with AI ready; a person asks for one.
+    opened = client.post(path, json={"trigger": "AUTO"})
+    assert opened.status_code == 200 and opened.json()["started"] is False, opened.text
+    assert opened.json()["reason"] == "ON_REQUEST_ONLY" and client.get(path).json()["run"] is None
+    started = client.post(path, json={"trigger": "MANUAL"})
     assert started.status_code == 202, started.text
-    assert started.json()["started"] is True and started.json()["run"]["trigger"] == "AUTO"
+    assert started.json()["started"] is True and started.json()["run"]["trigger"] == "MANUAL"
     run = client.get(path).json()["run"]  # the test client runs the background task before answering again
     assert run["status"] == "COMPLETED", run
     assert all(step["status"] == "DONE" for step in run["steps"]), run["steps"]
@@ -543,7 +547,7 @@ def test_each_case_ai_run_step_carries_its_trust_check_and_the_mvp_skips_templat
     path = f"/api/v1/investigations/{case.json()['id']}/ai-run"
     monkeypatch.setenv("MDARIX_FEATURE_SET", "mvp")
     monkeypatch.setattr("backend.app.ai_settings.ai_ready", lambda db, tenant_id: True)
-    assert client.post(path, json={"trigger": "AUTO"}).status_code == 202
+    assert client.post(path, json={"trigger": "MANUAL"}).status_code == 202
     run = client.get(path).json()["run"]
     assert run["status"] == "COMPLETED", run
     steps = {step["step"]: step for step in run["steps"]}

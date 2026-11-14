@@ -372,6 +372,9 @@ class GenAIProvider:
         from genai import features, pii
 
         item = features.known(feature)
+        if not item.offered:
+            # Not offered at all (AI-D5): refused before anything else, whatever the switches say.
+            raise GenAIUnavailable(f"GENAI_FEATURE_NOT_OFFERED: {item.key}")
         safe_prompt = SENSITIVE.sub(lambda m: m.group(1) + ": [REDACTED]", prompt)
         safe_context = redact_context(context or {})
         safe_evidence = redact_context(list(evidence or []))

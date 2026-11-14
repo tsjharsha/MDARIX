@@ -1,10 +1,8 @@
 """The case AI run API: start the case's AI analysis in one pass, and follow it.
 
 - ``POST /api/v1/investigations/{id}/ai-run`` (ai.run): queues a run and starts it in the background (202).
-  ``trigger=AUTO`` (the case page, the first time it opens) starts one only when the case has neither a run nor a
-  saved analysis, and only when AI really answers for the organization (a provider configured and allowed, AI switched
-  on, allowance left); otherwise it answers with what exists (200), so opening a case page never repeats the AI's work
-  and never writes rule results in the AI's name when AI is off. ``trigger=MANUAL`` (a person) starts nothing either
+  ``trigger=AUTO`` (the case page opening) never starts a run: AI runs only when a person asks (owner decision AI-D6);
+  it answers with what exists (200, ``reason: ON_REQUEST_ONLY``). ``trigger=MANUAL`` (a person) starts nothing either
   while AI does not answer: 200 with ``state: AI_OFF`` (RCA-D13).
   A run already queued or running is answered as it is (409 for a person's MANUAL request).
 - ``GET /api/v1/investigations/{id}/ai-run``: the latest run with each step's outcome (``run`` is null without one).
@@ -94,6 +92,9 @@ def start_run(
             404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Not found in your organization"}
         )
     current = runner.latest(db, tenant_id, investigation_id)
+    if payload.trigger == "AUTO":
+        # AI-D6: opening a case page never starts an AI run; a person asks for one (MANUAL).
+        return {"started": False, "run": runner.view(current), "reason": "ON_REQUEST_ONLY"}
     if current is not None and current.status in runner.ACTIVE and not runner.is_stale(current):
         if payload.trigger == "AUTO":
             return {"started": False, "run": runner.view(current)}

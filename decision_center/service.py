@@ -53,7 +53,9 @@ class DecisionCenterService:
     def _latest(
         self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, orchestration: str
     ) -> dict[str, Any] | None:
-        row = (
+        from backend.app.ai_review import usable_output
+
+        rows = (
             db.query(AIExecution)
             .filter(
                 AIExecution.tenant_id == tenant_id,
@@ -61,13 +63,21 @@ class DecisionCenterService:
                 AIExecution.orchestration_version == orchestration,
             )
             .order_by(AIExecution.execution_timestamp.desc())
-            .first()
+            .limit(20)
+            .all()
         )
+        # AI-D7: a language model's result counts only after a person accepted or edited it; the newest usable one.
+        row, output = None, None
+        for candidate in rows:
+            usable, content, _state = usable_output(db, candidate)
+            if usable:
+                row, output = candidate, content
+                break
         if not row:
             return None
         return {
             "execution_id": str(row.id),
-            "output": row.structured_output or {},
+            "output": output or {},
             "context_refs": row.context_refs or {},
             "evidence_refs": row.evidence_refs or {},
         }
@@ -222,9 +232,11 @@ class DecisionCenterService:
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             investigation_id=investigation_id,
-            provider="mdarix-controlled-decision-advisory",
-            model_name="mdarix-rule-grounded-advisory",
-            model_version="1.0",
+            # The real provider and model when one answered (AI-R step 11); "none" when no model did (the advisory is
+            # not offered, AI-D5), never a rules name that reads like a model.
+            provider=str(output["ai_advisory"].get("provider") or "none")[:80],
+            model_name=str(output["ai_advisory"].get("model") or "none")[:100],
+            model_version=str(output["ai_advisory"].get("model_version") or "none")[:100],
             prompt_template_version="R1-Day15-DecisionAdvisory-v1",
             orchestration_version="R1-Day15-DecisionAdvisory",
             context_refs={"temporal_context": context["temporal_context"]},

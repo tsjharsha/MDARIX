@@ -57,6 +57,7 @@ from backend.app.demo_requests import router as demo_requests_router
 from backend.app.trial.feedback import router as trial_feedback_router
 from backend.app.site_info import router as site_info_router
 from backend.app.paging import Page
+from backend.app.ai_review import router as ai_review_router
 from backend.app.ai_settings import router as ai_settings_router
 from backend.app.audit_chain_api import router as audit_chain_router
 from backend.app.tenant_export_api import router as tenant_export_router
@@ -487,6 +488,7 @@ app.include_router(demo_requests_router)
 app.include_router(trial_feedback_router)
 app.include_router(site_info_router)
 app.include_router(ai_settings_router)
+app.include_router(ai_review_router)
 app.include_router(audit_chain_router)
 app.include_router(tenant_export_router)
 app.include_router(data_import_router)
