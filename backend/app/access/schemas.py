@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RoleSwitch(BaseModel):
@@ -318,9 +318,24 @@ class ConnectorRunRequest(BaseModel):
     required_fields: list[str] = []
 
 
+class MappingRule(BaseModel):
+    """One source field's mapping rule. Typed, so a malformed rule is refused (422) rather than failing the preview."""
+
+    model_config = ConfigDict(extra="allow")
+
+    target_field: str = Field("", max_length=200)
+    transform: str | None = Field(None, max_length=40)
+    required: bool = False
+
+
+def mapping_rules(rules: dict[str, MappingRule]) -> dict[str, dict]:
+    """The rules as the mapping gateway reads them (plain dicts)."""
+    return {source: rule.model_dump() for source, rule in rules.items()}
+
+
 class MappingPreviewRequest(BaseModel):
     records: list[dict]
-    rules: dict
+    rules: dict[str, MappingRule]
     source_object: str
     target_entity: str
     mapping_version: str
@@ -505,6 +520,15 @@ class QueueItemsAction(BaseModel):
 
     ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=10, max_length=1000)
+
+
+class MailLogCheck(BaseModel):
+    """What the mail provider's log showed for events held after a restore (B6b-D10), checked by a person: only an
+    event it shows as NOT_DELIVERED may be retried; a DELIVERED one was sent before the restore and is discarded."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    result: str = Field(pattern="^(NOT_DELIVERED|DELIVERED)$")
+    reason: str = Field(min_length=10, max_length=1000, description="Where and how the log was checked")
 
 
 class TenantLimitsRequest(BaseModel):

@@ -613,16 +613,11 @@ class Product360Service:
         """
         tenant_id = tenant_id or self.tenant_id()
         with (db_engine or engine).connect() as conn:
-            product = (
-                conn.execute(
-                    text("SELECT id FROM products WHERE tenant_id=:tenant_id AND id=:id"),
-                    {"tenant_id": tenant_id, "id": product_id},
-                )
-                .mappings()
-                .one_or_none()
-            )
+            # By record ID, MDARIX ID or product identifier, as the product's page (a malformed id is not found: 404).
+            product = self.resolve_product(conn, tenant_id, product_id)
             if not product:
                 raise Product360Error("PRODUCT_NOT_FOUND", "Product not found")
+            product_id = str(product["id"])
             rows = self.investigations(conn, tenant_id, product_id)
             workflow = self.investigation_workflow(conn, tenant_id, product_id)
         return [{**rowdict(row), **workflow.get(str(row["id"]), {})} for row in rows]
