@@ -9,6 +9,7 @@ import {
   STATE_LABELS,
   TRIAL_ORGS_PATH,
   convertiblePlans,
+  daysLeftText,
   extensionError,
   extensionSentence,
   nameMatches,
@@ -28,6 +29,13 @@ type AuditItem = {
 };
 type PlanOption = { id: string; code: string; name: string; status?: string | null };
 
+/**
+ * The slot for part 4 of Trial organizations (AI and usage, and the per-user AI switches; spec TO-1 §3.6), which the
+ * AI build provides as one self-contained panel. It gets the trial shown and a callback that reloads the page after a
+ * change. Until it is passed, the slot shows the read-only line from the server ("AI is off for free trials").
+ */
+export type TrialAiPanel = (props: { detail: TrialDetail; onChanged: () => void }) => ReactNode;
+
 const ACTIONS: { key: Action; label: string; icon: ReactNode; danger?: boolean }[] = [
   { key: "extend", label: "Extend", icon: <CalendarPlus size={16} /> },
   { key: "end", label: "End early", icon: <ShieldOff size={16} /> },
@@ -43,6 +51,7 @@ export function TrialDetailPage({
   onOpenCustomers,
   onChanged,
   onMessage,
+  aiPanel,
 }: {
   tenantId: string;
   onBack: () => void;
@@ -50,6 +59,8 @@ export function TrialDetailPage({
   onOpenCustomers?: () => void;
   onChanged?: () => void;
   onMessage: (text: string, tone?: "good" | "critical") => void;
+  /** Part 4 (AI and usage): see ``TrialAiPanel``. */
+  aiPanel?: TrialAiPanel;
 }) {
   const detail = useResource<TrialDetail>(`${TRIAL_ORGS_PATH}/${tenantId}`);
   const history = useResource<{ items: AuditItem[] }>(`/api/v1/platform-admin/tenants/${tenantId}/audit`);
@@ -73,6 +84,12 @@ export function TrialDetailPage({
         onOpenWorkspace={onOpenWorkspace}
         onOpenCustomers={onOpenCustomers}
         source={detail}
+        aiPanel={aiPanel}
+        onAiChanged={() => {
+          detail.reload();
+          history.reload();
+          onChanged?.();
+        }}
       />
       {drawer && detail.data && (
         <ActionDrawer action={drawer} trial={detail.data} onClose={() => setDrawer(null)} onDone={done} />
@@ -89,7 +106,11 @@ export function TrialDetailView({
   onOpenWorkspace,
   onOpenCustomers,
   source,
+  aiPanel,
+  onAiChanged = () => undefined,
 }: {
+  aiPanel?: TrialAiPanel;
+  onAiChanged?: () => void;
   detail: TrialDetail | null;
   history: AuditItem[];
   onAction: (action: Action) => void;
@@ -119,7 +140,9 @@ export function TrialDetailView({
           <ToneBadge tone={stateTone(detail.state)} label={STATE_LABELS[detail.state] ?? detail.state} />
           {detail.state !== "CONVERTED" && detail.state !== "DATA_DELETED" && (
             <strong className="to-days">
-              {detail.state === "ACTIVE" || detail.state === "ENDING_SOON" ? `${dates.days_left} days left` : "Ended"}
+              {detail.state === "ACTIVE" || detail.state === "ENDING_SOON"
+                ? daysLeftText(dates.days_left, dates.in_grace)
+                : "Ended"}
             </strong>
           )}
         </div>
@@ -168,6 +191,15 @@ export function TrialDetailView({
             )}
             <dt>Ends</dt>
             <dd>{dates.ends_words ?? formatDate(dates.ends_at)}</dd>
+            {dates.grace_ends_at && (
+              <>
+                <dt>Grace period until</dt>
+                <dd>
+                  {dates.grace_ends_words ?? formatDate(dates.grace_ends_at)}
+                  {dates.in_grace ? " · the users can still sign in" : ""}
+                </dd>
+              </>
+            )}
             {dates.extension_max !== undefined && (
               <>
                 <dt>Extension</dt>
@@ -239,9 +271,15 @@ export function TrialDetailView({
         </section>
       </div>
 
-      <p className="to-ai" role="note">
-        <Sparkles size={14} aria-hidden="true" /> {detail.ai.line}
-      </p>
+      <section className="to-ai-slot" aria-label="AI and usage" data-slot="trial-ai">
+        {aiPanel ? (
+          aiPanel({ detail, onChanged: onAiChanged })
+        ) : (
+          <p className="to-ai" role="note">
+            <Sparkles size={14} aria-hidden="true" /> {detail.ai.line}
+          </p>
+        )}
+      </section>
 
       <Panel eyebrow="History" title="What happened in this trial">
         {history.length ? (

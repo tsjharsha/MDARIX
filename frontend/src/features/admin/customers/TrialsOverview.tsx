@@ -334,7 +334,7 @@ export function TrialsOverviewView({
                     <small>
                       {row.state === "ENDED"
                         ? retentionText(row.retention, formatDate, row.data_deleted_at)
-                        : `${plural(row.days_left, "day")} left`}
+                        : `${plural(row.days_left, "day")} left${row.in_grace ? " (grace period)" : ""}`}
                     </small>
                     {row.state !== "ENDED" && row.retention?.held_for_mvp_request && (
                       <small>{retentionText(row.retention, formatDate)}</small>

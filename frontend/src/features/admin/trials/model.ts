@@ -45,6 +45,11 @@ export type TrialDetail = {
     extension_left?: number;
     extension_max?: number;
     deletion?: { earliest_deletion: string | null; hold_reason: string | null } | null;
+    /** The end of a grace period given on Plans & Licensing; the trial runs until then. */
+    grace_ends_at?: string | null;
+    grace_ends_words?: string | null;
+    /** The end has passed but the grace period has not: the users can still sign in. */
+    in_grace?: boolean;
   };
   people: { used: number; owner: TrialPersonView | null; people: TrialPersonView[]; request_email: string | null };
   sample: {
@@ -78,6 +83,10 @@ export const STATE_LABELS: Record<TrialState, string> = {
 
 export const stateTone = (state: TrialState): "good" | "warning" | "neutral" | "critical" =>
   state === "ACTIVE" ? "good" : state === "ENDING_SOON" ? "warning" : state === "CONVERTED" ? "good" : "neutral";
+
+/** Days left of a running trial; in a grace period they count to the grace end and say so. */
+export const daysLeftText = (daysLeft: number, inGrace = false): string =>
+  `${daysLeft} day${daysLeft === 1 ? "" : "s"} left${inGrace ? " (grace period)" : ""}`;
 
 export const SAMPLE_LABELS = { LOADED: "Loaded", REMOVED: "Removed by the owner", RESTARTED: "Restarted" } as const;
 

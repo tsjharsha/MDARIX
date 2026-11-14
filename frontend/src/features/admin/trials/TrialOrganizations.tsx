@@ -10,7 +10,8 @@ import { TrialFeedbackWorkspace } from "../TrialFeedbackWorkspace";
 import { TrialsOverview } from "../customers/TrialsOverview";
 import { TrialExitRequests } from "../customers/TrialExitRequests";
 import { SupportWorkspace } from "../customers/SupportWorkspace";
-import { TrialDetailPage } from "./TrialDetail";
+import { TrialDetailPage, type TrialAiPanel } from "./TrialDetail";
+import { RunDeletionNow, type DueTrial } from "./RunDeletion";
 import { STATE_LABELS, STRIP, TRIAL_ORGS_PATH, type TrialCounts, type TrialState } from "./model";
 import "../../customer-admin/customer-admin.css";
 import "../customers/customers.css";
@@ -32,12 +33,15 @@ export function TrialOrganizations({
   onSection,
   websiteDemos = false,
   onOpenCustomers,
+  trialAiPanel,
 }: {
   section: TrialSection;
   onSection: (section: TrialSection) => void;
   websiteDemos?: boolean;
   /** Opens Customers & Tenants (from a converted trial). */
   onOpenCustomers?: () => void;
+  /** Part 4 (AI and usage) on each trial's page, when the AI build provides it (TrialDetail ``TrialAiPanel``). */
+  trialAiPanel?: TrialAiPanel;
 }) {
   const counts = useResource<TrialCounts>(`${TRIAL_ORGS_PATH}/summary`);
   const [open, setOpen] = useState<Open>(null);
@@ -88,6 +92,7 @@ export function TrialOrganizations({
               counts.reload();
             }}
             onMessage={notify}
+            aiPanel={trialAiPanel}
           />
         ) : open?.kind === "workspace" ? (
           <SupportWorkspace tenantId={open.id} onBack={() => setOpen(null)} onMessage={notify} />
@@ -106,6 +111,7 @@ export function TrialOrganizations({
             onOpenTrial={(id) => setOpen({ kind: "trial", id })}
             onChanged={counts.reload}
             onOpenCustomers={onOpenCustomers}
+            onMessage={notify}
           />
         ) : (
           <div className="cc-page">
@@ -159,25 +165,20 @@ type FormerTrial = {
   updated_at: string | null;
 };
 
-type DueTrial = {
-  tenant_id: string;
-  tenant_business_id: string | null;
-  name: string;
-  trial_ended_at: string;
-  earliest_deletion: string | null;
-  hold_reason: string | null;
-  legal_hold: boolean;
-};
-
-/** How trials end: requests to end early, trials due for deletion, and the former trials (read-only). */
-function EndingAndDeletion({
+/**
+ * How trials end: requests to end early, trials due for deletion with "Run deletion now", and the former trials
+ * (read-only).
+ */
+export function EndingAndDeletion({
   onOpenTrial,
   onChanged,
   onOpenCustomers,
+  onMessage = () => undefined,
 }: {
   onOpenTrial: (id: string) => void;
   onChanged: () => void;
   onOpenCustomers?: () => void;
+  onMessage?: (text: string, tone: "good" | "critical") => void;
 }) {
   const due = useResource<{ due: DueTrial[] }>("/api/v1/platform-admin/trial-retention");
   const [former, setFormer] = useState<"CONVERTED" | "DATA_DELETED">("CONVERTED");
@@ -196,7 +197,22 @@ function EndingAndDeletion({
         </div>
       </div>
       <TrialExitRequests onChanged={onChanged} />
-      <Panel eyebrow="Retention" title="Trials due for deletion" source={due}>
+      <Panel
+        eyebrow="Retention"
+        title="Trials due for deletion"
+        source={due}
+        action={
+          <RunDeletionNow
+            due={dueItems}
+            onDone={(text, tone) => {
+              onMessage(text, tone);
+              due.reload();
+              formerList.reload();
+              onChanged();
+            }}
+          />
+        }
+      >
         {dueItems.length ? (
           <ul className="to-list">
             {dueItems.map((item) => (
@@ -214,7 +230,7 @@ function EndingAndDeletion({
         ) : (
           <Empty
             title="No trial is due for deletion"
-            detail="A trial's data is due 30 days after it ends. The nightly run deletes it; it appears here first."
+            detail="A trial's data is due 30 days after it ends. The nightly run deletes it; it appears here first, and Run deletion now deletes it at once."
           />
         )}
       </Panel>

@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialsOverviewView, type TrialTableControls } from "./TrialsOverview";
 import { attentionList, retentionText, trialBadgeOf, trialsPath, type TrialItem, type TrialOverview } from "./trials";
-import { invitationProblem, keptBecause, trialRequestsPath } from "../TrialRequestsWorkspace";
+import { invitationProblem, trialRequestsPath } from "../TrialRequestsWorkspace";
+import { keptBecause } from "../trials/RunDeletion";
 
 const trial = (number: number, overrides: Partial<TrialItem> = {}): TrialItem => ({
   tenant_id: `t-${number}`,

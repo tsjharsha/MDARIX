@@ -4,8 +4,11 @@ import { DOMAINS } from "../consoleDomains";
 import { IDENTITY_SECTIONS, MOVED_SECTIONS, TRIAL_SECTIONS, movedTarget, sectionMatches } from "../areas/sections";
 import { trialTileDetail } from "../console/AdminOverview";
 import { TrialDetailView, eventLabel } from "./TrialDetail";
+import { EndingAndDeletion, TrialRequests } from "./TrialOrganizations";
+import { RunDeletionNow } from "./RunDeletion";
 import {
   convertiblePlans,
+  daysLeftText,
   extensionError,
   extensionSentence,
   nameMatches,
@@ -191,5 +194,78 @@ describe("dashboard", () => {
       "3 ending within 7 days · 2 waiting for review · 1 converted this month",
     );
     expect(trialTileDetail(null)).toContain("apart from customers");
+  });
+});
+
+describe("run 2: ending and deletion", () => {
+  it("offers Run deletion now in Ending and deletion, no longer in Requests", () => {
+    const ending = renderToStaticMarkup(
+      <EndingAndDeletion onOpenTrial={() => undefined} onChanged={() => undefined} />,
+    );
+    expect(ending).toContain("Trials due for deletion");
+    expect(ending).toContain("Run deletion now");
+    const requests = renderToStaticMarkup(<TrialRequests />);
+    expect(requests).not.toContain("Run deletion now");
+    expect(requests).not.toContain("Delete expired trial data");
+  });
+
+  it("lists what the run deletes and what a hold keeps before it runs", () => {
+    const html = renderToStaticMarkup(
+      <RunDeletionNow
+        initiallyOpen
+        onDone={() => undefined}
+        due={[
+          { tenant_id: "a", tenant_key: "TRIAL_A", name: "OrbitCare", trial_ended_at: "2026-10-01T00:00:00Z" },
+          {
+            tenant_id: "b",
+            tenant_key: "TRIAL_B",
+            name: "PulseWatch",
+            trial_ended_at: "2026-10-01T00:00:00Z",
+            legal_hold: true,
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("OrbitCare (TRIAL_A)");
+    expect(html).toContain("PulseWatch (TRIAL_B), under a legal hold");
+    expect(html).toContain("Delete data of 1 trial");
+  });
+});
+
+describe("run 2: grace period and the AI slot", () => {
+  it("shows a trial in its grace period as running, with the days to the grace end", () => {
+    const html = render(
+      trial({
+        state: "ENDING_SOON",
+        dates: {
+          ...trial().dates,
+          days_left: 5,
+          in_grace: true,
+          grace_ends_at: "2026-11-19T09:00:00+00:00",
+          grace_ends_words: "19 Nov 2026, 14:30 IST",
+        },
+      }),
+    );
+    expect(html).toContain("5 days left (grace period)");
+    expect(html).toContain("Grace period until");
+    expect(html).toContain("19 Nov 2026, 14:30 IST · the users can still sign in");
+    expect(html).not.toContain(">Ended<");
+    expect(daysLeftText(1)).toBe("1 day left");
+  });
+
+  it("keeps a slot for the AI and usage panel, showing the server's line until the panel is passed", () => {
+    const empty = render(trial());
+    expect(empty).toContain('data-slot="trial-ai"');
+    expect(empty).toContain("AI is off for free trials");
+    const withPanel = renderToStaticMarkup(
+      <TrialDetailView
+        detail={trial()}
+        history={[]}
+        onAction={() => undefined}
+        aiPanel={({ detail }) => <p>AI panel for {detail.name}</p>}
+      />,
+    );
+    expect(withPanel).toContain("AI panel for OrbitCare Devices");
+    expect(withPanel).not.toContain("AI is off for free trials");
   });
 });
