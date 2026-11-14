@@ -190,6 +190,7 @@ def test_requests_to_the_model_are_observed_after_masking(monkeypatch):
         "MDARIX_GENAI_PROVIDER": "groq",
         "MDARIX_GENAI_API_KEY": "k",
         "MDARIX_GENAI_FALLBACKS": "",
+        "MDARIX_AI_FEATURES": "case_analysis",
     }.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("MDARIX_GENAI_BASE_URL", raising=False)
@@ -197,7 +198,10 @@ def test_requests_to_the_model_are_observed_after_masking(monkeypatch):
     original = provider_module.GenAIProvider._send
     with model_requests() as sent:
         provider_module.GenAIProvider(max_retries=0).complete(
-            "Review.", {}, evidence=[{"id": "EV-VS014-001", "text": "Patient: Margaret Ellison, DOB: 1958-07-14."}]
+            "Review.",
+            {},
+            feature="case_analysis",
+            evidence=[{"id": "EV-VS014-001", "text": "Patient: Margaret Ellison, DOB: 1958-07-14."}],
         )
     assert provider_module.GenAIProvider._send is original  # restored
     assert len(sent) == 1 and "EV-VS014-001" in sent[0]

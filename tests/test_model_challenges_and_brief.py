@@ -22,6 +22,14 @@ from tests.test_day11_ai_investigator import context
 from tests.test_model_hypotheses import TwoStepModel
 
 
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 def _challenges_reply(context):
     first = context["hypotheses"][0]
     evidence = first["supporting"][0]["evidence"]
@@ -88,6 +96,7 @@ class FullModel(TwoStepModel):
         json_output=False,
         response_schema=None,
         max_output_tokens=None,
+        **_switches,
     ):
         if "sceptical reviewer" in (system or ""):
             reply = _challenges_reply(context)
@@ -95,7 +104,12 @@ class FullModel(TwoStepModel):
             reply = _brief_reply(context)
         else:
             return super().complete(
-                prompt, context, system=system, json_output=json_output, max_output_tokens=max_output_tokens
+                prompt,
+                context,
+                system=system,
+                json_output=json_output,
+                max_output_tokens=max_output_tokens,
+                feature="ask",
             )
         return GenAIResult("groq", "openai/gpt-oss-120b", "test", {"answer": reply}, 100, 50, 0.0, 10)
 

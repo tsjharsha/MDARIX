@@ -1,3 +1,5 @@
+import pytest
+
 """Competing hypotheses written by the language model, checked by MDARIX rules, with the templates as fallback."""
 
 import json
@@ -12,6 +14,14 @@ from investigator.model_provider import ModelInvestigatorProvider
 from investigator.service import EvidenceGroundedInvestigatorService
 from tests.test_day11_ai_investigator import context
 from tests.test_model_investigator import FakeModel, _good_reply
+
+
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
 
 
 def _hypotheses_reply(ids, tag="A"):
@@ -63,10 +73,16 @@ class TwoStepModel(FakeModel):
         json_output=False,
         response_schema=None,
         max_output_tokens=None,
+        **_switches,
     ):
         if "competing explanations" not in (system or ""):
             return super().complete(
-                prompt, context, system=system, json_output=json_output, max_output_tokens=max_output_tokens
+                prompt,
+                context,
+                system=system,
+                json_output=json_output,
+                max_output_tokens=max_output_tokens,
+                feature="ask",
             )
         reply = self.hypotheses if self.hypotheses is not None else _hypotheses_reply(context["evidence_ids"], self.tag)
         return GenAIResult("groq", "openai/gpt-oss-120b", "test", {"answer": reply}, 100, 50, 0.0, 10)
