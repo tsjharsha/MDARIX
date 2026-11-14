@@ -1,8 +1,6 @@
 """The routine complaint path, Case attachments and e-mail intake (backlog item B7, after the WHIF freeze).
 
-When DB-1 (tr24tenantindexes) lands, set down_revision to tr24tenantindexes.
-
-The twenty-fifth migration of the trial line, chained from ``tr24tenantindexes`` (DB-1's last migration; before
+The twenty-fifth migration of the trial line, chained from ``tr24aproductreferences`` (DB-1's last migration; before
 DB-1 it followed ``tr19casesescalation``). Expand-only: two new tables, new nullable columns or columns with a
 default, one widened check constraint and one partial unique index. Nothing is dropped or renamed.
 
@@ -28,7 +26,7 @@ from infrastructure.database.migrations.helpers import quoted
 from infrastructure.database.migrations.helpers import tenant_policy as _tenant_policy
 
 revision = "tr25routinepath"
-down_revision = "tr24tenantindexes"
+down_revision = "tr24aproductreferences"
 branch_labels = None
 depends_on = None
 
