@@ -310,8 +310,9 @@ class TrustedRetrievalService:
     def _evidence_ids_for_entity_filter(self, tenant_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID):
         return (
             text(
-                "SELECT evidence_id FROM evidence_entity_links "
-                "WHERE tenant_id=:tenant_id AND entity_type=:entity_type AND entity_id=:entity_id"
+                # Typed in the SQL: the driver sends an untyped UUID parameter as text (uuid = character varying).
+                "SELECT evidence_id FROM evidence_entity_links WHERE tenant_id=CAST(:tenant_id AS uuid) "
+                "AND entity_type=:entity_type AND entity_id=CAST(:entity_id AS uuid)"
             )
             .bindparams(tenant_id=tenant_id, entity_type=entity_type, entity_id=entity_id)
             .columns(evidence_id=Evidence.id.type)
@@ -320,7 +321,8 @@ class TrustedRetrievalService:
     def _investigation_evidence_ids(self, tenant_id: uuid.UUID, investigation_id: uuid.UUID):
         return (
             text(
-                "SELECT evidence_id FROM investigation_evidence WHERE tenant_id=:tenant_id AND investigation_id=:investigation_id"
+                "SELECT evidence_id FROM investigation_evidence "
+                "WHERE tenant_id=CAST(:tenant_id AS uuid) AND investigation_id=CAST(:investigation_id AS uuid)"
             )
             .bindparams(tenant_id=tenant_id, investigation_id=investigation_id)
             .columns(evidence_id=Evidence.id.type)

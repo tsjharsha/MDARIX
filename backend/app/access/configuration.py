@@ -34,6 +34,7 @@ from backend.app.access.schemas import (
     MappingRequest,
     ReleaseActionRequest,
     StatusRequest,
+    mapping_rules,
 )
 from backend.app.access.authz import (
     _admin_tenant,
@@ -984,7 +985,9 @@ def preview_mapping(
         )
     result = preview(
         payload.records,
-        MappingDefinition(payload.source_object, payload.target_entity, payload.mapping_version, payload.rules),
+        MappingDefinition(
+            payload.source_object, payload.target_entity, payload.mapping_version, mapping_rules(payload.rules)
+        ),
     )
     _audit_configuration(db, admin, "MAPPING_PREVIEW_EXECUTED", "MappingConfiguration", row.id, row.version)
     db.commit()
