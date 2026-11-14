@@ -30,6 +30,9 @@ from backend.app.logging_setup import configure_logging  # noqa: E402
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    from backend.app.db.job_timeouts import use_background_timeouts
+
+    use_background_timeouts()  # jobs: 5 minutes per statement, before any connection opens (DB-1, decision 4)
     configure_logging()
     from backend.app.config_check import enforce
 

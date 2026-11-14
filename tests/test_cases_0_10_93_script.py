@@ -132,9 +132,11 @@ def test_the_list_names_the_changes_and_writes_nothing():
 
 def _as_0_10_92(db, tenant_id) -> None:
     """Set a trial's records back to how a 0.10.92 trial holds them after migration tr19: the Cases at tr19's
-    defaults, the country as typed, no record owner, no triage version rows or speed."""
+    defaults, the country as typed, no record owner, no triage version rows or speed, and no severity on T-M13's nine
+    sample triage records."""
     from backend.app.db.models.foundation import Complaint
     from backend.app.db.models.intake import IntakeEvent, TriageRecord, TriageRecordVersion
+    from backend.app.trial.sample_calm import SAMPLE_TRIAGE_SEVERITY, triage_record_names
 
     for event in db.query(IntakeEvent).filter(IntakeEvent.tenant_id == tenant_id):
         event.status, event.channel, event.owner_id, event.complaint_id = "OPEN", None, None, None
@@ -142,8 +144,12 @@ def _as_0_10_92(db, tenant_id) -> None:
         if event.reference == "SAMPLE-CALL-02":
             event.country = "Germany"
     db.query(TriageRecordVersion).filter(TriageRecordVersion.tenant_id == tenant_id).delete()
-    for record in db.query(TriageRecord).filter(TriageRecord.tenant_id == tenant_id):
+    records = db.query(TriageRecord).filter(TriageRecord.tenant_id == tenant_id).all()
+    names = triage_record_names(db, tenant_id, records)
+    for record in records:
         record.speed, record.version = None, 1
+        if record.source_system == "MDARIX_SAMPLE" and names.get(record.id) in SAMPLE_TRIAGE_SEVERITY:
+            record.severity = None
     for complaint in db.query(Complaint).filter(Complaint.tenant_id == tenant_id):
         if complaint.source_system == "MDARIX_SAMPLE":
             complaint.record_owner = None
@@ -213,7 +219,7 @@ def _fingerprint(db, tenant_id) -> dict:
         "checks": rows(FirstContactCheck, "id", "classification", "signed_at", "signed_by", "updated_at", "answers"),
         "signatures": rows(SignedApprovalRecord, "id", "status", "content_fingerprint", "signature_hash"),
         "complaints": rows(Complaint, "id", "record_owner", "status"),
-        "triage": rows(TriageRecord, "id", "speed", "version"),
+        "triage": rows(TriageRecord, "id", "speed", "version", "severity"),
         "versions": rows(TriageRecordVersion, "id"),
     }
 
@@ -461,3 +467,124 @@ def test_a_new_trial_needs_nothing_from_the_backfill_and_keeps_its_duplicate_pai
     finally:
         with SessionLocal() as db:
             purge_trial(db, tenant_id, "test:cases-0-10-93-cleanup")
+
+
+# ----------------------------------------------------------------------------------- T-M13: sample triage severities
+
+CONFIRMED = {
+    "SAMPLE-RV-01": "CRITICAL",
+    "SAMPLE-RV-02": "NOT_KNOWN",
+    "SAMPLE-RV-06": "CRITICAL",
+    "SAMPLE-RV-07": "NEGLIGIBLE",
+    "SAMPLE-RV-08": "NOT_KNOWN",
+    "SAMPLE-RV-10": "SERIOUS",
+    "SAMPLE-RT-05": "SERIOUS",
+    "SAMPLE-CALL-03": "NOT_KNOWN",
+    "SAMPLE-RJ-02": "SERIOUS",
+}
+
+
+def _sample_severities(db, tenant_id) -> dict:
+    from backend.app.db.models.intake import TriageRecord
+    from backend.app.trial.sample_calm import triage_record_names
+
+    records = (
+        db.query(TriageRecord)
+        .filter(TriageRecord.tenant_id == tenant_id, TriageRecord.source_system == "MDARIX_SAMPLE")
+        .all()
+    )
+    names = triage_record_names(db, tenant_id, records)
+    return {names.get(row.id): row for row in records if names.get(row.id) in CONFIRMED}
+
+
+@pytest.mark.db
+def test_a_new_trial_has_the_confirmed_severities_and_the_market_harm_level_agrees():
+    """T-M13 (owner, 14 Nov 2026): the nine sample triage records the sample author finishes carry the confirmed
+    severity, and a market assessment's harm level pre-fill (the QMS severity first, else the triage record) reads the
+    same level, or none for "Not known yet"."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.reportability import markets
+    from backend.app.reportability.assessment_router import _severity_level
+    from backend.app.trial.retention import purge_trial
+    from tests.test_free_trial import _approved_trial_client
+
+    tenant_id = uuid.UUID(_approved_trial_client()[1]["tenant_id"])
+    try:
+        with SessionLocal() as db:
+            bind_tenant(db, tenant_id)
+            found = _sample_severities(db, tenant_id)
+            assert {name: row.severity for name, row in found.items()} == CONFIRMED
+            assert all(row.completed_at is not None for row in found.values())
+            complaints = {
+                row.complaint_identifier: row
+                for row in db.query(Complaint).filter(
+                    Complaint.tenant_id == tenant_id, Complaint.complaint_identifier.in_(list(CONFIRMED))
+                )
+            }
+            assert complaints, "the sample's complaints are missing"
+            for name, complaint in complaints.items():
+                level = _severity_level(db, tenant_id, complaint.id, complaint.severity)["severity_level"]
+                wanted = CONFIRMED[name] if CONFIRMED[name] in markets.LEVELS else None
+                assert level == wanted, (name, complaint.severity, level)
+            db.rollback()
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:cases-0-10-93-cleanup")
+
+
+@pytest.mark.db
+def test_an_older_trial_gets_the_severities_listed_audited_once_and_a_set_one_is_kept(old_trials):
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.models.intake import TriageRecordVersion
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+
+    script = _script()
+    (tenant_id, other), _own = old_trials
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        found = _sample_severities(db, tenant_id)
+        assert set(found) == set(CONFIRMED) and not any(row.severity for row in found.values())
+        found["SAMPLE-RV-02"].severity = "MINOR"  # a person's choice: never overwritten
+        db.commit()
+        listed = "\n".join(script.plan_tenant(db, tenant_id))
+        db.rollback()
+    for name, severity in CONFIRMED.items():
+        line = f"{name}: triage severity -> {severity} (T-M13, the sample author's)"
+        assert (line in listed) == (name != "SAMPLE-RV-02"), name
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        script.apply_tenant(db, tenant_id, batch=4)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        found = _sample_severities(db, tenant_id)
+        assert {name: row.severity for name, row in found.items()} == {**CONFIRMED, "SAMPLE-RV-02": "MINOR"}
+        for name, row in found.items():
+            if name == "SAMPLE-RV-02":
+                continue
+            versions = (
+                db.query(TriageRecordVersion)
+                .filter(TriageRecordVersion.tenant_id == tenant_id, TriageRecordVersion.triage_record_id == row.id)
+                .order_by(TriageRecordVersion.version)
+                .all()
+            )
+            # Version 1 as recorded before 0.10.93, version 2 the severity, with its reason.
+            assert [v.version for v in versions] == [1, 2], name
+            assert versions[1].changed_fields["severity"] == {"old": None, "new": CONFIRMED[name]}
+            assert versions[1].change_reason == script.SEVERITY_REASON
+        audits = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "TRIAGE_SEVERITY_SET_BY_UPGRADE")
+            .all()
+        )
+        assert len(audits) == len(CONFIRMED) - 1
+        assert all(row.actor_ref == script.UPGRADE_ACTOR for row in audits)
+        # A second run lists and changes nothing.
+        assert "triage severity" not in "\n".join(script.plan_tenant(db, tenant_id))
+        db.rollback()
+    with SessionLocal() as db:
+        bind_tenant(db, other)
+        # The other trial is untouched until its own run.
+        assert not any(row.severity for row in _sample_severities(db, other).values())

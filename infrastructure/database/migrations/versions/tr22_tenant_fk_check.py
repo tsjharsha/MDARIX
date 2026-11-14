@@ -21,7 +21,8 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def check_rows(system_scope: bool = True) -> None:
+    """The count and the refusal (also run on legacy organization databases before tr23's changes)."""
     connection = op.get_bind()
     sees_all = connection.exec_driver_sql(
         "SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user"
@@ -35,6 +36,10 @@ def upgrade():
     message = refusal(counts)
     if message:
         raise RuntimeError(message)
+
+
+def upgrade():
+    check_rows()
 
 
 def downgrade():

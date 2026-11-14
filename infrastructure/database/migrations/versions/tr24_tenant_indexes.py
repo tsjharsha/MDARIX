@@ -37,6 +37,13 @@ def upgrade():
             op.execute(f"CREATE INDEX CONCURRENTLY IF NOT EXISTS {name} ON public.{table} ({', '.join(columns)})")
 
 
+def create_tenant_indexes(system_scope: bool = True) -> None:
+    """The same indexes inside the caller's transaction, without CONCURRENTLY (a legacy organization database is
+    small; scripts/add_workflow_tables_to_legacy_planes.py)."""
+    for name, table, columns in INDEXES:
+        op.execute(f"CREATE INDEX IF NOT EXISTS {name} ON public.{table} ({', '.join(columns)})")
+
+
 def downgrade():
     with op.get_context().autocommit_block():
         _outside_any_transaction()
