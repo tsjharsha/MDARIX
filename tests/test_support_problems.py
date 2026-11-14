@@ -140,7 +140,10 @@ def test_a_signed_in_user_files_a_report_which_is_stored_audited_and_queued(repo
     with SessionLocal() as db:
         bind_system(db, "test: read outbox")
         event = db.query(OutboxEvent).filter(OutboxEvent.aggregate_id == uuid.UUID(created["id"])).one()
-    assert event.event_name == "SUPPORT_PROBLEM_REPORTED" and event.payload == {"report_id": created["id"]}
+    assert event.event_name == "SUPPORT_PROBLEM_REPORTED" and event.payload == {
+        "tenant_id": str(event.tenant_id),
+        "report_id": created["id"],
+    }
     assert "nothing happens" not in str(event.payload)
 
     second = reports["client_b"].post(BASE, json={"summary": "Sign-in slow", "details": "Takes a minute."})
