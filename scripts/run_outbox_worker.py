@@ -249,8 +249,10 @@ def process_pending_reports(limit: int = 10):
 
 def main(shutdown: threading.Event | None = None) -> int:
     from backend.app.config_check import enforce
+    from backend.app.db.job_timeouts import use_background_timeouts
     from backend.app.logging_setup import configure_logging
 
+    use_background_timeouts()  # events: 5 minutes per statement, before any connection opens (DB-1, decision 4)
     configure_logging()
     enforce()
     configured_publisher()
