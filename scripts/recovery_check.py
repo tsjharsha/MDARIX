@@ -629,24 +629,46 @@ def run(
     session_factory=_session,
     clock=check_clock,
 ) -> dict:
-    """Every step, each on a session of its own; only the outbox hold commits (and only with ``apply``)."""
+    """Every step, each on a session of its own; only the outbox hold commits (and only with ``apply``). An error
+    that stops the check is a FAIL step in the record, never a missing record."""
+    started = now or datetime.now(timezone.utc)
+    steps: list[dict] = []
+    found = {"database": None, "organisations": [], "held": False}
+    try:
+        _run_steps(steps, found, restore_point, backup_dir, source, erasure_log, apply, started, session_factory, clock)
+    except Exception as exc:  # the record is still written, and FAIL stops the recovery (RR-03)
+        steps.append(
+            step("check_stopped", FAIL, f"The recovery check stopped with an error: {type(exc).__name__}: {exc}"[:500])
+        )
+    return {
+        "record": "MDARIX recovery check (input to MDX-OPS-001)",
+        "database": found["database"],
+        "restore_point": restore_point.isoformat(),
+        "started_at": started.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "outbox_hold_applied": found["held"],
+        "result": overall(steps),
+        "steps": steps,
+        "organisations": found["organisations"],
+    }
+
+
+def _run_steps(steps, found, restore_point, backup_dir, source, erasure_log, apply, started, session_factory, clock):
     from sqlalchemy import text
 
     from backend.app.db.data_plane import schema_head
 
-    started = now or datetime.now(timezone.utc)
-    steps: list[dict] = []
     if backup_dir is not None:
         steps.append(check_manifest(backup_dir))
     read = session_factory("recovery check: read the restored database")
     try:
-        database = read.execute(text("SELECT current_database()")).scalar()
+        found["database"] = read.execute(text("SELECT current_database()")).scalar()
         quiet = check_quiet(read, restore_point, started)
         steps.append(quiet)
         facts = database_facts(read)
         steps += [check_schema(facts, schema_head()), check_security(facts, source), check_counts(facts, source)]
         steps.append(check_chains(read))
-        orgs = organisations(read, restore_point, started)
+        found["organisations"] = orgs = organisations(read, restore_point, started)
         steps.append(check_configuration(read, [org["tenant_id"] for org in orgs], started))
         steps.append(check_dedicated(read))
     finally:
@@ -659,6 +681,7 @@ def run(
         steps.append(hold_outbox(hold, restore_point, started, apply=apply))
         if apply:
             hold.commit()
+            found["held"] = True
         else:
             hold.rollback()
     finally:
@@ -670,17 +693,6 @@ def run(
     finally:
         erasures.rollback()
         erasures.close()
-    return {
-        "record": "MDARIX recovery check (input to MDX-OPS-001)",
-        "database": database,
-        "restore_point": restore_point.isoformat(),
-        "started_at": started.isoformat(),
-        "finished_at": datetime.now(timezone.utc).isoformat(),
-        "outbox_hold_applied": apply,
-        "result": overall(steps),
-        "steps": steps,
-        "organisations": orgs,
-    }
 
 
 def main(argv: list[str] | None = None) -> int:

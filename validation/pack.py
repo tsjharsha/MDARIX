@@ -115,6 +115,7 @@ class Sources:
     environment: dict = field(default_factory=dict)  # tool versions of the test run and the generator's own hashes
     signatures: list[dict] = field(default_factory=list)  # signatures.csv rows
     count_documents: dict[str, str] = field(default_factory=dict)  # documents holding a generated counts block
+    registers: dict[str, list[dict]] | None = None  # MDX-OPS-003 registers (read_registers); None: no folder
 
 
 @dataclass
@@ -310,6 +311,30 @@ def read_deviations(path: Path) -> list[dict]:
     return list(reader)
 
 
+# MDX-OPS-003 section 3: the D4 registers in docs/validation/registers/, by the name the generator uses.
+REGISTER_FILES = {
+    "incidents": "incidents.csv",
+    "operations": "operations-log.csv",
+    "complaints": "mdarix-complaints.csv",
+    "capas": "capa-log.csv",
+    "audit_findings": "customer-audit-findings.csv",
+}
+
+
+def read_registers(folder: Path) -> dict[str, list[dict]] | None:
+    """The operational registers (MDX-OPS-003), or None when the folder does not exist. A missing register file in
+    an existing folder is refused, so a figure never reads an absent register as an empty one."""
+    if not folder.is_dir():
+        return None
+    found = {}
+    for name, file_name in REGISTER_FILES.items():
+        path = folder / file_name
+        if not path.is_file():
+            raise ValueError(f"{file_name}: missing from {folder.name}/ (MDX-OPS-003 section 3)")
+        found[name] = list(csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines()))
+    return found
+
+
 def migration_head(versions: Path) -> str:
     """The Alembic head(s) from the migration files: revisions no other revision names as its down_revision."""
     revisions, parents = set(), set()
@@ -440,6 +465,12 @@ def check(sources: Sources, release: str) -> list[str]:
             problems.append(f"rule register {rule['code']}: content_hash does not match its content")
     for name, text in sorted(sources.count_documents.items()):
         problems += counts_problems(name, text, counts_block(sources))
+    for row in (sources.registers or {}).get("complaints", []):
+        if _yes(row.get("defect")) and not (row.get("linked_deviation") or "").strip():
+            problems.append(
+                f"{row.get('complaint_id')}: a defect without a linked deviation (MDX-OPS-003 OR-08), "
+                "so defect leakage cannot count it"
+            )
     for dev in release_deviations(sources, release):
         dev_id, status = dev["dev_id"], dev.get("status", "").strip().lower()
         if status not in DEV_STATUSES:
@@ -725,6 +756,84 @@ def rtm(sources: Sources) -> list[dict]:
     return rows
 
 
+def _yes(value) -> bool:
+    return (value or "").strip().lower() == "yes"
+
+
+def _open(rows: list[dict]) -> int:
+    return sum((row.get("status") or "").strip().upper() != "CLOSED" for row in rows)
+
+
+def defect_leakage(sources: Sources, release: str) -> dict | str:
+    """B6b spec B.3: defects found after release N / (found in validation of N + after). This release's deviations
+    are the defects: found_in "production" is after the release, any other value (IQ, OQ, PQ, automated suite) in its
+    validation. A complaint about MDARIX classed a defect is raised as a deviation (MDX-OPS-003 OR-08); those linked to
+    this release's deviations are shown, and one without a linked deviation is a check failure."""
+    if sources.registers is None:
+        return "no source: docs/validation/registers/ not found (MDX-OPS-003)"
+    devs = release_deviations(sources, release)
+    after = [d for d in devs if d.get("found_in", "").strip() == "production"]
+    before = len(devs) - len(after)
+    linked = [
+        row
+        for row in sources.registers["complaints"]
+        if _yes(row.get("defect")) and (row.get("linked_deviation") or "").strip().startswith(f"DEV-{release}-")
+    ]
+    return {
+        "found_in_validation": before,
+        "found_after_release": len(after),
+        "leakage": _pct(len(after), before + len(after)),
+        "defect_complaints_linked": len(linked),
+        "basis": "deviation-log.csv found_in for this release; registers/mdarix-complaints.csv; final 90 days after "
+        "the release (B6b spec B.3)",
+    }
+
+
+def post_go_live(sources: Sources) -> dict | str:
+    """B6b spec B.3: incidents, complaints about MDARIX, CAPAs, customer audit findings and data-integrity events,
+    from the registers at this commit (the monthly health report gives them per month and customer)."""
+    if sources.registers is None:
+        return "no source: docs/validation/registers/ not found (MDX-OPS-003)"
+    reg = sources.registers
+    incidents, complaints, capas, findings = reg["incidents"], reg["complaints"], reg["capas"], reg["audit_findings"]
+    minutes = 0
+    for row in incidents:
+        try:
+            minutes += int((row.get("minutes_down") or "0").strip() or 0)
+        except ValueError:
+            pass  # a non-number is not counted
+    by_class: dict[str, int] = {}
+    for row in findings:
+        key = (row.get("classification") or "").strip() or "unclassified"
+        by_class[key] = by_class.get(key, 0) + 1
+    drills = [row for row in reg["operations"] if row.get("type") in ("RESTORE_DRILL", "RECOVERY_RECORD")]
+    return {
+        "period": "all rows in docs/validation/registers/ at this commit",
+        "incidents": {"count": len(incidents), "open": _open(incidents), "minutes_down": minutes},
+        "data_integrity_incidents": sum((row.get("category") or "").strip() == "DATA" for row in incidents),
+        "complaints_about_mdarix": {
+            "count": len(complaints),
+            "open": _open(complaints),
+            "defects": sum(_yes(row.get("defect")) for row in complaints),
+        },
+        "capas": {
+            "count": len(capas),
+            "open": _open(capas),
+            "effective": sum(_yes(row.get("effective")) for row in capas),
+            "not_effective": sum((row.get("effective") or "").strip().lower() == "no" for row in capas),
+        },
+        "customer_audit_findings": {
+            "count": len(findings),
+            "open": _open(findings),
+            "by_classification": dict(sorted(by_class.items())),
+        },
+        "restore_drills_and_recoveries": {
+            "count": len(drills),
+            "failed": sum((row.get("result") or "").strip() == "FAIL" for row in drills),
+        },
+    }
+
+
 def _pct(part: int, whole: int) -> str:
     return f"{100 * part / whole:.1f}% ({part}/{whole})" if whole else "no data (0/0)"
 
@@ -751,9 +860,7 @@ def g13(sources: Sources, release: str) -> dict:
     devs = release_deviations(sources, release)
     deviated = {d.get("test_or_scenario", "").strip() for d in devs}
     figures["first_pass_yield"] = _pct(sum(outcome[s] == "PASS" and s not in deviated for s in executed), len(executed))
-    figures["defect_leakage"] = (
-        "no source yet: MDARIX's own complaint and CAPA registers do not exist until B6b Part D (D4)"
-    )
+    figures["defect_leakage"] = defect_leakage(sources, release)
     days = []
     for d in devs:
         if d.get("closed_utc", "").strip() and d.get("raised_utc", "").strip():
@@ -772,7 +879,7 @@ def g13(sources: Sources, release: str) -> dict:
         key = d.get("classification") or "unclassified"
         by_class[key] = by_class.get(key, 0) + 1
     figures["open_deviations"] = {"count": len(open_devs), "by_classification": dict(sorted(by_class.items()))}
-    figures["post_go_live_effectiveness"] = "no source yet: incident, complaint and CAPA registers come in B6b Part D"
+    figures["post_go_live_effectiveness"] = post_go_live(sources)
     return figures
 
 

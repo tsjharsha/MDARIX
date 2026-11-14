@@ -26,7 +26,7 @@ Change history
 | 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
 | 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1; MDX-CUS-005 0.2 with the O34 checklist item); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
 | 0.9 | 14 Nov 2026 | Owner decisions of 14 Nov 2026 ("Approved your recommendation") recorded as O35 to O38 (section 4); index versions of MDX-VAL-002 0.11, -010 0.4, -013 0.6, MDX-SUP-001 0.2, MDX-OPS-001 0.2 and -002 0.2 | Srinivas Telikicherla |
-| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); scenario PL-59 traces REQ-CLK-001's different-days case (owner request of 14 Nov 2026); the Retry block built server-side (MDX-VAL-002 RSK-056, MDX-OPS-001 RR-05a); index versions of MDX-VAL-002 0.12, MDX-SUP-001 0.3 and MDX-OPS-001 0.3; code baseline names the merged cut-off fixes | Srinivas Telikicherla |
+| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); scenario PL-59 traces REQ-CLK-001's different-days case (owner request of 14 Nov 2026); the Retry block built server-side (MDX-VAL-002 RSK-056, MDX-OPS-001 RR-05a); index versions of MDX-VAL-002 0.12, MDX-SUP-001 0.3, MDX-OPS-001 0.3 and -003 0.2; code baseline names the merged cut-off fixes | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -185,7 +185,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | MDX-SOP-005 | Access control | [MDX-SOP-005_ACCESS_CONTROL.md](MDX-SOP-005_ACCESS_CONTROL.md) | 0.1 | DRAFT |
 | MDX-OPS-001 | Recovery record (template) | [MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md](MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md) | 0.3 | DRAFT; first executed record at the next quarterly drill |
 | MDX-OPS-002 | Monthly service health report | [MDX-OPS-002_MONTHLY_HEALTH_REPORT.md](MDX-OPS-002_MONTHLY_HEALTH_REPORT.md) | 0.2 | DRAFT |
-| MDX-OPS-003 | Operational registers | [MDX-OPS-003_OPERATIONAL_REGISTERS.md](MDX-OPS-003_OPERATIONAL_REGISTERS.md); [registers/](registers/) | 0.1 | DRAFT |
+| MDX-OPS-003 | Operational registers | [MDX-OPS-003_OPERATIONAL_REGISTERS.md](MDX-OPS-003_OPERATIONAL_REGISTERS.md); [registers/](registers/) | 0.2 | DRAFT |
 | MDX-CUS-001 | Customer UAT/PQ template | [MDX-CUS-001_UAT_PQ_TEMPLATE.md](MDX-CUS-001_UAT_PQ_TEMPLATE.md); Word and Excel log in `customer-templates/` | 0.1 | DRAFT |
 | MDX-CUS-002 | Data migration plan template | [MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md](MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
 | MDX-CUS-003 | Data migration report template | [MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md](MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |

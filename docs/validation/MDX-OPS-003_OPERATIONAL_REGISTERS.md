@@ -4,20 +4,21 @@
 |---|---|
 | Document ID | MDX-OPS-003 |
 | Title | Operational registers: incidents, operations log, complaints about MDARIX, MDARIX CAPA log, customer audit findings |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA, quality approver |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
 | Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (MDX-VAL-000, DC-R42) |
 | Drafting | Drafted with software assistance; every line to be reviewed by Srinivas Telikicherla (MDX-VAL-000, DC-R43) |
 | Date | 14 Nov 2026 |
-| Code baseline | Branch `feat/b6b-part-d` from `6b01eda5`; registers in `docs/validation/registers/`; read by `scripts/health_report.py` |
+| Code baseline | Branch `feat/b6b-part-d` from `6b01eda5`; registers in `docs/validation/registers/`; read by `scripts/health_report.py` and by the generator (`validation/pack.py` `read_registers`, branch `feat/b6b-validation-pack`, 14 Nov 2026) |
 
 Change history
 
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 14 Nov 2026 | First draft (B6b Part D, item D4, `docs/specs/B6b-validation-pack-spec.md:230`): the register of complaints about MDARIX and the MDARIX CAPA log that the spec lists as missing (blocker 6); entries start empty except the restore drills already recorded in the runbook | Srinivas Telikicherla |
+| 0.2 | 14 Nov 2026 | Section 4: the generator reads the registers for defect leakage and the post-go-live figures (G13) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -124,9 +125,12 @@ column says so.
 ## 4. Use
 
 - Monthly health report: `python scripts/health_report.py --customer CUS-nnn --month YYYY-MM` (MDX-OPS-002).
-- Validation summary report (G13): the generator (`scripts/validation_pack.py`) does not read these registers yet; it
-  states "no source yet" for defect leakage and post-go-live effectiveness (`validation/pack.py:750`, `:770`). Reading
-  them is a follow-up change to the generator.
+- Validation summary report (G13): the generator (`scripts/validation_pack.py`, `validation/pack.py`) reads these
+  registers. Defect leakage: the release's deviations found in `production` over all its deviations (`found_in`), with
+  the complaints classed a defect linked to them; a defect complaint without a linked deviation (OR-08) is a check
+  failure. Post-go-live effectiveness: incidents (open, minutes down, `DATA` incidents), complaints about MDARIX
+  (open, defects), CAPAs (open, effective), customer audit findings by class, restore drills and recoveries (failed),
+  from all rows at the commit. A missing register file is refused. Tests: `tests/test_validation_pack.py`.
 - Periodic review (customer template MDX-CUS, Part E): the customer asks for the rows with `ALL` or its code.
 
 ## Signatures

@@ -20,6 +20,7 @@ from backend.app.db.models.foundation import AuditEvent, ConnectorConfiguration
 from backend.app.db.models.stage2 import OutboxEvent, WorkerHeartbeat
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system, bind_tenant
+from backend.app.enterprise_audit import make_audit_event
 from reports import pdf
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +70,25 @@ def test_any_failed_step_fails_the_check_and_a_flag_needs_an_explanation():
     assert recovery_check.overall([{"state": "PASS"}, {"state": "INFO"}]) == "PASS"
     assert recovery_check.overall([{"state": "PASS"}, {"state": "FLAG"}]) == "PASS WITH FLAGS"
     assert recovery_check.overall([{"state": "FLAG"}, {"state": "FAIL"}]) == "FAIL"
+
+
+@pytest.mark.unit
+def test_an_error_inside_the_check_still_writes_a_fail_record(tmp_path):
+    # B6b Part D review finding 5: an exception in run() must give a FAIL record (RR-03 stops the recovery), never
+    # a missing record and a stack trace in the terminal only.
+    def broken_session(reason):
+        raise ConnectionError("restored database refused the connection")
+
+    record = recovery_check.run(
+        restore_point=datetime(2026, 11, 13, 2, 15, tzinfo=timezone.utc), apply=True, session_factory=broken_session
+    )
+    assert record["result"] == "FAIL" and record["outbox_hold_applied"] is False
+    stopped = record["steps"][-1]
+    assert stopped["step"] == "check_stopped" and stopped["state"] == "FAIL"
+    assert "ConnectionError: restored database refused the connection" in stopped["summary"]
+    written = recovery_check.write_record(record, tmp_path)
+    assert [path.suffix for path in written] == [".json", ".pdf"]
+    assert '"result": "FAIL"' in written[0].read_text(encoding="utf-8")
 
 
 @pytest.mark.unit
@@ -261,7 +281,27 @@ def test_an_unsent_event_older_than_the_restore_point_is_held_audited_and_sent_o
     assert recovery_check.hold_outbox(db, point, now, apply=True, tenant_ids=[tenant_id])["held"] == 0
     db.rollback()
 
-    # A person checked the mail provider's log: not sent. Only the replay puts it back in the queue.
+    # The replay refuses it until a person has checked the mail provider's log and recorded "not delivered".
+    with pytest.raises(ValueError, match="HELD_AFTER_RESTORE"):
+        replay_outbox.replay(db, pending.id, "Mail provider log shows it was not sent")
+    bind_system(db, "test: mail-log check")
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref="test",
+            action="OUTBOX_MAIL_LOG_CHECKED",
+            entity_type="OutboxEvent",
+            details={
+                "source": "PLATFORM_ADMIN",
+                "count": 1,
+                "items": [{"id": str(pending.id), "result": "NOT_DELIVERED"}],
+            },
+            reason="Mail provider log searched: not delivered",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    # Recorded as not sent: only the replay puts it back in the queue.
     replay_outbox.replay(db, pending.id, "Mail provider log shows it was not sent")
     assert _due(db, pending.id, datetime.now(timezone.utc) + timedelta(seconds=1))
     bind_system(db, "test cleanup")

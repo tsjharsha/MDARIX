@@ -242,7 +242,8 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert figures["execution_progress"] == "66.7% (2/3)"
     assert figures["pass_rate"] == "100.0% (2/2)"
     assert figures["pass_rate_all_tests"] == "100.0% (3/3), tests in this JUnit (full suite)"
-    assert figures["defect_leakage"].startswith("no source yet")
+    assert figures["defect_leakage"] == "no source: docs/validation/registers/ not found (MDX-OPS-003)"
+    assert figures["post_go_live_effectiveness"] == figures["defect_leakage"]
     assert "WARNING: release 9.9.9" not in capsys.readouterr().err  # same as VERSION
     vsr = (out / "MDX-VAL-011-VSR.md").read_text(encoding="utf-8")
     assert "fit for MDARIX's intended use as validated" in vsr and "DEVELOPMENT RESULTS" not in vsr
@@ -769,3 +770,97 @@ def test_counts_in_the_documents_are_generated_never_typed(tmp_path, capsys):
     (docs / "README.md").write_text("# no block\n", encoding="utf-8")
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
     assert "README.md: no generated counts block" in capsys.readouterr().err
+
+
+# ---- D4 registers in the G13 figures (B6b Part D follow-up) ------------------------------------------------------
+
+REGISTER_ROWS = {
+    "incidents.csv": "incident_id,opened_utc,closed_utc,category,severity,customers,minutes_down,summary,root_cause,"
+    "deviation_id,capa_id,customer_notice,status\n"
+    "INC-2026-001,2026-12-01T10:00:00Z,2026-12-01T10:45:00Z,OUTAGE,S1,ALL,45,Web server stopped,disk full,,,"
+    "N-1,CLOSED\n"
+    "INC-2026-002,2026-12-03T08:00:00Z,,DATA,S3,CUS-001,0,Chain alert on one organisation,,DEV-9.9.9-002,,,OPEN\n",
+    "operations-log.csv": "entry_id,date_utc,type,customers,summary,result,reference,by\n"
+    "OPS-2026-001,2026-12-05,RESTORE_DRILL,ALL,Quarterly drill,PASS,drill record,system owner\n"
+    "OPS-2026-002,2026-12-06,RELEASE,ALL,Release,n/a,tag,system owner\n",
+    "mdarix-complaints.csv": "complaint_id,received_utc,customer,channel,summary,classification,defect,linked_incident,"
+    "linked_capa,linked_deviation,response_utc,status,closed_utc\n"
+    "MCP-2026-001,2026-12-02T09:00:00Z,CUS-001,support e-mail,Deadline shown a day late,DEFECT,yes,,,DEV-9.9.9-002,"
+    "2026-12-02T10:00:00Z,OPEN,\n"
+    "MCP-2026-002,2026-12-04T09:00:00Z,CUS-002,call,Wants a darker theme,USABILITY,no,,,,2026-12-04T10:00:00Z,"
+    "CLOSED,2026-12-04T11:00:00Z\n",
+    "capa-log.csv": "capa_id,opened_utc,source,problem,root_cause,action,owner,due_utc,effectiveness_check,effective,"
+    "status,closed_utc\n"
+    "MCAPA-2026-001,2026-12-02,INC-2026-001,Disk full,no alert,disk alert,system owner,2026-12-20,next month,yes,"
+    "CLOSED,2026-12-21\n",
+    "customer-audit-findings.csv": "finding_id,audit_date_utc,customer,audit_type,requirement,finding,classification,"
+    "response,capa_id,due_utc,status,closed_utc\n"
+    "CAF-2026-001,2026-12-10,CUS-001,remote,Audit trail review,No written review,MINOR,SOP updated,,2027-01-10,OPEN,\n",
+}
+
+
+def _registers(tmp_path: Path) -> Path:
+    folder = tmp_path / "registers"
+    folder.mkdir()
+    for name, text in REGISTER_ROWS.items():
+        (folder / name).write_text(text, encoding="utf-8")
+    return folder
+
+
+def _deviation(dev_id: str, found_in: str) -> dict:
+    return {
+        "dev_id": dev_id,
+        "found_in": found_in,
+        "status": "open",
+        "classification": "minor",
+        "customer_scope": "all",
+    }
+
+
+def test_defect_leakage_counts_this_releases_deviations_found_after_it(tmp_path):
+    sources = pack.Sources([], {}, registers=pack.read_registers(_registers(tmp_path)))
+    sources.deviations = [
+        _deviation("DEV-9.9.9-001", "OQ"),
+        _deviation("DEV-9.9.9-002", "production"),
+        _deviation("DEV-9.9.9-003", "automated suite"),
+        _deviation("DEV-9.9.8-001", "production"),  # another release: not counted
+    ]
+    leakage = pack.defect_leakage(sources, "9.9.9")
+    assert leakage["found_in_validation"] == 2 and leakage["found_after_release"] == 1
+    assert leakage["leakage"] == "33.3% (1/3)" and leakage["defect_complaints_linked"] == 1
+    assert pack.defect_leakage(sources, "9.9.7")["leakage"] == "no data (0/0)"
+
+
+def test_post_go_live_figures_come_from_the_registers(tmp_path):
+    figures = pack.post_go_live(pack.Sources([], {}, registers=pack.read_registers(_registers(tmp_path))))
+    assert figures["incidents"] == {"count": 2, "open": 1, "minutes_down": 45}
+    assert figures["data_integrity_incidents"] == 1
+    assert figures["complaints_about_mdarix"] == {"count": 2, "open": 1, "defects": 1}
+    assert figures["capas"] == {"count": 1, "open": 0, "effective": 1, "not_effective": 0}
+    assert figures["customer_audit_findings"] == {"count": 1, "open": 1, "by_classification": {"MINOR": 1}}
+    assert figures["restore_drills_and_recoveries"] == {"count": 1, "failed": 0}
+
+
+def test_a_missing_register_is_refused_and_an_unlinked_defect_is_a_check_failure(tmp_path):
+    folder = _registers(tmp_path)
+    sources = pack.Sources([], {}, registers=pack.read_registers(folder))
+    sources.registers["complaints"][1].update(defect="yes", linked_deviation="")
+    assert any(
+        problem.startswith("MCP-2026-002: a defect without a linked deviation")
+        for problem in pack.check(sources, "9.9.9")
+    )
+    (folder / "capa-log.csv").unlink()
+    with pytest.raises(ValueError, match="capa-log.csv: missing"):
+        pack.read_registers(folder)
+    assert pack.read_registers(tmp_path / "absent") is None
+
+
+def test_the_pack_reads_the_registers_into_g13(tmp_path):
+    root = _root(tmp_path)
+    folder = _registers(tmp_path)
+    folder.rename(root / "docs" / "validation" / "registers")
+    _run(root, "--dry-run", "--out", str(tmp_path / "out"))
+    figures = __import__("json").loads((tmp_path / "out" / "g13.json").read_text())
+    assert figures["defect_leakage"]["found_after_release"] == 0  # no deviations of 9.9.9 in this root
+    assert figures["defect_leakage"]["defect_complaints_linked"] == 1
+    assert figures["post_go_live_effectiveness"]["incidents"]["minutes_down"] == 45

@@ -101,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
                                    for name in GENERATOR_FILES if (ROOT / name).is_file()}},
         count_documents={name: (docs / name).read_text(encoding="utf-8") for name in COUNT_DOCUMENTS
                          if (docs / name).is_file()},
+        registers=pack.read_registers(docs / "registers"),
     )  # fmt: skip
     if args.update_counts:  # rating-4 finding 9: counts in the documents are generated, never typed
         block = pack.counts_block(sources)
