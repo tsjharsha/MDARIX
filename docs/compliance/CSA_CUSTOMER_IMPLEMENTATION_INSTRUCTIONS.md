@@ -1,6 +1,6 @@
 # Customer implementation and validation instructions
 
-> **SUPERSEDED (12 Nov 2026, B6b).** These MVP-1.0 instructions ask a customer to run installation qualification on a hosted service, which does not fit MDARIX as SaaS, and are retired. Do not give it to a customer or use it as evidence. They will be replaced by the customer validation instructions MDX-CUS-006 (B6b Part E); see [docs/validation/README.md](../validation/README.md).
+> **SUPERSEDED (12 Nov 2026, B6b).** These MVP-1.0 instructions ask a customer to run installation qualification on a hosted service, which does not fit MDARIX as SaaS, and are retired. Do not give it to a customer or use it as evidence. Successor: the customer validation instructions [MDX-CUS-006](../validation/MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md) (B6b Part E, 14 Nov 2026); see [docs/validation/README.md](../validation/README.md).
 
 1. Assign the customer validation owner, quality reviewer, system owner, and approver.
 2. Record the approved MDARIX commit, environment, migration head, and configuration versions.
