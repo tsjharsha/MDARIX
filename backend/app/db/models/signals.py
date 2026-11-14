@@ -114,6 +114,13 @@ class Signal(Base):
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id", "product_version_id"],
+            ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
+            name="fk_signals_version_of_product",
+        ),
+        CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         UniqueConstraint("tenant_id", "id", name="uq_signals_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "product_id"], ["products.tenant_id", "products.id"], name="fk_signals_product"
