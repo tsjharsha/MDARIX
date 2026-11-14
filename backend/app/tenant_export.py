@@ -210,7 +210,7 @@ def request_export(
             event_name=EVENT,
             aggregate_type="TenantExport",
             aggregate_id=row.id,
-            payload={"export_id": str(row.id)},
+            payload={"tenant_id": str(tenant_id), "export_id": str(row.id)},  # tenant: the worker's check (RSK-026)
             occurred_at=now,
         )
     )

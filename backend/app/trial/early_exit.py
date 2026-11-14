@@ -258,6 +258,7 @@ def _queue_ended_email(db: Session, subscription, now: datetime) -> None:
             aggregate_type="SubscriptionLifecycle",
             aggregate_id=subscription.id,
             payload={
+                "tenant_id": str(subscription.tenant_id),  # checked against the row by the worker (RSK-026)
                 "subscription_id": str(subscription.id),
                 "stage": "ENDED",
                 "early": True,
