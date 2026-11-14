@@ -118,6 +118,8 @@ class ComplaintMarketAssessment(Base):
     updated_at = _now()
 
     __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_complaint_market_assessments_tenant_id_id"),
         UniqueConstraint(
             "tenant_id", "complaint_id", "market", "version", name="uq_complaint_market_assessments_version"
         ),
