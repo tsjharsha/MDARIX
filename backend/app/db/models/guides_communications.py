@@ -163,6 +163,8 @@ class ExternalParty(Base):
     contact_erase_reason: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        UniqueConstraint("tenant_id", "id", name="uq_external_parties_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "complaint_id"],
             ["complaints.tenant_id", "complaints.id"],
@@ -185,7 +187,7 @@ class CommunicationEntry(Base):
     tenant_id: Mapped[uuid.UUID] = _tenant()
     complaint_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     intake_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("external_parties.id"), nullable=False)
+    party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
     subject: Mapped[str] = mapped_column(String(400), nullable=False)
@@ -201,7 +203,7 @@ class CommunicationEntry(Base):
     attempts = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     evidence = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     qms_reference: Mapped[str | None] = mapped_column(String(120))
-    in_reply_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("communication_entries.id"))
+    in_reply_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     # What raised it: {"type": "MarketAssessment", "market": "US", "questions": [...]} or {"type": "IntakeEvent", ...}.
     origin = mapped_column(JSONB)
     task_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -212,6 +214,18 @@ class CommunicationEntry(Base):
     updated_at = _tz(False)
 
     __table_args__ = (
+        # DB-1 (tr23).
+        ForeignKeyConstraint(
+            ["tenant_id", "party_id"],
+            ["external_parties.tenant_id", "external_parties.id"],
+            name="fk_communication_entries_party_id_tenant",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "in_reply_to"],
+            ["communication_entries.tenant_id", "communication_entries.id"],
+            name="fk_communication_entries_in_reply_to_tenant",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_communication_entries_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "complaint_id"],
             ["complaints.tenant_id", "complaints.id"],
