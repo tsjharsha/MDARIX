@@ -336,6 +336,8 @@ also questions in MDX-VAL-013.
 | O29 | The B6b spec and the B3 plan are copied into `docs/specs/` after the drafting-tool name and folder references are removed from the planning copies; the W1 spec is copied too; every spec in `docs/specs/` carries an "Approval record" section (date, the owner's approval words as recorded, approver), and approved specs are no longer headed DRAFT (owner, 12 Nov 2026; section 3.3) |
 | O30 | Sriharsha Telikicherla co-signs section 4 of this document as system owner; the owner signs last (owner, 12 Nov 2026; `signing/MDX-VAL-000-section-4.pdf`) |
 | O31 | `signatures.csv` keeps the content hash (`content_sha256`) apart from the signed PDF's hash (`sha256`); the generator checks the OQ protocol approval against `content_sha256` (owner, 12 Nov 2026; DC-R35; `validation/pack.py`) |
+| O32 | REQ-BAK-002 (a backup older than 26 hours raises an alert) is accepted until B6b Part D builds its control; Part D built it: the backup-age check is tested (`tests/test_backup_age_check.py`, PL-26 and PL-27), so PL-26 is no longer "future" (owner, 14 Nov 2026) |
+| O33 | One small negative test each for REQ-CLK-001 and REQ-REC-003 (owner, 14 Nov 2026: "still one small test each"): PL-57 (`tests/test_legal_deadlines.py`) and PL-58 (`tests/test_cases_0_10_93_script.py`) |
 
 ## 5. Codes used in these documents
 
@@ -349,7 +351,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6, PL followed by a number | Scenario IDs in the scenario register |
-| O1 to O31, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O33, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 

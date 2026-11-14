@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pytest
+
 from backend.app.intake import rules as intake_rules
 from backend.app.reportability import deadlines, rules
 
@@ -110,3 +112,16 @@ def test_the_watch_clock_and_triage_count_the_same_way():
     triage = intake_rules.provisional_deadlines(aware, ["IN"], intake_rules.FLAGGED, now, own="IN", org_zone="UTC")[0]
     assert clock.due_label == triage["due_label"] == "Sat 7 Nov 2026, 18:29 UTC"
     assert clock.days_left == triage["days_left"] == 6
+
+
+@pytest.mark.requirement("PL-57")
+def test_the_later_end_of_the_two_time_zones_is_never_the_deadline():
+    # REQ-CLK-001, negative (PL-57). Expected result derived from the requirement, not the code: awareness 06:00 UTC on
+    # Tue 10 Nov 2026 is 10 Nov in New York (01:00 EST) and in India (11:30 IST). The US window is 30 calendar days
+    # after the day of awareness (21 CFR 803.50(a)): latest day Thu 10 Dec 2026 in both zones. Its end in the
+    # authority's zone is 23:59:59 EST = 04:59:59 UTC on 11 Dec; in the organisation's, 23:59:59 IST = 18:29:59 UTC on
+    # 10 Dec. The deadline is the earlier; the authority's later end is refused.
+    aware = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
+    found = deadlines.count(aware, 30, rules.CALENDAR, "US", "Asia/Kolkata")
+    assert found.at != datetime(2026, 12, 11, 4, 59, 59, tzinfo=UTC)
+    assert found.at == datetime(2026, 12, 10, 18, 29, 59, tzinfo=UTC) and found.day == date(2026, 12, 10)
