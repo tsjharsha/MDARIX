@@ -422,3 +422,14 @@ def test_the_connector_gateway_refuses_the_sample_marker():
     run = ConnectorRun("t", "c", "r", state=sorted(CONNECTOR_STATES)[0])
     with pytest.raises(ValueError, match="reserved"):
         run.ingest([], source_system="MDARIX_SAMPLE", required_fields=set())
+
+
+def test_the_ai_status_of_a_trial_follows_the_chain_the_organization_and_the_person(trial, chain_on):
+    status = trial["client"].get("/api/v1/ai/status").json()
+    assert status["trial"] is True and status["enabled"] is True and status["sample_data_only"] is True
+    assert status["reason_code"] is None and "sample data only" in status["message"]
+    assert status["budget"]["limit"] == governance.DEFAULT_TRIAL_MONTHLY_TOKENS
+    _set_user(trial["user_id"], "INACTIVE")
+    inactive = trial["client"].get("/api/v1/ai/status").json()
+    assert inactive["enabled"] is False and inactive["reason_code"] == "USER_AI_INACTIVE"
+    assert inactive["message"].startswith("AI is not enabled for your account")

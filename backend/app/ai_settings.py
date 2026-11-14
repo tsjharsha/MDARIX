@@ -564,6 +564,11 @@ def ai_ready(db: Session, tenant_id) -> bool:
 
 # A free trial runs without AI: its screens say so plainly instead of naming an administrator setting.
 TRIAL_AI_OFF_MESSAGE = "AI is off for free trials. Every step works by hand, and Ask MDARIX answers from your records."
+TRIAL_AI_ON_MESSAGE = (
+    "AI in the free trial works on the sample data only. On your own data: AI available on paid plans. "
+    "AI results are proposals: review them before relying on them."
+)
+USER_AI_INACTIVE_MESSAGE = "AI is not enabled for your account. Every step works by hand."
 
 
 @router.get("/ai/status")
@@ -572,13 +577,34 @@ def ai_status(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = 
     is true for a free trial, whose AI is off."""
     from backend.app.trial.service import trial_subscription
 
+    from genai.provider import GenAIProvider, trial_chain
+
     trial = trial_subscription(db, ctx.tenant_id) is not None
     state = governance.usage(db, ctx.tenant_id)
-    if trial:
-        # Off whatever the switch says (genai/governance.py refuses a trial's model requests).
+    trial_models = (
+        [{"provider": item.provider_name, "model": item.model} for item in trial_chain(GenAIProvider())]
+        if trial
+        else []
+    )
+    if trial and not trial_models:
+        # No trial chain: off whatever the switch says (genai/governance.py refuses a trial's model requests).
         state = {**state, "ai_processing_allowed": False}
-    status = ai_status_for(state, _models_in_use())
+    if trial and trial_models:
+        # A trial uses its own lower allowance (decision T6).
+        state = {
+            **state,
+            "monthly_token_budget": governance.trial_monthly_budget(
+                None if state["budget_is_default"] else state["monthly_token_budget"]
+            ),
+        }
+    status = ai_status_for(state, trial_models if trial else _models_in_use())
     status["trial"] = trial
-    if trial and status["reason_code"] in ("PROVIDER_UNAVAILABLE", "AI_DISABLED"):
+    if trial and trial_models:
+        status["sample_data_only"] = True
+        if governance.user_ai_state(db, ctx.tenant_id, ctx.user_id) != governance.USER_AI_ACTIVE:
+            status.update(enabled=False, reason_code="USER_AI_INACTIVE", message=USER_AI_INACTIVE_MESSAGE)
+        elif status["reason_code"] is None:
+            status["message"] = TRIAL_AI_ON_MESSAGE
+    if trial and status["reason_code"] in ("PROVIDER_UNAVAILABLE", "AI_DISABLED") and not trial_models:
         status["message"] = TRIAL_AI_OFF_MESSAGE
     return status
