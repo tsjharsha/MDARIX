@@ -923,6 +923,49 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   their organization in the event, so the worker's check against another organization's content covers them too
   (RSK-026).
 
+### Database hardening (DB-1)
+
+- `scripts/upgrade_data_planes.py` creates or updates a dedicated plane's runtime role again: the password is quoted
+  as a literal by the server, because PostgreSQL takes no bound parameter in `CREATE ROLE`/`ALTER ROLE` (it refused
+  every run with `MDARIX_DATA_PLANE_RUNTIME_USER` set). `scripts/migrate_data_planes.py` refuses a runtime role
+  name that is not a plain lower-case name, as the other role scripts do.
+
+- Migration `tr21runtimeprivileges` (DB-02): the application's runtime role may only read `alembic_version` and
+  `business_id_counters` (business identifiers are still assigned by the database), and `tenant_data_planes` gets
+  forced row-level security: everyone reads it, only system scope writes it. `scripts/grant_runtime_privileges.py`,
+  `upgrade_data_planes.py` and `migrate_data_planes.py` revoke the same writes, so a deploy does not give them back.
+
+- Migration `tr22tenantfkcheck` (DB-01 pre-check, changes nothing): counts the rows that point at another
+  organization's row, or whose product version is set without a product or is not a version of that product, and
+  stops the upgrade with the counts if any is above zero. `scripts/check_tenant_references.py` prints the same
+  counts, read only, for a copy of a production backup.
+- Migration `tr23compositetenantfks` (DB-01, PV-1 F1 and F15): the 41 single-column references between
+  organization tables become composite `(tenant_id, x_id)`, so the database refuses a row that points at another
+  organization's row even when a code path forgets the check (the provisioning job step keeps both, its
+  organization may be empty). Complaints, risks, requirements, signals, intake events, decisions, investigation
+  briefs, assurance results and AI interactions may only carry a version of their own product, and never a version
+  without a product: the master-data rule VERSION_BELONGS_TO_PRODUCT now has its enforcer.
+
+- Migration `tr24tenantindexes` (DB-05): 68 indexes, built with `CREATE INDEX CONCURRENTLY` so writes continue:
+  one for each organization reference of `tr23` and for the most-used references that had none, and one starting
+  with `tenant_id` on every organization table that lacked it (the organization filter of every request). The list
+  is `infrastructure/database/migrations/tenant_indexes.py`; the schema drift check treats them as migration-owned.
+
+- Database timeouts (DB-03): the runtime and data-plane connections give up on a silent database after
+  `MDARIX_DB_SOCKET_TIMEOUT_SECONDS` (75 s by default; the owner connection for migrations and scripts has none), and
+  `scripts/configure_runtime_role.py` gives the runtime role a `statement_timeout` and an
+  `idle_in_transaction_session_timeout` (`MDARIX_DB_STATEMENT_TIMEOUT`, `MDARIX_DB_IDLE_IN_TRANSACTION_TIMEOUT`, 60 s
+  each). Operator step: run `scripts/configure_runtime_role.py` after the migration. A dedicated data plane that does
+  not answer is reported as `DATA_PLANE_UNAVAILABLE` (not "being upgraded"), and the failure is not cached, so the
+  plane serves again as soon as it is back.
+- Connection pools (DB-04): one control pool when the runtime login is the owner's, and a data-plane engine pushed
+  out of the cache (`MDARIX_DATA_PLANE_ENGINE_CACHE`, 32) closes its connections at once.
+
+- A date never chooses a product version (owner, 12 Nov 2026): Product 360 and its timeline read "as of" a date
+  without a version no longer pick the latest version released before that date, because a unit built earlier keeps
+  its own version. They show no version and the limitation "Version not known for this unit" with the candidate
+  versions; a chosen or recorded version is used as before.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
