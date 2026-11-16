@@ -19,6 +19,9 @@ describe("reviewing an AI proposal", () => {
     const html = renderToStaticMarkup(<AiReviewActions outputId="o-1" text="AI text" onReviewed={() => undefined} />);
     expect(html).toContain(AI_UNREVIEWED_LABEL);
     expect(html).toMatch(/Accept[\s\S]*Edit[\s\S]*Reject/);
+    // Accept leads: the only primary button; Edit and Reject stay secondary.
+    expect(html).toMatch(/class="ac-primary"[^>]*>(<svg[\s\S]*?<\/svg>)? Accept/);
+    expect(html.match(/ac-primary/g)).toHaveLength(1);
     const readOnly = renderToStaticMarkup(
       <AiReviewActions outputId="o-1" text="AI text" disabled onReviewed={() => undefined} />,
     );

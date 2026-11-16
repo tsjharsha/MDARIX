@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./statement-kind.css";
-import { Check, PencilLine, X } from "lucide-react";
+import { Check, PencilLine, Sparkles, X } from "lucide-react";
 import { describeError, postJson } from "../../app/apiClient";
 
 /** The label on every AI output nobody accepted or edited yet (AI-R 4.4, owner decision AI-D7). */
@@ -89,11 +89,11 @@ export function AiReviewActions({
   return (
     <div className="ai-review" role="group" aria-label="Review this AI proposal">
       <span className="ai-review-label" role="note">
-        {AI_UNREVIEWED_LABEL}
+        <Sparkles size={14} aria-hidden="true" /> {AI_UNREVIEWED_LABEL}
       </span>
       {!disabled && mode === null && (
         <span className="ca-row-actions">
-          <button type="button" className="ac-secondary" disabled={busy} onClick={() => void submit("ACCEPTED")}>
+          <button type="button" className="ac-primary" disabled={busy} onClick={() => void submit("ACCEPTED")}>
             <Check size={14} aria-hidden="true" /> Accept
           </button>
           <button type="button" className="ac-secondary" disabled={busy} onClick={() => setMode("EDITED")}>
