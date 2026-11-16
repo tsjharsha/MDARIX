@@ -391,6 +391,9 @@ def create_interaction(
         else:
             answer, checked_text = raw_answer, raw_answer
         response["provider_output"] = {**result.output, "answer": answer}
+        if result.call_id:
+            # The answer a person accepts, edits or rejects (POST /api/v1/ai-outputs/{ai_call_id}/review).
+            response["ai_call_id"] = result.call_id
         answer_check = check_answer(checked_text, known)
         shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check

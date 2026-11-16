@@ -25,4 +25,19 @@ describe("reviewing an AI proposal", () => {
     expect(readOnly).toContain(AI_UNREVIEWED_LABEL);
     expect(readOnly).not.toContain("Accept");
   });
+
+  it("shows who decided once the server says the output was reviewed, without the buttons", () => {
+    for (const [state, words] of [
+      ["ACCEPTED", "Accepted by a person"],
+      ["EDITED", "Edited by a person"],
+      ["REJECTED", "Rejected by a person"],
+    ] as const) {
+      const html = renderToStaticMarkup(<AiReviewActions outputId="o-1" state={state} />);
+      expect(html).toContain(words);
+      expect(html).not.toContain(AI_UNREVIEWED_LABEL);
+      expect(html).not.toContain("Reject<");
+    }
+    const open = renderToStaticMarkup(<AiReviewActions outputId="o-1" state="NOT_REVIEWED" />);
+    expect(open).toContain(AI_UNREVIEWED_LABEL);
+  });
 });

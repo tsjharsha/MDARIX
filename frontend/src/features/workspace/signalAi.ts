@@ -269,6 +269,9 @@ export type SignalSummary = {
     message?: string;
     label?: string;
     model?: string;
+    /** The saved AI result a person accepts, edits or rejects, and its review state. */
+    ai_execution_id?: string;
+    review_state?: string | null;
     dropped?: Array<{ text: string; reason: string }>;
     trust?: TrustSummary | null;
   };
@@ -330,6 +333,9 @@ export type CaseAiRunStep = {
   seconds?: number;
   // The automatic trust check saved with the step's AI result (trust.ts); null when the step saved no AI result.
   trust?: TrustSummary | null;
+  // A step the model wrote: its saved result, which a person accepts, edits or rejects, and the review state.
+  ai_execution_id?: string | null;
+  review_state?: string | null;
 };
 export type CaseAiRun = {
   id: string;

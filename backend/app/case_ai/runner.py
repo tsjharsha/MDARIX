@@ -64,10 +64,20 @@ def latest(db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> Ca
     )
 
 
-def view(run: CaseAiRun | None) -> dict | None:
+def view(run: CaseAiRun | None, db: Session | None = None) -> dict | None:
+    """The run for the screen; with ``db``, each step a model wrote carries its review state (AI-D7)."""
     if run is None:
         return None
     done = {item.get("step"): item for item in run.steps or []}
+    if db is not None:
+        from backend.app.ai_review import SUBJECT_EXECUTION, review_states
+
+        written = [item for item in done.values() if item.get("author") == "AI" and item.get("ai_execution_id")]
+        states = review_states(db, run.tenant_id, SUBJECT_EXECUTION, [item["ai_execution_id"] for item in written])
+        done = {
+            code: {**item, "review_state": states[item["ai_execution_id"]]} if item in written else item
+            for code, item in done.items()
+        }
     status = "FAILED" if is_stale(run) else run.status
     return {
         "id": str(run.id),

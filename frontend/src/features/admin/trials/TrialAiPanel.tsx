@@ -4,6 +4,7 @@ import { Panel, ToneBadge } from "../console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import "../../shared/statement-kind.css";
 import "./trialAi.css";
+import { TrialAiMetrics } from "./TrialAiMetrics";
 
 /*
  * Part 4 of Trial organizations (TO-1 spec 3.6.1): AI per trial and the per-person AI switch, as one self-contained
@@ -119,10 +120,7 @@ export function TrialAiPanel({
           {people.map((person) => (
             <li key={person.user_id}>
               <span>{person.display_name || "Unnamed person"}</span>
-              <ToneBadge
-                tone={person.active ? "good" : "neutral"}
-                label={`AI: ${word(person.active)}`}
-              />
+              <ToneBadge tone={person.active ? "good" : "neutral"} label={`AI: ${word(person.active)}`} />
               <button
                 type="button"
                 className="ac-secondary"
@@ -161,6 +159,7 @@ export function TrialAiPanel({
           </div>
         )}
       </Panel>
+      <TrialAiMetrics tenantId={detail.tenant_id} />
     </>
   );
 }

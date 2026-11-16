@@ -202,6 +202,7 @@ def explain(db: Session, tenant_id: uuid.UUID, record: dict, flagged: dict, *, a
             "dropped": dropped,
             "trust": trust,
             "label": LABEL,
+            "review_state": "NOT_REVIEWED",
         },
     }
 
@@ -241,6 +242,9 @@ def latest(db: Session, tenant_id: uuid.UUID, complaint_ids: list[str]) -> dict[
         .order_by(AssuranceResult.assurance_version)
     ):
         verdicts[result.ai_execution_id] = result.status
+    from backend.app.ai_review import SUBJECT_EXECUTION, review_states
+
+    reviewed = review_states(db, tenant_id, SUBJECT_EXECUTION, [row.id for row in found.values()])
     views = {}
     for complaint_id, row in found.items():
         output = row.structured_output or {}
@@ -258,6 +262,7 @@ def latest(db: Session, tenant_id: uuid.UUID, complaint_ids: list[str]) -> dict[
                 "dropped": output.get("dropped") or [],
                 "trust": {"status": status, "label": STATUS_LABELS.get(status, "Not checked")} if status else None,
                 "label": LABEL,
+                "review_state": reviewed[str(row.id)],
             },
         }
     return views

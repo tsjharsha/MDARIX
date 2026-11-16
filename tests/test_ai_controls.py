@@ -249,6 +249,10 @@ def test_a_signed_in_request_applies_its_organizations_controls(groq, tenant):
     assert response.status_code == 200, response.text
     assert groq and "jane@x.org" not in json.dumps(groq[-1])
     assert _usage(tenant)["requests"] == before + 1
+    # The model's answer names its call, which a person accepts, edits or rejects (AI-D7).
+    call_id = response.json()["response"]["ai_call_id"]
+    reviewed = client.post(f"/api/v1/ai-outputs/{call_id}/review", json={"decision": "ACCEPTED"})
+    assert reviewed.status_code == 200 and reviewed.json()["subject_type"] == "ai_call", reviewed.text
 
     _set(tenant, ai_processing_allowed=False)
     calls = len(groq)

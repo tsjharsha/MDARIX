@@ -837,6 +837,7 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
             "provider": result.provider,
             "model": result.model,
             "ai_execution_id": str(execution.id),
+            "review_state": "NOT_REVIEWED",
             "dropped": dropped,
             "trust": getattr(execution, "trust", None),
             "label": "AI interpretation: written by AI from the complaints cited, checked sentence by sentence; a "

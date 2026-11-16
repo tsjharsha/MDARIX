@@ -248,6 +248,83 @@ def test_an_observation_a_person_wrote_is_not_an_ai_output():
     assert response.status_code == 404 and response.json()["detail"]["code"] == "AI_OUTPUT_NOT_FOUND"
 
 
+def test_a_case_ai_run_step_the_model_wrote_carries_its_review_state():
+    from backend.app.case_ai import runner
+    from backend.app.db.models.case_ai import CaseAiRun
+
+    client = authenticated_client()
+    row_id = _model_result("MODEL RUN STEP")
+    case_id, tenant_id = _case()
+    run = CaseAiRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        investigation_id=case_id,
+        status="COMPLETED",
+        trigger="MANUAL",
+        as_of=datetime.now(timezone.utc),
+        requested_by="test",
+        steps=[
+            {"step": "ANALYSIS", "status": "DONE", "author": "AI", "ai_execution_id": str(row_id)},
+            {"step": "UNKNOWNS", "status": "DONE", "author": "RULES", "ai_execution_id": None},
+        ],
+    )
+
+    def steps():
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            return {item["step"]: item for item in runner.view(run, db)["steps"]}
+
+    try:
+        assert steps()["ANALYSIS"]["review_state"] == "NOT_REVIEWED"
+        assert "review_state" not in steps()["UNKNOWNS"], "a step the rules wrote needs no review"
+        assert _review(client, row_id, decision="ACCEPTED").status_code == 200
+        assert steps()["ANALYSIS"]["review_state"] == "ACCEPTED"
+    finally:
+        _review(client, row_id, decision="REJECTED", reason="Test cleanup: not this case's analysis")
+
+
+def test_a_second_look_explanation_carries_its_review_state():
+    from backend.app.complaint_review import explain
+
+    client = authenticated_client()
+    _, tenant_id = _case()
+    complaint_id = str(uuid.uuid4())
+    row_id = uuid.uuid4()
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        db.add(
+            AIExecution(
+                id=row_id,
+                tenant_id=tenant_id,
+                requestor_ref="test",
+                provider=explain.PROVIDER,
+                model_name="test-model",
+                model_version="1",
+                prompt_template_version=explain.VERSION,
+                orchestration_version=explain.VERSION,
+                context_refs={"complaint_id": complaint_id},
+                evidence_refs={},
+                structured_input={},
+                structured_output={"sentences": [{"text": "It names an injury.", "quotes": []}]},
+                validation_status="VALIDATED",
+                execution_timestamp=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+
+    def state():
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            return explain.latest(db, tenant_id, [complaint_id])[complaint_id]["ai"]["review_state"]
+
+    assert state() == "NOT_REVIEWED"
+    assert (
+        _review(client, row_id, decision="EDITED", edited_text="It names a burn.", reason="Be precise").status_code
+        == 200
+    )
+    assert state() == "EDITED"
+
+
 def test_the_case_record_labels_a_model_result_until_a_person_reviews_it():
     from reports.content import investigation_record
 

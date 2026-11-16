@@ -66,7 +66,7 @@ def latest_run(
 ):
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     _case(db, tenant_id, investigation_id)
-    return {"run": runner.view(runner.latest(db, tenant_id, investigation_id)), "steps": list(runner.STEP_LABELS)}
+    return {"run": runner.view(runner.latest(db, tenant_id, investigation_id), db), "steps": list(runner.STEP_LABELS)}
 
 
 @router.post("/{investigation_id}/ai-run", dependencies=[Depends(require_permission(AI_RUN))])
@@ -94,10 +94,10 @@ def start_run(
     current = runner.latest(db, tenant_id, investigation_id)
     if payload.trigger == "AUTO":
         # AI-D6: opening a case page never starts an AI run; a person asks for one (MANUAL).
-        return {"started": False, "run": runner.view(current), "reason": "ON_REQUEST_ONLY"}
+        return {"started": False, "run": runner.view(current, db), "reason": "ON_REQUEST_ONLY"}
     if current is not None and current.status in runner.ACTIVE and not runner.is_stale(current):
         if payload.trigger == "AUTO":
-            return {"started": False, "run": runner.view(current)}
+            return {"started": False, "run": runner.view(current, db)}
         raise HTTPException(
             409,
             detail={
@@ -107,13 +107,13 @@ def start_run(
         )
     if payload.trigger == "AUTO" and (current is not None or _has_analysis(db, tenant_id, investigation_id)):
         # The case's AI work exists already: opening its page never repeats it.
-        return {"started": False, "run": runner.view(current)}
+        return {"started": False, "run": runner.view(current, db)}
     if not ai_ready(control, tenant_id):
         # AI is off, not available or used up: nothing starts, AUTO or MANUAL (RCA-D13: the steps would be keyword
         # rules written for the sample data); every step still works by hand.
         return {
             "started": False,
-            "run": runner.view(current),
+            "run": runner.view(current, db),
             "reason": "AI_NOT_READY",
             "state": "AI_OFF",
             "message": "AI analysis is off for this organization.",
@@ -148,4 +148,4 @@ def start_run(
     )
     db.commit()
     background.add_task(runner.run_in_background, tenant_id, run.id)
-    return JSONResponse(status_code=202, content={"started": True, "run": runner.view(run)})
+    return JSONResponse(status_code=202, content={"started": True, "run": runner.view(run, db)})

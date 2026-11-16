@@ -316,6 +316,34 @@ def test_only_a_platform_administrator_sets_a_users_ai_switch(trial):
         _set_user(trial["user_id"], "ACTIVE")
 
 
+def test_the_platform_admin_sees_a_trials_ai_use_chain_and_switch_changes(trial, chain_on):
+    url = f"{TRIALS}/{trial['tenant_id']}/ai-metrics"
+    assert trial["client"].get(url).status_code == 403
+    admin = authenticated_client()
+    before = admin.get(url).json()
+    _summarize(trial, trial["sample"])
+    switched = admin.put(
+        f"{TRIALS}/{trial['tenant_id']}/users/{trial['user_id']}/ai-access",
+        json={"active": False, "reason": "Metrics test switch change"},
+    )
+    try:
+        assert switched.status_code == 200
+        metrics = admin.get(url)
+        assert metrics.status_code == 200, metrics.text
+        body = metrics.json()
+        assert body["organization_on"] is True
+        assert body["calls"]["total"] == before["calls"]["total"] + 1
+        assert body["calls"]["by_feature"]["summaries"] >= 1 and body["calls"]["by_outcome"]["ANSWERED"] >= 1
+        assert body["usage"]["limit"] == governance.trial_monthly_budget(None)
+        assert body["chain"] == [{"position": 1, "name": "freellmapi", "state": "READY", "resting_until": None}]
+        latest = body["switch_events"][0]
+        assert latest["action"] == "TRIAL_USER_AI_ACCESS_CHANGED" and latest["reason"] == "Metrics test switch change"
+        assert latest["new_values"] == {"ai_access": False} and latest["actor"]
+        assert "Summarize" not in metrics.text, "metrics carry no prompt or record text"
+    finally:
+        _set_user(trial["user_id"], "ACTIVE")
+
+
 def test_a_user_of_another_organization_is_refused_and_audited(trial):
     admin = authenticated_client()
     with SessionLocal() as db:

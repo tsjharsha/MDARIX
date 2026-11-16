@@ -88,6 +88,13 @@ def latest_reviews(db: Session, tenant_id, subject_type: str, subject_ids) -> di
     return {row.subject_id: row for row in rows}
 
 
+def review_states(db: Session, tenant_id, subject_type: str, subject_ids) -> dict[str, str]:
+    """Each output's review state for the screens: ACCEPTED, EDITED, REJECTED or NOT_REVIEWED."""
+    ids = [str(item) for item in subject_ids if item]
+    reviews = latest_reviews(db, tenant_id, subject_type, ids)
+    return {item: reviews[item].decision if item in reviews else "NOT_REVIEWED" for item in ids}
+
+
 def _model_executions(db: Session, tenant_id, execution_ids) -> set[str]:
     """The ids among these saved results that a language model wrote."""
     ids = {str(item) for item in execution_ids if item}

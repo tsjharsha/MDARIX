@@ -8,6 +8,18 @@ export const AI_UNREVIEWED_LABEL = "AI proposal, not reviewed";
 export const REVIEW_REASON_MIN = 5;
 
 export type AiReviewDecision = "ACCEPTED" | "EDITED" | "REJECTED";
+/** What the server says about an output: one of the decisions, or not reviewed yet. */
+export type AiReviewState = AiReviewDecision | "NOT_REVIEWED";
+
+const DECIDED: Record<AiReviewDecision, string> = {
+  ACCEPTED: "Accepted by a person",
+  EDITED: "Edited by a person",
+  REJECTED: "Rejected by a person",
+};
+
+/** The words for a reviewed output, or null while nobody has reviewed it. */
+export const reviewedText = (state?: string | null) =>
+  state && state in DECIDED ? DECIDED[state as AiReviewDecision] : null;
 export type AiReviewBody = { decision: AiReviewDecision; reason?: string; edited_text?: string };
 
 /** The review request, or why it cannot be sent yet (the server checks the same). */
@@ -30,13 +42,17 @@ export function AiReviewActions({
   text,
   onReviewed,
   disabled = false,
+  state = null,
 }: {
   outputId: string;
   /** The AI's text, the starting point of an edit. */
   text?: string | null;
-  onReviewed: (decision: AiReviewDecision) => void;
+  onReviewed?: (decision: AiReviewDecision) => void;
   disabled?: boolean;
+  /** The server's review state of this output; a reviewed output shows who decided, not the buttons. */
+  state?: string | null;
 }) {
+  const [decided, setDecided] = useState<string | null>(state);
   const [mode, setMode] = useState<"EDITED" | "REJECTED" | null>(null);
   const [reason, setReason] = useState("");
   const [edited, setEdited] = useState(text ?? "");
@@ -53,13 +69,23 @@ export function AiReviewActions({
     try {
       await postJson(`/api/v1/ai-outputs/${encodeURIComponent(outputId)}/review`, built.body);
       setMode(null);
-      onReviewed(decision);
+      setDecided(decision);
+      onReviewed?.(decision);
     } catch (error) {
       setProblem(describeError(error, "The review could not be saved."));
     } finally {
       setBusy(false);
     }
   };
+  const done = reviewedText(decided);
+  if (done)
+    return (
+      <div className="ai-review is-reviewed" role="group" aria-label="AI proposal reviewed">
+        <span className={`ai-review-label is-${String(decided).toLowerCase()}`} role="note">
+          <Check size={13} aria-hidden="true" /> {done}
+        </span>
+      </div>
+    );
   return (
     <div className="ai-review" role="group" aria-label="Review this AI proposal">
       <span className="ai-review-label" role="note">

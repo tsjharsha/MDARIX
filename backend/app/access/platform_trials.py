@@ -164,3 +164,113 @@ def set_trial_ai_access(tenant_id: uuid.UUID, payload: AiAccessChange, request: 
     )
     db.commit()
     return {"active": payload.active, "changed": changed, "total": len(people)}
+
+
+# The changes the Platform Administrator sees on the trial's AI metrics (story step 9: each switch change).
+AI_SWITCH_ACTIONS = (
+    "AI_PROCESSING_SETTING_CHANGED",
+    "AI_FEATURE_SETTING_CHANGED",
+    "TRIAL_USER_AI_ACCESS_CHANGED",
+    "TRIAL_AI_ACCESS_BULK_CHANGED",
+)
+METRIC_EVENTS = 20
+
+
+@router.get(BASE + "/{tenant_id}/ai-metrics")
+def trial_ai_metrics(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """A trial's AI this month: use against its own (lower) limit, model calls by outcome and feature, the trial
+    provider chain (configured, resting), and the latest switch changes. Counts and metadata only: no record text."""
+    import time
+
+    from sqlalchemy import func
+
+    from backend.app.db.models.ai_records import AiCall
+    from backend.app.db.models.foundation import AuditEvent
+    from genai.provider import GenAIProvider, _resting_until, trial_chain, trial_chain_names
+
+    admin = _require_platform_admin(request, db)
+    tenant = _trial(db, tenant_id, admin, "AI_METRICS")
+    state = governance.usage(db, tenant_id)
+    limit = governance.trial_monthly_budget(None if state["budget_is_default"] else state["monthly_token_budget"])
+    month_start = datetime.fromisoformat(state["month"]).replace(tzinfo=timezone.utc)
+    calls = (
+        db.query(AiCall.outcome, AiCall.feature, func.count(), func.max(AiCall.created_at))
+        .filter(AiCall.tenant_id == tenant_id, AiCall.created_at >= month_start)
+        .group_by(AiCall.outcome, AiCall.feature)
+        .all()
+    )
+    by_outcome: dict[str, int] = {}
+    by_feature: dict[str, int] = {}
+    for outcome, feature, count, _ in calls:
+        by_outcome[outcome] = by_outcome.get(outcome, 0) + count
+        by_feature[feature] = by_feature.get(feature, 0) + count
+    last = max((at for *_, at in calls if at is not None), default=None)
+    usable = {item.provider_name for item in trial_chain(GenAIProvider())}
+    resting, now = _resting_until(), time.time()
+    chain = []
+    for position, name in enumerate(trial_chain_names(), start=1):
+        until = resting.get(name, 0.0)
+        state_word = "RESTING" if until > now else ("READY" if name in usable else "NOT_USABLE")
+        chain.append(
+            {
+                "position": position,
+                "name": name,
+                "state": state_word,
+                "resting_until": datetime.fromtimestamp(until, timezone.utc).isoformat() if until > now else None,
+            }
+        )
+    events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action.in_(AI_SWITCH_ACTIONS))
+        .order_by(AuditEvent.created_at.desc())
+        .limit(METRIC_EVENTS)
+        .all()
+    )
+    actors = _names(db, {event.actor_ref for event in events})
+    return {
+        "organization_on": bool(tenant.ai_processing_allowed),
+        "usage": {
+            "month": state["month"],
+            "tokens_used": state["tokens_used"],
+            "limit": limit,
+            "percent": round(100 * state["tokens_used"] / limit) if limit else 0,
+            "requests": state["requests"],
+            "refused": state["refused"],
+        },
+        "calls": {
+            "total": sum(by_outcome.values()),
+            "by_outcome": by_outcome,
+            "by_feature": by_feature,
+            "last_at": last.isoformat() if last else None,
+        },
+        "chain": chain,
+        "switch_events": [
+            {
+                "action": event.action,
+                "at": event.created_at.isoformat() if event.created_at else None,
+                "actor": actors.get(str(event.actor_ref), "MDARIX"),
+                "reason": event.reason,
+                "old_values": event.old_values,
+                "new_values": event.new_values,
+                "details": {
+                    key: value
+                    for key, value in (event.details or {}).items()
+                    if key in ("feature", "bulk", "count", "value", "source")
+                },
+            }
+            for event in events
+        ],
+    }
+
+
+def _names(db: Session, refs) -> dict[str, str]:
+    ids = []
+    for ref in refs:
+        try:
+            ids.append(uuid.UUID(str(ref)))
+        except ValueError:
+            continue
+    if not ids:
+        return {}
+    rows = db.query(AuthUser.id, AuthUser.display_name, AuthUser.username).filter(AuthUser.id.in_(ids)).all()
+    return {str(row.id): row.display_name or row.username for row in rows}

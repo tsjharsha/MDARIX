@@ -29,6 +29,7 @@ import {
 import { AlsoKnownAs, StatusBadge, countOf } from "./common";
 import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
+import { AiReviewActions } from "../../shared/AiReview";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { Dispositions } from "./Dispositions";
 import { FirstContact } from "./FirstContact";
@@ -498,6 +499,15 @@ export function ExplainWithAi({ item, name }: { item: SecondLookItem; name: stri
               {dropped} sentence{dropped === 1 ? "" : "s"} left out: a quote not in the record, a decision or a stated
               cause.
             </p>
+          )}
+          {shown.ai.ai_execution_id && (
+            <AiReviewActions
+              key={shown.ai.ai_execution_id}
+              outputId={shown.ai.ai_execution_id}
+              text={shown.sentences.map((sentence) => sentence.text).join("\n")}
+              state={shown.ai.review_state}
+              disabled={!canRun}
+            />
           )}
         </>
       )}

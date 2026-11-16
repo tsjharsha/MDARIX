@@ -112,6 +112,23 @@
   font-size: var(--ms-fs-12);
   font-weight: 600;
 }
+/* Reviewed: the decision in plain words, flat and solid (no longer a proposal). */
+.ai-review-label.is-accepted,
+.ai-review-label.is-edited {
+  border-style: solid;
+  border-color: var(--ms-good-line, currentColor);
+  background: transparent;
+  color: var(--ms-good, inherit);
+}
+.ai-review-label.is-rejected {
+  border-style: solid;
+  border-color: var(--ms-line, currentColor);
+  background: transparent;
+  color: var(--ms-muted, inherit);
+}
+.ai-review-label svg {
+  vertical-align: -2px;
+}
 .ai-review-form {
   display: grid;
   gap: 6px;

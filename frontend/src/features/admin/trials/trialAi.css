@@ -17,3 +17,54 @@
 .to-ai-people li > span:first-child {
   flex: 1 1 12rem;
 }
+
+/* Story step 9: the trial's AI metrics. Flat operational panel (G-2). */
+.to-ai-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 12px;
+  align-items: center;
+}
+.to-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.to-ai-sub {
+  margin: 12px 0 6px;
+  font-size: var(--ms-fs-12);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ms-muted);
+}
+.to-ai-chain,
+.to-ai-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.to-ai-chain li,
+.to-ai-events li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ms-line-control);
+}
+.to-ai-chain-pos {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--ms-line);
+  border-radius: 50%;
+  font-size: var(--ms-fs-12);
+}
+.to-ai-events q {
+  flex-basis: 100%;
+  color: var(--ms-muted);
+}

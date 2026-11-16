@@ -9,6 +9,7 @@ import { StructuredAnswerView } from "./StructuredAnswer";
 import { TrustBadge } from "../workspace/sections/TrustBadge";
 import { onQuestionHanded, pendingQuestion, takeQuestion } from "./pendingQuestion";
 import { useAiBanner } from "../workspace/useAiStatus";
+import { AiReviewActions } from "../shared/AiReview";
 
 // Questions Ask answers well with or without AI: the counting ones get the fixed-rule answers of Getting started
 // (backend/app/trial/insight_questions.py ASK_TOPICS), the last searches the case's evidence.
@@ -237,6 +238,11 @@ export function AskAnswer({ result }: { result: any }) {
           {response.trust?.author === "AI" && <TrustBadge trust={response.trust} />}
         </div>
       </header>
+
+      {/* A model's answer is a proposal until a person accepts, edits or rejects it (AI-D7). */}
+      {typeof response.ai_call_id === "string" && (
+        <AiReviewActions key={response.ai_call_id} outputId={response.ai_call_id} text={answer} />
+      )}
 
       {ruleAnswers.length > 0 && <RuleAnswers answers={ruleAnswers} />}
 
