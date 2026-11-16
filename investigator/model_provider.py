@@ -129,6 +129,19 @@ class ModelAnalysisUnavailable(RuntimeError):
         self.detail = detail or {}
 
 
+def case_records(investigation_id, references) -> list[dict[str, Any]]:
+    """The records a case-analysis or drafting request carries, for the free-trial sample check
+    (``genai/sample_gate.py``): the investigation and every cited evidence record. Earlier model output in the context
+    was written from these records, so they are what the request rests on."""
+    records: list[dict[str, Any]] = [{"table": "investigations", "id": str(investigation_id)}]
+    seen = set()
+    for ref in references:
+        if ref.evidence_id and ref.evidence_id not in seen:
+            seen.add(ref.evidence_id)
+            records.append({"table": "evidence", "id": str(ref.evidence_id), "evidence_id": ref.evidence_identifier})
+    return records
+
+
 def select_evidence(
     workspace: InvestigationWorkspaceResponse, chunk_texts: dict[str, str]
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -224,11 +237,24 @@ class ModelInvestigatorProvider:
         )
         if investigator_question:
             prompt += f"\nThe investigator asks: {investigator_question[:1000]}\nDo not accept the question's premise."
+        sent = {str(entry["id"]) for entry in pack}
+        records = [{"table": "investigations", "id": str(investigation.get("id"))}]
+        records += [
+            {"table": "changes", "id": str(change.get("id"))}
+            for change in (workspace.product_context.get("changes") or [])[:8]
+        ]
+        records += [
+            {"table": "evidence", "id": str(item.get("id")), "evidence_id": item.get("evidence_identifier")}
+            for item in workspace.evidence_context
+            if str(item.get("evidence_identifier")) in sent
+        ]
         try:
             result = self.provider.complete(
                 prompt,
                 context,
                 feature="case_analysis",
+                records=records,
+                user_text=investigator_question,
                 system=SYSTEM,
                 json_output=True,
                 response_schema=ANALYSIS_RESPONSE_SCHEMA,

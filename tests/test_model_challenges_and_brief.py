@@ -263,3 +263,37 @@ def test_brief_checks():
     assert brief["headline"] == "Root cause is not established yet."
     assert brief["sections"]["what_we_know"] == [] and dropped[0]["reason"] == "NO_CITATION"
     assert brief["sections"]["next_steps"] == []
+
+
+class RecordingModel(FullModel):
+    """FullModel that keeps the feature and the records= list of every request."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = []
+
+    def complete(self, prompt, context=None, **kwargs):
+        self.calls.append((kwargs.get("feature"), kwargs.get("records"), context))
+        return super().complete(prompt, context, **kwargs)
+
+
+@pytest.mark.db
+def test_every_case_analysis_and_drafting_request_lists_the_records_it_carries(cleanup_ai_hypotheses):
+    model = RecordingModel()
+    _challenge(model, persist=True)
+    tenant_id, investigation_id = context()
+    db = SessionLocal()
+    try:
+        BriefService(model_writer=ModelBriefWriter(model)).generate(
+            db, tenant_id, investigation_id, BriefCreateRequest()
+        )
+    finally:
+        db.close()
+    features = [feature for feature, _records, _context in model.calls]
+    assert features.count("case_analysis") == 3 and features.count("drafting") == 1
+    for _feature, records, _context in model.calls:
+        assert records[0] == {"table": "investigations", "id": str(investigation_id)}
+        assert any(entry["table"] == "evidence" and entry["evidence_id"] for entry in records[1:])
+    _feature, records, sent = model.calls[0]
+    listed = {entry["evidence_id"] for entry in records if entry["table"] == "evidence"}
+    assert listed == {entry["id"] for entry in sent["evidence"]}

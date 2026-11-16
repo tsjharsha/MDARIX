@@ -95,3 +95,20 @@ def test_at_most_three_sentences_are_kept():
 def test_a_reply_that_is_not_the_requested_form_keeps_nothing():
     assert explain.check_sentences({"answer": "free text"}, explain.record_fields(RECORD)) == ([], [])
     assert explain.check_sentences([], explain.record_fields(RECORD)) == ([], [])
+
+
+def test_the_explanation_request_lists_the_complaint_for_every_field_it_sends():
+    from genai.provider import GenAIUnavailable
+
+    seen = {}
+
+    class Spy:
+        def complete(self, *_args, **kwargs):
+            seen.update(kwargs)
+            raise GenAIUnavailable("GENAI_TRIAL_SAMPLE_ONLY: test")
+
+    result = explain.explain(None, None, {**RECORD, "id": "c-1"}, {}, actor_ref="u", provider=Spy())
+    assert result["ai"]["status"] == "REFUSED"
+    blocks = {block["id"] for block in seen["evidence"]}
+    assert {entry["evidence_id"] for entry in seen["records"]} == blocks
+    assert {(entry["table"], entry["id"]) for entry in seen["records"]} == {("complaints", "c-1")}

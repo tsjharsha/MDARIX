@@ -20,6 +20,7 @@ from investigator.model_provider import (
     MAX_STATEMENT,
     ModelAnalysisUnavailable,
     asserts_causality_or_decision,
+    case_records,
     parse_json_reply,
 )
 from investigator.schemas import InvestigationAnalysis, SourceReference
@@ -91,7 +92,14 @@ class ModelHypothesisEngine:
             prompt += f"\nThe investigator asks: {investigator_question[:1000]}\nTest the premise; do not adopt it."
         try:
             result = self.provider.complete(
-                prompt, context, feature="case_analysis", system=SYSTEM, json_output=True, max_output_tokens=3000
+                prompt,
+                context,
+                feature="case_analysis",
+                records=case_records(analysis.investigation_id, refs.values()),
+                user_text=investigator_question,
+                system=SYSTEM,
+                json_output=True,
+                max_output_tokens=3000,
             )
         except GenAIUnavailable as exc:
             raise ModelAnalysisUnavailable("MODEL_CALL_FAILED", {"error": str(exc)}) from exc

@@ -143,6 +143,8 @@ def explain(db: Session, tenant_id: uuid.UUID, record: dict, flagged: dict, *, a
             "Explain what in this record looks like a complaint allegation.",
             {"flagged_because": reasons, "complaint_signs": signs},
             feature="summaries",
+            # Every field sent is the complaint's own (the free-trial sample check re-reads it).
+            records=[{"table": "complaints", "id": str(record["id"]), "evidence_id": name} for name in fields],
             system=SYSTEM,
             json_output=True,
             max_output_tokens=600,
