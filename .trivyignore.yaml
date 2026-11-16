@@ -92,6 +92,48 @@ vulnerabilities:
       not call GnuTLS: Python HTTPS uses OpenSSL and PostgreSQL connections use libpq/OpenSSL. Reassess when Debian
       publishes a fixed libgnutls30 package.
     expired_at: 2027-01-06
+  - id: CVE-2026-53615
+    statement: >-
+      util-linux DOS partition-table parser (bsdutils, libblkid1, libmount1, libsmartcols1, libuuid1, mount,
+      util-linux, util-linux-extra) with no Debian-fixed version available. MDARIX's containers never probe or mount
+      disks or partitions, nobody logs in to them, and they run as a non-root user with no-new-privileges and every
+      capability dropped. Reviewed 14 Nov 2026 (owner sign-off); reassess when Debian publishes a fix.
+    expired_at: 2027-01-06
+  - id: CVE-2026-119373
+    statement: >-
+      SQLite FTS5 flaw (libsqlite3-0) with no Debian-fixed version available. MDARIX stores its data in PostgreSQL and
+      never opens a SQLite database, uploaded or otherwise. Reviewed 14 Nov 2026 (owner sign-off).
+    expired_at: 2027-01-06
+  - id: CVE-2026-119374
+    statement: >-
+      SQLite FTS5 flaw (libsqlite3-0) with no Debian-fixed version available. MDARIX stores its data in PostgreSQL and
+      never opens a SQLite database, uploaded or otherwise. Reviewed 14 Nov 2026 (owner sign-off).
+    expired_at: 2027-01-06
+  - id: CVE-2026-119379
+    statement: >-
+      SQLite session-changeset flaw (libsqlite3-0) with no Debian-fixed version available. MDARIX never opens a SQLite
+      database and never applies SQLite changesets. Reviewed 14 Nov 2026 (owner sign-off).
+    expired_at: 2027-01-06
+  - id: CVE-2026-76844
+    statement: >-
+      zlib gzwrite flaw (zlib1g) with no Debian-fixed version available. MDARIX does not call zlib's gz* file
+      functions: Python's gzip and zipfile modules use zlib's deflate/inflate stream objects. Reviewed 14 Nov 2026
+      (owner sign-off); reassess when Debian publishes a fix.
+    expired_at: 2027-01-06
+  - id: CVE-2026-85091
+    statement: >-
+      zlib gz_vacate flaw (zlib1g) with no Debian-fixed version available. MDARIX does not call zlib's gz* file
+      functions: Python's gzip and zipfile modules use zlib's deflate/inflate stream objects. Reviewed 14 Nov 2026
+      (owner sign-off); reassess when Debian publishes a fix.
+    expired_at: 2027-01-06
+  - id: CVE-2026-116587
+    statement: >-
+      go-jose v3 (v3.0.5) inside the Caddy binary of mdarix/web, denial of service from crafted RSA parameters in a
+      JWK, with no fixed v3 release. v3 reaches Caddy only through its internal certificate-authority module (caddypki,
+      smallstep); MDARIX's Caddyfile configures no internal CA, ACME server or PKI app and obtains its certificate from a
+      public ACME CA, so no JWK is parsed by that module. go-jose v4 is already raised to the fixed 4.1.6. Reviewed 14 Nov
+      2026 (owner sign-off); remove once Caddy no longer pulls go-jose v3 or a fixed v3 ships.
+    expired_at: 2027-01-06
   - id: CVE-2026-88648
     statement: >-
       GnuTLS cross-domain certificate-restriction bypass with no Debian-fixed version available. The MDARIX API does

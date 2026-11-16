@@ -86,7 +86,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .model-cache
-          key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
+          key: embedding-model-bge-small-en-v1.5-fastembed-0.9.1
       # Nothing downloads the model at run time (DEV-02): the pinned revision is prepared here, checksum-checked.
       - name: Prepare the pinned local embedding model
         run: python scripts/prepare_embedding_cache.py
@@ -382,7 +382,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .model-cache
-          key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
+          key: embedding-model-bge-small-en-v1.5-fastembed-0.9.1
       - name: Remove a stale CI TLS database from an interrupted self-hosted run
         run: docker rm -f pg 2>/dev/null || true
       - name: Prepare the pinned local embedding model (nothing downloads it at run time)
@@ -626,6 +626,9 @@ jobs:
       # The browser suite signs the same fixture accounts in many times; sign-in limits are covered by
       # tests/test_auth_hardening.py and the production-mode job (production refuses this setting).
       MDARIX_RATE_LIMITS_ENABLED: 'false'
+      # The trial journey signs up with a made-up company domain that never resolves; the e-mail domain check is
+      # covered by the backend tests (tests/conftest.py switches it off the same way, development only).
+      MDARIX_TRIAL_DOMAIN_CHECK: 'off'
       DAY35_FIXTURE_APPLY: '1'
       # Disposable per-run password for the seeded fixture accounts (never a shared or real password).
       DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!
@@ -681,18 +684,20 @@ jobs:
         # A pull request runs the desktop profile; merges to main, the nightly run and manual runs add mobile.
         run: npm --prefix frontend run test:e2e -- ${{ github.event_name == 'pull_request' && '--project=chromium' || '' }}
       - name: Upload browser evidence
-        # Only when something failed, or on a manual run: passing evidence is recorded in the job log.
-        if: failure() || github.event_name == 'workflow_dispatch'
+        # Screenshots, traces and the API log for diagnosing a failure; the release evidence gate reads job results,
+        # not this artifact, so a passing run uploads nothing.
+        if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         # A report for people to read, never input to another job: a full artifact quota must not fail the gate.
         continue-on-error: true
         with:
-          retention-days: 7
+          retention-days: 2
           name: mdarix-browser-evidence
           path: |
             frontend/artifacts
             frontend/test-results
             artifacts/deep-crawl.json
+            backend.log
           if-no-files-found: warn
 
   container-validation:

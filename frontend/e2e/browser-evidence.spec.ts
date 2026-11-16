@@ -10,6 +10,9 @@ const PLATFORM_ADMIN_EMAIL = process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "r1-user-01
 const INVESTIGATOR_EMAIL = process.env.E2E_INVESTIGATOR_EMAIL ?? "r1-user-17@synthetic.invalid";
 // A Customer Administrator in a second tenant (Tenant B).
 const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "r1-user-06@synthetic.invalid";
+// A full page load on the Vite dev server (the CI browser job) fetches over a thousand modules one by one, and a cold
+// screen can take well over the default five seconds before the session check even starts.
+const SESSION_CHECK_MS = 30_000;
 
 async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
@@ -54,7 +57,7 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated Platform Admin workflow and screenshots", async ({ page }, testInfo) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     const consent = page.getByRole("dialog", { name: /privacy/i });
     if (await consent.isVisible().catch(() => false))
@@ -66,7 +69,7 @@ test.describe("MDARIX browser evidence", () => {
       ["/app/decision", "decision", /platform administration/i],
     ] as const) {
       await page.goto(route);
-      await expect(page.locator("body")).not.toContainText("Checking your session");
+      await expect(page.locator("body")).not.toContainText("Checking your session", { timeout: SESSION_CHECK_MS });
       await expect(page.locator("body")).not.toContainText("Loading tenant administration");
       await expect(page.locator("body")).not.toContainText("Administration unavailable");
       await expect(page.locator("body")).toContainText(expected, { timeout: 20_000 });
@@ -283,10 +286,11 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("protected routes expose a nonblank state", async ({ page }) => {
+    test.setTimeout(180_000);
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     for (const route of ["/app/admin", "/app/customer-admin", "/app/admin/mapping-studio", "/app/decision"]) {
       await page.goto(route);
-      await expect(page.locator("body")).not.toContainText("Checking your session");
+      await expect(page.locator("body")).not.toContainText("Checking your session", { timeout: SESSION_CHECK_MS });
       await expect(page.locator("body")).not.toBeEmpty();
       await expect(page.locator("body")).not.toContainText("Administration unavailable");
     }
