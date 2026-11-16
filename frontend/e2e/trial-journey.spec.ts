@@ -485,6 +485,12 @@ test.describe("free trial journey", () => {
       .getByRole("group", { name: "Root-cause attribution" })
       .getByRole("radio", { name: "Device-related" })
       .check();
+    // RCA tools: accepting the conclusion confirms the cause by ticking the supplier hypothesis and its category.
+    const cause = decide.getByRole("group", { name: /Confirmed root cause/ });
+    if (await cause.count()) {
+      await cause.getByRole("checkbox").first().check();
+      await cause.getByLabel("Cause category").selectOption("MATERIAL");
+    }
     await decide.getByRole("button", { name: "Continue to sign" }).click();
 
     const sign = page.getByRole("dialog", { name: "Sign the decision" });
