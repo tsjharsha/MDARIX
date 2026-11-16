@@ -137,6 +137,73 @@ def test_a_rejected_result_is_never_used_and_reviews_are_append_only():
             db.flush()
 
 
+def test_an_observation_a_model_proposed_reaches_the_decision_brief_only_after_review():
+    from backend.app.db.models.evidence_intelligence import EvidenceObservation
+    from backend.app.db.models.foundation import Investigation
+    from backend.app.decision_brief import compose
+
+    client = authenticated_client()
+    row_id = _model_result("MODEL EXTRACTION")
+    case_id, tenant_id = _case()
+    statement = f"MODEL OBSERVATION {uuid.uuid4().hex[:8]}"
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        evidence_id = db.execute(
+            text("SELECT id FROM evidence WHERE tenant_id = :t LIMIT 1"), {"t": tenant_id}
+        ).scalar()
+        db.add(
+            EvidenceObservation(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                evidence_id=evidence_id,
+                investigation_id=case_id,
+                statement=statement,
+                observation_type="EXPLICIT_SOURCE_STATEMENT",
+                extraction_method="GENAI",
+                ai_execution_id=row_id,
+            )
+        )
+        db.commit()
+
+    def facts():
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            case = db.get(Investigation, case_id)
+            return [item["statement"] for item in compose.facts_section(db, case, [])]
+
+    try:
+        assert statement not in facts()
+        labelled = client.get(f"/api/v1/investigations/{case_id}/intelligence/observations?page_size=200")
+        assert labelled.status_code == 200, labelled.text
+        mine = [item for item in labelled.json()["items"] if item["statement"] == statement]
+        assert mine and mine[0]["ai_label"] == "AI proposal, not reviewed"
+        assert _review(client, row_id, decision="ACCEPTED").status_code == 200
+        assert statement in facts()
+    finally:
+        _review(client, row_id, decision="REJECTED", reason="Test cleanup: not this case's extraction")
+
+
+def test_the_case_record_labels_a_model_result_until_a_person_reviews_it():
+    from reports.content import investigation_record
+
+    client = authenticated_client()
+    row_id = _model_result("MODEL SUMMARY LABEL")
+    case_id, tenant_id = _case()
+
+    def label():
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            rows = investigation_record(db, tenant_id, case_id)["ai_executions"]
+            return next(item["ai_label"] for item in rows if item["id"] == str(row_id))
+
+    try:
+        assert label() == "AI proposal, not reviewed"
+        assert _review(client, row_id, decision="ACCEPTED").status_code == 200
+        assert label() is None
+    finally:
+        _review(client, row_id, decision="REJECTED", reason="Test cleanup: not this case's analysis")
+
+
 def test_another_organizations_output_or_an_unknown_one_is_not_found():
     assert _review(authenticated_client(), uuid.uuid4(), decision="ACCEPTED").status_code == 404
 

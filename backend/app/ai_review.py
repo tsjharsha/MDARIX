@@ -83,6 +83,20 @@ def latest_reviews(db: Session, tenant_id, subject_type: str, subject_ids) -> di
     return {row.subject_id: row for row in rows}
 
 
+def unreviewed_executions(db: Session, tenant_id, execution_ids) -> set[str]:
+    """The ids among these saved results that a language model wrote and no person accepted or edited yet (AI-D7):
+    what they produced is shown as "AI proposal, not reviewed" and is not used downstream."""
+    ids = {str(item) for item in execution_ids if item}
+    if not ids:
+        return set()
+    rows = db.query(AIExecution.id, AIExecution.provider).filter(
+        AIExecution.tenant_id == tenant_id, AIExecution.id.in_([uuid.UUID(item) for item in ids])
+    )
+    by_model = {str(row.id) for row in rows if model_authored(row.provider)}
+    reviews = latest_reviews(db, tenant_id, SUBJECT_EXECUTION, by_model)
+    return {item for item in by_model if item not in reviews or reviews[item].decision not in USABLE_DECISIONS}
+
+
 def usable_output(db: Session, row: AIExecution) -> tuple[bool, dict | None, str]:
     """(usable downstream, the output to use, its review state) for one saved result."""
     output = row.structured_output or {}

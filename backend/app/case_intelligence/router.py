@@ -1721,7 +1721,12 @@ def set_link_state(
 # -------------------------------------------------------------------------------------------------- observations
 
 
-def _observation_view(row: EvidenceObservation, evidence: dict, names: dict[str, str]) -> dict:
+def _observation_view(
+    row: EvidenceObservation, evidence: dict, names: dict[str, str], unreviewed: frozenset[str] = frozenset()
+) -> dict:
+    from backend.app.ai_review import UNREVIEWED_LABEL
+
+    not_reviewed = bool(row.ai_execution_id) and str(row.ai_execution_id) in unreviewed
     kind = rules.observation_kind(row.epistemic_type, row.observation_type, row.extraction_method)
     origin = rules.observation_origin(row.origin, row.extraction_method)
     return {
@@ -1740,6 +1745,8 @@ def _observation_view(row: EvidenceObservation, evidence: dict, names: dict[str,
         if isinstance(row.effective_context, dict)
         else None,
         "created_at": _iso(row.created_at),
+        "ai_review_state": "NOT_REVIEWED" if not_reviewed else None,
+        "ai_label": UNREVIEWED_LABEL if not_reviewed else None,
     }
 
 
@@ -1761,8 +1768,11 @@ def _observation_views(db: Session, control_db: Session | None, tenant_id, rows)
         if evidence_ids
         else {}
     )
+    from backend.app.ai_review import unreviewed_executions
+
     names = _names(control_db, tenant_id, [row.created_by for row in rows])
-    return [_observation_view(row, evidence, names) for row in rows]
+    unreviewed = frozenset(unreviewed_executions(db, tenant_id, {row.ai_execution_id for row in rows}))
+    return [_observation_view(row, evidence, names, unreviewed) for row in rows]
 
 
 @router.get("/observations")

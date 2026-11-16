@@ -545,6 +545,85 @@ def test_starting_from_the_ai_draft(org):
     assert dropped.status_code == 200 and dropped.json()["narrative"]["ai_draft_text"] is None
 
 
+def test_a_model_drafted_ai_brief_is_used_only_after_a_person_accepts_or_edits_it(org):
+    from backend.app.db.models.ai_records import AiOutputReview
+
+    tenant_id = org["tenant_id"]
+    client, user_id = org["investigator"]
+    case = _case(org)
+    base = _base(case["id"])
+    now = datetime.now(timezone.utc)
+    execution_id = uuid.uuid4()
+    ai_brief = {
+        "headline": "Model headline.",
+        "sections": {"what_we_know": [{"statement": "Model statement", "evidence": []}]},
+    }
+    _add(
+        tenant_id,
+        AIExecution(
+            id=execution_id,
+            tenant_id=tenant_id,
+            investigation_id=uuid.UUID(case["id"]),
+            requestor_ref="test",
+            provider="groq",
+            model_name="test-model",
+            model_version="1",
+            prompt_template_version="brief-model-1",
+            orchestration_version="brief-model-1",
+            structured_output=ai_brief,
+            validation_status="VALIDATED",
+            execution_timestamp=now,
+        ),
+    )
+    _add(
+        tenant_id,
+        InvestigationBrief(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            investigation_id=uuid.UUID(case["id"]),
+            brief_version=1,
+            title="Investigation brief",
+            generated_by="test",
+            temporal_mode="current",
+            ai_execution_id=execution_id,
+            content={"ai_brief": ai_brief},
+            provenance={},
+            created_at=now,
+            updated_at=now,
+        ),
+    )
+    unreviewed = client.post(base, json={"use_ai_draft": True})
+    assert unreviewed.status_code == 409 and _code(unreviewed) == "AI_DRAFT_NOT_REVIEWED"
+    assert "AI proposal, not reviewed" in unreviewed.text
+
+    def review(decision, **fields):
+        _add(
+            tenant_id,
+            AiOutputReview(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                subject_type="ai_execution",
+                subject_id=str(execution_id),
+                decision=decision,
+                reviewer=str(user_id),
+                created_at=datetime.now(timezone.utc),
+                **fields,
+            ),
+        )
+
+    review("REJECTED", reason="Not supported")
+    rejected = client.post(base, json={"use_ai_draft": True})
+    assert rejected.status_code == 409 and _code(rejected) == "AI_DRAFT_NOT_REVIEWED"
+
+    from genai.call_record import sha256
+
+    edited = "The person's own summary."
+    review("EDITED", reason="Tightened", edited_text=edited, edited_text_sha256=sha256(edited))
+    made = client.post(base, json={"use_ai_draft": True})
+    assert made.status_code == 201, made.text
+    assert made.json()["narrative"]["ai_draft_text"] == "The person's own summary."
+
+
 # ------------------------------------------------------------------------------------------------ submitting
 
 

@@ -217,13 +217,21 @@ def facts_section(db: Session, case, rows: list[dict]) -> list[dict]:
     clauses = [EvidenceObservation.investigation_id == case.id]
     if usable:
         clauses.append(EvidenceObservation.evidence_id.in_(usable))
+    from backend.app.ai_review import unreviewed_executions
+
     facts: list[dict] = []
-    for observation in (
+    observations = (
         db.query(EvidenceObservation)
         .filter(EvidenceObservation.tenant_id == case.tenant_id, or_(*clauses))
         .order_by(EvidenceObservation.created_at, EvidenceObservation.id)
         .limit(OBSERVATIONS_SCANNED)
-    ):
+        .all()
+    )
+    # AI-D7: an observation a model proposed counts only after a person accepted or edited its extraction.
+    unreviewed = unreviewed_executions(db, case.tenant_id, {row.ai_execution_id for row in observations})
+    for observation in observations:
+        if observation.ai_execution_id and str(observation.ai_execution_id) in unreviewed:
+            continue
         evidence = by_id.get(str(observation.evidence_id))
         if evidence is not None and evidence["review_status"] in SET_ASIDE_REVIEW_STATUSES:
             continue

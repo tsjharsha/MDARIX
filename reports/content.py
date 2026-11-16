@@ -1058,6 +1058,9 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         .limit(50)
         .all()
     )
+    from backend.app.ai_review import UNREVIEWED_LABEL, unreviewed_executions
+
+    unreviewed = unreviewed_executions(db, tenant, [row.id for row in executions])
     from backend.app.case_challenge.brief import with_answers
     from backend.app.db.models.reviews import DecisionBriefVersion
 
@@ -1202,6 +1205,8 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
                 "confidence_label": row.confidence_label,
                 "error_state": row.error_state,
                 "execution_timestamp": _iso(row.execution_timestamp),
+                # AI-D7: a model's result nobody accepted or edited yet.
+                "ai_label": UNREVIEWED_LABEL if str(row.id) in unreviewed else None,
             }
             for row in executions
         ],
