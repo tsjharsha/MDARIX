@@ -684,9 +684,8 @@ jobs:
         # A pull request runs the desktop profile; merges to main, the nightly run and manual runs add mobile.
         run: npm --prefix frontend run test:e2e -- ${{ github.event_name == 'pull_request' && '--project=chromium' || '' }}
       - name: Upload browser evidence
-        # Screenshots, traces and the API log for diagnosing a failure; the release evidence gate reads job results,
-        # not this artifact, so a passing run uploads nothing.
-        if: failure()
+        # Only when something failed, or on a manual run: passing evidence is recorded in the job log.
+        if: failure() || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         # A report for people to read, never input to another job: a full artifact quota must not fail the gate.
         continue-on-error: true
