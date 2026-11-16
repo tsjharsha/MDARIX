@@ -83,6 +83,9 @@ export function MarketAssessmentDrawer({
     <Drawer title={`${recordName(complaint)}: assess per market`} onClose={onClose}>
       {detail.state === "error" && <InlineError text="The assessment could not be read." />}
       {data && <AssessmentIntro detail={data} />}
+      {data && shown.length > 1 && (
+        <MarketsAtAGlance markets={shown} active={active?.market} onPick={(picked) => setMarket(picked)} />
+      )}
       {data && <ReportingFacts complaintId={complaint.id} needs={data.complaint.needs} onSaved={reload} />}
       {data && !shown.length && (
         <p className="uw-hint">
@@ -119,6 +122,70 @@ export function MarketAssessmentDrawer({
   );
 }
 
+/** A market's state in one word and tone: the signed conclusion, else a draft, else still to assess. */
+export function marketConclusion(item: MarketItem): { label: string; tone: "good" | "warning" | "neutral" } {
+  const conclusion = item.current?.conclusion;
+  if (conclusion === "REPORTABLE") return { label: CONCLUSION_LABELS.REPORTABLE, tone: "warning" };
+  if (conclusion === "NOT_REPORTABLE") return { label: CONCLUSION_LABELS.NOT_REPORTABLE, tone: "good" };
+  return { label: item.draft ? "Draft" : "To assess", tone: "neutral" };
+}
+
+/** Every market at a glance (the step's headline): conclusion, clock, form and signer; a row opens its market. */
+export function MarketsAtAGlance({
+  markets,
+  active,
+  onPick,
+}: {
+  markets: MarketItem[];
+  active?: Market;
+  onPick: (market: Market) => void;
+}) {
+  return (
+    <section className="ca-drawer-section uw-ma-glance" aria-label="Every market at a glance">
+      <h3>Every market at a glance</h3>
+      <table className="ac-table">
+        <thead>
+          <tr>
+            <th scope="col">Market</th>
+            <th scope="col">Conclusion</th>
+            <th scope="col">Clock</th>
+            <th scope="col">Form</th>
+            <th scope="col">Signed by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {markets.map((item) => {
+            const state = marketConclusion(item);
+            return (
+              <tr key={item.market} className={item.market === active ? "is-active" : undefined}>
+                <th scope="row">
+                  <button type="button" className="ac-link" onClick={() => onPick(item.market)}>
+                    {item.label || MARKET_SHORT[item.market]}
+                  </button>
+                </th>
+                <td>
+                  <ToneBadge tone={state.tone} label={state.label} />
+                </td>
+                <td>
+                  {item.clock ? (
+                    <span className={item.clock.state === "OVERDUE" ? "uw-ma-overdue" : undefined}>
+                      {clockText(item.clock)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td>{item.current?.report_type_label ?? "—"}</td>
+                <td>{item.current?.signed_by ?? "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
   const legacy = detail.legacy_decision;
   return (
@@ -150,8 +217,7 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
         </div>
       )}
       <p className="ac-muted">
-        Add any enabled market where your procedure says this event must be assessed. MDARIX does not submit reports. An
-        Unknown answer raises a request to the reporter in the complaint's communications log.
+        MDARIX prepares the forms; you submit them. An Unknown answer asks the reporter for you.
       </p>
       <CommunicationsLink complaintId={detail.complaint.id} />
     </section>

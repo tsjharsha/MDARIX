@@ -3853,6 +3853,21 @@ div.uw-task-count:hover {
 .ca-drawer:has(.uw-ma-market) {
   width: min(780px, 100%);
 }
+/* The story's climax: with every market at a glance the drawer takes the wide size. */
+.ca-drawer:has(.uw-ma-glance) {
+  width: min(960px, 100%);
+}
+.uw-ma-glance h3 {
+  margin: 0 0 8px;
+  font-size: var(--ms-fs-16);
+}
+.uw-ma-glance tr.is-active th {
+  box-shadow: inset 3px 0 0 var(--ms-teal-mark);
+}
+.uw-ma-overdue {
+  color: var(--ms-crit);
+  font-weight: 600;
+}
 .uw-ma-intro q {
   display: block;
   color: var(--ac-ink-2);

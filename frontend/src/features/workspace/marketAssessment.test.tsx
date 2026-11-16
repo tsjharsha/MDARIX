@@ -3,7 +3,15 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { questionNumber } from "../../app/labels";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { MarketPanel, SignedVersion, TrainingPanel, WHY_ASSESSED, otherMarketLine } from "./sections/MarketAssessment";
+import {
+  MarketPanel,
+  MarketsAtAGlance,
+  SignedVersion,
+  TrainingPanel,
+  WHY_ASSESSED,
+  marketConclusion,
+  otherMarketLine,
+} from "./sections/MarketAssessment";
 import {
   EMPTY_SIGN,
   draftBody,
@@ -511,5 +519,32 @@ describe("the assessment screen", () => {
     );
     expect(html).toContain("No colleague holds a current acknowledgement yet.");
     expect(html).toContain("ISO 13485 clause 6.2");
+  });
+});
+
+describe("every market at a glance", () => {
+  it("shows each market's conclusion, form and signer in one table, a row opening its market", () => {
+    const us = item({
+      current: version({
+        conclusion: "REPORTABLE",
+        report_type_label: "30-day report",
+        signed_by: "Priya Sharma",
+        signed_at: "2026-11-01T10:00:00+00:00",
+      }),
+    });
+    const eu = item({ market: "EU_NI", label: "European Union", current: version({ conclusion: "NOT_REPORTABLE" }) });
+    const india = item({ market: "IN", label: "India (CDSCO)", current: null, draft: null });
+    expect([us, eu, india].map((market) => marketConclusion(market).label)).toEqual([
+      "Reportable",
+      "Not reportable",
+      "To assess",
+    ]);
+    const html = renderToStaticMarkup(
+      <MarketsAtAGlance markets={[us, eu, india]} active="US" onPick={() => undefined} />,
+    );
+    expect(html).toContain("Every market at a glance");
+    expect(html).toMatch(/United States \(FDA\)[\s\S]*Reportable[\s\S]*30-day report[\s\S]*Priya Sharma/);
+    expect(html).toMatch(/India \(CDSCO\)<\/button><\/th><td>[\s\S]*To assess/);
+    expect(html.match(/<button type="button" class="ac-link">/g)).toHaveLength(3);
   });
 });
