@@ -12,6 +12,11 @@ operator knows a release migrates the database.
 
 ### Fixed
 
+- **Automatic trial approval on a fresh server.** On a server where no Platform Administrator had been invited with
+  `scripts/create_platform_admin.py` (a new install, the CI browser job), there was no platform organization for the
+  automatic-approval account, so every sign-up was told "Your trial is being prepared" and then stayed pending without
+  a word. The approval now creates the platform organization when it is missing (the same code the script uses).
+
 - **Investigation timeline after the challenge panel is opened.** Opening the challenge panel records an event about
   the investigation itself, and the trust timeline then showed the investigation's own audit events (opened, state
   changes) by a bare id instead of its number. Those events are named by the investigation's number again.
