@@ -27,7 +27,8 @@ MODULES = (
 # Functions that return table names read from the database catalogue (information_schema / pg_catalog), reviewed.
 CATALOGUE = {"tenant_purge": {"tenant_tables"}, "tenant_export": {"_tables"}}
 SAFE_CALLS = {"list", "tuple", "sorted", "set", "frozenset", "str"}
-SAFE_METHODS = {"items", "keys", "values", "join", "strip", "split", "upper", "lower"}
+# A method call is trusted only when its receiver and every argument are trusted too.
+SAFE_METHODS = {"items", "keys", "values", "join", "strip", "split", "upper", "lower", "format"}
 
 
 class _Lint:
@@ -150,6 +151,7 @@ def test_every_dynamic_sql_identifier_comes_from_a_fixed_list(module):
 SAFE = """
 TABLES = {"products": "products", "evidence": "evidence"}
 CLAUSE = "status = 'OPEN'"
+TEMPLATE = "product_version_id {}"
 
 def _count(db, table, clause):
     return db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE tenant_id = :t AND {clause}"))
@@ -157,6 +159,7 @@ def _count(db, table, clause):
 def route(db, request):
     for name, table in TABLES.items():
         _count(db, table, CLAUSE)
+        _count(db, table, TEMPLATE.format("IS NOT NULL"))
     where = " OR ".join(f"{field} ILIKE :p" for field in ("name", "title"))
     return db.execute(text(f"SELECT * FROM products WHERE {where}"), {"p": request.query_params["q"]})
 """
@@ -180,6 +183,8 @@ def test_the_lint_accepts_fixed_lists_and_bound_values():
         'def route(db, payload):\n    for column in payload.columns:\n        db.execute(text(f"SELECT {column} FROM products"))',
         # SQL text handed over whole.
         "def route(db, query: str):\n    db.execute(text(query))",
+        # A fixed template filled with request input.
+        'CLAUSE = "status {}"\ndef route(db, op: str):\n    db.execute(text(CLAUSE.format(op)))',
     ],
 )
 def test_the_lint_refuses_request_input_in_an_identifier(unsafe):
