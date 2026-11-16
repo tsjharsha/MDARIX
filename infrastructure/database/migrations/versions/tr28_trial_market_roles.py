@@ -58,7 +58,9 @@ def upgrade():
 def downgrade():
     # Off, a row-level policy that would hide a row raises instead of filtering: the count below sees every tenant.
     op.execute("SET LOCAL row_security = off")
-    found = op.get_bind().execute(sa.text("SELECT count(*) FROM market_responsible_parties WHERE role = 'USER_FACILITY'"))
+    found = op.get_bind().execute(
+        sa.text("SELECT count(*) FROM market_responsible_parties WHERE role = 'USER_FACILITY'")
+    )
     if found.scalar():
         raise RuntimeError("A user facility profile exists: remove it before downgrading tr28 (no silent loss)")
     op.execute(f"ALTER TABLE market_responsible_parties DROP CONSTRAINT {ROLE_CHECK}")
