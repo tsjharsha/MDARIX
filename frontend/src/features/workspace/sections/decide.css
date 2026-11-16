@@ -808,7 +808,7 @@
 }
 .tr-body h3 {
   margin: 0 0 6px;
-  font-size: 0.95rem;
+  font-size: var(--ms-fs-16);
 }
 .tr-list {
   margin: 0;

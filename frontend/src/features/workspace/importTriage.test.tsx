@@ -42,10 +42,10 @@ const ITEM = {
     version: 1,
   },
 } as unknown as TriageItem;
-// Owner, 10 Nov (OD-12 + 3a): an old flagged import is Imported backlog work, not on "To triage".
-const OLD_FLAGGED = { ...ITEM, key: "COMPLAINT:c2", id: "c2", ref: "OB-01", identifier: "OB-01", backlog: true };
+// The server leaves Imported backlog items off the To triage list (B6a run 4: the list is paged on the server;
+// tests/test_import_triage_b2.py), so the list it sends holds the new item only.
 const LIST = {
-  items: [ITEM, OLD_FLAGGED],
+  items: [ITEM],
   summary: { open: 1, done: 0, conflicts: 0 },
   people: [],
 } as unknown as TriageList;
@@ -154,7 +154,9 @@ describe("QMS triage and the imported backlog (0.10.93)", () => {
     expect(html).toContain("Imported: check the reportability decision in your QMS");
     expect(html.match(/Open the triage form/g)).toHaveLength(1);
     expect(html.match(/Confirm triage</g)).toHaveLength(1);
-    expect(render(<Triage />)).not.toContain("OB-01");
+    const toTriage = render(<Triage />);
+    expect(toTriage).toContain("QT-2");
+    expect(toTriage).not.toContain("OB-01");
   });
 
   it("offers Confirm QMS triage on an old flagged import whose QMS triage waits for a person", () => {
