@@ -1201,7 +1201,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
             result:
               "The MDARIX answer: a Summary, Known facts, Supporting and Contradicting evidence, Unknowns, Missing evidence, Suggested next steps and the Sources it used.",
-            note: "While AI is off for your organization (as in every free trial), the answer comes from your records only and says so. When AI is switched on, AI interpretations are labelled and still cite their sources.",
+            note: "While AI is off for your organization (as in a free trial, unless MDARIX switches it on), the answer comes from your records only and says so. When AI is switched on, AI interpretations are labelled and still cite their sources.",
           },
         ],
       },
@@ -1770,7 +1770,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "In the Admin console open Security › AI processing.",
               "Choose Turn AI on or Turn AI off, give a Reason for the change and, to switch on, acknowledge where the records go.",
             ],
-            note: "AI is off for a new organization, and stays off in free trials during the product validation phase.",
+            note: "AI is off for a new organization, and off in a free trial unless MDARIX switches it on for that trial.",
           },
           {
             title: "Set up the e-mail intake address (customer administrators)",

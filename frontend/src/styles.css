@@ -10775,6 +10775,32 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .su-mfa-note strong {
   color: var(--auth-ink, inherit);
 }
+.su-mfa-note details {
+  margin-top: 4px;
+}
+.su-mfa-note summary {
+  cursor: pointer;
+  color: var(--auth-teal);
+  font-weight: 600;
+}
+/* The trial's four facts as chips, read in one glance before the form. */
+.su-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.su-facts li {
+  padding: 4px 12px;
+  border: 1px solid var(--auth-line, var(--ms-line));
+  border-radius: var(--ms-radius-pill);
+  background: var(--auth-wash, var(--ms-mint));
+  color: var(--auth-ink, var(--ms-ink));
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+}
 .auth-page .auth-card.su-done {
   justify-items: start;
 }

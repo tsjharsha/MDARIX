@@ -15,7 +15,7 @@ import {
 } from "../../app/types";
 import { api } from "../../app/api";
 import { AI_TIMEOUT_MS, describeError, postJson } from "../../app/apiClient";
-import { useCan, useFeatureSet, useIsTrial } from "../workspace/workspaceContext";
+import { useCan, useFeatureSet } from "../workspace/workspaceContext";
 import { CaseRecordDownload } from "../reports/CaseRecordDownload";
 import { displayId } from "../../app/displayId";
 import { hasSavedResults, loadSavedResults } from "./savedResults";
@@ -212,7 +212,6 @@ export function InvestigationWorkspacePanel({
   // Under the MVP feature set the counterfactual and the template failure chains are parked and the decision is taken
   // on the case's own Decision tab (app/featureSet.ts).
   const mvp = useFeatureSet() === "mvp";
-  const trial = useIsTrial();
   const decisionLabel = mvp ? "Open the decision" : "Open Decision Center";
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
   const [analysis, setAnalysis] = useState<InvestigationAnalysis | null>(null);
@@ -978,7 +977,7 @@ export function InvestigationWorkspacePanel({
       <section id="workflow-decision" className="panel empty-state">
         <h3>Decision readiness</h3>
         <p>
-          {trial ? "AI is off in the free trial. " : "AI outputs inform the workflow. "}Authorized humans record
+          {aiBanner ? `${aiBanner.disabledReason} ` : "AI outputs inform the workflow. "}Authorized humans record
           decisions {mvp ? "on this investigation's Decision tab" : "in the Decision Center"}.
         </p>
         <button className="primary-action" onClick={onOpenDecision}>

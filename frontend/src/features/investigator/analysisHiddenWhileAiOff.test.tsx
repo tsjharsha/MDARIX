@@ -10,11 +10,12 @@ vi.mock("../workspace/useAiStatus", () => ({ useAiReady: () => ai.ready, useAiBa
 
 const { InvestigationWorkspacePanel } = await import("./InvestigationWorkspacePanel");
 
-function render(ready: boolean | null, banner: unknown = null): string {
+function render(ready: boolean | null, banner: unknown = null, isTrial = false): string {
   ai.ready = ready;
   ai.banner = banner;
   const workspace = {
     session: { feature_set: "mvp", business_permissions: ["ai.run", "records.write"] },
+    isTrial,
     open: vi.fn(),
     notify: vi.fn(),
     work: { investigations: [], investigationId: "c" },
@@ -54,5 +55,13 @@ describe("the R1 analysis while AI is off", () => {
 
   it("is shown as before while AI answers", () => {
     expect(analysisParts(render(true))).toEqual([true, true, true]);
+  });
+
+  it("says AI is off in Decision readiness only when the server says so, never for a trial with AI on", () => {
+    const on = render(true, null, true);
+    expect(on).toContain("AI outputs inform the workflow.");
+    expect(on).not.toContain("AI is off");
+    const off = render(false, aiStatusBanner({ enabled: false, trial: true }));
+    expect(off).toContain("AI is off for free trials. Authorized humans record");
   });
 });

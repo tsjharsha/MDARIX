@@ -471,7 +471,7 @@ type AiSettings = {
   models: { provider: string; model: string }[];
   provider_name: string | null;
   masking: boolean;
-  /** On the Free Trial plan: AI stays off during the product validation phase and the API refuses to switch it on. */
+  /** On the Free Trial plan: AI is off unless MDARIX switches it on for that trial. */
   free_trial?: boolean;
   /** The four bars AI must pass before a pilot; production refuses switching AI on until they are met. */
   release_gate?: ReleaseGate;
@@ -511,7 +511,7 @@ export function platformAiSwitch(
 }
 
 /** Whether the tenant's content may go to an AI model, its monthly token allowance, and this month's use. */
-function TenantAiSettings({
+export function TenantAiSettings({
   tenantId,
   name,
   onMessage,
@@ -547,7 +547,7 @@ function TenantAiSettings({
               <dt>AI processing</dt>
               <dd>
                 {on ? "On" : "Off: rule-based answers only"}
-                {data.free_trial ? " · Free trial: AI stays off during the product validation phase" : ""}
+                {data.free_trial && !on ? " · Free trial: AI is off unless MDARIX switches it on for this trial" : ""}
               </dd>
             </div>
             <div>
@@ -580,8 +580,7 @@ function TenantAiSettings({
           </button>
           {trialLocked && (
             <small className="ac-muted">
-              AI cannot be switched on for a free trial: the free trial agreement keeps it off during the product
-              validation phase.
+              AI for a free trial is managed on the trial&apos;s page in Trial Organizations.
             </small>
           )}
         </div>

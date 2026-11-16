@@ -4,7 +4,9 @@ import {
   EMAIL_HINTS,
   ReviewedAddressNote,
   STEP_ONE_CODES,
+  SignupDone,
   SignupForm,
+  TRIAL_AI_LINE,
   TrialConsent,
   WhatHappensNext,
 } from "./SignupForm";
@@ -24,7 +26,8 @@ describe("free trial request form", () => {
     // The pre-rendered page, before site-info answers: the server's default (company-and-personal).
     const html = renderToStaticMarkup(<SignupForm />);
     expect(html).toContain("sample data from day one");
-    expect(html).toContain("AI is off");
+    expect(html).toContain(TRIAL_AI_LINE);
+    expect(html).not.toContain("AI is off");
     expect(html).toContain(
       "With a company or personal email, the trial is approved automatically and the activation link arrives",
     );
@@ -93,5 +96,13 @@ describe("free trial request form", () => {
     const html = renderToStaticMarkup(<SignupForm />);
     expect(html).toContain("stores only a salted hash of it, so no one at MDARIX can read it");
     expect(html).not.toContain("never sees it");
+  });
+
+  it("ends on sign-in as the main step, with the guide as a secondary link", () => {
+    const html = renderToStaticMarkup(<SignupDone approving email="a@b.example" />);
+    expect(html).toMatch(
+      /class="primary-action" href="\/signin\?email=a%40b\.example">Sign in when your email arrives/,
+    );
+    expect(html).toMatch(/class="su-secondary"[^>]*>Read the free trial user guide/);
   });
 });

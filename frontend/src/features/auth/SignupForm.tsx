@@ -50,6 +50,8 @@ const MESSAGES: Record<string, string> = {
 };
 
 const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
+/** What the trial says about AI, in every place the sign-up mentions it. */
+export const TRIAL_AI_LINE = "AI works on the sample data only, and every AI answer waits for a person to accept it.";
 /** Under the email field: how a request is approved, as the server is set (site-info). Exported for its test. */
 export const EMAIL_HINTS: Record<TrialApproval, string> = {
   "company-and-personal":
@@ -109,8 +111,51 @@ export function WhatHappensNext({ reviewed, approval }: { reviewed: boolean; app
         : approval === "company-domains"
           ? "with a company email, the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first)."
           : "the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first, usually within one business day)."}{" "}
-      Your workspace comes with sample data, and AI is off during the trial.
+      Your workspace comes with sample data. {TRIAL_AI_LINE}
     </p>
+  );
+}
+
+/** After the request: the next step is the email, then sign-in, so that is the main button. */
+export function SignupDone({ approving, email }: { approving: boolean; email: string }) {
+  return (
+    <div className="auth-card su-card su-done" role="status">
+      <CheckCircle2 size={40} aria-hidden="true" />
+      <h1>{approving ? "Your trial is being prepared" : "Request received"}</h1>
+      {approving ? (
+        <p className="auth-lead">
+          Thank you. Your workspace is being prepared with sample data. Within a few minutes we email{" "}
+          <strong>{email}</strong> the link to activate your account.
+        </p>
+      ) : (
+        <p className="auth-lead">
+          Thank you. The MDARIX team reviews your request, usually within one business day, and emails{" "}
+          <strong>{email}</strong> an invitation once it is approved.
+        </p>
+      )}
+      <ol className="su-next">
+        <li>
+          {approving
+            ? "Your workspace is prepared with sample data that tells the whole story."
+            : "The MDARIX team reviews your request and prepares your workspace with sample data."}
+        </li>
+        <li>You set your own password from the invitation email. {PASSWORD_PROMISE}</li>
+        <li>
+          You add MDARIX to an authenticator app on your phone and save your recovery codes: two-factor sign-in (MFA) is
+          required.
+        </li>
+        <li>You sign in, explore the sample investigation, then upload your own exports.</li>
+      </ol>
+      <a className="primary-action" href={`/signin?email=${encodeURIComponent(email)}`}>
+        Sign in when your email arrives
+      </a>
+      <a className="su-secondary" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
+        Read the free trial user guide
+      </a>
+      <a className="su-secondary" href="/">
+        Back to website
+      </a>
+    </div>
   );
 }
 
@@ -252,43 +297,7 @@ export function SignupForm() {
     }
   };
 
-  if (done)
-    return (
-      <div className="auth-card su-card su-done" role="status">
-        <CheckCircle2 size={40} aria-hidden="true" />
-        <h1>{approving ? "Your trial is being prepared" : "Request received"}</h1>
-        {approving ? (
-          <p className="auth-lead">
-            Thank you. Your workspace is being prepared with sample data. Within a few minutes we email{" "}
-            <strong>{email}</strong> the link to activate your account.
-          </p>
-        ) : (
-          <p className="auth-lead">
-            Thank you. The MDARIX team reviews your request, usually within one business day, and emails{" "}
-            <strong>{email}</strong> an invitation once it is approved.
-          </p>
-        )}
-        <ol className="su-next">
-          <li>
-            {approving
-              ? "Your workspace is prepared with sample data that tells the whole story."
-              : "The MDARIX team reviews your request and prepares your workspace with sample data."}
-          </li>
-          <li>You set your own password from the invitation email. {PASSWORD_PROMISE}</li>
-          <li>
-            You add MDARIX to an authenticator app on your phone and save your recovery codes: two-factor sign-in (MFA)
-            is required.
-          </li>
-          <li>You sign in, explore the sample investigation, then upload your own exports.</li>
-        </ol>
-        <a className="primary-action" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
-          Read the free trial user guide
-        </a>
-        <a className="su-secondary" href="/">
-          Back to website
-        </a>
-      </div>
-    );
+  if (done) return <SignupDone approving={approving} email={email} />;
 
   const alert = message && (
     <div className="su-message" role="alert">
@@ -306,17 +315,31 @@ export function SignupForm() {
     <form className="auth-card su-card" onSubmit={submit}>
       <span className="eyebrow">Request access</span>
       <h1>Start your free trial</h1>
+      <ul className="su-facts" aria-label="The trial at a glance">
+        <li>30 days</li>
+        <li>up to 50 people</li>
+        <li>sample data from day one</li>
+        <li>no card</li>
+      </ul>
       <p className="auth-lead">
-        30 days, your whole team (up to 50 people) and 5,000 uploaded rows, with sample data from day one and no credit
-        card. AI is off during the trial. You set your own password from the invitation email; {PASSWORD_PROMISE}
+        5,000 uploaded rows included. {TRIAL_AI_LINE} You set your own password from the invitation email;{" "}
+        {PASSWORD_PROMISE}
       </p>
       <div className="su-mfa-note" role="note">
         <Smartphone size={20} aria-hidden="true" />
-        <p>
-          <strong>Have your phone ready.</strong> Every MDARIX account uses two-factor sign-in (MFA). When you first
-          sign in, you add MDARIX to an authenticator app on your phone (Microsoft Authenticator, Google Authenticator,
-          1Password or similar) and save your recovery codes. Each colleague you invite needs one too.
-        </p>
+        <div>
+          <p>
+            <strong>Have your phone ready.</strong> Every account uses two-factor sign-in (MFA).
+          </p>
+          <details>
+            <summary>How it works</summary>
+            <p>
+              When you first sign in, you add MDARIX to an authenticator app on your phone (Microsoft Authenticator,
+              Google Authenticator, 1Password or similar) and save your recovery codes. Each colleague you invite needs
+              one too.
+            </p>
+          </details>
+        </div>
       </div>
       <ol className="su-steps" aria-label="Request steps">
         <li className={step === 1 ? "is-current" : "is-done"} aria-current={step === 1 ? "step" : undefined}>
