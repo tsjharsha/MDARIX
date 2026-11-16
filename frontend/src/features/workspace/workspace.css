@@ -9196,3 +9196,29 @@ details.uw-team-change[open] {
   flex: none;
   color: var(--ms-good);
 }
+
+/* Evidence for and against as one 2-segment bar beside the numbers, comparable across cards (no red: R3). */
+.rca-evidence {
+  align-items: center;
+}
+.rca-evidence-bar {
+  display: inline-flex;
+  gap: 2px;
+  width: 72px;
+  height: 6px;
+}
+.rca-evidence-bar i {
+  flex-basis: 0;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-good-mark);
+}
+.rca-evidence-bar i + i {
+  background: var(--ms-line-strong);
+}
+
+/* One quiet rise when a page of the workspace changes (the admin console already has it). */
+@media (prefers-reduced-motion: no-preference) {
+  .uw-hybrid .ca-section {
+    animation: ac-rise 180ms ease-out both;
+  }
+}
