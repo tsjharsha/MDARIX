@@ -69,3 +69,23 @@ Until the owner fills a row (link, date, yes/no answers), that provider is not v
 4. Keep superseded rows in the document history (git), not in the table.
 
 See also `docs/runbooks/AI_PROVIDERS.md` (configuration) and `docs/runbooks/ENVIRONMENT_VARIABLES.md` (settings).
+
+## Provider assessment: Gemini on Google Cloud Vertex AI (paid organizations; DRAFT for the owner, 16 Nov 2026)
+
+What MDARIX enforces in code (tested on fakes; no provider called): the Mumbai region (`asia-south1`) is the only one
+accepted in staging and production; the model must be pinned with its version (no moving names); the keyless
+service-account token from the metadata server is reused until it expires; tokens used for thinking are counted;
+every request is masked and recorded in `ai_calls` with hashes, not content; the provider is refused in production
+until `MDARIX_GENAI_VERTEX_ZDR` is set.
+
+| Question | Answer today | Owner item |
+|---|---|---|
+| Commercial use allowed | Yes, under the Google Cloud terms of the billing account | Confirm on the account once billing is upgraded |
+| Trains on customer data | Google states it does not train on customer data sent to Vertex AI | Record the link and date checked |
+| Retention | In-memory cache and abuse-monitoring logging may apply | Switch the cache off for the project; get the written exception or invoiced billing; then set `MDARIX_GENAI_VERTEX_ZDR` |
+| Region | Mumbai (`asia-south1`), enforced | None |
+| Contract | Google Cloud terms and data processing addendum | Accept on the company's account after registration |
+| Qualification | Not qualified: Part C (golden dataset v3, `qualify_ai.py`) not built | Decide after #25 |
+
+Conclusion: usable only after the owner items above and AI qualification. Until then every paid organization's AI
+stays off.
