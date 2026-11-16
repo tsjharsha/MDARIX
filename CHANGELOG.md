@@ -10,6 +10,47 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Unreleased: Trial organizations
+
+TO-1 parts 1 to 3: one Platform Admin page for free trials, and the customer lists show pilot and paying customers
+only. No migration.
+
+#### Added
+- **Trial organizations area** (left rail, after Customers & Tenants): Requests (trial, pilot and one-to-one demo
+  requests, moved from Identity & Access › Onboarding), Trials (moved from Customers & Tenants), Ending and deletion
+  (requests to end early, trials due for deletion, converted trials and trials whose data was deleted), Feedback
+  (moved from Customers & Tenants). A strip of five counts opens where each is handled. Old links still open the
+  new sections.
+- **Trial page**: dates with the extension used of 30 days, people, sample data, activity, the next step, the trial's
+  history, "AI is off for free trials", and the actions the server allows now, each with the reason when not.
+- **Trial actions** (`/api/v1/platform-admin/trial-organizations/{tenant}/...`, Platform Admin only, audited):
+  extend (`TRIAL_EXTENDED`; up to the original end + 30 days in total, reason required; an ended trial can be reopened
+  while its data is kept, never after an early end, deletion or conversion); end early (an exit request "Ended by
+  MDARIX" raised and approved in one step, `TRIAL_EXIT_RAISED_BY_MDARIX` and `TRIAL_ENDED_EARLY`; data kept 30 days;
+  owner e-mailed); convert to pilot or paid (`TRIAL_CONVERTED`, plan history kept, owner promoted, customer type
+  PILOT or CUSTOMER); delete data now only when retention says it is due, with the organization's name typed
+  (`TRIAL_DATA_DELETED_BY_ADMIN`). A refused action is audited `TRIAL_ACTION_REFUSED` with its code.
+- **Dashboard**: a Free trials tile (active, ending within 7 days, waiting for review, converted this month);
+  new organizations per day are two series, customers and trials.
+
+#### Changed
+- Free trials are left out of the customer directory, the tenant directory, the older tenant list and its CSV,
+  customer users, customer administrators, expiring subscriptions, renewals and the dashboard's customer figures.
+  The `view=TRIAL` saved view returns 422 `VIEW_MOVED`. A converted trial appears in the main lists.
+- Plans & Licensing › Subscriptions applies the trial rules too: a trial's start does not move, its end stays within
+  the original end + 30 days, and the Free Trial plan is never given to a customer (`TRIAL_PLAN_NOT_ASSIGNABLE`).
+- Identity & Access no longer has Onboarding; Customers & Tenants has Customers and Tenants only.
+- Run 2: **Run deletion now** (the retention run, `POST /platform-admin/trial-retention/run`, unchanged) moved from
+  the trial request queue to Trial organizations › Ending and deletion, beside the trials due for deletion.
+- Run 2: the **Ended early** filter of the Trials list is paged and sorted on the server like the other filters (it
+  read at most 200 ended trials before).
+- Run 2: a trial in a **grace period** (a grace end set on Plans & Licensing) shows as running, with its days left
+  counted to the grace end and "(grace period)" beside them; it counts as active in the strip and the dashboard tile,
+  and can be ended early. An extension given during the grace period counts from the grace end.
+- Run 2: the trial page has a slot for the AI and usage panel (part 4); until it is built the slot shows "AI is off
+  for free trials".
+- Run 2: user guide page `docs/user-guide/PLATFORM_ADMIN_TRIAL_ORGANIZATIONS.md`.
+
 ### Fixed
 
 - **Automatic trial approval on a fresh server.** On a server where no Platform Administrator had been invited with

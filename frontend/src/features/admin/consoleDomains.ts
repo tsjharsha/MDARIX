@@ -1,4 +1,13 @@
-import { Database, LayoutDashboard, LifeBuoy, LockKeyhole, Settings2, ShieldCheck, Users } from "lucide-react";
+import {
+  Database,
+  Hourglass,
+  LayoutDashboard,
+  LifeBuoy,
+  LockKeyhole,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS } from "./customers/model";
 import {
   AI_SECTIONS,
@@ -7,14 +16,17 @@ import {
   OPERATIONS_SECTIONS,
   PLANS_SECTIONS,
   SECURITY_SECTIONS,
+  TRIAL_ORGANIZATIONS,
+  TRIAL_SECTIONS,
 } from "./areas/sections";
 
 /** The platform administration console's areas: name, one-line purpose, icon and sections, in menu order. */
 export const DOMAINS = [
   ["Platform Overview", "Health, activity and attention", LayoutDashboard, ["Overview"]],
   ["Customers & Tenants", "Customer and tenant lifecycle", Users, CUSTOMER_TENANT_SECTIONS],
+  [TRIAL_ORGANIZATIONS, "Free-trial requests, trials and how they end", Hourglass, TRIAL_SECTIONS],
   ["Plans & Licensing", "Plans, subscriptions and reminders", Settings2, PLANS_SECTIONS],
-  ["Identity & Access", "Accounts, roles and onboarding requests", LockKeyhole, IDENTITY_SECTIONS],
+  ["Identity & Access", "Accounts, roles and access", LockKeyhole, IDENTITY_SECTIONS],
   ["Data & Integrations", "Define, connect, map, release and run customer data", Database, DATA_INTEGRATION_SECTIONS],
   ["AI Control Center", "Models, evaluations and assurance", ShieldCheck, AI_SECTIONS],
   ["Security", "Isolation, audit, support access and retention", LockKeyhole, SECURITY_SECTIONS],

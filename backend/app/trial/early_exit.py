@@ -37,6 +37,9 @@ EXIT_REASONS: dict[str, str] = {
     "OTHER": "Another reason",
 }
 
+# Raised by MDARIX from Trial organizations (TO-1, backend/app/trial/admin_actions.py); never offered to the owner.
+MDARIX_REASONS: dict[str, str] = {"ENDED_BY_MDARIX": "Ended by MDARIX"}
+
 PENDING = "PENDING"
 
 
@@ -61,7 +64,7 @@ def view(row: TrialExitRequest | None) -> dict | None:
         "id": str(row.id),
         "status": row.status,
         "reason_code": row.reason_code,
-        "reason_label": EXIT_REASONS.get(row.reason_code or ""),
+        "reason_label": EXIT_REASONS.get(row.reason_code or "") or MDARIX_REASONS.get(row.reason_code or ""),
         "reason": row.reason,
         "delete_data": row.delete_data,
         "data_deleted": row.data_deleted,

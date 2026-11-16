@@ -133,7 +133,10 @@ def list_customer_users(
     customer, tenant, name."""
     admin = _require_platform_admin(request, db)
     opened = sorted(support_access.open_tenants(db, admin, support_access.PEOPLE, request=request), key=str)
-    query = _base(db).filter(~_is_platform_role(), ~_is_customer_admin_role())
+    from backend.app.trial.scope import not_trial_clause
+
+    # People of free trials are on Trial organizations (TO-1), not here.
+    query = _base(db).filter(~_is_platform_role(), ~_is_customer_admin_role(), not_trial_clause(AuthUser.tenant_id))
     withheld = query.filter(AuthUser.tenant_id.not_in(opened)).with_entities(AuthUser.tenant_id).distinct().count()
     query = query.filter(AuthUser.tenant_id.in_(opened))
     query = _status(_search(query, q), status)

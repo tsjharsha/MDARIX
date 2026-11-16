@@ -51,10 +51,13 @@ def list_customer_accounts(
 
     ``sort``/``order`` order every page by a column of the directory (backend/app/sorting.py); by default the list is
     in customer-name order."""
+    from backend.app.trial.scope import not_trial_clause, not_trial_only_customer_clause
+
     _require_platform_admin(request, db)
     page = max(1, page)
     page_size = min(100, max(1, page_size))
-    query = db.query(Customer)
+    # Free trials are on Trial organizations only (TO-1): a customer whose every tenant is a trial is left out.
+    query = db.query(Customer).filter(not_trial_only_customer_clause(Customer.id))
     if q.strip():
         like = f"%{q.strip().lower()}%"
         tenants_matching = db.query(Tenant.customer_id).filter(
@@ -85,13 +88,17 @@ def list_customer_accounts(
         query = query.filter(Customer.id.in_(on_plan))
     total = query.count()
     tenant_count = (
-        select(func.count(Tenant.id)).where(Tenant.customer_id == Customer.id).correlate(Customer).scalar_subquery()
+        select(func.count(Tenant.id))
+        .where(Tenant.customer_id == Customer.id, not_trial_clause(Tenant.id))
+        .correlate(Customer)
+        .scalar_subquery()
     )
     active_admins = (
         select(func.count(AuthUser.id))
         .join(Tenant, Tenant.id == AuthUser.tenant_id)
         .where(
             Tenant.customer_id == Customer.id,
+            not_trial_clause(Tenant.id),
             func.upper(AuthUser.role) == ROLE,
             func.upper(AuthUser.status) == "ACTIVE",
         )
@@ -123,7 +130,10 @@ def list_customer_accounts(
     customers = query.offset((page - 1) * page_size).limit(page_size).all()
     customer_ids = [customer.id for customer in customers]
     tenants = (
-        db.query(Tenant).filter(Tenant.customer_id.in_(customer_ids)).order_by(Tenant.tenant_key).all()
+        db.query(Tenant)
+        .filter(Tenant.customer_id.in_(customer_ids), not_trial_clause(Tenant.id))
+        .order_by(Tenant.tenant_key)
+        .all()
         if customer_ids
         else []
     )

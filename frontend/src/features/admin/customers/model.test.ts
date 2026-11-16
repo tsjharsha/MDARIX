@@ -28,8 +28,8 @@ import {
 } from "./model";
 
 describe("Customers & Tenants model", () => {
-  it("has five sections instead of fourteen", () => {
-    expect(SECTIONS).toEqual(["Customers", "Tenants", "Trials", "Feedback"]);
+  it("holds customers only: free trials and their feedback are on Trial organizations", () => {
+    expect(SECTIONS).toEqual(["Customers", "Tenants"]);
   });
 
   it("offers only the standing change that is valid", () => {

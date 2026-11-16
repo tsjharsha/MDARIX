@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
-import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, Copy, MailCheck, RefreshCw, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { sortParams, useServerSort, type SortState } from "../../app/tableSort";
 import { formatUtc } from "../../app/dates";
@@ -79,24 +79,6 @@ export function reviewLines(
   if (!decided || !row.reviewed_at) return [];
   return [{ label: decided, value: `${row.reviewed_by_name ?? "—"}, ${formatUtc(row.reviewed_at)}` }];
 }
-/** A closed trial past its 30 days (backend/app/trial/retention.py trials_due); a held one is kept by the run. */
-type DueTrial = {
-  tenant_id: string;
-  tenant_key: string;
-  name: string;
-  trial_ended_at: string;
-  delete_after: string;
-  legal_hold?: boolean;
-  held_for_mvp_request?: boolean;
-  hold_until?: string;
-};
-/** Why a due trial is kept by the run, or null when it is deleted. */
-export const keptBecause = (trial: Pick<DueTrial, "legal_hold" | "held_for_mvp_request" | "hold_until">) =>
-  trial.legal_hold
-    ? "under a legal hold"
-    : trial.held_for_mvp_request
-      ? `held for its pilot request${trial.hold_until ? ` until ${new Date(trial.hold_until).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} at the latest` : ""}`
-      : null;
 type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
 
 /** One page of the queue (backend/app/trial/service.py request_queue): counts per status for the tabs. */
@@ -163,7 +145,6 @@ export function TrialRequestsWorkspace() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<TrialRequest | null>(null);
   const [declining, setDeclining] = useState<TrialRequest | null>(null);
-  const [retention, setRetention] = useState<DueTrial[] | null>(null);
   const [reason, setReason] = useState("");
   const [result, setResult] = useState<{ tone: "good" | "bad"; text: string; link?: string } | null>(null);
 
@@ -225,39 +206,8 @@ export function TrialRequestsWorkspace() {
     }
   };
 
-  const openRetention = async () => {
-    setResult(null);
-    try {
-      const data = await requestJson<{ due: DueTrial[] }>("/api/v1/platform-admin/trial-retention");
-      setRetention(data.due);
-    } catch (error) {
-      setResult({ tone: "bad", text: error instanceof Error ? error.message : "Retention could not be checked." });
-    }
-  };
-  const runRetention = async () => {
-    setBusy("retention");
-    try {
-      const data = await requestJson<{ purged: number }>("/api/v1/platform-admin/trial-retention/run", {
-        method: "POST",
-      });
-      setResult({
-        tone: "good",
-        text: `Deleted the data of ${data.purged} closed trial${data.purged === 1 ? "" : "s"}.`,
-      });
-      load();
-    } catch (error) {
-      setResult({ tone: "bad", text: error instanceof Error ? error.message : "Trial data could not be deleted." });
-    } finally {
-      setBusy(null);
-      setRetention(null);
-    }
-  };
-
   // The server sends only the chosen tab's page (older answers may hold every status).
   const rows = items.filter((item) => item.status === filter);
-  // Due trials a legal hold or an open pilot request keeps are listed apart: the run skips them.
-  const deleting = (retention ?? []).filter((trial) => !keptBecause(trial));
-  const kept = (retention ?? []).filter((trial) => keptBecause(trial));
   return (
     <section className="platform-admin-card trial-queue" aria-labelledby="trial-queue-title">
       <div className="platform-admin-card-title">
@@ -270,9 +220,6 @@ export function TrialRequestsWorkspace() {
           </p>
         </div>
         <div className="trial-queue-head-actions">
-          <button className="platform-admin-secondary" onClick={openRetention} disabled={busy !== null}>
-            <Trash2 size={15} /> Delete expired trial data
-          </button>
           <button className="platform-admin-secondary" onClick={load} disabled={state === "loading"}>
             <RefreshCw size={15} /> Refresh
           </button>
@@ -492,54 +439,6 @@ export function TrialRequestsWorkspace() {
               >
                 {busy ? "Creating workspace…" : "Approve and create workspace"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {retention && (
-        <div className="trial-queue-dialog" role="dialog" aria-modal="true" aria-labelledby="trial-retention-title">
-          <DialogBehaviour onClose={() => setRetention(null)} />
-          <div>
-            <h4 id="trial-retention-title">Delete expired trial data</h4>
-            {deleting.length === 0 ? (
-              <p>No closed trial is due for deletion. Nothing will be deleted.</p>
-            ) : (
-              <>
-                <p>
-                  These trials closed more than 30 days ago. Their records and uploads are deleted, their users can no
-                  longer sign in, and the workspace is archived. The audit trail is kept. This cannot be undone.
-                </p>
-                <ul>
-                  {deleting.map((trial) => (
-                    <li key={trial.tenant_id}>
-                      {trial.name} ({trial.tenant_key}), trial ended {formatDate(trial.trial_ended_at)}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {kept.length > 0 && (
-              <>
-                <p>Kept for now:</p>
-                <ul>
-                  {kept.map((trial) => (
-                    <li key={trial.tenant_id}>
-                      {trial.name} ({trial.tenant_key}), {keptBecause(trial)}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <div className="trial-queue-dialog-actions">
-              <button className="platform-admin-secondary" onClick={() => setRetention(null)}>
-                {deleting.length ? "Cancel" : "Close"}
-              </button>
-              {deleting.length > 0 && (
-                <button className="platform-admin-primary" disabled={busy !== null} onClick={runRetention}>
-                  {busy ? "Deleting…" : `Delete data of ${deleting.length} trial${deleting.length === 1 ? "" : "s"}`}
-                </button>
-              )}
             </div>
           </div>
         </div>

@@ -16,8 +16,9 @@ import {
 describe("platform administrator areas", () => {
   it("keeps each area short: 34 sections instead of 80, a guided sequence only where setup is one", () => {
     const counts = Object.entries(AREA_SECTIONS).map(([area, sections]) => [area, sections.length] as const);
-    // 33, and Operations > Problem reports since 0.10.37 (FUN-07).
-    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(34);
+    // 33, and Operations > Problem reports since 0.10.37 (FUN-07); Identity & Access > Onboarding moved to Trial
+    // organizations > Requests (TO-1), an area of its own.
+    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(33);
     for (const [area, count] of counts) if (area !== DATA_AND_INTEGRATIONS) expect(count).toBeLessThanOrEqual(6);
   });
 

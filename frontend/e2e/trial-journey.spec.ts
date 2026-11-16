@@ -217,7 +217,7 @@ test.describe("free trial journey", () => {
     test.setTimeout(180_000);
     const problems = watchErrors(page);
     await signInAdmin(page);
-    await openAdminSection(page, "Identity & Access", "Onboarding");
+    await openAdminSection(page, "Trial organizations", "Requests");
     await page
       .getByRole("tablist", { name: "Trial request status" })
       .getByRole("tab", { name: /^Approved/ })
@@ -627,9 +627,9 @@ test.describe("free trial journey", () => {
     const admin = await context.newPage();
     problems.push(...watchErrors(admin));
     await signInAdmin(admin);
-    // Customers & Tenants > Trials: the early-exit requests load on their own. (The overview table above them computes
+    // Trial organizations > Ending and deletion: the early-exit requests load on their own. (The overview table above them computes
     // every trial's story; its columns, cited for, demo and rating, are covered by the API tests.)
-    await openAdminSection(admin, "Customers & Tenants", "Trials");
+    await openAdminSection(admin, "Trial organizations", "Ending and deletion");
     const requests = admin.getByRole("table", { name: "Requests to end a trial early" });
     const row = requests.getByRole("row").filter({ hasText: ORGANIZATION });
     await expect(row).toContainText("Waiting for you", { timeout: 20_000 });

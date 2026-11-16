@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialsOverviewView, type TrialTableControls } from "./TrialsOverview";
 import { attentionList, retentionText, trialBadgeOf, trialsPath, type TrialItem, type TrialOverview } from "./trials";
-import { invitationProblem, keptBecause, trialRequestsPath } from "../TrialRequestsWorkspace";
+import { invitationProblem, trialRequestsPath } from "../TrialRequestsWorkspace";
+import { keptBecause } from "../trials/RunDeletion";
 
 const trial = (number: number, overrides: Partial<TrialItem> = {}): TrialItem => ({
   tenant_id: `t-${number}`,
@@ -76,7 +77,8 @@ describe("the trials overview, one page at a time", () => {
     const html = render(overview());
     expect(html).toContain("Page 2 of 7");
     expect(html).toContain("320 trials");
-    expect(html.match(/Open tenant/g)).toHaveLength(50);
+    // Each row opens its trial's own page (Trial organizations), not the tenant record.
+    expect(html.match(/Open trial/g)).toHaveLength(50);
     expect(html).toContain("Org 51");
     expect(html).toContain("Org 100");
     expect(html).not.toContain("Org 101");

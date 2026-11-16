@@ -720,8 +720,13 @@ def trial_overview(
     order: str = "",
     state: str = "",
     q: str = "",
+    within=None,
 ) -> dict:
     """Every Free Trial organization still holding data: its dates, usage, story progress and feedback.
+
+    ``within`` (a set of tenant ids) narrows the table to those trials before it is sorted and paged (the trials ended
+    early, TO-1); the summary and the attention list still cover every trial. A trial in a grace period given on
+    Plans & Licensing is still running: its state and days left count to the end of the grace period.
 
     ``summary``, ``chapters`` and ``attention`` (who needs a person first) cover every trial; ``items`` is one page
     (``page``, ``page_size`` up to 200) of the trials in ``state`` (ACTIVE, ENDING_SOON or ENDED) whose name, tenant
@@ -784,8 +789,10 @@ def trial_overview(
                     bool(row.legal_hold),
                 )
             )
-            ended = row.expires_at <= now
-            seconds_left = (row.expires_at - now).total_seconds()
+            # Its users can sign in until the end of a grace period, so the trial runs until then.
+            running_until = retention.effective_end(row)
+            ended = running_until <= now
+            seconds_left = (running_until - now).total_seconds()
             item = {
                 "tenant_id": str(row.tenant_id),
                 "tenant_business_id": row.business_id,
@@ -795,6 +802,8 @@ def trial_overview(
                 "people": [],
                 "starts_at": row.starts_at.isoformat() if row.starts_at else None,
                 "expires_at": row.expires_at.isoformat(),
+                "grace_ends_at": row.grace_ends_at.isoformat() if running_until > row.expires_at else None,
+                "in_grace": row.expires_at <= now < running_until,
                 "data_deleted_at": kept["earliest_deletion"],
                 # Held while an open request asks to move the data into the MVP (backend/app/trial/retention.py).
                 "retention": kept,
@@ -829,7 +838,9 @@ def trial_overview(
         shown = [
             item
             for item, text in zip(items, searched)
-            if (not wanted or item["state"] == wanted) and (not needle or needle in text)
+            if (not wanted or item["state"] == wanted)
+            and (not needle or needle in text)
+            and (within is None or tenant_of[id(item)] in within)
         ]
         if parse_sort(sort, order)[0] in OVERVIEW_SORTS:
             shown = sort_rows(shown, sort, order, OVERVIEW_SORTS)

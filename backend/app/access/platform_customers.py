@@ -289,7 +289,22 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     order = params.get("order", "asc").lower()
     page = max(1, int(params.get("page", "1")))
     page_size = min(100, max(1, int(params.get("page_size", "25"))))
-    rows = db.query(Tenant, Customer).outerjoin(Customer, Customer.id == Tenant.customer_id)
+    from backend.app.trial.scope import not_trial_clause
+
+    if saved_view == "TRIAL":
+        # Free trials moved to their own page (TO-1); this list shows pilot and paying customers only.
+        raise HTTPException(
+            422,
+            detail={
+                "code": "VIEW_MOVED",
+                "message": "Free trials are listed under Trial organizations, not in the customer lists",
+            },
+        )
+    rows = (
+        db.query(Tenant, Customer)
+        .outerjoin(Customer, Customer.id == Tenant.customer_id)
+        .filter(not_trial_clause(Tenant.id))
+    )
     if query:
         rows = rows.filter(
             func.lower(Tenant.name).contains(query)
@@ -369,14 +384,6 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
                     SubscriptionLifecycle.expires_at >= today,
                     SubscriptionLifecycle.expires_at <= today + timedelta(days=90),
                 )
-            )
-        )
-    elif saved_view == "TRIAL":
-        rows = rows.filter(
-            Tenant.id.in_(
-                db.query(TenantPlanAssignment.tenant_id)
-                .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
-                .filter(func.lower(PlanDefinition.code).contains("trial"), TenantPlanAssignment.status == "ACTIVE")
             )
         )
     elif saved_view == "DESIGN_PARTNERS":

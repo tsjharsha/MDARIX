@@ -910,10 +910,13 @@ def list_platform_tenants(
     order: str = "asc",
     db: Session = Depends(get_db),
 ):
+    from backend.app.trial.scope import not_trial_clause
+
     _require_platform_admin(request, db)
     page = max(1, page)
     page_size = min(100, max(1, page_size))
-    rows = db.query(Tenant)
+    # Free trials are on Trial organizations only (TO-1), left out before counting and paging.
+    rows = db.query(Tenant).filter(not_trial_clause(Tenant.id))
     if q.strip():
         like = f"%{q.strip()}%"
         # The tenant's name or business identifier, or the business identifier of the customer that owns it.

@@ -62,6 +62,10 @@ export type TrialItem = {
   team_changes?: TrialTeamChange[];
   starts_at: string | null;
   expires_at: string;
+  /** The end of a grace period given on Plans & Licensing; the trial runs (and counts its days) until then. */
+  grace_ends_at?: string | null;
+  /** The end has passed but the grace period has not: still running. */
+  in_grace?: boolean;
   data_deleted_at: string;
   retention?: TrialRetention | null;
   state: TrialState;

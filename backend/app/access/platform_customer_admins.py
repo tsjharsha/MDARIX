@@ -131,13 +131,16 @@ def list_customer_admins(
     tenant_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
 ):
-    """Every Customer Administrator of every customer, with what can be done for each."""
+    """Every Customer Administrator of every customer, with what can be done for each. Free trials have their own
+    page (TO-1), so accounts in trial organizations are left out."""
+    from backend.app.trial.scope import not_trial_clause
+
     _require_platform_admin(request, db)
     query = (
         db.query(AuthUser, Tenant, Customer)
         .join(Tenant, Tenant.id == AuthUser.tenant_id)
         .outerjoin(Customer, Customer.id == Tenant.customer_id)
-        .filter(_is_customer_admin())
+        .filter(_is_customer_admin(), not_trial_clause(Tenant.id))
     )
     if q and q.strip():
         like = f"%{q.strip().lower()}%"

@@ -1,0 +1,131 @@
+/* Trial organizations: flat operational screens (design rule G-2: no gradients, glass or glow). */
+
+.to-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.to-hero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.to-hero h2 {
+  margin: 2px 0 6px;
+  color: var(--ac-navy);
+}
+.to-next {
+  margin: 0;
+  color: var(--ac-ink-2);
+}
+.to-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.to-days {
+  font-size: var(--ms-fs-24);
+  color: var(--ac-navy);
+}
+
+.to-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 0;
+}
+.to-action {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 240px;
+}
+.to-action small {
+  color: var(--ac-muted);
+}
+
+.to-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.to-card {
+  padding: 14px 16px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.to-card h3 {
+  margin: 0 0 8px;
+  font-size: var(--ms-fs-14);
+  color: var(--ac-navy);
+}
+.to-card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 0;
+}
+.to-card dt {
+  color: var(--ac-muted);
+}
+.to-card dd {
+  margin: 0;
+}
+.to-count {
+  display: contents;
+}
+.to-people,
+.to-list,
+.to-history {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.to-list li,
+.to-history li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.to-list span,
+.to-history small,
+.to-people small {
+  color: var(--ac-muted);
+}
+.to-ai {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-ink-2);
+}
+
+@media (max-width: 1080px) {
+  .to-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .to-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .to-strip,
+  .to-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .to-hero-side {
+    align-items: flex-start;
+  }
+}
