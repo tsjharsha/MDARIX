@@ -50,6 +50,21 @@ freeze. Migration `tr32_trial_ai_ready` (revision `tr32aiready`, re-attached at 
 - Trial organizations: an AI panel for each trial (Platform Administrator): per-person Active/Inactive switches, one
   or all at once, with a reason of at least 10 characters.
 - User guide "AI in MDARIX"; draft trial-AI privacy and sub-processor wording for legal review (not published).
+- The per-person AI switch of a trial moves to the Trial organizations routes
+  (`/platform-admin/trial-organizations/{id}/users/{user}/ai-access` and `.../{id}/ai-access` for everyone, body
+  `{active, reason}`), audited `TRIAL_USER_AI_ACCESS_CHANGED` (plus `TRIAL_AI_ACCESS_BULK_CHANGED` for "set all");
+  refused changes are audited `TRIAL_ACTION_REFUSED`. The earlier routes are removed.
+- A Platform Administrator switching AI on for an organization re-authenticates (password and authenticator code).
+- Observations AI proposes from an evidence document are accepted, edited or rejected one by one; accepting the
+  extraction as a whole no longer makes them facts; an edit uses the person's words.
+- Accept, Edit and Reject on Ask answers, signal summaries, the second-look explanation and each AI-written step of a
+  case's AI analysis; a reviewed output says who decided ("Accepted by a person").
+- Trial organizations: the AI panel shows this month's AI use against the trial's limit, model calls by outcome and
+  feature, the trial provider chain (ready, resting) and the latest switch changes.
+- AI code suggestions on a report's IMDRF code fields: proposals with confidence and the complaint's quoted words, from
+  the loaded IMDRF release only; a person enters each one in its field; "Confirm all codes" never takes them.
+- In a free trial, AI actions show once AI answers there (trial chain set, AI on for the organization and the user).
+- Fixed: two workspace drawers skipped a heading level (h2 to h4); four font sizes were off the type scale.
 
 
 ## [0.11.03] - not released yet
