@@ -1115,6 +1115,49 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "root-cause",
+        title: "Root cause: overview, fishbone, 5 Whys and the Pareto",
+        where: "Investigations › Intelligence › Overview, Fishbone and 5 Whys; Trends › By resolution",
+        purpose:
+          "MDARIX structures the investigation; a person finds and signs the cause. Each possible cause is a hypothesis, and only a signed decision confirms a cause. No AI is used.",
+        tasks: [
+          {
+            title: "Read the investigation at a glance",
+            steps: [
+              "On Overview read the version of each complaint at its event date (a date never chooses a version: without one on the complaint or its lot it stays unknown) and one list of facts with their source, hypotheses with evidence for and against, open contradictions, open unknowns and the 5 Whys.",
+              "Choose the record a line names to open it where it can be changed.",
+            ],
+          },
+          {
+            title: "Fill the fishbone",
+            who: "Quality Investigator, Leader.",
+            steps: [
+              "On Fishbone choose Add a possible cause, write it in one line, choose its category (People, Process, Method, Material, Machine, Environment; Software for software products) and, optionally, the failure mode of your FMEA it names.",
+              "It is added as a proposed hypothesis: weigh evidence for and against it on Hypotheses.",
+              "To rule a cause out, judge the hypothesis Contradicted or Retired with the reason; it stays visible, struck through.",
+            ],
+          },
+          {
+            title: "Ask why five times",
+            who: "Quality Investigator, Leader.",
+            steps: [
+              "On 5 Whys choose Start a 5 Whys, describe the problem and answer two to seven whys.",
+              "Each why starts as unknown: add its evidence and state on Failure chain, or choose Open a question.",
+              "The last why is not a root cause; it may name the hypothesis it is.",
+            ],
+          },
+          {
+            title: "Confirm the cause when you sign",
+            who: "Decision maker.",
+            steps: [
+              "When you sign the decision, tick the hypotheses you accept as the root cause and choose their category, or Not determined with the reason. Nothing is ticked for you.",
+              "Accepting the conclusion needs a category. Decisions signed before these tools read Not categorised and are never changed; a superseding decision re-categorises.",
+              "Trends › By resolution shows the Pareto of confirmed causes: complaints, each once under its current confirmed cause; never a rate.",
+            ],
+          },
+        ],
+      },
+      {
         id: "challenge",
         title: "Challenge: drafts and questions from your records",
         where: "Investigations › Intelligence › Challenge",
