@@ -15,7 +15,8 @@ tr24a pre-checks refuse a database with rows that break a rule, with the counts,
 and tr25 (the routine path, Case attachments,
 e-mail intake) and tr26 (a hypothesis's drafting rule, a follow-up's field action or product change) and tr27 (the
 reportability floor a market conclusion used) and tr28 (reporting roles per market, the user facility
-profile) and tr31 (a country outside the five markets).
+profile) and tr31 (a country outside the five markets) and trrcatools (root-cause methods, the confirmed cause at
+signing, section comments, the per-risk harm estimate).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -459,6 +460,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'report_obligations' AND column_name = 'country')"
+        ),
+    ),
+    Step(
+        "trrca",
+        "tr3x_trial_rca_tools.py",
+        "add_rca_tools",
+        (),
+        ("hypotheses", "failure_chains", "decisions", "brief_review_actions", "risks", "failure_modes"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'failure_chains' AND column_name = 'method')"
         ),
     ),
 )

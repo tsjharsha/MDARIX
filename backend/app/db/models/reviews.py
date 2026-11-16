@@ -180,6 +180,8 @@ class BriefReviewAction(Base):
     actor_ref: Mapped[str] = mapped_column(String(255), nullable=False)
     actor_role: Mapped[str | None] = mapped_column(String(60))
     created_at = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+    # RCA tools (trrcatools): the dossier section a reviewer comment names (none: the whole version).
+    section_key: Mapped[str | None] = mapped_column(String(40))
 
     __table_args__ = (
         ForeignKeyConstraint(
