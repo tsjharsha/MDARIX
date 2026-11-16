@@ -20,7 +20,6 @@ import {
   type Mandatory,
   type ReportDetail,
   type ReportList,
-  type ReportListItem,
   type ReportView,
 } from "../authorityReports";
 import { InlineError } from "./boardParts";
@@ -46,6 +45,7 @@ import { FollowUps } from "./FollowUps";
 import { MirFiles, MirNeeds } from "./MirFiles";
 import { PersonalAtSend, personalBody } from "./PersonalAtSend";
 import { OtherReportPage, type AttachedDetail } from "./OtherCountries";
+import { Flag } from "../../shared/hero/HeroVisuals";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -151,7 +151,6 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
   const countries = otherCountryOptions(all);
   const items = byCountry(all, country ?? "");
   const rows = list.data ? reportsInView(items, view) : [];
-  const name = (row: ReportListItem) => `${row.form_title ?? "Report"} for ${row.complaint_ref}`;
   return (
     <>
       <div className="ca-action-row uw-list-actions">
@@ -181,6 +180,7 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
           caption={view}
           rows={rows}
           rowKey={(row) => String(row.id)}
+          onRowClick={(row) => onOpen(String(row.id))}
           empty={{
             ...EMPTY[view],
             action: (
@@ -241,20 +241,6 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
               },
             },
             { key: "market", label: "Market", render: (row) => row.market_label },
-            {
-              key: "open",
-              label: "",
-              render: (row) => (
-                <button
-                  type="button"
-                  className="ac-secondary"
-                  aria-label={`Open the ${name(row)}`}
-                  onClick={() => onOpen(String(row.id))}
-                >
-                  Open
-                </button>
-              ),
-            },
           ]}
         />
       </Panel>
@@ -264,7 +250,9 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
           <div className="uw-forms">
             {list.data.forms.map((form) => (
               <div key={form.market} className="uw-form-card">
-                <b>{marketLabel(form.market)}</b>
+                <b>
+                  <Flag country={form.market.split("_")[0]} decorative /> {marketLabel(form.market)}
+                </b>
                 <span>{form.title.replace(/ worksheet$/, "")}</span>
                 <span className="ac-muted">{versionWords(form.version)}</span>
                 {form.starter ? (

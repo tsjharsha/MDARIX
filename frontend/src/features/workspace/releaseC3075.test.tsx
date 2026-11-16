@@ -255,7 +255,10 @@ describe("Reports: list views, six columns, cards on a phone", () => {
     expect(html).toContain("Open reports · 1");
     expect(html).toContain("18 of 24 mandatory");
     expect(html).toContain("Created from the decision tree");
-    expect((html.match(/>Open</g) ?? []).length).toBe(1);
+    // The report's name opens it and so does its row: no separate Open column.
+    expect((html.match(/>Open</g) ?? []).length).toBe(0);
+    expect(html).toContain('class="is-clickable"');
+    expect(html).toContain('class="hx-flag"');
     expect(html).toContain("ms-cards");
     expect(html).toContain("Forms MDARIX prepares");
     expect(html).toContain("In MDARIX today");
