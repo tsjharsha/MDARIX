@@ -164,15 +164,17 @@ def test_a_route_with_the_context_as_a_dependency_reissues_the_cookie_itself():
 @pytest.mark.parametrize("with_plan", [True, False])
 def test_the_licence_is_active_only_for_an_active_organization_with_a_plan(with_plan):
     # Each case makes its own ACTIVE organization, so the answer never depends on what another test left behind.
-    from backend.app.db.models.foundation import PlanDefinition, TenantPlanAssignment
+    from backend.app.db.models.foundation import TenantPlanAssignment
+    from tests.test_tenant_security import _security_plan
 
     with SessionLocal() as db:
         bind_system(db, "test: an organization with or without a plan")
         organization = _tenant(db, "LIC")
         if with_plan:
-            plan = db.query(PlanDefinition).filter(PlanDefinition.status == "ACTIVE").first()
-            assert plan is not None, "the seeded plans include an active one"
             now = datetime.now(timezone.utc)
+            # A test plan of its own, never "the first active plan": that can be the Free Trial plan, and a customer
+            # on it shows as a trial plan in the platform dashboard (TO-1).
+            plan = _security_plan(db, now)
             db.add(
                 TenantPlanAssignment(
                     tenant_id=organization.id,
