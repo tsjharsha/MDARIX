@@ -216,7 +216,7 @@ export function ReportDrawer({
     return (
       <Drawer title="Report" onClose={onClose}>
         <p className="ac-muted">
-          {resource.error ? errorText(resource.error, "The report could not be read.") : "Reading…"}
+          {resource.error ? errorText(resource.error, "The report could not be read.") : "Loading…"}
         </p>
       </Drawer>
     );

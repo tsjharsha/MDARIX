@@ -146,14 +146,14 @@ describe("Home's tiles while they read (D1.6)", () => {
   beforeEach(stubWindow);
   afterEach(() => vi.unstubAllGlobals());
 
-  it("say Reading… on every tile, never an all-clear, before the data arrives", () => {
+  it("say Loading… on every tile, never an all-clear, before the data arrives", () => {
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={workspace({ isTrial: true } as Partial<WorkspaceApi>)}>
         <HomeSection heading={{ current: null }} />
       </WorkspaceContext.Provider>,
     );
     const stats = html.slice(html.indexOf('aria-label="What needs attention"'), html.indexOf("uw-home-grid"));
-    expect(stats.match(/Reading…/g)).toHaveLength(3);
+    expect(stats.match(/Loading…/g)).toHaveLength(3);
     expect(stats).not.toContain("No product rising");
     expect(stats).not.toContain("Nothing past its time");
   });

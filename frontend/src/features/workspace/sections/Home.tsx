@@ -119,7 +119,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
             // Never an all-clear before the data has arrived (0.10.81, U-07).
             detail={
               overdue.state === "loading"
-                ? "Reading…"
+                ? "Loading…"
                 : overdue.data?.total
                   ? "Complaints past a deadline or target: act on these first"
                   : "Nothing past its time"
@@ -132,7 +132,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
             title="Due this week"
             short="Next 7 days"
             detail={
-              dueWeek.state === "loading" ? "Reading…" : "Complaints with a deadline or target in the next 7 days"
+              dueWeek.state === "loading" ? "Loading…" : "Complaints with a deadline or target in the next 7 days"
             }
           />
           <Stat
@@ -144,7 +144,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
             short={rising.length ? "A product rising" : "Nothing rising"}
             detail={
               trends.state === "loading"
-                ? "Reading…"
+                ? "Loading…"
                 : rising.length
                   ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
                     "Products rising against their history"

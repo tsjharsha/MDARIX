@@ -143,6 +143,6 @@ describe("item 10: an investigation opened a moment ago never claims more than i
         {null}
       </Panel>,
     );
-    expect(html).toContain("Reading…");
+    expect(html).toContain("Loading…");
   });
 });

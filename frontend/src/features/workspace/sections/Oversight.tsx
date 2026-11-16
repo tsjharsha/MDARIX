@@ -390,7 +390,7 @@ export function EventDrawer({
     return (
       <Drawer title="Event" onClose={onClose}>
         <p className="ac-muted">
-          {resource.error ? errorText(resource.error, "The event could not be read.") : "Reading…"}
+          {resource.error ? errorText(resource.error, "The event could not be read.") : "Loading…"}
         </p>
       </Drawer>
     );

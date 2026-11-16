@@ -203,7 +203,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
     return (
       <Drawer title="Decision guide" onClose={onClose}>
         <p className="ac-muted">
-          {resource.error ? errorText(resource.error, "The guide could not be read.") : "Reading…"}
+          {resource.error ? errorText(resource.error, "The guide could not be read.") : "Loading…"}
         </p>
       </Drawer>
     );

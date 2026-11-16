@@ -96,7 +96,7 @@ export function Panel({
       {/* Never an empty grey box (0.10.70): the placeholder says what it does. */}
       {shown.state === "loading" && (
         <div className="ac-skeleton" aria-label={`Loading ${title}`}>
-          <span className="ac-skeleton-text">Reading…</span>
+          <span className="ac-skeleton-text">Loading…</span>
         </div>
       )}
       {shown.state === "forbidden" &&

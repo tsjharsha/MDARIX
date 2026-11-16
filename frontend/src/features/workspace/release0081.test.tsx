@@ -35,7 +35,7 @@ describe("Home while it reads (U-07)", () => {
         <HomeSection heading={{ current: null }} />
       </WorkspaceContext.Provider>,
     );
-    expect(html).toContain("Reading…");
+    expect(html).toContain("Loading…");
     expect(html).not.toContain("Nothing past its time");
     const clocks = renderToStaticMarkup(<LegalClocks clocks={[]} onOpen={() => undefined} reading />);
     expect(clocks).toContain("Reading the legal clocks…");

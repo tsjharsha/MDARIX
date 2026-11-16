@@ -512,7 +512,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
     return (
       <Drawer title="Communication" onClose={onClose}>
         <p className="ac-muted">
-          {resource.error ? errorText(resource.error, "The entry could not be read.") : "Reading…"}
+          {resource.error ? errorText(resource.error, "The entry could not be read.") : "Loading…"}
         </p>
       </Drawer>
     );

@@ -833,7 +833,7 @@ function ProductIdentity({
             ? identityText(profile.data, product.product_identifier.startsWith("SAMPLE-"))
             : profile.state === "error"
               ? "Could not be read."
-              : "Reading…"}
+              : "Loading…"}
           {eu && (
             <>
               <br />
