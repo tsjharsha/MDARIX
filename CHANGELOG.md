@@ -10,6 +10,15 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Investigation timeline after the challenge panel is opened.** Opening the challenge panel records an event about
+  the investigation itself, and the trust timeline then showed the investigation's own audit events (opened, state
+  changes) by a bare id instead of its number. Those events are named by the investigation's number again.
+- **Workflow scenario tests answer the challenge questions.** The end-to-end workflow scenarios
+  (`tests/test_e2e_workflow_scenarios.py`) now answer the material challenge questions before "Submit for review", as
+  an investigator does; the gate (owner decision B5-D3) is unchanged.
+
 ## [0.10.98] - not released yet
 
 B5a: the investigation challenge. Migration `tr26challengeloop` (chained from `tr25routinepath`; DB-1 (tr21-tr24) is

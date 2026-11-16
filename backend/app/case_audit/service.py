@@ -387,7 +387,9 @@ def read_intelligence(found: Gathered) -> None:
     )
     for event in events:
         details = event.details if isinstance(event.details, dict) else {}
-        business_id = details.get("business_id")
+        # An event about the investigation itself (the challenge panel opened) is named by the case's own number;
+        # without it the case's known number was overwritten and its audit events showed a bare id.
+        business_id = details.get("business_id") or (case.business_id if event.object_id == case.id else None)
         kind = OBJECT_LABELS.get(event.object_type, rules.readable(event.object_type))
         found.remember(str(event.object_type or "Intelligence").title().replace("_", ""), event.object_id, business_id)
         # In words: "Fact" when something is added, "Hypothesized → Supported" when it changes.
