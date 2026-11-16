@@ -61,5 +61,7 @@ describe("A records-only answer", () => {
     );
     expect(markup).toContain("AI proposal, not reviewed");
     expect(markup).toMatch(/Accept[\s\S]*Edit[\s\S]*Reject/);
+    // One review marker: the proposal label replaces the generic badge.
+    expect(markup).not.toContain("Human review required");
   });
 });

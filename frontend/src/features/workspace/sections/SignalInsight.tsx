@@ -74,18 +74,8 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
 export function SummaryView({ summary, canReview = false }: { summary: SignalSummary; canReview?: boolean }) {
   const note = aiSummaryNote(summary);
   if (!summary.sentences.length) return <p className="ac-muted">The trend has no complaints to summarize.</p>;
-  return (
+  const body = (
     <>
-      {summary.author === "AI" && summary.ai?.label && (
-        <p className="uw-ai-label">
-          <Sparkles size={14} aria-hidden="true" /> {summary.ai.label}
-        </p>
-      )}
-      {summary.author === "AI" && summary.ai?.trust && (
-        <div className="uw-ai-head">
-          <TrustBadge trust={summary.ai.trust} />
-        </div>
-      )}
       <ul className="uw-sum-list">
         {summary.sentences.map((sentence, index) => (
           <li key={index}>
@@ -104,17 +94,34 @@ export function SummaryView({ summary, canReview = false }: { summary: SignalSum
           the signal&apos;s complaints, or claiming a cause.
         </p>
       )}
-      {summary.author === "AI" && summary.ai?.ai_execution_id && (
-        <AiReviewActions
-          key={summary.ai.ai_execution_id}
-          outputId={summary.ai.ai_execution_id}
-          text={summary.sentences.map((sentence) => sentence.text).join("\n")}
-          state={summary.ai.review_state}
-          disabled={!canReview}
-        />
-      )}
       {note && <p className="ac-muted">{note}</p>}
     </>
+  );
+  const ai = summary.author === "AI" ? summary.ai : undefined;
+  if (!ai) return body;
+  // One frame for an AI output (design rule R4): one label, the trust check and Accept · Edit · Reject in one header.
+  return (
+    <section className="ai-out" aria-label="AI output">
+      <header className="ai-out-head">
+        {ai.ai_execution_id ? (
+          <AiReviewActions
+            key={ai.ai_execution_id}
+            outputId={ai.ai_execution_id}
+            text={summary.sentences.map((sentence) => sentence.text).join("\n")}
+            state={ai.review_state}
+            disabled={!canReview}
+          />
+        ) : (
+          ai.label && (
+            <span className="uw-ai-label">
+              <Sparkles size={14} aria-hidden="true" /> {ai.label}
+            </span>
+          )
+        )}
+        {ai.trust && <TrustBadge trust={ai.trust} />}
+      </header>
+      {body}
+    </section>
   );
 }
 

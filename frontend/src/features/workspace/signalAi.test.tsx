@@ -209,6 +209,14 @@ describe("the signal summary", () => {
     });
     const open = renderToStaticMarkup(<SummaryView summary={summary("NOT_REVIEWED")} canReview />);
     expect(open).toContain("AI proposal, not reviewed");
+    // One frame, one label: the review row is the frame's header.
+    expect(open).toMatch(/<section class="ai-out"[^>]*><header class="ai-out-head"><div class="ai-review"/);
+    const labelled = renderToStaticMarkup(
+      <SummaryView
+        summary={{ ...summary("NOT_REVIEWED"), ai: { ...summary("NOT_REVIEWED").ai, label: "Written by AI" } }}
+      />,
+    );
+    expect(labelled).not.toContain("Written by AI");
     expect(open).toMatch(/Accept[\s\S]*Edit[\s\S]*Reject/);
     expect(renderToStaticMarkup(<SummaryView summary={summary("ACCEPTED")} canReview />)).toContain(
       "Accepted by a person",

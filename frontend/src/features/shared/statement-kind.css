@@ -178,3 +178,32 @@
   background: var(--ms-ai-bg);
   color: var(--ms-ai);
 }
+
+/* One frame for every AI output (design rule R4): a dashed AI edge, one header row with the label, the trust check
+   and Accept · Edit · Reject, then the body. */
+.ai-out {
+  display: grid;
+  gap: 10px;
+  border: 1px dashed var(--ms-ai-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+  overflow: hidden;
+}
+.ai-out-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  background: var(--ms-ai-bg);
+}
+.ai-out-head .ai-review {
+  margin-top: 0;
+}
+.ai-out > :not(.ai-out-head) {
+  margin-inline: 12px;
+}
+.ai-out > :last-child {
+  margin-bottom: 12px;
+}

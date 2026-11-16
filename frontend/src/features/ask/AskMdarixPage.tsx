@@ -136,7 +136,6 @@ export function AskMdarixPage({
             use.
           </p>
         </div>
-        <div className="version-pill">Human review required</div>
       </section>
       <section className="panel">
         <label htmlFor="ask-question">Question</label>
@@ -227,7 +226,7 @@ export function AskAnswer({ result }: { result: any }) {
               <AlertTriangle size={14} aria-hidden="true" /> No matching evidence found
             </span>
           )}
-          <span className="ask-badge">Human review required</span>
+          {typeof response.ai_call_id !== "string" && <span className="ask-badge">Human review required</span>}
           {structured?.aiUsed === false ? (
             <span className="ask-badge" data-ai-used="false">
               <Info size={14} aria-hidden="true" /> {madeBy}
