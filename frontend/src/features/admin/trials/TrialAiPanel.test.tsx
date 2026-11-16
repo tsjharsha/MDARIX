@@ -1,7 +1,19 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const list = vi.hoisted(() => ({ data: null as unknown }));
+vi.mock("../../customer-admin/shared", async (original) => ({
+  ...(await original<typeof import("../../customer-admin/shared")>()),
+  useResource: (path: string) => ({
+    state: "ready",
+    data: path.endsWith("/ai-access") ? list.data : null,
+    reload: () => undefined,
+  }),
+}));
+
 import {
   TrialAiPanel,
+  aiGates,
   aiAccessReasonProblem,
   aiAccessRequest,
   peopleToChange,
@@ -45,5 +57,22 @@ describe("TO-1 part 4: AI per person in a trial", () => {
     expect(renderToStaticMarkup(<TrialAiPanel detail={detail} onChanged={() => undefined} />)).toContain(
       "AI for this trial",
     );
+  });
+
+  it("always shows the three gates, and each person's AI as one real switch", () => {
+    list.data = { organization_on: true, trial_chain_on: true, items: PEOPLE };
+    expect(aiGates(list.data as never).map((gate) => `${gate.label}: ${gate.value}`)).toEqual([
+      "Trial AI services: Ready",
+      "Organization: Switched on",
+      "People: 2 of 3 with AI",
+    ]);
+    const html = renderToStaticMarkup(<TrialAiPanel detail={{ tenant_id: "t-1" }} onChanged={() => undefined} />);
+    expect(html).toContain("Trial AI services");
+    expect(html).toContain("2 of 3 with AI");
+    expect(html.match(/role="switch"/g)).toHaveLength(3);
+    expect(html).toMatch(/role="switch" aria-checked="true" aria-label="AI for Asha"/);
+    expect(html).toMatch(/role="switch" aria-checked="false" aria-label="AI for Ravi"/);
+    expect(html).not.toContain("AI: Active");
+    list.data = null;
   });
 });

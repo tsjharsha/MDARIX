@@ -41,6 +41,24 @@ export function aiAccessRequest(tenantId: string, target: boolean, reason: strin
 
 type Pending = { target: boolean; only?: string };
 
+type Gate = { label: string; value: string; on: boolean };
+
+/** The three gates a person's AI passes, shown whether they are on or off (trial services, organization, people). */
+export function aiGates(list: TrialAiAccessList): Gate[] {
+  const active = list.items.filter((person) => person.active).length;
+  return [
+    { label: "Trial AI services", value: list.trial_chain_on ? "Ready" : "Not set up", on: list.trial_chain_on },
+    {
+      label: "Organization",
+      value: list.organization_on ? "Switched on" : "Not switched on",
+      on: list.organization_on,
+    },
+    { label: "People", value: `${active} of ${list.items.length} with AI`, on: active > 0 },
+  ];
+}
+
+const switchId = (userId: string) => `ai-switch-${userId}`;
+
 export function TrialAiPanel({
   detail,
   onChanged,
@@ -60,16 +78,22 @@ export function TrialAiPanel({
     setReason("");
     setProblem(null);
   };
+  // Back to the switch that opened the reason step, so keyboard users keep their place.
+  const close = () => {
+    const back = pending?.only;
+    setPending(null);
+    if (back) window.setTimeout(() => document.getElementById(switchId(back))?.focus());
+  };
   const save = async () => {
     if (!pending) return;
     const reasonProblem = aiAccessReasonProblem(reason);
     if (reasonProblem) return setProblem(reasonProblem);
-    if (!changing.length) return setPending(null);
+    if (!changing.length) return close();
     const request = aiAccessRequest(detail.tenant_id, pending.target, reason, pending.only);
     setBusy(true);
     try {
       await send(request.path, "PUT", request.body);
-      setPending(null);
+      close();
       list.reload();
       onChanged();
     } catch (error) {
@@ -88,6 +112,16 @@ export function TrialAiPanel({
         </p>
       )}
       <Panel eyebrow="AI and usage" title="AI for this trial" source={list}>
+        {list.data && (
+          <ol className="to-ai-gates" aria-label="What AI needs for each person">
+            {aiGates(list.data).map((gate) => (
+              <li key={gate.label}>
+                <span>{gate.label}</span>
+                <ToneBadge tone={gate.on ? "good" : "neutral"} label={gate.value} />
+              </li>
+            ))}
+          </ol>
+        )}
         {list.data && !list.data.organization_on && (
           <p className="ac-note" role="status">
             The organization has not switched AI on: no user has AI, whatever these switches say.
@@ -120,15 +154,18 @@ export function TrialAiPanel({
           {people.map((person) => (
             <li key={person.user_id}>
               <span>{person.display_name || "Unnamed person"}</span>
-              <ToneBadge tone={person.active ? "good" : "neutral"} label={`AI: ${word(person.active)}`} />
               <button
                 type="button"
-                className="ac-secondary"
-                aria-label={`Set ${person.display_name || "this person"} ${word(!person.active)}`}
+                id={switchId(person.user_id)}
+                className="to-switch"
+                role="switch"
+                aria-checked={person.active}
+                aria-label={`AI for ${person.display_name || "this person"}`}
                 onClick={() => open({ target: !person.active, only: person.user_id })}
               >
-                Set {word(!person.active)}
+                <span aria-hidden="true" />
               </button>
+              <small className="to-switch-word">{word(person.active)}</small>
             </li>
           ))}
         </ul>
@@ -141,21 +178,27 @@ export function TrialAiPanel({
             </p>
             <label>
               Reason (kept in the trial&apos;s audit trail)
-              <input value={reason} onChange={(event) => setReason(event.target.value)} />
+              <textarea
+                rows={2}
+                autoFocus
+                value={reason}
+                aria-describedby={problem ? "ai-reason-error" : undefined}
+                onChange={(event) => setReason(event.target.value)}
+              />
             </label>
+            {problem && (
+              <p id="ai-reason-error" className="ac-error" role="alert">
+                {problem}
+              </p>
+            )}
             <span className="ca-row-actions">
               <button type="button" className="ac-primary" disabled={busy} onClick={() => void save()}>
                 Set {word(pending.target)}
               </button>
-              <button type="button" className="ac-secondary" disabled={busy} onClick={() => setPending(null)}>
+              <button type="button" className="ac-secondary" disabled={busy} onClick={close}>
                 Cancel
               </button>
             </span>
-            {problem && (
-              <p className="ac-error" role="alert">
-                {problem}
-              </p>
-            )}
           </div>
         )}
       </Panel>
