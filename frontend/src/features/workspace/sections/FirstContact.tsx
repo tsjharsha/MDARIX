@@ -1782,7 +1782,7 @@ function EscalationPanel({
 }) {
   return (
     <section className="uw-case-escalation" aria-label="This case becomes a complaint">
-      <h4>This case becomes a complaint</h4>
+      <h3>This case becomes a complaint</h3>
       <p>
         Nothing is typed again. {item.reference} keeps its reference and its awareness time, and its clock keeps
         running.

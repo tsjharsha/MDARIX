@@ -265,7 +265,7 @@ def get_request_context(
     from genai.governance import set_request_tenant
 
     # Model calls made while handling this request apply this organization's AI switch and budget.
-    set_request_tenant(tenant_id)
+    set_request_tenant(tenant_id, user_id)
     membership = (
         db.query(TenantMembership)
         .filter(

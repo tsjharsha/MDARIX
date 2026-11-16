@@ -37,6 +37,10 @@ from evaluation.real_pipeline import record_run, run_real_golden_suite  # noqa: 
 GOLDEN_TENANT_KEY = "ACME_CARE_SYNTHETIC"
 
 
+# The features the golden evaluation exercises (case analysis and the brief drafted from it).
+EVALUATED_FEATURES = ("case_analysis", "drafting")
+
+
 def switch_ai_on(db, tenant_key: str = GOLDEN_TENANT_KEY) -> bool:
     """Switch AI processing on for the synthetic golden organization, audited like an administrator's change.
     Returns False when it was already on. Refuses any other organization."""
@@ -49,9 +53,13 @@ def switch_ai_on(db, tenant_key: str = GOLDEN_TENANT_KEY) -> bool:
         raise ValueError("Only the synthetic golden organization can be switched on by the evaluation")
     bind_system(db, "AI evaluation switches AI on for the synthetic golden organization")
     tenant = db.query(Tenant).filter(Tenant.tenant_key == tenant_key).one()
-    if tenant.ai_processing_allowed:
+    # The evaluated feature must be on for the organization too (tenants.ai_features, genai/features.py).
+    features_before = dict(tenant.ai_features or {})
+    if tenant.ai_processing_allowed and all(features_before.get(key) is True for key in EVALUATED_FEATURES):
         return False
+    before = {"ai_processing_allowed": tenant.ai_processing_allowed, "ai_features": features_before}
     tenant.ai_processing_allowed = True
+    tenant.ai_features = {**features_before, **dict.fromkeys(EVALUATED_FEATURES, True)}
     db.add(
         make_audit_event(
             tenant_id=tenant.id,
@@ -66,8 +74,8 @@ def switch_ai_on(db, tenant_key: str = GOLDEN_TENANT_KEY) -> bool:
                 "synthetic_data_only": True,
             },
             reason="AI evaluation gate on the synthetic golden dataset",
-            old_values={"ai_processing_allowed": False},
-            new_values={"ai_processing_allowed": True},
+            old_values=before,
+            new_values={"ai_processing_allowed": True, "ai_features": tenant.ai_features},
         )
     )
     db.commit()

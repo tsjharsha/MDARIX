@@ -22,6 +22,7 @@ import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
 import { TrialOrganizations, type TrialSection } from "./trials/TrialOrganizations";
+import { trialAiPanel } from "./trials/TrialAiPanel";
 import "./console/admin-console.css";
 
 type Props = {
@@ -338,6 +339,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                         section={location.item as TrialSection}
                         onSection={(item) => setLocation({ domain: TRIAL_ORGANIZATIONS, item })}
                         websiteDemos={websiteDemos}
+                        trialAiPanel={trialAiPanel}
                         onOpenCustomers={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })}
                       />
                     ) : isAreaDomain(location.domain) ? (

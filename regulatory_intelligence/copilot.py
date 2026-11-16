@@ -210,6 +210,8 @@ def draft_with_model(
             grounded_context=context,
             question=drafting_question(document_type, title),
             provider=provider,
+            # Not offered until AI qualification (owner, 14 Nov 2026): the rules draft is shown, with the reason.
+            feature="regulatory_drafting",
         )
     except GenAIUnavailable as exc:  # an advisory that lets a refusal through
         refusal = exc.refusal() if callable(getattr(exc, "refusal", None)) else {"code": "GENAI_UNAVAILABLE"}

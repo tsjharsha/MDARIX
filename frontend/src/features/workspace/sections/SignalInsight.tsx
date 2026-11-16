@@ -17,6 +17,7 @@ import {
 } from "../signalAi";
 import { InlineError } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
+import { AiReviewActions } from "../../shared/AiReview";
 
 /**
  * What a signal's complaints have in common (from their records, or written by AI and checked sentence by sentence;
@@ -57,7 +58,7 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
         ) : undefined
       }
     >
-      {summary && <SummaryView summary={summary} />}
+      {summary && <SummaryView summary={summary} canReview={canRunAi} />}
       <InlineError text={error} />
       {insight.data && <TrendLine trend={insight.data.trend} />}
     </Panel>
@@ -65,7 +66,7 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
 }
 
 /** The summary's sentences with the complaints each cites (exported for its unit test). */
-export function SummaryView({ summary }: { summary: SignalSummary }) {
+export function SummaryView({ summary, canReview = false }: { summary: SignalSummary; canReview?: boolean }) {
   const note = aiSummaryNote(summary);
   if (!summary.sentences.length) return <p className="ac-muted">The trend has no complaints to summarize.</p>;
   return (
@@ -97,6 +98,15 @@ export function SummaryView({ summary }: { summary: SignalSummary }) {
           {summary.ai!.dropped!.length} sentence{summary.ai!.dropped!.length === 1 ? "" : "s"} left out: not backed by
           the signal&apos;s complaints, or claiming a cause.
         </p>
+      )}
+      {summary.author === "AI" && summary.ai?.ai_execution_id && (
+        <AiReviewActions
+          key={summary.ai.ai_execution_id}
+          outputId={summary.ai.ai_execution_id}
+          text={summary.sentences.map((sentence) => sentence.text).join("\n")}
+          state={summary.ai.review_state}
+          disabled={!canReview}
+        />
       )}
       {note && <p className="ac-muted">{note}</p>}
     </>

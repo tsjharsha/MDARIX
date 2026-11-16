@@ -10,6 +10,14 @@ import genai.provider as provider_module
 from genai.provider import GenAIProvider, GenAIUnavailable
 
 
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 class _Response:
     def __init__(self, text: str):
         self.text = text
@@ -67,13 +75,13 @@ def _route(monkeypatch, behaviour: dict):
 
 def test_a_rate_limited_primary_hands_over_to_the_next_free_provider_at_once(monkeypatch):
     calls = _route(monkeypatch, {"groq": "limited", "cerebras": "ok", "generativelanguage": "ok"})
-    result = GenAIProvider().complete("Summarize the evidence", {"status": "open"})
+    result = GenAIProvider().complete("Summarize the evidence", {"status": "open"}, feature="ask")
     assert result.provider == "cerebras" and result.output["answer"] == "answer from cerebras"
     # Groq was asked once (no waiting on a limit), then Cerebras with its own key.
     assert calls == [("groq", "Bearer groq-key"), ("cerebras", "Bearer cerebras-key")]
     # The limited provider rests: the next request goes straight to the fallback.
     calls.clear()
-    assert GenAIProvider().complete("Again", {}).provider == "cerebras"
+    assert GenAIProvider().complete("Again", {}, feature="ask").provider == "cerebras"
     assert [host for host, _ in calls] == ["cerebras"]
 
 
@@ -93,7 +101,7 @@ def test_a_structured_request_retries_rate_limited_primary_before_provider_fallb
         return _Response('{"summary":"fallback"}')
 
     monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
-    result = GenAIProvider(max_retries=1).complete("Analyse", {}, json_output=True)
+    result = GenAIProvider(max_retries=1).complete("Analyse", {}, json_output=True, feature="ask")
 
     assert result.provider == "groq"
     assert calls == ["groq", "groq"]
@@ -101,7 +109,7 @@ def test_a_structured_request_retries_rate_limited_primary_before_provider_fallb
 
 def test_a_provider_that_is_down_is_skipped_too(monkeypatch):
     calls = _route(monkeypatch, {"groq": "down", "cerebras": "down", "generativelanguage": "ok"})
-    result = GenAIProvider().complete("Summarize", {})
+    result = GenAIProvider().complete("Summarize", {}, feature="ask")
     assert result.provider == "gemini" and result.output["human_review_required"] is True
     assert [host for host, _ in calls][-1] == "generativelanguage"
 
@@ -109,14 +117,14 @@ def test_a_provider_that_is_down_is_skipped_too(monkeypatch):
 def test_when_every_provider_fails_the_caller_falls_back_to_rules(monkeypatch):
     _route(monkeypatch, {"groq": "limited", "cerebras": "limited", "generativelanguage": "down"})
     with pytest.raises(GenAIUnavailable):
-        GenAIProvider().complete("Summarize", {})
+        GenAIProvider().complete("Summarize", {}, feature="ask")
 
 
 def test_fallbacks_without_a_key_are_not_tried(monkeypatch):
     monkeypatch.delenv("MDARIX_GENAI_GEMINI_API_KEY")
     calls = _route(monkeypatch, {"groq": "limited", "cerebras": "limited", "generativelanguage": "ok"})
     with pytest.raises(GenAIUnavailable):
-        GenAIProvider().complete("Summarize", {})
+        GenAIProvider().complete("Summarize", {}, feature="ask")
     assert "generativelanguage" not in [host for host, _ in calls]
 
 
@@ -124,7 +132,7 @@ def test_without_fallbacks_the_primary_keeps_its_retries(monkeypatch):
     monkeypatch.delenv("MDARIX_GENAI_FALLBACKS")
     calls = _route(monkeypatch, {"groq": "limited"})
     with pytest.raises(GenAIUnavailable):
-        GenAIProvider(max_retries=2).complete("Summarize", {})
+        GenAIProvider(max_retries=2).complete("Summarize", {}, feature="ask")
     assert len(calls) == 3 and not provider_module._COOLDOWN_UNTIL
 
 
@@ -132,7 +140,7 @@ def test_without_a_primary_no_fallback_is_called(monkeypatch):
     monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "controlled")
     monkeypatch.delenv("MDARIX_GENAI_API_KEY")
     calls = _route(monkeypatch, {"cerebras": "ok", "generativelanguage": "ok"})
-    result = GenAIProvider().complete("Summarize", {})
+    result = GenAIProvider().complete("Summarize", {}, feature="ask")
     assert result.provider == "controlled" and calls == []
 
 
@@ -153,7 +161,7 @@ def test_a_retired_or_misspelt_fallback_is_skipped_and_shown(monkeypatch):
     calls = _route(monkeypatch, {"groq": "limited", "generativelanguage": "ok", "github": "ok"})
     provider = GenAIProvider()
     assert [item.provider_name for item in provider.fallbacks] == ["gemini"]
-    assert provider.complete("Summarize", {}).provider == "gemini"
+    assert provider.complete("Summarize", {}, feature="ask").provider == "gemini"
     assert "github" not in [host for host, _ in calls]
     skipped = provider.health()["skipped_fallbacks"]
     assert set(skipped) == {"github", "geminy"} and "retired" in skipped["github"]

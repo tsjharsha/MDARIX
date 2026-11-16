@@ -5,9 +5,11 @@
   ``tenant_scope``. In staging and production a model request with no organization is refused, so content is never
   sent without its owner's controls being checked.
 * **Switch.** ``tenants.ai_processing_allowed`` off: no model is called and the features answer from rules.
-* **Free trials.** An organization on the Free Trial plan never reaches a model during the product validation phase,
-  whatever its switch says (the trial agreement, terms and privacy policy promise it; ``backend/app/ai_settings.py``
-  also refuses to switch it on).
+* **Free trials.** While ``MDARIX_AI_TRIAL_CHAIN`` is empty (the default) an organization on the Free Trial plan never
+  reaches a model, whatever its switch says. Once the owner sets the trial chain, a trial uses AI on its sample data
+  only (owner decision AI-D14a; ``genai/sample_gate.py``), through that chain only, when its administrator switched AI
+  on and the person's own AI flag (``auth_users.ai_access``, set by a Platform Administrator) is ACTIVE.
+* **Feature.** ``tenants.ai_features[feature]`` must be true for the feature the request names.
 * **Budget.** Tokens used this calendar month (``ai_usage_monthly``) may not exceed the organization's
   ``ai_monthly_token_budget``, or ``MDARIX_GENAI_TENANT_MONTHLY_TOKENS`` when it has none.
 * **Rest periods.** A provider that rate-limits or fails is skipped by every process until ``genai_provider_rest``
@@ -23,6 +25,7 @@ import logging
 import os
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
 logger = logging.getLogger("mdarix.genai")
@@ -44,17 +47,24 @@ def end_request_scope(token: contextvars.Token) -> None:
     _scope.reset(token)
 
 
-def set_request_tenant(tenant_id) -> None:
-    """Record the signed-in organization for this request's model calls (called by the request context)."""
+def set_request_tenant(tenant_id, user_id=None) -> None:
+    """Record the signed-in organization (and person) for this request's model calls (called by the request
+    context)."""
     holder = _scope.get()
     if holder is not None and tenant_id:
         holder["tenant_id"] = str(tenant_id)
+        if user_id:
+            holder["user_id"] = str(user_id)
 
 
 @contextmanager
-def tenant_scope(tenant_id):
-    """Model calls inside run for ``tenant_id`` (background jobs, scripts and tests)."""
-    token = _scope.set({"tenant_id": str(tenant_id)} if tenant_id else {})
+def tenant_scope(tenant_id, user_id=None):
+    """Model calls inside run for ``tenant_id`` (background jobs, scripts and tests), and ``user_id`` when a person
+    asked."""
+    scope = {"tenant_id": str(tenant_id)} if tenant_id else {}
+    if tenant_id and user_id:
+        scope["user_id"] = str(user_id)
+    token = _scope.set(scope)
     try:
         yield
     finally:
@@ -64,6 +74,11 @@ def tenant_scope(tenant_id):
 def current_tenant() -> str | None:
     holder = _scope.get()
     return (holder or {}).get("tenant_id")
+
+
+def current_user() -> str | None:
+    holder = _scope.get()
+    return (holder or {}).get("user_id")
 
 
 # ------------------------------------------------------------------------------------------------------ checks
@@ -119,36 +134,125 @@ def is_free_trial(db, tenant_id) -> bool:
     return trial_subscription(db, uuid.UUID(str(tenant_id))) is not None
 
 
-def check_allowed(estimated_tokens: int) -> str | None:
-    """Raise GenAIUnavailable when this request's organization may not use a model now; returns its id (or None)."""
+@dataclass(frozen=True)
+class Access:
+    """Who a permitted model request is for: the organization (None outside any scope in development), whether it
+    is a free trial (its requests use the trial chain on sample data only), and the signed-in person."""
+
+    tenant_id: str | None
+    trial: bool = False
+    user_id: str | None = None
+
+    @property
+    def organisation_type(self) -> str:
+        return "TRIAL" if self.trial else "PAID"
+
+
+DEFAULT_TRIAL_MONTHLY_TOKENS = 200_000
+USER_AI_ACTIVE = "ACTIVE"
+USER_AI_INACTIVE = "INACTIVE"
+
+
+def trial_monthly_budget(tenant_budget: int | None) -> int:
+    """A free trial's allowance: its own, else ``MDARIX_AI_TRIAL_MONTHLY_TOKENS`` (lower than paid, decision T6)."""
+    if tenant_budget is not None:
+        return int(tenant_budget)
+    raw = os.getenv("MDARIX_AI_TRIAL_MONTHLY_TOKENS", "").strip()
+    return int(raw) if raw.isdigit() else DEFAULT_TRIAL_MONTHLY_TOKENS
+
+
+def _trial_or_paid(db, tenant_id) -> bool:
+    """Whether the organization is a free trial; when that cannot be read it is treated as paid (fail closed: a paid
+    organization's request never goes to the trial chain)."""
+    try:
+        return is_free_trial(db, tenant_id)
+    except Exception:
+        logger.exception("The organization's plan could not be read; treated as paid")
+        db.rollback()
+        return False
+
+
+def user_ai_state(db, tenant_id, user_id) -> str | None:
+    """The person's own AI flag (``auth_users.ai_access``, set by a Platform Administrator); None when unknown."""
+    from backend.app.db.models.foundation import AuthUser
+
+    if not user_id:
+        return None
+    try:
+        user = db.get(AuthUser, uuid.UUID(str(user_id)))
+    except (ValueError, TypeError):
+        return None
+    if user is None or str(user.tenant_id) != str(tenant_id):
+        return None
+    return user.ai_access
+
+
+def check_allowed(estimated_tokens: int, *, feature: str | None = None, trial_chain_on: bool = False) -> Access:
+    """Raise GenAIUnavailable when this request's organization may not use a model now; else who it is for.
+
+    Checks, in order: the organization's type (trial or paid); a trial needs the trial chain switched on
+    (``MDARIX_AI_TRIAL_CHAIN``); the organization's AI switch; for a trial, the person's own AI flag ACTIVE; the
+    organization's switch for ``feature`` (``tenants.ai_features``); its monthly budget (a trial's default is lower).
+    Every refusal is counted."""
     from backend.app.runtime_env import is_production_like
     from genai.provider import GenAIUnavailable
 
     tenant_id = current_tenant()
+    user_id = current_user()
     if tenant_id is None:
         if is_production_like():
             logger.error("A model request had no organization scope; refused")
             raise GenAIUnavailable("GENAI_NO_TENANT_SCOPE")
-        return None
+        return Access(None, False, user_id)
     db = _session(tenant_id)
     try:
+        from backend.app.db.models.foundation import Tenant
+
+        trial = _trial_or_paid(db, tenant_id)
         state = usage(db, tenant_id)
-        if is_free_trial(db, tenant_id):
+        tenant = db.get(Tenant, uuid.UUID(tenant_id))
+        switches = dict((tenant.ai_features if tenant is not None else None) or {})
+        budget = (
+            trial_monthly_budget(tenant.ai_monthly_token_budget if tenant else None)
+            if trial
+            else state["monthly_token_budget"]
+        )
+        if trial and not trial_chain_on:
             refusal = "GENAI_OFF_FOR_FREE_TRIAL"
         elif not state["ai_processing_allowed"]:
             refusal = "GENAI_DISABLED_FOR_ORGANIZATION"
-        elif state["tokens_used"] + estimated_tokens > state["monthly_token_budget"]:
+        elif trial and user_ai_state(db, tenant_id, user_id) != USER_AI_ACTIVE:
+            # The per-person switch applies to free trials only; a paid organization's people are not affected.
+            refusal = "GENAI_USER_AI_INACTIVE"
+        elif feature is not None and switches.get(feature) is not True:
+            refusal = "GENAI_FEATURE_OFF_FOR_ORGANIZATION"
+        elif state["tokens_used"] + estimated_tokens > budget:
             refusal = "GENAI_MONTHLY_BUDGET_REACHED"
         else:
-            return tenant_id
+            return Access(tenant_id, trial, user_id)
         _add_usage(db, tenant_id, refused=1)
         db.commit()
     finally:
         db.close()
     logger.info("Model request refused for an organization: %s", refusal)
-    if refusal == "GENAI_MONTHLY_BUDGET_REACHED":
+    if refusal == "GENAI_MONTHLY_BUDGET_REACHED" and not trial:
         check_budget_thresholds(tenant_id, budget_refused=True)
     raise GenAIUnavailable(refusal)
+
+
+def count_refusal(tenant_id: str | None) -> None:
+    """Count one refused model request for the organization (never fails the request)."""
+    if tenant_id is None:
+        return
+    try:
+        db = _session(tenant_id)
+        try:
+            _add_usage(db, tenant_id, refused=1)
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("A refused AI request could not be counted")
 
 
 def record_usage(tenant_id: str | None, input_tokens: int, output_tokens: int, cost: float) -> None:

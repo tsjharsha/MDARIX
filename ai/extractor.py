@@ -133,7 +133,9 @@ class AIEvidenceExtractor:
         try:
             result = self.provider_client.complete(
                 prompt,
-                {
+                feature="evidence_extraction",
+                records=[{"table": "evidence", "id": str(evidence_id)}],
+                context={
                     "evidence_id": evidence_id,
                     "metadata": metadata or {},
                     "prompt_injection_detected": injection_detected,

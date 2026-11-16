@@ -4,10 +4,18 @@ import genai.provider as provider_module
 from genai.provider import GenAIProvider, GenAIUnavailable, redact_context
 
 
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 def test_genai_defaults_fail_safe_without_provider(monkeypatch):
     monkeypatch.delenv("MDARIX_GENAI_BASE_URL", raising=False)
     monkeypatch.delenv("MDARIX_GENAI_API_KEY", raising=False)
-    result = GenAIProvider().complete("Explain this", {"token": "secret", "status": "open"})
+    result = GenAIProvider().complete("Explain this", {"token": "secret", "status": "open"}, feature="ask")
     assert result.provider == "controlled"
     assert result.output["human_review_required"] is True
     assert result.output["causality_state"] == "NOT_ESTABLISHED"
@@ -16,14 +24,14 @@ def test_genai_defaults_fail_safe_without_provider(monkeypatch):
 def test_context_redaction_and_input_limit():
     assert redact_context({"password": "x", "status": "open"}) == {"password": "[REDACTED]", "status": "open"}
     with pytest.raises(GenAIUnavailable, match="TOKEN_LIMIT"):
-        GenAIProvider(max_input_tokens=1).complete("a very long prompt", {})
+        GenAIProvider(max_input_tokens=1).complete("a very long prompt", {}, feature="ask")
 
 
 def test_provider_outage_is_bounded(monkeypatch):
     monkeypatch.setenv("MDARIX_GENAI_BASE_URL", "http://127.0.0.1:1")
     monkeypatch.setenv("MDARIX_GENAI_API_KEY", "test")
     with pytest.raises(GenAIUnavailable, match="PROVIDER_UNAVAILABLE"):
-        GenAIProvider(timeout_seconds=1, max_retries=0).complete("hello", {})
+        GenAIProvider(timeout_seconds=1, max_retries=0).complete("hello", {}, feature="ask")
 
 
 def test_groq_mode_uses_chat_completions_contract(monkeypatch):
@@ -56,7 +64,9 @@ def test_groq_mode_uses_chat_completions_contract(monkeypatch):
     monkeypatch.setenv("MDARIX_GENAI_TIMEOUT_SECONDS", "20")
     monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
 
-    result = provider_module.GenAIProvider(max_retries=0).complete("Summarize the evidence", {"status": "open"})
+    result = provider_module.GenAIProvider(max_retries=0).complete(
+        "Summarize the evidence", {"status": "open"}, feature="ask"
+    )
 
     assert captured["url"] == provider_module.GROQ_BASE_URL
     assert captured["body"]["messages"][0]["role"] == "user"
@@ -101,7 +111,7 @@ def test_groq_structured_request_uses_strict_schema_and_reasoning_budget(monkeyp
     }
 
     provider_module.GenAIProvider(max_retries=0).complete(
-        "Return an analysis", {}, json_output=True, response_schema=schema, max_output_tokens=2500
+        "Return an analysis", {}, json_output=True, response_schema=schema, max_output_tokens=2500, feature="ask"
     )
 
     assert captured["body"]["response_format"]["type"] == "json_schema"
@@ -139,7 +149,7 @@ def test_invalid_structured_response_is_retried_before_fallback(monkeypatch):
     monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(provider_module.time, "sleep", lambda seconds: None)
 
-    result = provider_module.GenAIProvider(max_retries=1).complete("Return JSON", {}, json_output=True)
+    result = provider_module.GenAIProvider(max_retries=1).complete("Return JSON", {}, json_output=True, feature="ask")
 
     assert calls == 2
     assert json.loads(result.output["answer"]) == {"summary": "repaired"}
@@ -162,4 +172,64 @@ def test_empty_numeric_settings_mean_the_defaults(monkeypatch):
         4000,
         1000,
         0.0,
+    )
+
+
+def test_vertex_builds_its_address_and_signs_in_as_the_vm(monkeypatch):
+    captured = []
+
+    class Response:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(self.body).encode()
+
+    def fake_urlopen(request, timeout):
+        captured.append(request)
+        if request.full_url == provider_module.VERTEX_TOKEN_URL:
+            return Response({"access_token": "vm-token", "expires_in": 3599, "token_type": "Bearer"})
+        return Response({"choices": [{"message": {"content": "From the records."}}], "usage": {}})
+
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "vertex")
+    monkeypatch.setenv("MDARIX_GENAI_PROJECT", "mdarix-test")
+    for name in ("MDARIX_GENAI_API_KEY", "MDARIX_GENAI_BASE_URL", "MDARIX_GENAI_LOCATION", "MDARIX_GENAI_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(provider_module, "_VERTEX_TOKEN", {"value": None, "expires": 0.0})
+    monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
+
+    provider = GenAIProvider(max_retries=0)
+    assert provider.configured
+    assert provider.model == "google/gemini-2.5-flash"
+    assert provider.base_url == (
+        "https://asia-south1-aiplatform.googleapis.com/v1/projects/mdarix-test"
+        "/locations/asia-south1/endpoints/openapi/chat/completions"
+    )
+    for _ in range(2):
+        result = provider.complete("Summarize the evidence", {"status": "open"}, feature="ask")
+        assert result.provider == "vertex"
+        assert result.output["answer"] == "From the records."
+    token_calls = [r for r in captured if r.full_url == provider_module.VERTEX_TOKEN_URL]
+    model_calls = [r for r in captured if r.full_url == provider.base_url]
+    # One token for both requests (it is reused until a minute before it expires), sent as a bearer token.
+    assert len(token_calls) == 1
+    assert token_calls[0].get_header("Metadata-flavor") == "Google"
+    assert [r.get_header("Authorization") for r in model_calls] == ["Bearer vm-token", "Bearer vm-token"]
+
+
+def test_vertex_without_a_project_is_not_configured(monkeypatch):
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "vertex")
+    for name in ("MDARIX_GENAI_PROJECT", "MDARIX_GENAI_API_KEY", "MDARIX_GENAI_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    provider = GenAIProvider()
+    assert not provider.configured
+    assert provider.complete("hello", {}, feature="ask").output["status"] == "PROVIDER_NOT_CONFIGURED"
+    assert provider_module.vertex_url("p1", "europe-west4").startswith(
+        "https://europe-west4-aiplatform.googleapis.com/"
     )

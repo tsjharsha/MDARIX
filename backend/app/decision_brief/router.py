@@ -391,9 +391,40 @@ def _out_of_date(db: Session, case: Investigation, made_at) -> bool:
     return any(moment is not None and moment > made_at for moment in (latest_scope, latest_evidence))
 
 
+def _reviewed_ai_brief(db: Session, brief) -> dict | None:
+    """The AI brief's content as a person accepted or edited it (AI-D7). A brief drafted by a language model and not
+    yet accepted or edited is refused; a brief the rules assembled needs no review."""
+    from backend.app.ai_review import UNREVIEWED_LABEL, usable_output
+    from backend.app.db.models.foundation import AIExecution
+
+    if brief is None or brief.ai_execution_id is None:
+        return brief.content if brief is not None else None
+    execution = (
+        db.query(AIExecution)
+        .filter(AIExecution.tenant_id == brief.tenant_id, AIExecution.id == brief.ai_execution_id)
+        .first()
+    )
+    usable, output, state = usable_output(db, execution) if execution is not None else (False, None, "NOT_REVIEWED")
+    if not usable:
+        raise error(
+            409,
+            "AI_DRAFT_NOT_REVIEWED",
+            "The AI brief was rejected; write the narrative"
+            if state == "REJECTED"
+            else f'The AI brief is marked "{UNREVIEWED_LABEL}": accept or edit it first',
+        )
+    if state == "EDITED":
+        # The person's text replaces the model's (the model's stays in the review history).
+        if "edited_text" in output:
+            return {"executive_summary": {"text": output["edited_text"]}}
+        return {"ai_brief": output}
+    return brief.content
+
+
 def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID, list[str]]:
     brief = composer.latest_ai_brief(db, case)
-    text = rules.ai_draft_text(brief.content if brief is not None else None)
+    content = _reviewed_ai_brief(db, brief)
+    text = rules.ai_draft_text(content)
     if brief is None or not text:
         raise error(
             409,
@@ -416,7 +447,7 @@ def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID, list[s
             },
         },
         brief.id,
-        rules.ai_draft_actions(brief.content),
+        rules.ai_draft_actions(content),
     )
 
 

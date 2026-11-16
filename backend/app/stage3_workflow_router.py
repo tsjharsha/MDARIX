@@ -366,7 +366,15 @@ def create_interaction(
         model_context = grounded
         if len(json.dumps(grounded, default=str)) > budget:
             model_context = compact_context(grounded, budget)
-        result = provider.complete(prompt, model_context, max_output_tokens=ASK_MAX_OUTPUT_TOKENS)
+        result = provider.complete(
+            prompt,
+            model_context,
+            feature="ask",
+            # The records whose text is sent; a case's own context is not listed, so a trial is refused for it.
+            records=None if payload.investigation_id else search.get("records"),
+            user_text=payload.prompt,
+            max_output_tokens=ASK_MAX_OUTPUT_TOKENS,
+        )
         from genai.ask import normalize_answer
         from genai.structured_answer import evidence_texts, render_markdown
 
@@ -383,6 +391,9 @@ def create_interaction(
         else:
             answer, checked_text = raw_answer, raw_answer
         response["provider_output"] = {**result.output, "answer": answer}
+        if result.call_id:
+            # The answer a person accepts, edits or rejects (POST /api/v1/ai-outputs/{ai_call_id}/review).
+            response["ai_call_id"] = result.call_id
         answer_check = check_answer(checked_text, known)
         shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check

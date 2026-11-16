@@ -1,10 +1,8 @@
 """The case AI run API: start the case's AI analysis in one pass, and follow it.
 
 - ``POST /api/v1/investigations/{id}/ai-run`` (ai.run): queues a run and starts it in the background (202).
-  ``trigger=AUTO`` (the case page, the first time it opens) starts one only when the case has neither a run nor a
-  saved analysis, and only when AI really answers for the organization (a provider configured and allowed, AI switched
-  on, allowance left); otherwise it answers with what exists (200), so opening a case page never repeats the AI's work
-  and never writes rule results in the AI's name when AI is off. ``trigger=MANUAL`` (a person) starts nothing either
+  ``trigger=AUTO`` (the case page opening) never starts a run: AI runs only when a person asks (owner decision AI-D6);
+  it answers with what exists (200, ``reason: ON_REQUEST_ONLY``). ``trigger=MANUAL`` (a person) starts nothing either
   while AI does not answer: 200 with ``state: AI_OFF`` (RCA-D13).
   A run already queued or running is answered as it is (409 for a person's MANUAL request).
 - ``GET /api/v1/investigations/{id}/ai-run``: the latest run with each step's outcome (``run`` is null without one).
@@ -68,7 +66,7 @@ def latest_run(
 ):
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     _case(db, tenant_id, investigation_id)
-    return {"run": runner.view(runner.latest(db, tenant_id, investigation_id)), "steps": list(runner.STEP_LABELS)}
+    return {"run": runner.view(runner.latest(db, tenant_id, investigation_id), db), "steps": list(runner.STEP_LABELS)}
 
 
 @router.post("/{investigation_id}/ai-run", dependencies=[Depends(require_permission(AI_RUN))])
@@ -94,9 +92,12 @@ def start_run(
             404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Not found in your organization"}
         )
     current = runner.latest(db, tenant_id, investigation_id)
+    if payload.trigger == "AUTO":
+        # AI-D6: opening a case page never starts an AI run; a person asks for one (MANUAL).
+        return {"started": False, "run": runner.view(current, db), "reason": "ON_REQUEST_ONLY"}
     if current is not None and current.status in runner.ACTIVE and not runner.is_stale(current):
         if payload.trigger == "AUTO":
-            return {"started": False, "run": runner.view(current)}
+            return {"started": False, "run": runner.view(current, db)}
         raise HTTPException(
             409,
             detail={
@@ -106,13 +107,13 @@ def start_run(
         )
     if payload.trigger == "AUTO" and (current is not None or _has_analysis(db, tenant_id, investigation_id)):
         # The case's AI work exists already: opening its page never repeats it.
-        return {"started": False, "run": runner.view(current)}
+        return {"started": False, "run": runner.view(current, db)}
     if not ai_ready(control, tenant_id):
         # AI is off, not available or used up: nothing starts, AUTO or MANUAL (RCA-D13: the steps would be keyword
         # rules written for the sample data); every step still works by hand.
         return {
             "started": False,
-            "run": runner.view(current),
+            "run": runner.view(current, db),
             "reason": "AI_NOT_READY",
             "state": "AI_OFF",
             "message": "AI analysis is off for this organization.",
@@ -147,4 +148,4 @@ def start_run(
     )
     db.commit()
     background.add_task(runner.run_in_background, tenant_id, run.id)
-    return JSONResponse(status_code=202, content={"started": True, "run": runner.view(run)})
+    return JSONResponse(status_code=202, content={"started": True, "run": runner.view(run, db)})

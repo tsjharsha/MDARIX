@@ -39,11 +39,23 @@ def checks() -> list[tuple[str, str, str]]:
         return found
     provider = GenAIProvider()
     found.append((PASS, "Provider chosen", f"{name} {provider.model}"))
-    found.append(
-        (PASS, "Credentials", "An API key is set (never shown).")
-        if provider.configured
-        else (FAIL, "Credentials", f"Set MDARIX_GENAI_API_KEY for {name}.")
-    )
+    if name == "vertex":
+        # Vertex AI signs in as the VM's service account (genai/provider.py vertex_token): no key, only the project.
+        found.append(
+            (PASS, "Credentials", f"Vertex AI at {provider.base_url}, signed in as the VM's service account.")
+            if provider.configured
+            else (
+                FAIL,
+                "Credentials",
+                "Set MDARIX_GENAI_PROJECT to the Google Cloud project (and _LOCATION if not asia-south1).",
+            )
+        )
+    else:
+        found.append(
+            (PASS, "Credentials", "An API key is set (never shown).")
+            if provider.configured
+            else (FAIL, "Credentials", f"Set MDARIX_GENAI_API_KEY for {name}.")
+        )
     contracted = name in contracted_providers()
     found.append(
         (PASS, "Under contract", f"{name} is listed in MDARIX_GENAI_CONTRACTED_PROVIDERS.")

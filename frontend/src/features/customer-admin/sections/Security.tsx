@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../aiSettings";
+import {
+  MASKING_SUMMARY,
+  TRIAL_AI_ACKNOWLEDGEMENT,
+  aiAcknowledgement,
+  aiFeaturePayload,
+  aiSettingsPayload,
+  featureLock,
+  providerLabel,
+  type AiFeature,
+} from "../aiSettings";
 import { BadgeCheck, Bot, Gauge } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { TwoFactorPanel } from "../../shared/TwoFactorSettings";
@@ -118,6 +127,11 @@ type AiSettings = {
   masking: boolean;
   /** The four bars AI must pass before a pilot; production refuses switching AI on until they are met. */
   release_gate?: ReleaseGate;
+  /** A free trial: AI only on the sample data, and only once MDARIX has set the trial's AI services. */
+  free_trial?: boolean;
+  trial_chain_on?: boolean;
+  /** Each AI feature with its intended use and risk, and whether it is on for the organization. */
+  features?: AiFeature[];
 };
 
 /** Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. */
@@ -126,6 +140,7 @@ function AiProcessing() {
   const settings = useResource<AiSettings>("/api/v1/admin/ai-settings");
   const data = settings.data;
   const on = data?.ai_processing_allowed ?? false;
+  const trial = Boolean(data?.free_trial);
   const share =
     data && data.monthly_token_budget ? Math.min(100, (data.tokens_used / data.monthly_token_budget) * 100) : 0;
   const change = () =>
@@ -136,10 +151,48 @@ function AiProcessing() {
         : `AI features (Ask MDARIX, hypotheses, challenges and briefs) will send the records an answer needs to ${providerLabel(data?.provider_name)}. ${MASKING_SUMMARY}`,
       confirmLabel: on ? "Turn AI off" : "Turn AI on",
       reason: { label: "Reason for the change", min: 10 },
-      ...(on ? {} : { acknowledge: aiAcknowledgement(data?.provider_name) }),
+      // Turning AI on is signature-grade: the password and an authenticator code (the server checks both).
+      ...(on
+        ? {}
+        : {
+            acknowledge: trial
+              ? `${aiAcknowledgement(data?.provider_name)} ${TRIAL_AI_ACKNOWLEDGEMENT}`
+              : aiAcknowledgement(data?.provider_name),
+            password: true,
+            mfaCode: true,
+          }),
       done: on ? "AI processing is off for your organization." : "AI processing is on for your organization.",
-      run: async (reason, _password, acknowledged) => {
-        await send("/api/v1/admin/ai-settings", "PUT", aiSettingsPayload(!on, reason, acknowledged));
+      run: async (reason, password, acknowledged, mfaCode) => {
+        await send(
+          "/api/v1/admin/ai-settings",
+          "PUT",
+          aiSettingsPayload(!on, reason, acknowledged, on ? undefined : { password, mfaCode }, trial),
+        );
+        settings.reload();
+      },
+    });
+  const switchFeature = (feature: AiFeature) =>
+    confirm({
+      title: feature.enabled ? `Turn ${feature.label} off?` : `Turn ${feature.label} on?`,
+      body: feature.enabled
+        ? `${feature.label} will answer from rules only.`
+        : `${feature.intended_use} A person reviews every result; it must never: ${feature.never}`,
+      confirmLabel: feature.enabled ? "Turn off" : "Turn on",
+      reason: { label: "Reason for the change", min: 10 },
+      ...(feature.enabled ? {} : { password: true, mfaCode: true }),
+      done: feature.enabled ? `${feature.label} is off.` : `${feature.label} is on.`,
+      run: async (reason, password, _acknowledged, mfaCode) => {
+        await send(
+          "/api/v1/admin/ai-settings",
+          "PUT",
+          aiFeaturePayload(
+            on,
+            feature.key,
+            !feature.enabled,
+            reason,
+            feature.enabled ? undefined : { password, mfaCode },
+          ),
+        );
         settings.reload();
       },
     });
@@ -211,8 +264,78 @@ function AiProcessing() {
           </p>
         </Panel>
       </div>
+      <AiFeatures features={data?.features} onSwitch={switchFeature} />
       <AiReleaseGate gate={data?.release_gate} />
     </>
+  );
+}
+
+/** Each AI feature with what it is for, its risk and its switch; a feature this service does not offer is locked. */
+export function AiFeatures({
+  features,
+  onSwitch,
+}: {
+  features: AiFeature[] | undefined;
+  onSwitch: (feature: AiFeature) => void;
+}) {
+  return (
+    <Panel eyebrow="Per feature" title="AI features">
+      <p className="ac-muted">
+        Each feature uses AI only when AI processing is on and the feature is on. Turning one on needs your password and
+        authenticator code. Every result is an AI proposal until a person accepts or edits it.
+      </p>
+      <Table
+        caption="AI features"
+        rows={features ?? []}
+        rowKey={(row) => row.key}
+        empty={{ title: "No AI features", detail: "This service lists no AI features." }}
+        columns={[
+          {
+            key: "label",
+            label: "Feature",
+            render: (row) => (
+              <span>
+                <strong>{row.label}</strong>
+                <br />
+                <small className="ac-muted">{row.intended_use}</small>
+              </span>
+            ),
+          },
+          {
+            key: "risk",
+            label: "Risk",
+            render: (row) => (
+              <ToneBadge
+                tone={row.risk === "MEDIUM" ? "warning" : "good"}
+                label={
+                  row.risk === "MEDIUM"
+                    ? "Medium: a proposal a person may turn into a record"
+                    : "Low: advice a person reads"
+                }
+              />
+            ),
+          },
+          {
+            key: "enabled",
+            label: "Status",
+            render: (row) => {
+              const lock = featureLock(row);
+              if (lock) return <span className="ac-muted">Off · {lock}</span>;
+              return (
+                <button
+                  type="button"
+                  className={row.enabled ? "ac-secondary" : "ac-primary"}
+                  aria-pressed={row.enabled}
+                  onClick={() => onSwitch(row)}
+                >
+                  {row.enabled ? "On · turn off" : "Off · turn on"}
+                </button>
+              );
+            },
+          },
+        ]}
+      />
+    </Panel>
   );
 }
 

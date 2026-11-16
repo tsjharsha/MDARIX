@@ -452,6 +452,9 @@ def ai_kind(provider: str | None, prompt_template_version: str | None = None) ->
     known = AI_KIND_LABELS.get(str(provider or "").strip().lower())
     if known:
         return known
+    if "decisionadvisory" in str(prompt_template_version or "").lower():
+        # Saved under the real provider since AI-R step 11 (or "none" when no model answered).
+        return "Decision advisory"
     return str(prompt_template_version or "").strip() or "AI run"
 
 

@@ -7,7 +7,7 @@ summary is returned for human review.
 
 from __future__ import annotations
 import json, os, re, time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib import error as urlerror, request
 import logging
 
@@ -31,11 +31,62 @@ OPENAI_COMPATIBLE = {
     # shim, which Anthropic does not offer for production use. For production under a commercial agreement only
     # (genai/policy.py, docs/compliance/AI_PROVIDER_REGISTER.md).
     "anthropic": ("https://api.anthropic.com/v1/messages", "claude-sonnet-5-5"),
+    # Gemini on Google Cloud Vertex AI, through Vertex's OpenAI-compatible endpoint. Its address names the Google
+    # Cloud project and region (vertex_url below), and it signs in without an API key (vertex_token below).
+    "vertex": (None, "google/gemini-2.5-flash"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
     # OmniRoute: a self-hosted gateway that forwards each request to the upstream providers configured in it. The model
     # name is an OmniRoute model or combo; set MDARIX_GENAI_OMNIROUTE_MODEL to the one you configured.
     "omniroute": ("http://127.0.0.1:20128/v1/chat/completions", "auto"),
+    # FreeLLMAPI: a self-hosted router on the same server (loopback only) for the free-trial chain, sample data only
+    # (owner decisions AI-D14a, AI-D2a). It names the upstream that answered in its X-Routed-Via header.
+    "freellmapi": ("http://127.0.0.1:3011/v1/chat/completions", "auto"),
 }
+# The free-trial chain (MDARIX_AI_TRIAL_CHAIN, empty by default = off): the providers a Free Trial organization's
+# sample-data requests may go to, in order. A paid organization never uses it (genai/vetted.py has the register).
+TRIAL_CHAIN_SETTING = "MDARIX_AI_TRIAL_CHAIN"
+TRIAL_TIMEOUTS = {"freellmapi": 30}
+TRIAL_DEFAULT_TIMEOUT = 20
+TRIAL_DEADLINE_SECONDS = 60.0
+# Seconds a trial-chain provider rests after each kind of failure (genai/provider.py _classify).
+REST_SECONDS = {"UNAVAILABLE": 60.0, "RATE_LIMITED": 900.0, "KEY_REFUSED": 3600.0, "UPSTREAM_NOT_VETTED": 3600.0}
+ORGANISATION_TRIAL = "TRIAL"
+ORGANISATION_PAID = "PAID"
+# Vertex AI: asia-south1 (Mumbai) keeps the processing in India. The access token comes from the metadata server of
+# the Google Cloud VM, for the service account attached to it: no key is stored, and the token lasts about an hour.
+VERTEX_DEFAULT_LOCATION = "asia-south1"
+VERTEX_TOKEN_URL = "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+# Providers that sign in without an API key: a model on MDARIX's own server, or Vertex AI through the VM's identity.
+KEYLESS_PROVIDERS = frozenset({"ollama", "vertex"})
+_VERTEX_TOKEN: dict[str, object] = {"value": None, "expires": 0.0}
+
+
+def vertex_url(project: str | None, location: str | None) -> str | None:
+    """Vertex AI's chat-completions address for a Google Cloud project and region; None without a project."""
+    if not project or not project.strip():
+        return None
+    location = (location or VERTEX_DEFAULT_LOCATION).strip()
+    return (
+        f"https://{location}-aiplatform.googleapis.com/v1/projects/{project.strip()}"
+        f"/locations/{location}/endpoints/openapi/chat/completions"
+    )
+
+
+def vertex_token(timeout: float) -> str:
+    """An access token for Vertex AI from the VM's metadata server, reused until a minute before it expires."""
+    if _VERTEX_TOKEN["value"] and time.time() < float(_VERTEX_TOKEN["expires"]):
+        return str(_VERTEX_TOKEN["value"])
+    req = request.Request(VERTEX_TOKEN_URL, headers={"Metadata-Flavor": "Google"})
+    with request.urlopen(req, timeout=timeout) as response:
+        raw = json.loads(response.read())
+    token = raw.get("access_token")
+    if not token:
+        raise GenAIUnavailable("GENAI_PROVIDER_UNAVAILABLE: no Vertex AI access token")
+    _VERTEX_TOKEN["value"] = token
+    _VERTEX_TOKEN["expires"] = time.time() + max(0, int(raw.get("expires_in") or 0) - 60)
+    return token
+
+
 # Providers in OPENAI_COMPATIBLE that speak their own Messages API instead of chat completions.
 ANTHROPIC_MESSAGES_API = frozenset({"anthropic"})
 ANTHROPIC_VERSION = "2023-06-01"
@@ -96,6 +147,24 @@ REFUSAL_MESSAGES = {
     "GENAI_UNAVAILABLE": (
         "The AI service is not available right now, so MDARIX answered from its rules; please try again in a "
         "few minutes."
+    ),
+    "GENAI_FEATURE_UNKNOWN": (
+        "This request names no known AI feature, so no AI was used and MDARIX answered from its rules."
+    ),
+    "GENAI_FEATURE_NOT_OFFERED": ("This AI feature is not offered, so MDARIX answered from its rules."),
+    "GENAI_FEATURE_OFF_ON_PLATFORM": (
+        "This AI feature is not switched on for this service, so MDARIX answered from its rules."
+    ),
+    "GENAI_FEATURE_OFF_FOR_ORGANIZATION": (
+        "This AI feature is switched off for your organization; an administrator can turn it on under "
+        "Security › AI processing."
+    ),
+    # A free trial's person whose own AI flag a Platform Administrator set INACTIVE.
+    "GENAI_USER_AI_INACTIVE": "AI is not enabled for your account, so MDARIX answered from its rules.",
+    # Free trials use AI on the sample data only (owner decision AI-D14a): never on the trial's own records.
+    "GENAI_TRIAL_SAMPLE_ONLY": (
+        "AI available on paid plans. In the free trial, AI works on the sample data only, so MDARIX answered "
+        "from its rules."
     ),
 }
 
@@ -170,6 +239,16 @@ class GenAIResult:
     estimated_cost: float
     latency_ms: int
     human_review_required: bool = True
+    # Per-call facts (AI-R 4.3, trial chain 2.4): the gateway is ``provider``; the upstream is who actually answered.
+    upstream_provider: str | None = None
+    upstream_model: str | None = None
+    region: str | None = None
+    thinking_tokens: int = 0
+    organisation_type: str | None = None
+    chain: str | None = None
+    chain_position: int | None = None
+    attempts: tuple = ()
+    call_id: str | None = None
 
 
 def redact_context(value):
@@ -205,6 +284,8 @@ class GenAIProvider:
         self.provider_name = (provider_name or os.getenv("MDARIX_GENAI_PROVIDER", "controlled")).strip().lower()
         known_url, known_model = OPENAI_COMPATIBLE.get(self.provider_name, (None, "mdarix-controlled"))
         self.base_url = base_url or os.getenv(prefix + "BASE_URL") or known_url
+        if self.provider_name == "vertex" and not self.base_url:
+            self.base_url = vertex_url(os.getenv(prefix + "PROJECT"), os.getenv(prefix + "LOCATION"))
         self.api_key = api_key or os.getenv(prefix + "API_KEY")
         self.model = model or os.getenv(prefix + "MODEL", known_model)
         self.model_version = os.getenv(prefix + "MODEL_VERSION", "unconfigured")
@@ -220,7 +301,7 @@ class GenAIProvider:
 
     @property
     def configured(self) -> bool:
-        return bool(self.base_url and (self.api_key or self.provider_name == "ollama"))
+        return bool(self.base_url and (self.api_key or self.provider_name in KEYLESS_PROVIDERS))
 
     def health(self):
         now = time.time()
@@ -266,6 +347,9 @@ class GenAIProvider:
         prompt: str,
         context: dict | None = None,
         *,
+        feature: str | None = None,
+        records: list[dict] | None = None,
+        user_text: str | None = None,
         system: str | None = None,
         json_output: bool = False,
         response_schema: dict | None = None,
@@ -274,10 +358,23 @@ class GenAIProvider:
     ) -> GenAIResult:
         """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request.
 
-        ``evidence`` (records with an ``id`` and ``text`` or fields) is sent in delimited ``<evidence id="...">``
-        blocks after the context (``user_content``), masked and redacted like the context."""
-        from genai import pii
+        ``feature`` (``genai/features.py``) is required: a request without a known feature is refused before anything
+        else. ``evidence`` (records with an ``id`` and ``text`` or fields) is sent in delimited ``<evidence id="...">``
+        blocks after the context (``user_content``), masked and redacted like the context. ``records`` lists every
+        record whose content is in the prompt, context or evidence (``{"table", "id"}``, plus ``evidence_id`` naming
+        its evidence block): a Free Trial organization's request is sent only when each is unedited sample data
+        (``genai/sample_gate.py``). ``user_text`` is free text the person typed (the Ask question).
 
+        Order (every refusal comes before any network code): feature known -> nothing configured = no AI -> feature
+        on the platform list -> the organization's switches and budget (its type: trial or paid) -> trial: the
+        sample-data gate and the trial chain; paid: the paid provider and its fallbacks. A paid organization never
+        reaches the trial chain, and a trial organization never reaches the paid provider."""
+        from genai import features, pii
+
+        item = features.known(feature)
+        if not item.offered:
+            # Not offered at all (AI-D5): refused before anything else, whatever the switches say.
+            raise GenAIUnavailable(f"GENAI_FEATURE_NOT_OFFERED: {item.key}")
         safe_prompt = SENSITIVE.sub(lambda m: m.group(1) + ": [REDACTED]", prompt)
         safe_context = redact_context(context or {})
         safe_evidence = redact_context(list(evidence or []))
@@ -291,45 +388,58 @@ class GenAIProvider:
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
         started = time.monotonic()
-        # Fallbacks stand in for a configured primary only: without one (controlled mode) no model is called.
-        if not self.configured:
-            return GenAIResult(
-                "controlled",
-                self.model,
-                CONFIG_VERSION,
-                {
-                    "status": "PROVIDER_NOT_CONFIGURED",
-                    "answer": None,
-                    "limitations": ["No AI service is set up here, so no AI was used."],
-                    "human_review_required": True,
-                    "causality_state": "NOT_ESTABLISHED",
-                },
-                input_tokens,
-                0,
-                0.0,
-                int((time.monotonic() - started) * 1000),
-            )
+        trial_names = trial_chain_names()
+        # Fallbacks stand in for a configured primary only: with no paid provider and no trial chain (controlled
+        # mode) no model is called and nothing is read.
+        if not self.configured and not trial_names:
+            return self._controlled(input_tokens, started)
+        features.check_platform(item)
         from genai.policy import allowed
 
-        chain = [
-            item for item in [self, *self.fallbacks] if item.configured and allowed(item.provider_name, item.model)
+        paid_chain = [
+            provider
+            for provider in [self, *self.fallbacks]
+            if provider.configured and allowed(provider.provider_name, provider.model) and _paid_may_use(provider)
         ]
-        if not chain:
+        if self.configured and not paid_chain and not trial_names:
             # Every configured provider is forbidden here (for example a free tier in production): no model is called.
             logger.error("No AI provider may receive customer data in this environment; answering without a model")
             raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED")
         from genai import governance
 
-        # The organization's AI switch and monthly budget (raises when it may not use a model now).
-        tenant_id = governance.check_allowed(input_tokens + (max_output_tokens or self.max_output))
+        # The organization's switches, its feature switch and its budget; also whether it is a free trial.
+        access = governance.check_allowed(
+            input_tokens + (max_output_tokens or self.max_output), feature=item.key, trial_chain_on=bool(trial_names)
+        )
+        call = _Call(
+            feature=item,
+            prompt=safe_prompt,
+            context=safe_context,
+            evidence=safe_evidence,
+            system=system,
+            json_output=json_output,
+            response_schema=response_schema,
+            max_output_tokens=max_output_tokens,
+            input_tokens=input_tokens,
+            started=started,
+            records=list(records or []),
+        )
+        if access.trial:
+            return self._complete_trial(access, call, user_text)
+        if not self.configured:
+            return self._controlled(input_tokens, started)
+        if not paid_chain:
+            logger.error("No AI provider may receive this organization's data here; answering without a model")
+            raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED")
         resting_until = _resting_until()
-        resting = [item for item in chain if resting_until.get(item.provider_name, 0) > time.time()]
+        resting = [provider for provider in paid_chain if resting_until.get(provider.provider_name, 0) > time.time()]
         # Providers that are resting are tried last, so a request still gets an answer if every provider rests.
-        ordered = [item for item in chain if item not in resting] + resting
+        ordered = [provider for provider in paid_chain if provider not in resting] + resting
         last_error: GenAIUnavailable | None = None
-        for item in ordered:
+        attempts: list[dict] = []
+        for position, provider in enumerate(ordered, start=1):
             try:
-                result = item._send(
+                result = provider._send(
                     safe_prompt,
                     safe_context,
                     evidence=safe_evidence,
@@ -341,12 +451,267 @@ class GenAIProvider:
                     started=started,
                     fail_fast=len(ordered) > 1,
                 )
-                governance.record_usage(tenant_id, result.input_tokens, result.output_tokens, result.estimated_cost)
-                return result
             except GenAIUnavailable as exc:
                 last_error = exc
-                logger.warning("GenAI provider %s unavailable; trying the next one", item.provider_name)
+                attempts.append({"provider": provider.provider_name, "outcome": exc.reason[:120]})
+                logger.warning("GenAI provider %s unavailable; trying the next one", provider.provider_name)
+                continue
+            result = replace(
+                result,
+                organisation_type=ORGANISATION_PAID,
+                chain="paid",
+                chain_position=position,
+                attempts=tuple(attempts),
+            )
+            return _finish(access, call, result)
+        _record_failure(access, call, attempts, ORGANISATION_PAID, "paid")
         raise last_error or GenAIUnavailable("GENAI_PROVIDER_UNAVAILABLE: no provider")
+
+    def _controlled(self, input_tokens: int, started: float) -> GenAIResult:
+        return GenAIResult(
+            "controlled",
+            self.model,
+            CONFIG_VERSION,
+            {
+                "status": "PROVIDER_NOT_CONFIGURED",
+                "answer": None,
+                "limitations": ["No AI service is set up here, so no AI was used."],
+                "human_review_required": True,
+                "causality_state": "NOT_ESTABLISHED",
+            },
+            input_tokens,
+            0,
+            0.0,
+            int((time.monotonic() - started) * 1000),
+        )
+
+    def _complete_trial(self, access, call: "_Call", user_text: str | None) -> GenAIResult:
+        """A Free Trial organization: sample data only, through the trial chain, with the failover rules."""
+        from genai import governance, sample_gate
+
+        # Before any network code: every record in the request must be unedited sample data of this organization.
+        sample_gate.check(access.tenant_id, records=call.records, evidence=call.evidence, user_text=user_text)
+        chain = trial_chain(self)
+        if not chain:
+            governance.count_refusal(access.tenant_id)
+            raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED: no usable provider in the trial chain")
+        resting_until = _resting_until()
+        resting = [provider for provider in chain if resting_until.get(provider.provider_name, 0) > time.time()]
+        ordered = [provider for provider in chain if provider not in resting] + resting
+        deadline = time.monotonic() + TRIAL_DEADLINE_SECONDS
+        attempts: list[dict] = []
+        for position, provider in enumerate(ordered, start=1):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                attempts.append({"provider": provider.provider_name, "outcome": "DEADLINE"})
+                break
+            try:
+                result = provider._send_once(call, timeout=min(float(provider.timeout), remaining))
+            except _Failover as exc:
+                attempts.append({"provider": provider.provider_name, "outcome": exc.kind, "status": exc.status})
+                logger.warning(
+                    "Trial AI provider %s failed (%s); %s",
+                    provider.provider_name,
+                    exc.kind,
+                    "stopping" if exc.stop else "trying the next one",
+                )
+                if exc.stop:
+                    break
+                _after_failure(provider.provider_name, exc.kind)
+                continue
+            result = replace(
+                result,
+                organisation_type=ORGANISATION_TRIAL,
+                chain="trial",
+                chain_position=position,
+                attempts=tuple(attempts),
+            )
+            return _finish(access, call, result)
+        _record_failure(access, call, attempts, ORGANISATION_TRIAL, "trial")
+        raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: trial chain ({len(attempts)} tried)")
+
+    def _payload(
+        self,
+        content: str,
+        *,
+        system: str | None,
+        json_output: bool,
+        response_schema: dict | None,
+        max_output_tokens: int | None,
+        safe_prompt: str,
+        safe_context: dict,
+        evidence: list[dict] | None,
+    ) -> bytes:
+        if self.provider_name in ANTHROPIC_MESSAGES_API:
+            # Anthropic Messages API: the system prompt is a top-level field, and current models refuse sampling
+            # parameters such as temperature, so none is sent.
+            body = {
+                "model": self.model,
+                "max_tokens": max_output_tokens or self.max_output,
+                "messages": [{"role": "user", "content": content}],
+            }
+            if system:
+                body["system"] = system
+            if self.model.startswith(ANTHROPIC_EFFORT_MODELS):
+                body["output_config"] = {"effort": "low"}
+            return json.dumps(body).encode()
+        if self.provider_name in OPENAI_COMPATIBLE:
+            body = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": content}],
+                "temperature": 0,
+            }
+            if self.provider_name == "groq":
+                body["max_completion_tokens"] = max_output_tokens or self.max_output
+            else:
+                body["max_tokens"] = max_output_tokens or self.max_output
+            if system:
+                body["messages"].insert(0, {"role": "system", "content": system})
+            if self.provider_name == "vertex":
+                # Gemini Flash may spend the output allowance on thinking; a low effort leaves room for the answer.
+                body["reasoning_effort"] = (os.getenv("MDARIX_GENAI_VERTEX_REASONING_EFFORT") or "low").strip().lower()
+            if response_schema and self.provider_name == "groq" and self.model in STRICT_JSON_SCHEMA_MODELS:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "mdarix_investigation_analysis",
+                        "strict": True,
+                        "schema": response_schema,
+                    },
+                }
+                # GPT-OSS can spend the entire completion budget on reasoning. Low, hidden reasoning leaves a
+                # deterministic structured answer while retaining enough analysis for this evidence-review task.
+                body["reasoning_effort"] = "low"
+                body["reasoning_format"] = "hidden"
+            elif json_output:
+                body["response_format"] = {"type": "json_object"}
+            return json.dumps(body).encode()
+        context = {**safe_context, "evidence": evidence} if evidence else safe_context
+        return json.dumps(
+            {"model": self.model, "prompt": safe_prompt, "context": context, "max_tokens": self.max_output}
+        ).encode()
+
+    def _open(self, payload: bytes, timeout: float):
+        """One HTTP request: the parsed reply and its headers."""
+        req = request.Request(
+            self.base_url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "MDARIX-R1/1.0",
+            },
+        )
+        if self.provider_name in ANTHROPIC_MESSAGES_API:
+            req.add_header("x-api-key", self.api_key or "")
+            req.add_header("anthropic-version", ANTHROPIC_VERSION)
+        elif self.provider_name == "vertex" and not self.api_key:
+            req.add_header("Authorization", f"Bearer {vertex_token(timeout)}")
+        elif self.api_key:
+            req.add_header("Authorization", f"Bearer {self.api_key}")
+        with request.urlopen(req, timeout=timeout) as response:
+            raw = json.loads(response.read())
+            headers = getattr(response, "headers", None)
+        return raw, headers
+
+    def _parse(self, raw: dict, *, json_output: bool, input_tokens: int, started: float) -> GenAIResult:
+        """The reply as a result; ``InvalidStructuredOutput`` when a structured request got no JSON object."""
+        thinking = 0
+        if self.provider_name in ANTHROPIC_MESSAGES_API:
+            if raw.get("stop_reason") == "refusal":
+                raise InvalidStructuredOutput("the model declined the request")
+            texts = [
+                block.get("text") or ""
+                for block in raw.get("content") or []
+                if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            answer = "".join(texts) or None
+            usage = raw.get("usage") or {}
+            output_tokens = int(usage.get("output_tokens") or max(1, len(str(answer or "")) // 4))
+            input_tokens = int(usage.get("input_tokens") or input_tokens)
+        elif self.provider_name in OPENAI_COMPATIBLE:
+            answer = ((raw.get("choices") or [{}])[0].get("message") or {}).get("content")
+            usage = raw.get("usage") or {}
+            output_tokens = int(usage.get("completion_tokens") or max(1, len(str(answer or "")) // 4))
+            input_tokens = int(usage.get("prompt_tokens") or input_tokens)
+            details = usage.get("completion_tokens_details") or {}
+            thinking = int((details.get("reasoning_tokens") if isinstance(details, dict) else 0) or 0)
+        else:
+            answer = raw.get("answer", raw.get("output", raw.get("text")))
+            output_tokens = min(self.max_output, max(1, len(str(answer or "")) // 4))
+        if json_output:
+            if not isinstance(answer, str) or not answer.strip():
+                raise InvalidStructuredOutput("empty structured response")
+            answer = _strip_code_fence(answer)
+            try:
+                structured = json.loads(answer)
+            except (TypeError, ValueError) as exc:
+                raise InvalidStructuredOutput("invalid structured response") from exc
+            if not isinstance(structured, dict):
+                raise InvalidStructuredOutput("structured response is not an object")
+        output = {
+            "answer": answer,
+            "limitations": ["Provider output requires human review."],
+            "human_review_required": True,
+            "causality_state": "NOT_ESTABLISHED",
+        }
+        return GenAIResult(
+            self.provider_name if self.provider_name != "controlled" else "external",
+            self.model,
+            self.model_version,
+            output,
+            input_tokens,
+            output_tokens,
+            ((input_tokens + output_tokens) / 1000) * self.cost_per_1k,
+            int((time.monotonic() - started) * 1000),
+            upstream_provider=self.provider_name,
+            upstream_model=str(raw.get("model") or self.model) if isinstance(raw, dict) else self.model,
+            region=provider_region(self),
+            thinking_tokens=thinking,
+        )
+
+    def _send_once(self, call: "_Call", *, timeout: float) -> GenAIResult:
+        """One trial-chain attempt, no retries (the next provider is the retry). Raises ``_Failover`` with the
+        failure's kind: the caller moves on, or stops for a request that would fail everywhere (400, 413)."""
+        from genai import vetted
+
+        content = user_content(call.prompt, call.context, call.evidence)
+        payload = self._payload(
+            content,
+            system=call.system,
+            json_output=call.json_output,
+            response_schema=call.response_schema,
+            max_output_tokens=call.max_output_tokens,
+            safe_prompt=call.prompt,
+            safe_context=call.context,
+            evidence=call.evidence,
+        )
+        try:
+            raw, headers = self._open(payload, timeout)
+        except urlerror.HTTPError as exc:
+            raise _Failover.from_status(exc.code) from exc
+        except GenAIUnavailable as exc:
+            raise _Failover("UNAVAILABLE") from exc
+        except (urlerror.URLError, OSError, ValueError) as exc:
+            # Connection refused, DNS failure, timeout (an OSError) or an unreadable reply.
+            raise _Failover("UNAVAILABLE") from exc
+        try:
+            upstream = vetted.identify(self.provider_name, headers=headers, raw=raw, configured_model=self.model)
+        except vetted.UpstreamNotVetted as exc:
+            # The answer is discarded unread: it came from (or may have come from) a provider not vetted.
+            logger.error("Trial AI reply discarded: %s", exc)
+            raise _Failover("UPSTREAM_NOT_VETTED") from exc
+        try:
+            result = self._parse(
+                raw, json_output=call.json_output, input_tokens=call.input_tokens, started=call.started
+            )
+        except InvalidStructuredOutput as exc:
+            raise _Failover("INVALID_OUTPUT") from exc
+        return replace(
+            result,
+            upstream_provider=upstream.provider,
+            upstream_model=upstream.model,
+            region=vetted_region(upstream.provider),
+        )
 
     def _send(
         self,
@@ -365,116 +730,21 @@ class GenAIProvider:
         """One provider: the request with its retries. With other providers to fall back to (fail_fast), a rate
         limit moves on at once and the provider rests for a while instead of being waited on."""
         content = user_content(safe_prompt, safe_context, evidence)
-        if self.provider_name in ANTHROPIC_MESSAGES_API:
-            # Anthropic Messages API: the system prompt is a top-level field, and current models refuse sampling
-            # parameters such as temperature, so none is sent.
-            body = {
-                "model": self.model,
-                "max_tokens": max_output_tokens or self.max_output,
-                "messages": [{"role": "user", "content": content}],
-            }
-            if system:
-                body["system"] = system
-            if self.model.startswith(ANTHROPIC_EFFORT_MODELS):
-                body["output_config"] = {"effort": "low"}
-            payload = json.dumps(body).encode()
-        elif self.provider_name in OPENAI_COMPATIBLE:
-            body = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": content}],
-                "temperature": 0,
-            }
-            if self.provider_name == "groq":
-                body["max_completion_tokens"] = max_output_tokens or self.max_output
-            else:
-                body["max_tokens"] = max_output_tokens or self.max_output
-            if system:
-                body["messages"].insert(0, {"role": "system", "content": system})
-            if response_schema and self.provider_name == "groq" and self.model in STRICT_JSON_SCHEMA_MODELS:
-                body["response_format"] = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "mdarix_investigation_analysis",
-                        "strict": True,
-                        "schema": response_schema,
-                    },
-                }
-                # GPT-OSS can spend the entire completion budget on reasoning. Low, hidden reasoning leaves a
-                # deterministic structured answer while retaining enough analysis for this evidence-review task.
-                body["reasoning_effort"] = "low"
-                body["reasoning_format"] = "hidden"
-            elif json_output:
-                body["response_format"] = {"type": "json_object"}
-            payload = json.dumps(body).encode()
-        else:
-            context = {**safe_context, "evidence": evidence} if evidence else safe_context
-            payload = json.dumps(
-                {"model": self.model, "prompt": safe_prompt, "context": context, "max_tokens": self.max_output}
-            ).encode()
+        payload = self._payload(
+            content,
+            system=system,
+            json_output=json_output,
+            response_schema=response_schema,
+            max_output_tokens=max_output_tokens,
+            safe_prompt=safe_prompt,
+            safe_context=safe_context,
+            evidence=evidence,
+        )
         error = None
         for attempt in range(self.retries + 1):
             try:
-                req = request.Request(
-                    self.base_url,
-                    data=payload,
-                    headers={
-                        "Content-Type": "application/json",
-                        "User-Agent": "MDARIX-R1/1.0",
-                    },
-                )
-                if self.provider_name in ANTHROPIC_MESSAGES_API:
-                    req.add_header("x-api-key", self.api_key or "")
-                    req.add_header("anthropic-version", ANTHROPIC_VERSION)
-                elif self.api_key:
-                    req.add_header("Authorization", f"Bearer {self.api_key}")
-                with request.urlopen(req, timeout=self.timeout) as response:
-                    raw = json.loads(response.read())
-                if self.provider_name in ANTHROPIC_MESSAGES_API:
-                    if raw.get("stop_reason") == "refusal":
-                        raise InvalidStructuredOutput("the model declined the request")
-                    texts = [
-                        block.get("text") or ""
-                        for block in raw.get("content") or []
-                        if isinstance(block, dict) and block.get("type") == "text"
-                    ]
-                    answer = "".join(texts) or None
-                    usage = raw.get("usage") or {}
-                    output_tokens = int(usage.get("output_tokens") or max(1, len(str(answer or "")) // 4))
-                    input_tokens = int(usage.get("input_tokens") or input_tokens)
-                elif self.provider_name in OPENAI_COMPATIBLE:
-                    answer = ((raw.get("choices") or [{}])[0].get("message") or {}).get("content")
-                    usage = raw.get("usage") or {}
-                    output_tokens = int(usage.get("completion_tokens") or max(1, len(str(answer or "")) // 4))
-                    input_tokens = int(usage.get("prompt_tokens") or input_tokens)
-                else:
-                    answer = raw.get("answer", raw.get("output", raw.get("text")))
-                    output_tokens = min(self.max_output, max(1, len(str(answer or "")) // 4))
-                if json_output:
-                    if not isinstance(answer, str) or not answer.strip():
-                        raise InvalidStructuredOutput("empty structured response")
-                    answer = _strip_code_fence(answer)
-                    try:
-                        structured = json.loads(answer)
-                    except (TypeError, ValueError) as exc:
-                        raise InvalidStructuredOutput("invalid structured response") from exc
-                    if not isinstance(structured, dict):
-                        raise InvalidStructuredOutput("structured response is not an object")
-                output = {
-                    "answer": answer,
-                    "limitations": ["Provider output requires human review."],
-                    "human_review_required": True,
-                    "causality_state": "NOT_ESTABLISHED",
-                }
-                return GenAIResult(
-                    self.provider_name if self.provider_name != "controlled" else "external",
-                    self.model,
-                    self.model_version,
-                    output,
-                    input_tokens,
-                    output_tokens,
-                    ((input_tokens + output_tokens) / 1000) * self.cost_per_1k,
-                    int((time.monotonic() - started) * 1000),
-                )
+                raw, _headers = self._open(payload, self.timeout)
+                return self._parse(raw, json_output=json_output, input_tokens=input_tokens, started=started)
             except Exception as exc:
                 error = exc
                 status = exc.code if isinstance(exc, urlerror.HTTPError) else None
@@ -506,7 +776,200 @@ class GenAIProvider:
         if fail_fast and _COOLDOWN_UNTIL.get(self.provider_name, 0) <= time.time():
             # Down rather than limited: rest briefly so the next requests go straight to a working provider.
             _rest(self.provider_name, float(os.getenv("MDARIX_GENAI_OUTAGE_REST_SECONDS", "60")), "UNAVAILABLE")
-        raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: {type(error).__name__}")
+        reason = "GENAI_PROVIDER_UNAVAILABLE"
+        if isinstance(error, InvalidStructuredOutput):
+            reason = "GENAI_PROVIDER_UNAVAILABLE: INVALID_OUTPUT"
+        raise GenAIUnavailable(f"{reason}: {type(error).__name__}")
+
+
+@dataclass(frozen=True)
+class _Call:
+    """One request as it is sent: masked, redacted and sized."""
+
+    feature: object
+    prompt: str
+    context: dict
+    evidence: list
+    system: str | None
+    json_output: bool
+    response_schema: dict | None
+    max_output_tokens: int | None
+    input_tokens: int
+    started: float
+    records: list
+
+
+class _Failover(Exception):
+    """A trial-chain attempt failed; ``kind`` decides what happens next (``REST_SECONDS``; ``stop`` ends the chain)."""
+
+    def __init__(self, kind: str, status: int | None = None, stop: bool = False):
+        super().__init__(kind)
+        self.kind = kind
+        self.status = status
+        self.stop = stop
+
+    @classmethod
+    def from_status(cls, status: int) -> "_Failover":
+        if status == 429:
+            return cls("RATE_LIMITED", status)
+        if status in (401, 403):
+            return cls("KEY_REFUSED", status)
+        if status in (400, 413):
+            # Our request is wrong or too big: it would fail at every provider, so the rules answer at once.
+            return cls("REQUEST_REFUSED", status, stop=True)
+        return cls("UNAVAILABLE", status)
+
+
+def _after_failure(name: str, kind: str) -> None:
+    """Rest a failed trial provider for its kind of failure; tell the operators about a key or upstream problem."""
+    seconds = REST_SECONDS.get(kind)
+    if seconds:
+        _rest(name, seconds, kind)
+    if kind in ("KEY_REFUSED", "UPSTREAM_NOT_VETTED"):
+        try:
+            from backend.app.alerts import send_alert
+
+            send_alert(
+                "Trial AI provider problem",
+                f"Trial AI provider {name} failed with {kind}; it rests for {int(seconds or 0)} seconds. "
+                "Check its key, or the upstreams configured in it against the vetted-provider register.",
+            )
+        except Exception:
+            logger.exception("Trial AI provider alert could not be sent")
+
+
+def _finish(access, call: _Call, result: GenAIResult) -> GenAIResult:
+    """An answered request: count its tokens and write its call record (genai/call_record.py)."""
+    from genai import call_record, governance
+
+    governance.record_usage(access.tenant_id, result.input_tokens, result.output_tokens, result.estimated_cost)
+    call_id = call_record.write(access, call, result, outcome="ANSWERED")
+    return replace(result, call_id=call_id) if call_id else result
+
+
+def _record_failure(access, call: _Call, attempts: list[dict], organisation_type: str, chain: str) -> None:
+    """Every provider failed after a request was sent: the call record says FAILED (or INVALID_OUTPUT), no output."""
+    from genai import call_record
+
+    if not attempts:
+        return
+    invalid = all("INVALID_OUTPUT" in str(item.get("outcome")) for item in attempts)
+    call_record.write(
+        access,
+        call,
+        None,
+        outcome="INVALID_OUTPUT" if invalid else "FAILED",
+        organisation_type=organisation_type,
+        chain=chain,
+        attempts=attempts,
+    )
+
+
+def provider_region(provider: GenAIProvider) -> str | None:
+    """Where a provider processes the request, when its address says so (Vertex names its region)."""
+    if provider.provider_name == "vertex" and provider.base_url:
+        match = re.match(r"https://([a-z0-9-]+)-aiplatform\.googleapis\.com/", provider.base_url)
+        return match.group(1) if match else None
+    return None
+
+
+def vetted_region(name: str) -> str | None:
+    from genai import vetted
+
+    for row in vetted.load().get("providers") or []:
+        if str(row.get("provider") or "").lower() == name:
+            return row.get("region")
+    return None
+
+
+def trial_chain_names() -> list[str]:
+    """``MDARIX_AI_TRIAL_CHAIN`` as written (comma-separated, in order); empty = no AI for free trials."""
+    return [name.strip().lower() for name in os.getenv(TRIAL_CHAIN_SETTING, "").split(",") if name.strip()]
+
+
+def paid_provider_names() -> set[str]:
+    """Providers for paid organizations only: never in the trial chain (keeps paid keys away from trial traffic)."""
+    from genai.policy import contracted_providers
+
+    return {"vertex", "anthropic", *contracted_providers()}
+
+
+def trial_only_names() -> set[str]:
+    """Providers registered for the trial chain (genai/vetted_providers.json): never for a paid organization."""
+    from genai import vetted
+
+    return {
+        str(row.get("provider") or "").lower()
+        for row in vetted.load().get("providers") or []
+        if row.get("chain") == vetted.TRIAL_CHAIN
+    }
+
+
+def _paid_may_use(provider: GenAIProvider) -> bool:
+    """In staging and production a paid organization's request never goes to a trial-chain provider."""
+    from backend.app.runtime_env import is_production_like
+
+    return not (is_production_like() and provider.provider_name in trial_only_names())
+
+
+def is_loopback(url: str | None) -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(url or "").hostname or "").lower()
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def trial_chain_problems(names: list[str] | None = None) -> dict[str, str]:
+    """Names in ``MDARIX_AI_TRIAL_CHAIN`` that may not be used, with the reason."""
+    from backend.app.runtime_env import is_production_like
+    from genai import vetted
+
+    names = trial_chain_names() if names is None else names
+    register = vetted.load()
+    paid = paid_provider_names()
+    found = {}
+    for name in names:
+        if name in paid:
+            found[name] = "a paid provider may not stand in the trial chain"
+            continue
+        if name not in OPENAI_COMPATIBLE:
+            found[name] = "not a supported provider name"
+            continue
+        problem = vetted.chain_problem(name, register)
+        if problem:
+            found[name] = problem
+            continue
+        if is_production_like() and name in ("freellmapi", "omniroute"):
+            url = os.getenv(f"MDARIX_GENAI_{name.upper()}_BASE_URL") or OPENAI_COMPATIBLE[name][0]
+            if not is_loopback(url):
+                found[name] = "its address must be on this server (127.0.0.1)"
+    return found
+
+
+def trial_chain(primary: GenAIProvider) -> list[GenAIProvider]:
+    """The usable trial-chain providers, in order: vetted, configured, and (in staging and production) on loopback."""
+    names = trial_chain_names()
+    problems = trial_chain_problems(names)
+    for name, reason in problems.items():
+        if name not in _WARNED_FALLBACKS:
+            _WARNED_FALLBACKS.add(name)
+            logger.warning("Trial AI provider %s is skipped: %s", name, reason)
+    chain = []
+    for name in dict.fromkeys(names):
+        if name in problems:
+            continue
+        provider = GenAIProvider(
+            provider_name=name,
+            timeout_seconds=os.getenv(f"MDARIX_GENAI_{name.upper()}_TIMEOUT_SECONDS")
+            or TRIAL_TIMEOUTS.get(name, TRIAL_DEFAULT_TIMEOUT),
+            max_retries=0,
+            max_input_tokens=primary.max_input,
+            max_output_tokens=primary.max_output,
+            fallbacks=[],
+        )
+        if provider.configured:
+            chain.append(provider)
+    return chain
 
 
 def _resting_until() -> dict[str, float]:

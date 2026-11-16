@@ -68,7 +68,7 @@ function ActionBlock({ action }: { action: LoopAction }) {
   const groups = [...action.by_version, ...(action.new_vs_old ? [action.new_vs_old] : [])];
   return (
     <section className="ca-drawer-section" aria-label={actionHeading(action)}>
-      <h4>{actionHeading(action)}</h4>
+      <h3>{actionHeading(action)}</h3>
       <p className="uw-cr-meta">
         Action date {day(action.on)} · {windowLine(action, day)}
       </p>

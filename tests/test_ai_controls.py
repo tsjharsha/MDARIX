@@ -16,6 +16,15 @@ from genai.pii import mask, mask_text
 from genai.provider import GenAIProvider, GenAIUnavailable
 from tests.conftest import authenticated_client
 
+
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 # ------------------------------------------------------------------------------------------------ masking
 
 
@@ -105,8 +114,11 @@ def groq(monkeypatch):
     provider_module._COOLDOWN_UNTIL.clear()
 
 
+REAUTH = "backend.app.governance_router.verify_signing_credentials"
+
+
 @pytest.fixture
-def tenant():
+def tenant(monkeypatch):
     """The synthetic tenant with AI switched on explicitly, its original policy restored afterwards.
 
     AI processing is off for new organizations (md23), so tests that need a model opt in the way an administrator
@@ -117,29 +129,34 @@ def tenant():
     bind_system(db, "test")
     row = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
     tenant_id = row.id
-    saved = (row.ai_processing_allowed, row.ai_monthly_token_budget)
+    saved = (row.ai_processing_allowed, row.ai_monthly_token_budget, dict(row.ai_features or {}))
     db.close()
     _set(tenant_id, ai_processing_allowed=False)  # so the switch below is a real "on" that needs the acknowledgement
     from tests.support_grants import grant_support_access
 
     grant_support_access(tenant_id, areas=("CONFIGURATION",))  # the customer approved Configuration access
-    switched = authenticated_client().put(
-        f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
-        json={
-            "ai_processing_allowed": True,
-            "use_default_budget": True,
-            "acknowledgement": True,
-            "reason": "Tests switch AI on for the synthetic organization",
-        },
-    )
+    # Switching on is signature-grade (password + authenticator code); its own tests cover the check.
+    with monkeypatch.context() as signed:
+        signed.setattr(REAUTH, lambda *args, **kwargs: None)
+        switched = authenticated_client().put(
+            f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
+            json={
+                "ai_processing_allowed": True,
+                "use_default_budget": True,
+                "acknowledgement": True,
+                "reason": "Tests switch AI on for the synthetic organization",
+            },
+        )
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
+    # The organization's switch for the feature these tests use (tenants.ai_features, genai/features.py).
+    _set(tenant_id, ai_features={"ask": True})
     try:
         yield tenant_id
     finally:
         db = SessionLocal()
         bind_system(db, "test")
         db.query(Tenant).filter(Tenant.id == tenant_id).update(
-            {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1]}
+            {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1], "ai_features": saved[2]}
         )
         db.commit()
         db.close()
@@ -165,7 +182,9 @@ def _usage(tenant_id) -> dict:
 def test_the_model_never_receives_personal_information(groq, tenant):
     with governance.tenant_scope(tenant):
         GenAIProvider().complete(
-            "Summarize: reported by Jane Doe, jane.doe@hospital.org.", {"reporter_phone": "617 555 0100", "lot": "L-7"}
+            "Summarize: reported by Jane Doe, jane.doe@hospital.org.",
+            {"reporter_phone": "617 555 0100", "lot": "L-7"},
+            feature="ask",
         )
     body = json.dumps(groq[-1])
     assert "Jane Doe" not in body and "jane.doe@hospital.org" not in body and "617 555 0100" not in body
@@ -175,7 +194,7 @@ def test_the_model_never_receives_personal_information(groq, tenant):
 def test_usage_is_counted_per_organization_and_month(groq, tenant):
     before = _usage(tenant)
     with governance.tenant_scope(tenant):
-        GenAIProvider().complete("Summarize the record.", {"lot": "L-1"})
+        GenAIProvider().complete("Summarize the record.", {"lot": "L-1"}, feature="ask")
     after = _usage(tenant)
     assert after["requests"] == before["requests"] + 1
     assert after["tokens_used"] == before["tokens_used"] + 47
@@ -185,23 +204,26 @@ def test_an_organization_with_ai_switched_off_gets_no_model_call(groq, tenant):
     _set(tenant, ai_processing_allowed=False)
     before = _usage(tenant)["refused"]
     with governance.tenant_scope(tenant), pytest.raises(GenAIUnavailable, match="GENAI_DISABLED_FOR_ORGANIZATION"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == [] and _usage(tenant)["refused"] == before + 1
 
 
 def test_the_monthly_budget_stops_model_calls(groq, tenant):
     _set(tenant, ai_monthly_token_budget=_usage(tenant)["tokens_used"] + 10)
     with governance.tenant_scope(tenant), pytest.raises(GenAIUnavailable, match="GENAI_MONTHLY_BUDGET_REACHED"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == []
 
 
 def test_production_refuses_a_model_call_without_an_organization(groq, monkeypatch):
     monkeypatch.setenv("MDARIX_ENV", "production")
-    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "groq")
-    monkeypatch.setenv("MDARIX_GENAI_GROQ_ZDR", "true")
+    # Groq is registered for the free-trial chain only (genai/vetted_providers.json), so the paid provider here is
+    # another contracted one; the fixture still captures any request.
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "cerebras")
+    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "cerebras")
+    monkeypatch.setenv("MDARIX_GENAI_CEREBRAS_ZDR", "true")
     with pytest.raises(GenAIUnavailable, match="GENAI_NO_TENANT_SCOPE"):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert groq == []
 
 
@@ -227,6 +249,10 @@ def test_a_signed_in_request_applies_its_organizations_controls(groq, tenant):
     assert response.status_code == 200, response.text
     assert groq and "jane@x.org" not in json.dumps(groq[-1])
     assert _usage(tenant)["requests"] == before + 1
+    # The model's answer names its call, which a person accepts, edits or rejects (AI-D7).
+    call_id = response.json()["response"]["ai_call_id"]
+    reviewed = client.post(f"/api/v1/ai-outputs/{call_id}/review", json={"decision": "ACCEPTED"})
+    assert reviewed.status_code == 200 and reviewed.json()["subject_type"] == "ai_call", reviewed.text
 
     _set(tenant, ai_processing_allowed=False)
     calls = len(groq)
@@ -304,6 +330,10 @@ def test_a_long_document_is_cut_to_the_models_limit_and_the_cut_is_reported():
 
 
 def _latest_setting_event(tenant_id):
+    return _latest_event(tenant_id, "AI_PROCESSING_SETTING_CHANGED")
+
+
+def _latest_event(tenant_id, action):
     from backend.app.db.models.foundation import AuditEvent
 
     db = SessionLocal()
@@ -311,7 +341,7 @@ def _latest_setting_event(tenant_id):
     try:
         return (
             db.query(AuditEvent)
-            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "AI_PROCESSING_SETTING_CHANGED")
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == action)
             .order_by(AuditEvent.chain_seq.desc())
             .first()
         )
@@ -339,7 +369,12 @@ def test_a_customer_administrator_switches_ai_off_for_their_organization_with_a_
     assert "acknowledgement" not in (event.details or {})  # switching off needs no acknowledgement
 
 
-def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
+def signed_off(monkeypatch) -> None:
+    """The signature-grade check passes (its own tests cover the password and the code)."""
+    monkeypatch.setattr("backend.app.governance_router.verify_signing_credentials", lambda *args, **kwargs: None)
+
+
+def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant, monkeypatch):
     from tests.test_business_permissions import _client_with_role
 
     _set(tenant, ai_processing_allowed=False)
@@ -348,6 +383,10 @@ def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
     refused = admin.put("/api/v1/admin/ai-settings", json=body)
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
     assert _usage(tenant)["ai_processing_allowed"] is False
+    # Switching on is signature-grade: refused without the password and authenticator code (C6).
+    unsigned = admin.put("/api/v1/admin/ai-settings", json={**body, "acknowledgement": True})
+    assert unsigned.status_code == 403 and _usage(tenant)["ai_processing_allowed"] is False
+    signed_off(monkeypatch)
     switched = admin.put("/api/v1/admin/ai-settings", json={**body, "acknowledgement": True})
     assert switched.status_code == 200, switched.text
     answer = switched.json()
@@ -382,6 +421,7 @@ def test_in_production_ai_is_switched_on_only_when_the_release_gate_is_met(tenan
 
     ready = {"ready": True, "met": 4, "total": 4, "enforced": True, "bars": [], "message": "ready"}
     monkeypatch.setattr(ai_release_gate, "status", lambda models=None, files=None: ready)
+    signed_off(monkeypatch)
     switched = admin.put("/api/v1/admin/ai-settings", json=body)
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
     # Switching off is never gated.
@@ -390,7 +430,7 @@ def test_in_production_ai_is_switched_on_only_when_the_release_gate_is_met(tenan
     assert off.status_code == 200 and off.json()["ai_processing_allowed"] is False
 
 
-def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement():
+def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement(monkeypatch):
     platform = authenticated_client()
     code = f"AIOFF{uuid.uuid4().hex[:6].upper()}"
     created = platform.post(
@@ -407,6 +447,13 @@ def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the
     refused = platform.put(url, json=body)
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
     assert platform.put(url, json={"monthly_token_budget": 1000, "reason": "Budget only"}).status_code == 200
+    # The Platform Administrator's switch-on needs the password and an authenticator code too (owner, 16 Nov).
+    unsigned = platform.put(url, json={**body, "acknowledgement": True})
+    assert unsigned.status_code == 403 and unsigned.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
+    assert platform.get(url).json()["ai_processing_allowed"] is False
+    refusal = _latest_event(uuid.UUID(created.json()["id"]), "SIGNATURE_REAUTHENTICATION_FAILED")
+    assert refusal.details == {"attempt": "AI_PROCESSING_SWITCH_ON"}
+    monkeypatch.setattr(REAUTH, lambda *args, **kwargs: None)
     switched = platform.put(url, json={**body, "acknowledgement": True})
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True
     event = _latest_setting_event(uuid.UUID(created.json()["id"]))
@@ -528,5 +575,5 @@ def test_a_model_call_past_80_percent_tells_the_administrators(groq, tenant, mon
     )
     monkeypatch.setattr(governance, "_record_thresholds", lambda tenant_id, refused, now: [(80, {})])
     with governance.tenant_scope(tenant):
-        GenAIProvider().complete("Summarize the record.", {})
+        GenAIProvider().complete("Summarize the record.", {}, feature="ask")
     assert notices == [80]

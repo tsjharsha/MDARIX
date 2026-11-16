@@ -243,3 +243,52 @@ To go into `legal/trial-agreement.md` as a new 1.5:
    currently accepts company emails and, since 0.10.48, personal addresses such as Gmail at once)?
 4. Should the refusal message name the reason (sanctions) or stay neutral, as it does now ("MDARIX cannot offer a free
    trial to organizations in this country or region")?
+
+---
+
+## 5. AI in free trials and AI sub-processors (AI-R, trial chain; DRAFT, 16 Nov 2026)
+
+### Problem
+The free trial agreement and the privacy notice say AI is off for free trials. The trial chain (owner decision 14 Nov
+2026, T1-T8) would let a trial's administrator switch AI on for the **sample data only**, through free AI services
+that may process it outside India. Paid organizations would use one contracted provider (Gemini on Google Cloud Vertex
+AI, Mumbai). Neither use is described to customers today. **Nothing here is switched on; this text must be approved
+before any trial or customer sees AI.**
+
+### Proposed text
+For the free trial agreement, a new clause after the AI sentence:
+
+> If your organization's trial administrator switches AI on, AI features work only on the sample data supplied with
+> the trial, and only on sample records nobody has edited. AI never receives records you upload or type, except a
+> question of up to 300 characters that you type into Ask MDARIX. Do not type patient, reporter or other personal
+> data into it. Trial AI uses free third-party AI services, listed in our sub-processor list, which may process the
+> sample data and your question outside India. Personal information is masked before anything is sent. AI results in
+> a trial are proposals for you to review, are not validated, and are never used to qualify AI for paid use. Our
+> Platform Administrator may switch AI off for any person in the trial.
+
+For the privacy notice, under the AI paragraph:
+
+> When AI is switched on for a paid organization, the records an AI feature needs for an answer are sent, after
+> personal information is masked, to the AI provider named in the organization's settings and in our sub-processor
+> list, under a contract that forbids training on the data. We keep a record of each AI request (who asked, which
+> feature, which model answered, and a fingerprint of what was sent), not the content sent. In a free trial, only
+> sample data and short typed questions are sent, as the trial agreement describes.
+
+Sub-processor list (rows to add, each filled only after the owner records the provider's terms in
+`docs/compliance/AI_PROVIDER_REGISTER.md`):
+
+| Sub-processor | Purpose | Data | Location | Used for |
+|---|---|---|---|---|
+| Google Cloud (Vertex AI) | AI features for paid organizations | Masked case records an answer needs | Mumbai, India | Paid and pilot organizations, once switched on |
+| Each vetted upstream behind the trial gateways, and Groq | AI features in free trials | Sample data and typed questions of up to 300 characters, masked | Outside India possible | Free trials, once switched on |
+
+### Where it would go
+`legal/trial-agreement.md` (AI clause), `legal/privacy.md` (AI paragraph) and the sub-processor list.
+
+### Open questions for the lawyer
+1. Is a typed question of up to 300 characters, sent outside India, acceptable under the DPDP Act with this notice,
+   or must trial AI refuse all typed text?
+2. Does sending synthetic sample data outside India need any statement beyond this one?
+3. Must each free upstream be named individually in the sub-processor list, and must customers be told before one is
+   added or changed?
+4. Is the "not validated" wording enough to keep trial AI output out of a customer's regulated records?

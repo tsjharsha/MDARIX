@@ -105,13 +105,17 @@ def test_the_case_ai_run_starts_nothing_while_ai_is_off_whoever_asks(monkeypatch
         CASE, case_ai_router.RunRequest(trigger=trigger), background, db=db, control=None, ctx=ctx
     )
 
-    assert answer == {
-        "started": False,
-        "run": None,
-        "reason": "AI_NOT_READY",
-        "state": "AI_OFF",
-        "message": "AI analysis is off for this organization.",
-    }
+    if trigger == "AUTO":
+        # AI-D6: opening a case page never starts a run, whether AI is on or off.
+        assert answer == {"started": False, "run": None, "reason": "ON_REQUEST_ONLY"}
+    else:
+        assert answer == {
+            "started": False,
+            "run": None,
+            "reason": "AI_NOT_READY",
+            "state": "AI_OFF",
+            "message": "AI analysis is off for this organization.",
+        }
     db.add.assert_not_called()
     db.commit.assert_not_called()
     background.add_task.assert_not_called()

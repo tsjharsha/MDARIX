@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { errorText, send } from "../../customer-admin/shared";
 import { REPORTS, isSimilarTable, similarRows, type ReportDetail, type WorksheetField } from "../authorityReports";
 import { SimilarGrid } from "./SimilarTable";
 import { formatDateTime } from "../../../app/dates";
@@ -6,8 +8,9 @@ import { formName } from "./TreeSign";
 import { FieldRow, useAction } from "./Reports";
 import { InlineError } from "./boardParts";
 import { TraceLink } from "./TraceValue";
-import { useWorkspace } from "../workspaceContext";
+import { useCanRunAi, useWorkspace } from "../workspaceContext";
 import "./decide.css";
+import "../../shared/statement-kind.css";
 
 export type GiveGroup = { scope: "PRODUCT" | "ORGANIZATION" | "EVENT"; title: string; things: WorksheetField[][] };
 
@@ -127,6 +130,139 @@ export function ConfirmAllCodes({
         </p>
       )}
       <InlineError text={action.error} />
+    </section>
+  );
+}
+
+export type AiCodeSuggestion = {
+  annex: string;
+  code: string;
+  term: string;
+  confidence: number;
+  quote: string;
+  field_ids: string[];
+};
+export type AiCodeReply = {
+  suggestions: AiCodeSuggestion[];
+  ai: { status: string; reason?: string | null; message?: string | null; ai_execution_id?: string; label?: string };
+};
+
+const AI_CODE_LABEL = "AI suggestion";
+
+/** The AI's proposals, each with its confidence, the complaint's words it rests on and the field it would go in; a
+ * person enters each one (exported for its unit test). */
+export function AiCodeSuggestionList({
+  detail,
+  reply,
+  entered,
+  busy,
+  onEnter,
+}: {
+  detail: Pick<ReportDetail, "sections">;
+  reply: AiCodeReply;
+  entered: string[];
+  busy: boolean;
+  onEnter: (item: AiCodeSuggestion, field: string) => void;
+}) {
+  const fields = new Map(detail.sections.flatMap((section) => section.fields).map((item) => [item.id, item]));
+  if (!reply.suggestions.length)
+    return (
+      <p className="ac-muted" role="status">
+        {reply.ai.message ??
+          "No code could be proposed from the complaint's own words: choose codes in each field's code picker."}
+      </p>
+    );
+  return (
+    <ul className="rp-ai-codes">
+      {reply.suggestions.map((item) => {
+        const field = item.field_ids.map((id) => fields.get(id)).find(Boolean);
+        const done = entered.includes(`${item.annex}:${item.code}`);
+        return (
+          <li key={`${item.annex}:${item.code}`}>
+            <div className="rp-ai-code-head">
+              <span className="ai-review-label">{AI_CODE_LABEL}</span>
+              <strong>
+                <code>{item.code}</code> {item.term}
+              </strong>
+              <span className="rp-ai-confidence" aria-label={`Confidence ${Math.round(item.confidence * 100)}%`}>
+                <span style={{ width: `${Math.round(item.confidence * 100)}%` }} />
+              </span>
+              <small>{Math.round(item.confidence * 100)}% confidence</small>
+            </div>
+            <q className="uw-cr-quote">{item.quote}</q>
+            {field &&
+              (done ? (
+                <p className="dt-success" role="status">
+                  ✓ Entered in {field.number} {field.label}
+                </p>
+              ) : (
+                <button type="button" className="ac-secondary" disabled={busy} onClick={() => onEnter(item, field.id)}>
+                  Enter in {field.number} {field.label}
+                </button>
+              ))}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** AI code suggestions (AI-R part D): IMDRF proposals from the complaint's own words, from the loaded release only.
+ * Nothing is entered until a person enters a code, field by field; "Confirm all codes" never takes these. */
+export function AiCodeSuggestions({
+  detail,
+  onChanged,
+}: {
+  detail: ReportDetail;
+  onChanged: (detail: ReportDetail) => void;
+}) {
+  const canRun = useCanRunAi();
+  const action = useAction(onChanged, "The code was not entered.");
+  const [reply, setReply] = useState<AiCodeReply | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState("");
+  const [entered, setEntered] = useState<string[]>([]);
+  const coded = detail.sections.some((section) => section.fields.some((item) => item.code_annex));
+  if (!detail.editable || !canRun || !coded) return null;
+  const ask = async () => {
+    setAsking(true);
+    setError("");
+    try {
+      setReply(await send<AiCodeReply>(`${REPORTS}/${detail.id}/codes/ai-suggestions`, "POST"));
+      setEntered([]);
+    } catch (reason) {
+      setError(errorText(reason, "No codes could be suggested."));
+    } finally {
+      setAsking(false);
+    }
+  };
+  const enter = async (item: AiCodeSuggestion, field: string) => {
+    const body = { codes: [item.code], ai_execution_id: reply?.ai.ai_execution_id };
+    if (await action.run(`${REPORTS}/${detail.id}/fields/${field}`, "PUT", body))
+      setEntered((done) => [...done, `${item.annex}:${item.code}`]);
+  };
+  return (
+    <section className="uw-card uw-card-pad rp-ai-suggest" aria-label="AI code suggestions">
+      <div className="rp-ai-suggest-head">
+        <p className="ac-muted">
+          {reply?.ai.label ??
+            "AI can propose IMDRF codes from the complaint's own words. You enter each one; nothing is entered for you."}
+        </p>
+        <button type="button" className="ac-secondary" disabled={asking} onClick={() => void ask()}>
+          <Sparkles size={15} aria-hidden="true" />{" "}
+          {asking ? "Suggesting…" : reply ? "Suggest again" : "Suggest IMDRF codes with AI"}
+        </button>
+      </div>
+      {reply && (
+        <AiCodeSuggestionList
+          detail={detail}
+          reply={reply}
+          entered={entered}
+          busy={action.busy}
+          onEnter={(item, field) => void enter(item, field)}
+        />
+      )}
+      <InlineError text={error || action.error} />
     </section>
   );
 }

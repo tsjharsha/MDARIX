@@ -44,7 +44,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
-from backend.app.access.permissions import DATA_EXPORT, REGULATORY_APPROVE, REGULATORY_REVIEW, require_permission
+from backend.app.access.permissions import (
+    AI_RUN,
+    DATA_EXPORT,
+    REGULATORY_APPROVE,
+    REGULATORY_REVIEW,
+    require_permission,
+)
 from backend.app.authority_reports import forms, rules, worksheet
 from backend.app.complaint_review.service import people
 from backend.app import signing_commit
@@ -1380,6 +1386,8 @@ class FieldRequest(BaseModel):
     clear: bool = False
     # IMDRF codes chosen in the code picker (0.10.77), for a code field: the server writes the field's text.
     codes: list[str] | None = Field(default=None, max_length=5)
+    # The AI suggestion run the codes come from (AI-R part D): each code must be one it proposed for this field.
+    ai_execution_id: uuid.UUID | None = None
 
 
 def _code_entry(db, control_db, obligation, field, payload: FieldRequest, actor: str) -> dict:
@@ -1407,10 +1415,71 @@ def _code_entry(db, control_db, obligation, field, payload: FieldRequest, actor:
             "codes": [item.code for item in items],
             "release": release,
             "code_state": state,
+            **_ai_origin(db, obligation, field, [item.code for item in items], payload.ai_execution_id),
         }
     if not suggestion:
         raise _error(422, "NOTHING_SUGGESTED", "No code is suggested here: choose one in the code picker")
     return {**entry, "value": suggestion, "code_state": worksheet.CONFIRMED}
+
+
+def _hidden_on_form(obligation, field) -> bool:
+    """B9 step 7: section F is an importer's or user facility's report only; G, H and the front page's number a
+    manufacturer's only (a field the report does not show, switches off included)."""
+    if obligation.form_code != forms.FDA_3500A.code:
+        return False
+    section = next(part.code for part in forms.FDA_3500A.sections if field in part.fields)
+    return section in (("G", "H", "FRONT") if us_role(obligation) else ("F",))
+
+
+def _ai_origin(db, obligation, field, codes: list[str], execution_id: uuid.UUID | None) -> dict:
+    """Where an entered code came from, when a person took it from an AI suggestion: each code must be one that run
+    proposed for this field's annex (422 otherwise). The entry keeps the run and each code's confidence."""
+    if execution_id is None:
+        return {}
+    from backend.app.authority_reports import ai_codes
+
+    proposed = ai_codes.suggested(db, obligation.tenant_id, obligation.id, execution_id)
+    annex = field.source[-1]
+    missing = [code for code in codes if (annex, code) not in proposed]
+    if missing:
+        raise _error(422, "NOT_AI_SUGGESTED", f"{', '.join(missing)} was not suggested by that AI run for this field")
+    return {
+        "origin": "AI_SUGGESTION",
+        "ai_execution_id": str(execution_id),
+        "confidence": {code: proposed[(annex, code)]["confidence"] for code in codes},
+    }
+
+
+@router.post("/{obligation_id}/codes/ai-suggestions", dependencies=[DECIDERS, Depends(require_permission(AI_RUN))])
+def ai_code_suggestions(
+    obligation_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """IMDRF code proposals from AI for this draft's code fields (AI-R part D): each with its confidence and the
+    complaint's words it rests on, from the loaded release only. Nothing is entered: a person enters each one through
+    the field (``codes`` with ``ai_execution_id``). AI off or refused: no proposals, with why."""
+    from backend.app.authority_reports import ai_codes
+
+    obligation = _obligation(db, _tenant(ctx), obligation_id)
+    if obligation.state not in rules.EDITABLE:
+        raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
+    complaint = (
+        db.query(Complaint)
+        .filter(Complaint.tenant_id == obligation.tenant_id, Complaint.id == obligation.complaint_id)
+        .one_or_none()
+    )
+    if complaint is None:
+        raise _error(404, "COMPLAINT_NOT_FOUND", "The complaint of this report no longer exists")
+    code_fields = {
+        item.id: item.source[-1]
+        for item in _form(obligation).fields()
+        if item.source and item.source.startswith("imdrf_") and not _hidden_on_form(obligation, item)
+    }
+    result = ai_codes.suggest(db, control_db, obligation, code_fields, complaint, actor_ref=str(ctx.user_id))
+    db.commit()
+    return result
 
 
 @router.put("/{obligation_id}/fields/{field_id}", dependencies=[DECIDERS])
@@ -1427,12 +1496,8 @@ def set_field(
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
     field = next((item for item in _form(obligation).fields() if item.id == field_id), None)
-    # B9 step 7: section F is an importer's or user facility's report only; G, H and the front page's number a
-    # manufacturer's only (404 as for any field the report does not show, switches off included).
-    if field is not None and obligation.form_code == forms.FDA_3500A.code:
-        section = next(part.code for part in forms.FDA_3500A.sections if field in part.fields)
-        if section in (("G", "H", "FRONT") if us_role(obligation) else ("F",)):
-            field = None
+    if field is not None and _hidden_on_form(obligation, field):
+        field = None
     if field is None:
         raise _error(404, "FIELD_UNKNOWN", "No such field on this form")
     field = forms.in_force(_form(obligation), field)  # B9 off: India's P1 is typed again
@@ -1518,6 +1583,11 @@ def set_field(
         cleared=payload.clear,
         confirmed=payload.confirmed,
         **({"code_state": code_state, "codes": entries[field_id].get("codes")} if code_state else {}),
+        **(
+            {"ai_suggestion": True, "ai_execution_id": str(payload.ai_execution_id)}
+            if code_state and payload.ai_execution_id
+            else {}
+        ),
     )
     db.commit()
     return detail(db, control_db, ctx, obligation)

@@ -4459,7 +4459,7 @@ div.uw-task-count:hover {
   border: 1px solid var(--ac-serious);
   border-radius: var(--ac-radius);
 }
-.uw-case-escalation h4 {
+.uw-case-escalation h3 {
   margin: 0;
 }
 .uw-cp-origin {
@@ -4541,7 +4541,7 @@ div.uw-task-count:hover {
 }
 .uw-rp-table {
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--ms-fs-13);
   min-width: 640px;
 }
 .uw-rp-table th,
@@ -8931,7 +8931,7 @@ details.uw-team-change[open] {
 }
 .rr-detail h3 {
   margin: 16px 0 6px;
-  font-size: var(--ms-fs-14, 14px);
+  font-size: var(--ms-fs-14);
 }
 .rr-logic {
   margin: 0;

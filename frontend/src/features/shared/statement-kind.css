@@ -94,3 +94,47 @@
   outline: 2px solid var(--ms-teal);
   outline-offset: 2px;
 }
+
+/* An AI output nobody reviewed yet: flat, dashed violet like an AI interpretation (G-2), with Accept / Edit / Reject. */
+.ai-review {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 4px;
+}
+.ai-review-label {
+  border: 1px dashed var(--ms-ai-line);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-ai-bg);
+  color: var(--ms-ai);
+  padding: 1px 6px;
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+}
+/* Reviewed: the decision in plain words, flat and solid (no longer a proposal). */
+.ai-review-label.is-accepted,
+.ai-review-label.is-edited {
+  border-style: solid;
+  border-color: var(--ms-good-line, currentColor);
+  background: transparent;
+  color: var(--ms-good, inherit);
+}
+.ai-review-label.is-rejected {
+  border-style: solid;
+  border-color: var(--ms-line, currentColor);
+  background: transparent;
+  color: var(--ms-muted, inherit);
+}
+.ai-review-label svg {
+  vertical-align: -2px;
+}
+.ai-review-form {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.ai-review-form label {
+  display: grid;
+  gap: 2px;
+}

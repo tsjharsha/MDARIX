@@ -240,6 +240,10 @@ class ConnectorRun:
             raise ValueError("unsupported connector state")
 
     def ingest(self, records: list[dict], *, source_system: str, required_fields: set[str]) -> dict:
+        from backend.app.trial.sample_marker import refuse_reserved
+
+        # The sample marker is reserved for MDARIX's own sample data (backend/app/trial/sample_marker.py).
+        refuse_reserved(source_system)
         accepted = []
         for record in records:
             self.processed += 1

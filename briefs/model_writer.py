@@ -15,6 +15,7 @@ from investigator.model_provider import (
     MAX_STATEMENT,
     ModelAnalysisUnavailable,
     asserts_causality_or_decision,
+    case_records,
     parse_json_reply,
 )
 
@@ -117,9 +118,23 @@ class ModelBriefWriter:
                 {"type": item.challenge_type, "statement": item.statement, "severity": item.severity}
                 for item in challenge_set.challenges
             ]
+        references = [ref for item in analysis.observations + analysis.contradictions for ref in item.source_references]
+        if hypothesis_set is not None:
+            references += [
+                ref
+                for item in hypothesis_set.hypotheses
+                for relation in item.supporting_evidence + item.contradicting_evidence
+                for ref in relation.source_references
+            ]
         try:
             result = self.provider.complete(
-                "Draft the investigation brief.", context, system=SYSTEM, json_output=True, max_output_tokens=3000
+                "Draft the investigation brief.",
+                context,
+                feature="drafting",
+                records=case_records(analysis.investigation_id, references),
+                system=SYSTEM,
+                json_output=True,
+                max_output_tokens=3000,
             )
         except GenAIUnavailable as exc:
             raise ModelAnalysisUnavailable("MODEL_CALL_FAILED", {"error": str(exc)}) from exc

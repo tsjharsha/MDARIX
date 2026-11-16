@@ -51,5 +51,15 @@ describe("A records-only answer", () => {
     );
     expect(markup.split(note).length - 1).toBe(1);
     expect(markup).not.toContain("AI suggestions are advisory");
+    expect(markup).not.toContain("AI proposal, not reviewed");
+  });
+
+  it("puts Accept, Edit and Reject on a model's answer", async () => {
+    const { AskAnswer } = await import("./AskMdarixPage");
+    const markup = renderToStaticMarkup(
+      <AskAnswer result={{ response: { ai_call_id: "c-1", provider_output: { answer: "From the sample." } } }} />,
+    );
+    expect(markup).toContain("AI proposal, not reviewed");
+    expect(markup).toMatch(/Accept[\s\S]*Edit[\s\S]*Reject/);
   });
 });

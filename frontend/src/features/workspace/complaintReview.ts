@@ -102,6 +102,7 @@ export type SecondLookExplanation = {
     dropped?: Array<{ text: string; reason: string }>;
     trust?: TrustSummary | null;
     label?: string;
+    review_state?: string | null;
   };
 };
 

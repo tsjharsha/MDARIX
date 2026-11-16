@@ -39,6 +39,7 @@ for _module in (
     platform_customers,
     platform_onboarding,
     platform_tenants,
+    platform_trials,
     platform_customer_admins,
     platform_customer_accounts,
     platform_accounts,
@@ -46,7 +47,6 @@ for _module in (
     platform_subscriptions,
     platform_reference,
     platform_reference_data,
-    platform_trials,
     catalog,
 ):
     router.include_router(_module.router)

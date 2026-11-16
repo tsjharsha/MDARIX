@@ -10,6 +10,63 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Unreleased: AI ready
+
+AI built behind switches that are all off by default; off means zero model calls (owner approval of the AI-R spec,
+11 Nov 2026, and the free-trial amendment of 14 Nov 2026). Branch `feat/ai-trial-chain`; merges after the 4-12 Dec
+freeze. Migration `tr32_trial_ai_ready` (revision `tr32aiready`, re-attached at merge): `tenants.ai_features`,
+`auth_users.ai_access`, `ai_calls`, `ai_output_reviews`.
+
+- Every AI request names its feature (Ask, summaries, case analysis, drafting, evidence extraction, code suggestions,
+  decision advisory); none may decide. A server lists the features it allows (`MDARIX_AI_FEATURES`, empty by
+  default); an administrator turns each feature on for the organization with a reason and a re-authentication. The
+  decision advisory is not offered.
+- Free trials may use AI on the sample data only, through the free-trial chain `MDARIX_AI_TRIAL_CHAIN` (empty by
+  default; intended FreeLLMAPI, then OmniRoute, then Groq), once the trial's owner switches it on with an
+  acknowledgement. On a trial's own records AI says "AI available on paid plans" and sends nothing. Paid organizations
+  never use the free chain. Only providers recorded in the vetted-provider register may answer.
+- A Platform Administrator can switch AI off for one person, or many, in a free trial ("AI is not enabled for your
+  account"); new people have it on. Audited with the reason.
+- Every request sent to a model is recorded: feature, hashes of what was sent (never the content), the service and
+  the model that actually answered, tokens, time and outcome.
+- A person accepts, edits or rejects an AI result; the Decision Center uses a model's result only after that.
+  Opening a case no longer starts an AI analysis by itself.
+- Staging and production refuse moving model names (`-latest`, `auto`) and an unrecorded model version for the paid
+  provider; Gemini on Vertex AI (Mumbai) is available as the paid provider.
+- No request can mark a record as MDARIX sample data (`MDARIX_SAMPLE` is refused on mappings, connectors and
+  connector runs).
+- The live AI evaluation in CI runs by hand only, with a typed spend confirmation and a token cap.
+- Switching AI processing on for an organization now needs the administrator's password and authenticator code, as
+  turning a feature on does (Security › AI processing, with a new AI features table: intended use, risk, switch;
+  features this service does not offer are shown off and locked).
+- The regulatory copilot is not offered until AI is qualified: it shows the rules draft and says why.
+- Every AI output nobody reviewed is labelled "AI proposal, not reviewed" with Accept, Edit and Reject. A model's
+  brief cannot start a Decision Brief, and its proposed observations stay out of the brief's facts and the evidence
+  summary, until a person accepts or edits them; case reports carry the label.
+- Case analysis, drafting and the second-look explanation list the records they send, so a free trial's sample-data
+  check covers them too.
+- OmniRoute's answering provider and model are read from its X-OmniRoute-Provider and X-OmniRoute-Model headers (its
+  reply's model field cannot name the provider); a cached OmniRoute reply is discarded.
+- Trial organizations: an AI panel for each trial (Platform Administrator): per-person Active/Inactive switches, one
+  or all at once, with a reason of at least 10 characters.
+- User guide "AI in MDARIX"; draft trial-AI privacy and sub-processor wording for legal review (not published).
+- The per-person AI switch of a trial moves to the Trial organizations routes
+  (`/platform-admin/trial-organizations/{id}/users/{user}/ai-access` and `.../{id}/ai-access` for everyone, body
+  `{active, reason}`), audited `TRIAL_USER_AI_ACCESS_CHANGED` (plus `TRIAL_AI_ACCESS_BULK_CHANGED` for "set all");
+  refused changes are audited `TRIAL_ACTION_REFUSED`. The earlier routes are removed.
+- A Platform Administrator switching AI on for an organization re-authenticates (password and authenticator code).
+- Observations AI proposes from an evidence document are accepted, edited or rejected one by one; accepting the
+  extraction as a whole no longer makes them facts; an edit uses the person's words.
+- Accept, Edit and Reject on Ask answers, signal summaries, the second-look explanation and each AI-written step of a
+  case's AI analysis; a reviewed output says who decided ("Accepted by a person").
+- Trial organizations: the AI panel shows this month's AI use against the trial's limit, model calls by outcome and
+  feature, the trial provider chain (ready, resting) and the latest switch changes.
+- AI code suggestions on a report's IMDRF code fields: proposals with confidence and the complaint's quoted words, from
+  the loaded IMDRF release only; a person enters each one in its field; "Confirm all codes" never takes them.
+- In a free trial, AI actions show once AI answers there (trial chain set, AI on for the organization and the user).
+- Fixed: two workspace drawers skipped a heading level (h2 to h4); four font sizes were off the type scale.
+
+
 ### Added
 
 - **Free security scans for the test release** (`scripts/security_scan.sh`, runbook `docs/runbooks/SECURITY_SCANS.md`):

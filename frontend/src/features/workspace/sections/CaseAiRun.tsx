@@ -7,6 +7,7 @@ import { useCan } from "../workspaceContext";
 import { isRunning, runHeadline, runPath, runProgress, type CaseAiRun, type CaseAiRunStep } from "../signalAi";
 import { InlineError } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
+import { AiReviewActions } from "../../shared/AiReview";
 
 const POLL_MS = 3000;
 
@@ -123,7 +124,7 @@ export function RunView({
       {run && (
         <ol className="uw-ai-steps" aria-label={`${done} of ${total} steps done`}>
           {run.steps.map((step) => (
-            <StepItem key={step.step} step={step} />
+            <StepItem key={step.step} step={step} canReview={canRun} />
           ))}
         </ol>
       )}
@@ -142,7 +143,7 @@ export function RunView({
   );
 }
 
-function StepItem({ step }: { step: CaseAiRunStep }) {
+function StepItem({ step, canReview }: { step: CaseAiRunStep; canReview: boolean }) {
   const icon =
     step.status === "DONE" ? (
       <CheckCircle2 size={15} className="ac-tone-icon tone-good" aria-hidden="true" />
@@ -161,6 +162,14 @@ function StepItem({ step }: { step: CaseAiRunStep }) {
         <ToneBadge tone="neutral" label={step.author === "AI" ? "Written by AI" : "From the rules"} />
       )}
       {step.status === "DONE" && step.trust && <TrustBadge trust={step.trust} />}
+      {step.status === "DONE" && step.author === "AI" && step.ai_execution_id && (
+        <AiReviewActions
+          key={step.ai_execution_id}
+          outputId={step.ai_execution_id}
+          state={step.review_state}
+          disabled={!canReview}
+        />
+      )}
       {step.status === "SKIPPED" && (
         <small className="ac-muted">Not run in this edition: a fixed template, not an analysis</small>
       )}

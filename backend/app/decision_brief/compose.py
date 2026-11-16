@@ -217,13 +217,25 @@ def facts_section(db: Session, case, rows: list[dict]) -> list[dict]:
     clauses = [EvidenceObservation.investigation_id == case.id]
     if usable:
         clauses.append(EvidenceObservation.evidence_id.in_(usable))
+    from backend.app.ai_review import observation_reviews
+
     facts: list[dict] = []
-    for observation in (
+    observations = (
         db.query(EvidenceObservation)
         .filter(EvidenceObservation.tenant_id == case.tenant_id, or_(*clauses))
         .order_by(EvidenceObservation.created_at, EvidenceObservation.id)
         .limit(OBSERVATIONS_SCANNED)
-    ):
+        .all()
+    )
+    # AI-D7: an observation a model proposed counts only after a person accepted or edited that observation; an edit
+    # uses the person's words.
+    reviewed = observation_reviews(db, case.tenant_id, observations)
+    for observation in observations:
+        statement = observation.statement
+        if str(observation.id) in reviewed:
+            statement = reviewed[str(observation.id)][1]
+            if statement is None:
+                continue
         evidence = by_id.get(str(observation.evidence_id))
         if evidence is not None and evidence["review_status"] in SET_ASIDE_REVIEW_STATUSES:
             continue
@@ -235,7 +247,7 @@ def facts_section(db: Session, case, rows: list[dict]) -> list[dict]:
         facts.append(
             {
                 "kind": "OBSERVATION",
-                "statement": observation.statement,
+                "statement": statement,
                 "epistemic_type": kind,
                 "epistemic_label": intelligence.epistemic_label(kind),
                 "origin": intelligence.observation_origin(observation.origin, observation.extraction_method),

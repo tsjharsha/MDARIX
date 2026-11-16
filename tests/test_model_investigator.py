@@ -11,6 +11,14 @@ from investigator.service import EvidenceGroundedInvestigatorService
 from tests.test_day11_ai_investigator import context
 
 
+@pytest.fixture(autouse=True)
+def _ai_features_on_platform(monkeypatch):
+    # These tests exercise the provider itself: every offered feature is on the platform list (genai/features.py).
+    monkeypatch.setenv(
+        "MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,evidence_extraction,code_suggestions"
+    )
+
+
 class FakeModel(GenAIProvider):
     """Answers like the live model would, from the evidence it was actually given."""
 
@@ -30,6 +38,7 @@ class FakeModel(GenAIProvider):
         json_output=False,
         response_schema=None,
         max_output_tokens=None,
+        **_switches,
     ):
         self.seen = {
             "prompt": prompt,

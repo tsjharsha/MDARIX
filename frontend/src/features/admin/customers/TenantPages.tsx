@@ -484,6 +484,32 @@ const aiProviderText = (data: { models: { provider: string }[]; provider_name: s
   return providers.length ? providers.join(", ") : "None set up";
 };
 
+/**
+ * The Platform Administrator's AI switch for one tenant. Turning AI on needs the acknowledgement (given on the
+ * customer's instruction) and, as for the customer's own administrator, the password and an authenticator code: the
+ * server refuses the switch-on without them (owner, 16 Nov 2026).
+ */
+export function platformAiSwitch(
+  url: string,
+  on: boolean,
+  name: string,
+  providerName: string | null | undefined,
+  put: (path: string, method: "PUT", body: unknown) => Promise<unknown>,
+): Confirmation {
+  return {
+    title: on ? `Turn AI off for ${name}?` : `Turn AI on for ${name}?`,
+    body: on
+      ? "Nothing from this tenant is sent to an AI model; its features answer from rules."
+      : `This tenant's AI features will send the records an answer needs to ${providerLabel(providerName)}. ${MASKING_SUMMARY}`,
+    confirmLabel: on ? "Turn AI off" : "Turn AI on",
+    reason: { label: "Reason (kept in the audit trail)", min: 5 },
+    ...(on ? {} : { acknowledge: aiAcknowledgement(providerName, name), password: true, mfaCode: true }),
+    run: (reason, password, acknowledged, mfaCode) =>
+      put(url, "PUT", aiSettingsPayload(!on, reason, acknowledged, on ? undefined : { password, mfaCode })),
+    done: on ? `AI processing is off for ${name}.` : `AI processing is on for ${name}.`,
+  };
+}
+
 /** Whether the tenant's content may go to an AI model, its monthly token allowance, and this month's use. */
 function TenantAiSettings({
   tenantId,
@@ -511,19 +537,7 @@ function TenantAiSettings({
       run: (reason) => send(url, "PUT", { ...body, reason }),
       done,
     });
-  // Turning AI on needs the acknowledgement, given here on the customer's instruction (the API refuses it otherwise).
-  const switchAi = () =>
-    setConfirm({
-      title: on ? `Turn AI off for ${name}?` : `Turn AI on for ${name}?`,
-      body: on
-        ? "Nothing from this tenant is sent to an AI model; its features answer from rules."
-        : `This tenant's AI features will send the records an answer needs to ${providerLabel(data?.provider_name)}. ${MASKING_SUMMARY}`,
-      confirmLabel: on ? "Turn AI off" : "Turn AI on",
-      reason: { label: "Reason (kept in the audit trail)", min: 5 },
-      ...(on ? {} : { acknowledge: aiAcknowledgement(data?.provider_name, name) }),
-      run: (reason, _password, acknowledged) => send(url, "PUT", aiSettingsPayload(!on, reason, acknowledged)),
-      done: on ? `AI processing is off for ${name}.` : `AI processing is on for ${name}.`,
-    });
+  const switchAi = () => setConfirm(platformAiSwitch(url, on, name, data?.provider_name, send));
   return (
     <>
       <Panel eyebrow="AI processing" title={`AI for ${name}`} source={settings}>

@@ -766,6 +766,8 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
         result = provider.complete(
             f"Summarize what these {len(rows)} complaints about {signal.problem_key or 'one problem'} have in common.",
             {"signal": signal.business_id},
+            feature="summaries",
+            records=[{"table": "complaints", "id": str(row.id), "evidence_id": _ref(row)} for row in rows],
             system=AI_SYSTEM,
             json_output=True,
             max_output_tokens=800,
@@ -835,6 +837,7 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
             "provider": result.provider,
             "model": result.model,
             "ai_execution_id": str(execution.id),
+            "review_state": "NOT_REVIEWED",
             "dropped": dropped,
             "trust": getattr(execution, "trust", None),
             "label": "AI interpretation: written by AI from the complaints cited, checked sentence by sentence; a "

@@ -14,7 +14,7 @@ STATUS.md win.
 | [architecture/future/](architecture/future/) | Target-state designs that are **not built** yet | Future |
 | [specs/](specs/) | Original R1 product/architecture specifications and per-capability contracts (Day 1 freeze onward) | Reference; some details superseded |
 | [adr/](adr/) | Architecture decision records: ADR-001…ADR-010 (still *Proposed*); ADR-011…ADR-016 (*Accepted* 2026-10-08: control plane and tenant cell, data placement, deployment roles, cell identity and packages, platform access, migrations); ADR-017 (*Accepted* 2026-10-11: staging on Oracle Cloud Always Free, pilots on Azure) | Reference |
-| [user-guide/](user-guide/) | Pilot guide pointer, the plain-language Quality Manager workflow walkthrough and the Platform Administrator's [Trial organizations](user-guide/PLATFORM_ADMIN_TRIAL_ORGANIZATIONS.md) page | Current |
+| [user-guide/](user-guide/) | Pilot guide pointer, the plain-language Quality Manager workflow walkthrough, the Platform Administrator's [Trial organizations](user-guide/PLATFORM_ADMIN_TRIAL_ORGANIZATIONS.md) page and [AI in MDARIX](user-guide/AI_IN_MDARIX.md) (switches, review, free trials) | Current |
 | [diagrams/](diagrams/) | Mermaid architecture diagrams | Reference |
 | [runbooks/](runbooks/) | Database hardening, production readiness gates, operations, developer tooling, simulator endpoints | Operational |
 | [validation/](validation/README.md) | MDARIX validation documents (B6b): document control and index, Validation Master Plan, product risk assessment, GAMP 5 justification, scenario register (master copy), signature register | Drafts for review and signature — not a certification |

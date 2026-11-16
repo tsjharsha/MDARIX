@@ -361,6 +361,7 @@ class BriefService:
                     deterministic_result=content,
                     grounded_context=grounded,
                     question=inv.investigation_question,
+                    feature="drafting",
                 ),
             }
         ai_execution_id = None

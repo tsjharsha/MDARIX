@@ -1735,7 +1735,13 @@ def set_link_state(
 # -------------------------------------------------------------------------------------------------- observations
 
 
-def _observation_view(row: EvidenceObservation, evidence: dict, names: dict[str, str]) -> dict:
+def _observation_view(
+    row: EvidenceObservation, evidence: dict, names: dict[str, str], reviewed: dict | None = None
+) -> dict:
+    from backend.app.ai_review import UNREVIEWED_LABEL
+
+    state = (reviewed or {}).get(str(row.id), (None, None))[0]
+    not_reviewed = state == "NOT_REVIEWED"
     kind = rules.observation_kind(row.epistemic_type, row.observation_type, row.extraction_method)
     origin = rules.observation_origin(row.origin, row.extraction_method)
     return {
@@ -1754,6 +1760,11 @@ def _observation_view(row: EvidenceObservation, evidence: dict, names: dict[str,
         if isinstance(row.effective_context, dict)
         else None,
         "created_at": _iso(row.created_at),
+        # A model's proposal: NOT_REVIEWED, ACCEPTED, EDITED or REJECTED; each observation is reviewed on its own
+        # (POST /api/v1/ai-outputs/{observation id}/review).
+        "ai_review_state": state,
+        "ai_execution_id": str(row.ai_execution_id) if row.ai_execution_id else None,
+        "ai_label": UNREVIEWED_LABEL if not_reviewed else None,
     }
 
 
@@ -1775,8 +1786,11 @@ def _observation_views(db: Session, control_db: Session | None, tenant_id, rows)
         if evidence_ids
         else {}
     )
+    from backend.app.ai_review import observation_reviews
+
     names = _names(control_db, tenant_id, [row.created_by for row in rows])
-    return [_observation_view(row, evidence, names) for row in rows]
+    reviewed = observation_reviews(db, tenant_id, rows)
+    return [_observation_view(row, evidence, names, reviewed) for row in rows]
 
 
 @router.get("/observations")

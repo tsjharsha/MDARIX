@@ -234,6 +234,12 @@ class EvidenceIntelligenceService:
             .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
             .all()
         )
+        from backend.app.ai_review import UNREVIEWED_LABEL, unreviewed_executions
+
+        unreviewed = unreviewed_executions(db, tenant_id, {o.ai_execution_id for o in observations})
+
+        def not_reviewed(o) -> bool:
+            return bool(o.ai_execution_id) and str(o.ai_execution_id) in unreviewed
 
         entity_links = (
             db.query(EvidenceEntityLink)
@@ -268,7 +274,10 @@ class EvidenceIntelligenceService:
                 if evidence.ingestion_timestamp
                 else None,
             },
-            "evidence_summary": build_evidence_summary(evidence, observations, tenant_id),
+            # AI-D7: the summary uses only observations a person reviewed (or the rules wrote).
+            "evidence_summary": build_evidence_summary(
+                evidence, [o for o in observations if not not_reviewed(o)], tenant_id
+            ),
             "chunks_count": len(chunks),
             "chunks": [
                 {
@@ -291,6 +300,7 @@ class EvidenceIntelligenceService:
                     "quality_status": o.quality_status,
                     "limitations": o.limitations,
                     "ai_execution_id": str(o.ai_execution_id) if o.ai_execution_id else None,
+                    "ai_label": UNREVIEWED_LABEL if not_reviewed(o) else None,
                 }
                 for o in observations
             ],

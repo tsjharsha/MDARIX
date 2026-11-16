@@ -4,6 +4,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from backend.app.trial.sample_marker import refuse_reserved, refuse_reserved_in
+
 
 class RoleSwitch(BaseModel):
     role: str
@@ -92,6 +94,9 @@ class ConnectorRequest(BaseModel):
     configuration: dict = {}
     version: str = "v1"
 
+    # The sample marker is reserved for MDARIX's own sample data (backend/app/trial/sample_marker.py).
+    _not_sample = field_validator("configuration")(classmethod(lambda cls, value: refuse_reserved_in(value)))
+
 
 class MappingRequest(BaseModel):
     code: str
@@ -104,6 +109,8 @@ class MappingRequest(BaseModel):
     source_table: str | None = None
     target_schema: str = "public"
     target_table: str | None = None
+
+    _not_sample = field_validator("source_system")(classmethod(lambda cls, value: refuse_reserved(value)))
 
 
 class MappingCheckRequest(BaseModel):
@@ -286,6 +293,8 @@ class MasterMappingRequest(BaseModel):
     target_entity: str
     definition: dict = {}
 
+    _not_sample = field_validator("source_system")(classmethod(lambda cls, value: refuse_reserved(value)))
+
 
 class MappingVersionRequest(BaseModel):
     master_mapping_id: uuid.UUID
@@ -317,6 +326,8 @@ class ConnectorRunRequest(BaseModel):
     source_system: str = "SIMULATED"
     required_fields: list[str] = []
 
+    _not_sample = field_validator("source_system")(classmethod(lambda cls, value: refuse_reserved(value)))
+
 
 class MappingRule(BaseModel):
     """One source field's mapping rule. Typed, so a malformed rule is refused (422) rather than failing the preview."""
@@ -339,6 +350,8 @@ class MappingPreviewRequest(BaseModel):
     source_object: str
     target_entity: str
     mapping_version: str
+
+    _not_sample = field_validator("source_object")(classmethod(lambda cls, value: refuse_reserved(value)))
 
 
 class StatusRequest(BaseModel):

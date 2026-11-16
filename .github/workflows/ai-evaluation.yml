@@ -3,9 +3,12 @@ name: AI evaluation gate
 # VS013-VS015) against the contracted model. A release is promoted only after this passes
 # (docs/runbooks/DEPLOYMENT.md, docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md).
 #
-# When: by hand (Actions > AI evaluation gate > Run workflow), every Monday, and on pull requests that change the AI
-# code or the golden dataset. It needs the model's API key (repository secret MDARIX_EVALUATION_API_KEY); without
-# it (forks, or before the secret is set) the run is skipped with a notice instead of failing.
+# When: by hand only (Actions > AI evaluation gate > Run workflow), because every run spends money on the paid model
+# (owner decision AI-D10: live spend only with the owner's OK per run). There is no schedule and no pull-request
+# trigger. The person starting it types SPEND in "confirm_spend" and sets a token cap ("max_tokens", used as the
+# organization's monthly allowance for the run, so the run stops there). It calls the paid provider only, never the
+# free-trial chain (MDARIX_AI_TRIAL_CHAIN is empty here). It needs the model's API key (repository secret
+# MDARIX_EVALUATION_API_KEY); without it the run is skipped with a notice instead of failing.
 #
 # The evaluation step runs under a production-like provider policy (MDARIX_ENV=staging): only the contracted
 # provider may be called, personal-data masking cannot be switched off, and every model request needs its
@@ -21,17 +24,14 @@ on:
         description: Model name (empty for the provider's default)
         required: false
         default: ''
-  schedule:
-    - cron: '17 5 * * 1'
-  pull_request:
-    paths:
-      - 'genai/**'
-      - 'investigator/**'
-      - 'hypothesis_engine/**'
-      - 'challenger/**'
-      - 'evaluation/**'
-      - 'data/golden/**'
-      - '.github/workflows/ai-evaluation.yml'
+      confirm_spend:
+        description: Type SPEND to confirm this run may spend money on the paid model (the owner approved it)
+        required: true
+        default: ''
+      max_tokens:
+        description: Token cap for the whole run (the run stops when it is reached)
+        required: true
+        default: '200000'
 permissions:
   contents: read
 concurrency:
@@ -55,6 +55,11 @@ jobs:
       MDARIX_GENAI_MODEL: ${{ inputs.model || '' }}
       MDARIX_GENAI_API_KEY: ${{ secrets.MDARIX_EVALUATION_API_KEY }}
       MDARIX_GENAI_FALLBACKS: ''
+      # The paid provider only: the free-trial chain is never used by an evaluation.
+      MDARIX_AI_TRIAL_CHAIN: ''
+      MDARIX_AI_FEATURES: 'case_analysis,drafting'
+      # The token cap: the synthetic organization's monthly allowance for this run.
+      MDARIX_GENAI_TENANT_MONTHLY_TOKENS: ${{ inputs.max_tokens }}
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -67,6 +72,19 @@ jobs:
           --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
+      - name: Confirm the spend and the token cap
+        env:
+          CONFIRM_SPEND: ${{ inputs.confirm_spend }}
+          MAX_TOKENS: ${{ inputs.max_tokens }}
+        run: |
+          if [ "$CONFIRM_SPEND" != "SPEND" ]; then
+            echo "::error title=AI evaluation refused::Type SPEND in confirm_spend: this run spends money on the paid model."
+            exit 1
+          fi
+          case "$MAX_TOKENS" in
+            ''|*[!0-9]*) echo "::error title=AI evaluation refused::max_tokens must be a whole number."; exit 1 ;;
+          esac
+          echo "Live evaluation confirmed with a cap of $MAX_TOKENS tokens."
       - name: Check for the model key
         id: key
         run: |

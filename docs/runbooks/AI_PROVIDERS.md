@@ -85,6 +85,7 @@ Supported provider names:
 | Cerebras (paid tier) | `cerebras` | `https://api.cerebras.ai/v1/chat/completions` | `gpt-oss-120b` |
 | Mistral (paid plan, EU) | `mistral` | `https://api.mistral.ai/v1/chat/completions` | `mistral-small-latest` |
 | Google Gemini API (paid tier) | `gemini` | Gemini's OpenAI-compatible endpoint | `gemini-flash-latest` |
+| **Google Cloud Vertex AI** (Gemini) | `vertex` | `https://<region>-aiplatform.googleapis.com/v1/projects/<project>/locations/<region>/endpoints/openapi/chat/completions`, built from `MDARIX_GENAI_PROJECT` and `MDARIX_GENAI_LOCATION` (default `asia-south1`); no API key: an access token from the VM's metadata server | `google/gemini-2.5-flash` |
 | Ollama (self-hosted) | `ollama` | `http://127.0.0.1:11434/v1/chat/completions` | `llama3.2` |
 | OmniRoute (self-hosted gateway) | `omniroute` | `http://127.0.0.1:20128/v1/chat/completions` (override with `MDARIX_GENAI_OMNIROUTE_BASE_URL`) | `auto` (set `MDARIX_GENAI_OMNIROUTE_MODEL` to your OmniRoute model or combo) |
 
@@ -108,6 +109,23 @@ MDARIX_GENAI_MODEL=claude-sonnet-5-5
 MDARIX_GENAI_CONTRACTED_PROVIDERS=anthropic
 MDARIX_GENAI_ANTHROPIC_ZDR=true   # only once zero data retention is confirmed for the account
 ```
+
+Vertex AI example (`.env` on the Google Cloud VM):
+
+```dotenv
+MDARIX_GENAI_PROVIDER=vertex
+MDARIX_GENAI_PROJECT=<google cloud project id>
+MDARIX_GENAI_LOCATION=asia-south1          # Mumbai: processing stays in India
+MDARIX_GENAI_MODEL=google/gemini-2.5-flash # check the region's model list before changing it
+MDARIX_GENAI_CONTRACTED_PROVIDERS=vertex
+MDARIX_GENAI_VERTEX_ZDR=true               # only once the cache is off and abuse logging does not apply
+```
+
+Before it is used, in the Google Cloud project: enable the Vertex AI API; give the VM a service account with the
+`Vertex AI User` role and the `cloud-platform` access scope (changing either needs the VM stopped); switch off the
+project's Gemini input cache; and confirm abuse-monitoring logging does not apply (invoiced billing account) or ask
+Google for the exception. The token is read from the metadata server, so Vertex only works on a Google Cloud VM;
+elsewhere, set `MDARIX_GENAI_BASE_URL` and an `MDARIX_GENAI_API_KEY` access token yourself.
 
 Claude through AWS Bedrock or Google Vertex AI, and Azure OpenAI, need their own request signing and are not
 supported by `genai/provider.py` today.
@@ -152,6 +170,49 @@ bars under Security › AI processing; MDARIX staff see them, with what to do, i
 
 Commit the sign-off and the release record with the release; the API image ships them. An organization that already
 had AI on keeps it; the screens show the gate's state.
+
+## Switches, all off by default (AI ready, switched off)
+
+A model is called only when every level allows it:
+
+| Switch | Default | Off means |
+|---|---|---|
+| `MDARIX_GENAI_PROVIDER` (paid organizations) | `controlled` | No model for paid organizations |
+| `MDARIX_AI_TRIAL_CHAIN` (free trials) | empty | No model for free trials (a trial's switch-on is refused with 409) |
+| `MDARIX_AI_FEATURES` (platform feature list) | empty | No feature calls a model |
+| Organization: `tenants.ai_processing_allowed` | off | This organization's content goes to no model |
+| Organization feature: `tenants.ai_features[feature]` | absent | This feature calls no model for this organization |
+| Person (free trials only): `auth_users.ai_access` | ACTIVE | INACTIVE: "AI is not enabled for your account" |
+
+Every request names its feature (`genai/features.py`); the decision advisory is not offered. Each request sent writes
+one `ai_calls` row (hashes of what was sent, never the content; the gateway and the provider and model that actually
+answered; tokens; outcome). A person accepts, edits or rejects AI results (`POST /api/v1/ai-outputs/{id}/review`);
+the Decision Center uses a model's result only after that. Opening a case never starts an AI run.
+
+**Emergency off:** `MDARIX_GENAI_PROVIDER=controlled` (everyone) or an empty `MDARIX_AI_TRIAL_CHAIN` (trials only),
+then restart the API. `tests/test_ai_r_zero_calls.py` proves each level gives zero calls.
+
+## Free-trial chain (sample data only; owner amendment 14 Nov 2026)
+
+- Order: FreeLLMAPI -> OmniRoute -> Groq. Set `MDARIX_AI_TRIAL_CHAIN=freellmapi,omniroute,groq` and each
+  provider's `MDARIX_GENAI_<NAME>_API_KEY` (FreeLLMAPI and OmniRoute keys are their own gateway keys; upstream keys are
+  entered only in each gateway's own key store, never in MDARIX's settings). Only names vetted in
+  `genai/vetted_providers.json` are used; in staging and production the gateways must be on 127.0.0.1.
+- Failover: connection failure, timeout, 408 or 5xx -> next, rests 60 s; 429 -> next at once, rests 15 min;
+  401/403 -> next, rests 1 hour, operator alert; empty or invalid structured answer -> next; reply from an upstream
+  not vetted (or none named) -> discarded, next, the gateway rests 1 hour, alert; 400/413 -> stop, rules answer.
+  Timeouts: FreeLLMAPI 30 s, others 20 s; no retries; 60 s in total; then the rules answer.
+- Sample data only: every request lists the records it carries; each must be this trial's own unedited sample
+  record (`source_system = MDARIX_SAMPLE`, text still matching the sample). Typed text (the Ask question) is capped
+  at 300 characters. No request may write the sample marker (422).
+- The trial's owner switches AI on with a second acknowledgement (sample data only, free AI services, possibly
+  outside India); a Platform Administrator sets each user's switch (`PUT /api/v1/platform-admin/trial-organizations/{id}/
+  users/{user_id}/ai-access`, or `.../trial-organizations/{id}/ai-access` for everyone; body `{active, reason}`),
+  audited `TRIAL_USER_AI_ACCESS_CHANGED`; switching AI on (trial owner or Platform Administrator) needs the password
+  and an authenticator code.
+- Owner items before any trial sees AI: provider terms checked and recorded in the register; the trial agreement,
+  terms, privacy policy and sub-processor list updated (they promise AI off in trials today); the production pause
+  lifted for installing FreeLLMAPI beside MDARIX (loopback only, pinned version).
 
 ## Refusals people see
 

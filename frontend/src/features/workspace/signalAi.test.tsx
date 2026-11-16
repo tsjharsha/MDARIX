@@ -200,6 +200,21 @@ describe("the signal summary", () => {
     expect(ai).toContain("1 sentence left out");
   });
 
+  it("puts Accept, Edit and Reject on an AI summary, and shows who decided once it is reviewed", () => {
+    const summary = (review_state: string) => ({
+      author: "AI" as const,
+      complaints: 3,
+      sentences: [{ text: "Two describe a clear line.", complaints: ["CMP000001"] }],
+      ai: { status: "COMPLETED", ai_execution_id: "e-1", review_state },
+    });
+    const open = renderToStaticMarkup(<SummaryView summary={summary("NOT_REVIEWED")} canReview />);
+    expect(open).toContain("AI proposal, not reviewed");
+    expect(open).toMatch(/Accept[\s\S]*Edit[\s\S]*Reject/);
+    expect(renderToStaticMarkup(<SummaryView summary={summary("ACCEPTED")} canReview />)).toContain(
+      "Accepted by a person",
+    );
+  });
+
   it("says why AI did not write it", () => {
     expect(
       aiSummaryNote({
@@ -275,6 +290,26 @@ describe("the case AI run", () => {
       <RunView run={run()} running={false} canRun={false} busy={false} error="" onRun={vi.fn()} />,
     );
     expect(viewer).not.toContain("Run the analysis again");
+  });
+
+  it("puts Accept, Edit and Reject on each step the model wrote, not on the rules' steps", () => {
+    const steps = [
+      { step: "ANALYSIS", label: "Analysis of the evidence", status: "DONE" as const, author: "AI" as const },
+      { step: "HYPOTHESES", label: "Competing explanations", status: "DONE" as const, author: "RULES" as const },
+    ];
+    const markup = (review_state: string) =>
+      renderToStaticMarkup(
+        <RunView
+          run={run({ steps: [{ ...steps[0], ai_execution_id: "e-1", review_state }, steps[1]] })}
+          running={false}
+          canRun
+          busy={false}
+          error=""
+          onRun={vi.fn()}
+        />,
+      );
+    expect(markup("NOT_REVIEWED").match(/AI proposal, not reviewed/g)).toHaveLength(1);
+    expect(markup("REJECTED")).toContain("Rejected by a person");
   });
 
   it("starts by itself and shows only while AI answers for the organization", () => {
