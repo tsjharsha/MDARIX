@@ -291,6 +291,8 @@ export type Column<T> = {
   // What the column sorts by when its heading is clicked; by default the row's field of the same key, then the
   // first of `fields`, then the text the cell shows. Columns without a heading (row actions) never sort.
   sortValue?: (row: T) => unknown;
+  /** Left out of the default column choice (still offered under "Columns"); a plain list shows it. */
+  hidden?: boolean;
 };
 
 /** The value a column sorts by (see Column.sortValue). */
@@ -392,7 +394,7 @@ function ChoosableTable<T>({
   // Columns without a heading (row actions such as Open or Change) always stay, at the end.
   const pinned = columns.filter((column) => !column.label.trim());
   const named = columns.filter((column) => column.label.trim());
-  const defaults = named.map((column) => column.key);
+  const defaults = named.filter((column) => !column.hidden).map((column) => column.key);
   const extraKeys = useMemo(
     () =>
       availableFieldKeys(

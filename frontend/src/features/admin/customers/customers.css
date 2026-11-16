@@ -643,3 +643,13 @@ dl.cw-review {
 .cc-trial-support small {
   color: var(--ac-muted);
 }
+
+/* A fold for figures that are useful but not first (the trials funnel and attention list). */
+.cc-fold > summary {
+  cursor: pointer;
+  color: var(--ac-teal);
+  font-weight: 600;
+}
+.cc-fold[open] > summary {
+  margin-bottom: 12px;
+}

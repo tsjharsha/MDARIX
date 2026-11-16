@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialsOverviewView, type TrialTableControls } from "./TrialsOverview";
+import { ColumnScope } from "../../tables/ColumnChooser";
 import { attentionList, retentionText, trialBadgeOf, trialsPath, type TrialItem, type TrialOverview } from "./trials";
 import { invitationProblem, trialRequestsPath } from "../TrialRequestsWorkspace";
 import { keptBecause } from "../trials/RunDeletion";
@@ -77,12 +78,16 @@ describe("the trials overview, one page at a time", () => {
     const html = render(overview());
     expect(html).toContain("Page 2 of 7");
     expect(html).toContain("320 trials");
-    // Each row opens its trial's own page (Trial organizations), not the tenant record.
-    expect(html.match(/Open trial/g)).toHaveLength(50);
+    // Each row's name opens its trial's own page (Trial organizations); no "Open trial" column off-screen.
+    expect(html.match(/<button type="button" class="ac-link"><strong>Org \d+<\/strong><\/button>/g)).toHaveLength(50);
+    expect(html).not.toContain("Open trial");
+    expect(html).toContain('class="is-clickable"');
     expect(html).toContain("Org 51");
     expect(html).toContain("Org 100");
     expect(html).not.toContain("Org 101");
-    expect(html).toContain("320 holding data in all");
+    // No second row of number tiles: the Trial organizations strip already counts the trials.
+    expect(html).not.toContain("320 holding data in all");
+    expect(html).not.toContain('aria-label="Trial figures"');
     // Previous and Next both work on a middle page.
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Previous/);
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Next/);
@@ -171,5 +176,21 @@ describe("trial data held for a pilot request", () => {
       /^held for its pilot request until .+ at the latest$/,
     );
     expect(keptBecause({})).toBeNull();
+  });
+
+  it("shows at most the working columns by default in the console; the rest wait under Columns", () => {
+    const html = renderToStaticMarkup(
+      <ColumnScope.Provider value="test-trials">
+        <TrialsOverviewView
+          overview={{ state: "ready", data: overview(), reload: () => undefined }}
+          onOpenTenant={() => undefined}
+          table={controls}
+        />
+      </ColumnScope.Provider>,
+    );
+    const head = html.slice(html.indexOf("<thead>"), html.indexOf("</thead>"));
+    for (const hidden of ["Cited for", "Feedback", "Demo", "Support access"])
+      expect(head, hidden).not.toContain(hidden);
+    expect(head).toContain("Organization");
   });
 });

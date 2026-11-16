@@ -1,16 +1,6 @@
 import { useState } from "react";
-import {
-  CalendarCheck,
-  CalendarClock,
-  Eye,
-  LifeBuoy,
-  MessageSquare,
-  Rocket,
-  Sparkles,
-  Upload,
-  Users,
-} from "lucide-react";
-import { BarList, Panel, StatTile, ToneBadge } from "../console/charts";
+import { Eye, LifeBuoy, Users } from "lucide-react";
+import { BarList, Panel, ToneBadge } from "../console/charts";
 import {
   ConfirmDialog,
   SearchBox,
@@ -194,7 +184,6 @@ export function TrialsOverviewView({
   onOpenWorkspace?: (tenantId: string) => void;
 }) {
   const data = overview.data;
-  const summary = data?.summary;
   const engagedAt = data?.engaged_chapters ?? 4;
   const items = data?.items ?? [];
   const attention = attentionList(data, engagedAt);
@@ -213,70 +202,34 @@ export function TrialsOverviewView({
           </p>
         </div>
       </div>
-      <section className="ac-stats" aria-label="Trial figures">
-        <StatTile
-          label="Active trials"
-          value={summary ? summary.active : null}
-          detail={summary ? `${summary.trials} holding data in all` : "Unavailable"}
-          icon={<Rocket size={18} />}
-        />
-        <StatTile
-          label="Ending within 7 days"
-          value={summary ? summary.ending_soon : null}
-          detail="Talk to them before the trial closes"
-          tone={summary?.ending_soon ? "warning" : undefined}
-          icon={<CalendarClock size={18} />}
-        />
-        <StatTile
-          label="Acted in the story"
-          value={summary ? summary.acted : null}
-          detail={summary ? `${summary.engaged} engaged (${engagedAt}+ chapters)` : "Unavailable"}
-          icon={<Sparkles size={18} />}
-        />
-        <StatTile
-          label="Uploaded their own data"
-          value={summary ? summary.own_data : null}
-          detail="The strongest sign of intent"
-          icon={<Upload size={18} />}
-        />
-        <StatTile
-          label="Booked a demo"
-          value={summary ? (summary.demo_requested ?? 0) : null}
-          detail="From Getting started; contact them under Requests"
-          tone={summary?.demo_requested ? "good" : undefined}
-          icon={<CalendarCheck size={18} />}
-        />
-        <StatTile
-          label="Gave feedback"
-          value={summary ? summary.feedback : null}
-          detail="Read it under Feedback"
-          icon={<MessageSquare size={18} />}
-        />
-      </section>
-      <div className="ac-grid two">
-        <Panel eyebrow="Where trials stop" title="Active trials that acted in each chapter" source={overview}>
-          <BarList items={chapterFunnel(data)} colour="series" />
-          <p className="ac-note">
-            Read it as a funnel: a chapter many trials skip is where the story needs a better first step.
-          </p>
-        </Panel>
-        <Panel eyebrow="Help them succeed" title="Who needs attention first" source={overview}>
-          <ul className="cc-trial-attention">
-            {attention.map((item) => (
-              <li key={item.tenant_id}>
-                <button type="button" className="ac-link" onClick={() => onOpenTenant(item.tenant_id)}>
-                  {item.name}
-                </button>
-                <span>
-                  {plural(item.days_left, "day")} left · {item.story.acted_count} of {item.story.total} chapters · next:{" "}
-                  {nextChapterTitle(item, data?.chapters ?? [])}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {!attention.length && <p className="ac-muted">No active trial.</p>}
-        </Panel>
-      </div>
+      {/* The strip above already counts the trials; the funnel and the attention list wait one click away. */}
+      <details className="cc-fold">
+        <summary>Where trials stop, and who needs attention first</summary>
+        <div className="ac-grid two">
+          <Panel eyebrow="Where trials stop" title="Active trials that acted in each chapter" source={overview}>
+            <BarList items={chapterFunnel(data)} colour="series" />
+            <p className="ac-note">
+              Read it as a funnel: a chapter many trials skip is where the story needs a better first step.
+            </p>
+          </Panel>
+          <Panel eyebrow="Help them succeed" title="Who needs attention first" source={overview}>
+            <ul className="cc-trial-attention">
+              {attention.map((item) => (
+                <li key={item.tenant_id}>
+                  <button type="button" className="ac-link" onClick={() => onOpenTenant(item.tenant_id)}>
+                    {item.name}
+                  </button>
+                  <span>
+                    {plural(item.days_left, "day")} left · {item.story.acted_count} of {item.story.total} chapters ·
+                    next: {nextChapterTitle(item, data?.chapters ?? [])}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {!attention.length && <p className="ac-muted">No active trial.</p>}
+          </Panel>
+        </div>
+      </details>
       {showExitRequests && <TrialExitRequests onChanged={overview.reload} />}
       <Panel eyebrow="Every trial" title="Trials holding data" source={overview}>
         <div className="cc-toolbar">
@@ -293,6 +246,7 @@ export function TrialsOverviewView({
           caption="Free trials"
           rows={items}
           rowKey={(row) => row.tenant_id}
+          onRowClick={(row) => onOpenTenant(row.tenant_id)}
           serverSort={{ sort: table.sort, onSort: table.onSort, keys: TRIAL_SORT_KEYS }}
           empty={
             filtered
@@ -305,7 +259,9 @@ export function TrialsOverviewView({
               label: "Organization",
               render: (row) => (
                 <span className="cc-trial-org">
-                  <strong>{row.name}</strong>
+                  <button type="button" className="ac-link" onClick={() => onOpenTenant(row.tenant_id)}>
+                    <strong>{row.name}</strong>
+                  </button>
                   <small>{row.tenant_key}</small>
                 </span>
               ),
@@ -398,6 +354,7 @@ export function TrialsOverviewView({
             {
               key: "demo",
               label: "Demo",
+              hidden: true,
               render: (row) =>
                 row.demo_request
                   ? `${row.demo_request.status === "NEW" ? "Requested" : row.demo_request.status === "CONTACTED" ? "Contacted" : "Closed"} ${formatDate(row.demo_request.created_at)}`
@@ -406,11 +363,13 @@ export function TrialsOverviewView({
             {
               key: "cited",
               label: "Cited for",
+              hidden: true,
               render: (row) => (row.cited_for?.length ? row.cited_for.join("; ") : "—"),
             },
             {
               key: "feedback",
               label: "Feedback",
+              hidden: true,
               render: (row) =>
                 row.feedback
                   ? `${row.feedback.overall ?? "—"}/5 overall · ${row.feedback.recommend ?? "—"}/10 recommend`
@@ -419,6 +378,7 @@ export function TrialsOverviewView({
             {
               key: "support",
               label: "Support access",
+              hidden: true,
               render: (row) => {
                 const state = support[row.tenant_id];
                 const text = supportStateText(state);
@@ -438,15 +398,6 @@ export function TrialsOverviewView({
                   </span>
                 );
               },
-            },
-            {
-              key: "open",
-              label: " ",
-              render: (row) => (
-                <button type="button" className="ac-link" onClick={() => onOpenTenant(row.tenant_id)}>
-                  Open trial
-                </button>
-              ),
             },
           ]}
         />
