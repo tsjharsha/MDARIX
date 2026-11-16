@@ -349,14 +349,12 @@ def eligible(db: Session, request_id: uuid.UUID, now: datetime | None = None) ->
 
 def _approver(db: Session, create: bool = True, personal: bool = False):
     """The platform's automatic-approval account for company emails, or with ``personal`` for personal ones (neither
-    can sign in), created once in the platform organization."""
+    can sign in), created once in the platform organization (itself created on a server that has none yet: sign-up
+    has already promised the approval)."""
     from backend.app.db.models.foundation import AuthUser
-    from backend.app.support_access import platform_tenant_id
+    from backend.app.support_access import ensure_platform_tenant
     from backend.app.trial.service import _hash
 
-    tenant_id = platform_tenant_id(db)
-    if tenant_id is None:
-        return None
     username, name = (
         (PERSONAL_APPROVER_USERNAME, PERSONAL_APPROVER_NAME) if personal else (APPROVER_USERNAME, APPROVER_NAME)
     )
@@ -366,7 +364,7 @@ def _approver(db: Session, create: bool = True, personal: bool = False):
     now = datetime.now(timezone.utc)
     user = AuthUser(
         id=uuid.uuid4(),
-        tenant_id=tenant_id,
+        tenant_id=ensure_platform_tenant(db, now).id,
         username=username,
         display_name=name,
         company="MDARIX",
@@ -397,8 +395,6 @@ def approve_if_eligible(request_id: uuid.UUID) -> dict:
             logger.info("Trial request waits for review: %s", why)
             return {"approved": False, "why": why}
         approver = _approver(db, personal=why == "PERSONAL_ADDRESS")
-        if approver is None:
-            return {"approved": False, "why": "NO_PLATFORM_ORGANIZATION"}
         db.commit()
         result = approve_request(db, request_id, approver)
         if result.get("email_delivery") == "FAILED":
