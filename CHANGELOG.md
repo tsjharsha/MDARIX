@@ -36,6 +36,20 @@ freeze. Migration `tr32_trial_ai_ready` (revision `tr32aiready`, re-attached at 
 - No request can mark a record as MDARIX sample data (`MDARIX_SAMPLE` is refused on mappings, connectors and
   connector runs).
 - The live AI evaluation in CI runs by hand only, with a typed spend confirmation and a token cap.
+- Switching AI processing on for an organization now needs the administrator's password and authenticator code, as
+  turning a feature on does (Security › AI processing, with a new AI features table: intended use, risk, switch;
+  features this service does not offer are shown off and locked).
+- The regulatory copilot is not offered until AI is qualified: it shows the rules draft and says why.
+- Every AI output nobody reviewed is labelled "AI proposal, not reviewed" with Accept, Edit and Reject. A model's
+  brief cannot start a Decision Brief, and its proposed observations stay out of the brief's facts and the evidence
+  summary, until a person accepts or edits them; case reports carry the label.
+- Case analysis, drafting and the second-look explanation list the records they send, so a free trial's sample-data
+  check covers them too.
+- OmniRoute's answering provider and model are read from its X-OmniRoute-Provider and X-OmniRoute-Model headers (its
+  reply's model field cannot name the provider); a cached OmniRoute reply is discarded.
+- Trial organizations: an AI panel for each trial (Platform Administrator): per-person Active/Inactive switches, one
+  or all at once, with a reason of at least 10 characters.
+- User guide "AI in MDARIX"; draft trial-AI privacy and sub-processor wording for legal review (not published).
 
 
 ## [0.11.03] - not released yet
