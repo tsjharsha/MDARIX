@@ -7,7 +7,6 @@ switches, the sample-data gate, the per-person flag) are in ``tests/test_ai_tria
 
 from __future__ import annotations
 
-import io
 import json
 from datetime import date, timedelta
 from urllib import error as urlerror
@@ -20,64 +19,11 @@ from genai.provider import GenAIProvider, GenAIUnavailable
 
 pytestmark = pytest.mark.unit
 
-FREELLMAPI = "http://127.0.0.1:3011/v1/chat/completions"
-OMNIROUTE = "http://127.0.0.1:20128/v1/chat/completions"
-GROQ = provider_module.GROQ_BASE_URL
-TODAY = date.today().isoformat()
-
-
-def _register(**overrides) -> dict:
-    """A register with every trial provider vetted today (the shipped one has nothing vetted yet)."""
-    upstream = {
-        "kind": "upstream",
-        "chain": "trial",
-        "terms_link": "https://example.invalid/terms",
-        "date_checked": TODAY,
-        "region": "US",
-        "commercial_use": True,
-        "trains_on_data": "no",
-        "checked_by": "test",
-    }
-    rows = [
-        {"provider": "freellmapi", "kind": "gateway", "chain": "trial", "upstream_from": "header:x-routed-via"},
-        {
-            "provider": "omniroute",
-            "kind": "gateway",
-            "chain": "trial",
-            "upstream_from": "headers:x-omniroute-provider,x-omniroute-model",
-            "cache_header": "x-omniroute-cache",
-        },
-        {**upstream, "provider": "groq", "direct": True},
-        {**upstream, "provider": "cerebras"},
-        {**upstream, "provider": "mistral", "commercial_use": False},
-    ]
-    for name, change in overrides.items():
-        rows = [{**row, **change} if row["provider"] == name else row for row in rows]
-    return {"version": 1, "warn_after_days": 183, "refuse_after_days": 365, "providers": rows}
-
-
-class _Reply(io.BytesIO):
-    def __init__(self, body: dict, headers: dict | None = None):
-        super().__init__(json.dumps(body).encode())
-        self.headers = headers or {}
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-
-# OmniRoute names the upstream in two headers (its published source, release v3.8.54; never called).
-OMNI_CEREBRAS = {"X-OmniRoute-Provider": "cerebras", "X-OmniRoute-Model": "m-2", "X-OmniRoute-Cache": "MISS"}
-
-
-def _answer(text: str = "From the sample records.", model: str = "m-1") -> dict:
-    return {"choices": [{"message": {"content": text}}], "model": model, "usage": {"prompt_tokens": 5}}
-
-
-def _http_error(url: str, status: int):
-    return urlerror.HTTPError(url, status, "error", {}, io.BytesIO(b"{}"))
+from tests.fake_ai_gateway import FREELLMAPI, GROQ, OMNI_CEREBRAS, OMNIROUTE, install
+from tests.fake_ai_gateway import Reply as _Reply
+from tests.fake_ai_gateway import answer as _answer
+from tests.fake_ai_gateway import http_error as _http_error
+from tests.fake_ai_gateway import register as _register
 
 
 @pytest.fixture
@@ -107,19 +53,7 @@ def chain(monkeypatch):
         lambda tokens, feature=None, trial_chain_on=False: governance.Access("t-1", trial["value"], "u-1"),
     )
     monkeypatch.setattr(sample_gate, "check", lambda *args, **kwargs: None)
-    state = {"sent": [], "replies": {}}
-
-    def urlopen(req, timeout=None):
-        url = req.full_url
-        state["sent"].append(url)
-        reply = state["replies"].get(url)
-        if reply is None:
-            raise urlerror.URLError("connection refused")
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
-
-    monkeypatch.setattr(provider_module.request, "urlopen", urlopen)
+    state = install(monkeypatch)
     yield {"state": state, "written": written, "trial": trial}
     provider_module._COOLDOWN_UNTIL.clear()
 

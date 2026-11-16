@@ -10,8 +10,6 @@ qualification level comes with part C.
 
 from __future__ import annotations
 
-import io
-import json
 import socket
 
 import pytest
@@ -24,6 +22,7 @@ from genai import governance
 from genai import provider as provider_module
 from genai.features import FEATURES
 from genai.provider import GenAIProvider, GenAIUnavailable
+from tests.fake_ai_gateway import Reply, answer, install
 
 pytestmark = pytest.mark.db
 
@@ -31,23 +30,9 @@ OFFERED = [key for key, item in FEATURES.items() if item.offered]
 LEVELS = ("platform", "feature_list", "organization", "organization_feature", "budget")
 
 
-class _Reply(io.BytesIO):
-    headers: dict = {}
-
-    def __init__(self):
-        super().__init__(json.dumps({"choices": [{"message": {"content": "ok"}}], "usage": {}}).encode())
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-
 @pytest.fixture
 def guard(monkeypatch):
     """Any connection off this machine fails the test; model requests are recorded and answered by a fake."""
-    sent = []
     real_connect = socket.socket.connect
 
     def connect(sock, address):
@@ -58,12 +43,7 @@ def guard(monkeypatch):
 
     monkeypatch.setattr(socket.socket, "connect", connect)
 
-    def urlopen(req, timeout=None):
-        sent.append(req.full_url)
-        return _Reply()
-
-    monkeypatch.setattr(provider_module.request, "urlopen", urlopen)
-    return sent
+    return install(monkeypatch, default=lambda: Reply(answer("ok")))["sent"]
 
 
 @pytest.fixture

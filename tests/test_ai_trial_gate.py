@@ -7,10 +7,8 @@ N5, N7, C6 and C8.
 
 from __future__ import annotations
 
-import io
 import json
 import uuid
-from datetime import date
 
 import pytest
 from sqlalchemy.orm import make_transient
@@ -24,42 +22,14 @@ from genai import governance, sample_gate, vetted
 from genai import provider as provider_module
 from genai.provider import REFUSAL_MESSAGES, GenAIProvider, GenAIUnavailable
 from tests.conftest import authenticated_client
+from tests.fake_ai_gateway import FREELLMAPI, FREELLMAPI_CEREBRAS, Reply, answer, install, register
 from tests.test_free_trial import PASSWORD, _approved_trial_client, _clean_trial_workspaces  # noqa: F401
 
 pytestmark = pytest.mark.db
 
-FREELLMAPI = "http://127.0.0.1:3011/v1/chat/completions"
-REGISTER = {
-    "version": 1,
-    "warn_after_days": 183,
-    "refuse_after_days": 365,
-    "providers": [
-        {"provider": "freellmapi", "kind": "gateway", "chain": "trial", "upstream_from": "header:x-routed-via"},
-        {
-            "provider": "cerebras",
-            "kind": "upstream",
-            "chain": "trial",
-            "terms_link": "https://example.invalid/terms",
-            "date_checked": date.today().isoformat(),
-            "region": "US",
-            "commercial_use": True,
-            "trains_on_data": "no",
-        },
-    ],
-}
 
-
-class _Reply(io.BytesIO):
-    def __init__(self):
-        body = {"choices": [{"message": {"content": "From the sample."}}], "usage": {"prompt_tokens": 4}}
-        super().__init__(json.dumps(body).encode())
-        self.headers = {"x-routed-via": "cerebras/gpt-oss-120b"}
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
+def _gateway_reply() -> Reply:
+    return Reply(answer("From the sample."), FREELLMAPI_CEREBRAS)
 
 
 @pytest.fixture(scope="module")
@@ -96,14 +66,8 @@ def chain_on(monkeypatch, trial):
     monkeypatch.setenv("MDARIX_GENAI_FREELLMAPI_API_KEY", "test-key")
     monkeypatch.delenv("MDARIX_GENAI_FREELLMAPI_BASE_URL", raising=False)
     monkeypatch.setenv("MDARIX_AI_FEATURES", "summaries")
-    monkeypatch.setattr(vetted, "load", lambda path=None: REGISTER)
-    sent = []
-
-    def urlopen(req, timeout=None):
-        sent.append(req.full_url)
-        return _Reply()
-
-    monkeypatch.setattr(provider_module.request, "urlopen", urlopen)
+    monkeypatch.setattr(vetted, "load", lambda path=None: register())
+    sent = install(monkeypatch, default=_gateway_reply)["sent"]
     _set_tenant(trial["tenant_id"], ai_processing_allowed=True, ai_features={"summaries": True})
     _set_user(trial["user_id"], "ACTIVE")
     yield sent
