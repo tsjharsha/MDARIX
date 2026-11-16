@@ -120,10 +120,27 @@ export function readyForFeedback(status: FeedbackTiming, now = Date.now()): bool
   return trialDays >= ASK_AFTER_DAYS || own.products + own.lots + own.complaints > 0;
 }
 
+const SESSION_KEY = "mdarix.session.started";
+const QUIET_MINUTES = 10;
+
+/** Whether this browser session began less than 10 minutes ago: no feedback ask while someone is still finding their
+ * way (or giving a demo). The first call marks the session's start. Exported for tests. */
+export function quietStart(store: () => Pick<Storage, "getItem" | "setItem">, now = Date.now()): boolean {
+  try {
+    const storage = store();
+    const started = Number(storage.getItem(SESSION_KEY) ?? 0);
+    if (!started) storage.setItem(SESSION_KEY, String(now));
+    return now - (started || now) < QUIET_MINUTES * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
 /** Invitation shown across the trial workspace until the person has given feedback (or chose "Not now"). */
 export function FeedbackPrompt({ onOpen }: { onOpen: () => void }) {
   const [state, setState] = useState<"hidden" | "shown">("hidden");
   useEffect(() => {
+    if (quietStart(() => window.sessionStorage)) return;
     let until = 0;
     try {
       until = Number(window.localStorage.getItem(DISMISSED_KEY) ?? 0);

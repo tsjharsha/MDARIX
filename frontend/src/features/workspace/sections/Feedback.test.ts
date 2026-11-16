@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feedbackChoices, readyForFeedback } from "./Feedback";
+import { feedbackChoices, quietStart, readyForFeedback } from "./Feedback";
 
 const DAY = 24 * 3600 * 1000;
 const none = { products: 0, lots: 0, complaints: 0 };
@@ -75,5 +75,25 @@ describe("what the feedback form asks about", () => {
       const full = feedbackChoices({ featureSet: "full", aiReady, isTrial: false });
       expect(values(full.features)).not.toContain("ASK_MDARIX");
     }
+  });
+});
+
+describe("the quiet start of a session", () => {
+  it("asks for no feedback in the first 10 minutes of a browser session", () => {
+    const kept = new Map<string, string>();
+    const store = () => ({
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+    });
+    const start = Date.parse("2026-11-17T10:00:00Z");
+    expect(quietStart(store, start)).toBe(true);
+    expect(quietStart(store, start + 9 * 60 * 1000)).toBe(true);
+    expect(quietStart(store, start + 11 * 60 * 1000)).toBe(false);
+    // Storage that cannot be read never hides the ask for ever.
+    expect(
+      quietStart(() => {
+        throw new Error("blocked");
+      }),
+    ).toBe(false);
   });
 });
