@@ -415,3 +415,40 @@ def test_b3_the_sample_us_report_gives_both_pdfs_and_the_xml(trial):
         assert "G8" not in report.entries and "emdr_xml" in snapshot.fields
     # The approval re-recorded on the new fingerprint, so the files download again.
     assert emdr.validate(files()) == []
+
+
+def test_b3_the_refresh_lists_the_sample_us_file_only_when_it_can_add_it(monkeypatch):
+    """F3: a trial made while the code lists were not loaded has its US example approved without an eMDR file, and
+    the refresh cannot add one either (no FDA codes); its listing said "would add" on every run all the same. The
+    listing and the apply now agree, with or without the code lists, and the listing changes nothing."""
+    from backend.app import regulatory_reference
+    from backend.app.trial import sample_0_10_96
+    from backend.app.trial.retention import purge_trial
+    from tests.code_lists import ensure_loaded
+    from tests.test_free_trial import _approved_trial_client
+
+    ensure_loaded()
+    with monkeypatch.context() as unloaded:
+        unloaded.setattr(regulatory_reference, "newest_release", lambda control: None)
+        _, approval, _ = _approved_trial_client()
+        tenant_id = uuid.UUID(approval["tenant_id"])
+        try:
+            with SessionLocal() as db:
+                bind_tenant(db, tenant_id)
+                report, snapshot = _sample_us(db, tenant_id)
+                entries, fields = dict(report.entries), dict(snapshot.fields)
+                assert "emdr_xml" not in fields
+                assert sample_0_10_96.refresh(db, tenant_id, apply=False) == 0
+                assert sample_0_10_96.refresh(db, tenant_id, apply=True) == 0
+                db.commit()
+                report, snapshot = _sample_us(db, tenant_id)
+                assert report.entries == entries and snapshot.fields == fields  # left exactly as it was
+                unloaded.undo()  # the code lists loaded: the file is owed, listed once, and added once
+                assert sample_0_10_96.refresh(db, tenant_id, apply=False) == 1
+                assert "emdr_xml" not in _sample_us(db, tenant_id)[1].fields  # the listing changed nothing
+                assert sample_0_10_96.refresh(db, tenant_id, apply=True) == 1
+                db.commit()
+                assert sample_0_10_96.refresh(db, tenant_id, apply=False) == 0
+        finally:
+            with SessionLocal() as db:
+                purge_trial(db, tenant_id, "test:release-0-10-96-cleanup")
