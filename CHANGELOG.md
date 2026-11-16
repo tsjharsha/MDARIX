@@ -10,6 +10,20 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Automatic trial approval on a fresh server.** On a server where no Platform Administrator had been invited with
+  `scripts/create_platform_admin.py` (a new install, the CI browser job), there was no platform organization for the
+  automatic-approval account, so every sign-up was told "Your trial is being prepared" and then stayed pending without
+  a word. The approval now creates the platform organization when it is missing (the same code the script uses).
+
+- **Investigation timeline after the challenge panel is opened.** Opening the challenge panel records an event about
+  the investigation itself, and the trust timeline then showed the investigation's own audit events (opened, state
+  changes) by a bare id instead of its number. Those events are named by the investigation's number again.
+- **Workflow scenario tests answer the challenge questions.** The end-to-end workflow scenarios
+  (`tests/test_e2e_workflow_scenarios.py`) now answer the material challenge questions before "Submit for review", as
+  an investigator does; the gate (owner decision B5-D3) is unchanged.
+
 ## [0.11.00] - not released yet
 
 B9: markets. India first (MvPI adverse event reports), then Canada (mandatory problem reports), then the US importer
