@@ -117,7 +117,7 @@ describe("the report's Next step with 0.10.89's eMDR file, in the hero design", 
 
   it("is the design's next card, with what the eMDR XML needs as a callout and its held-back button still legible", () => {
     expect(css).toMatch(
-      /\.uw-hybrid \.ac-main \.uw-rail-next \{[^}]*background: linear-gradient\(160deg, var\(--ms-mint\)/,
+      /\.uw-hybrid \.ac-main \.uw-rail-next \{[^}]*background: var\(--ms-mint\);/, // flat, no gradient (G-2)
     );
     expect(css).toMatch(
       /\.uw-rail-next #rp-emdr-needs \{[^}]*border-left: 3px solid var\(--ms-warn-mark\);[^}]*background: var\(--ms-warn-bg\);/,

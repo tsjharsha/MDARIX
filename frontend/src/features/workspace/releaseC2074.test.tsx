@@ -372,7 +372,10 @@ describe("the phone's search", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('placeholder="Search complaints, products, reports"');
     const sheet = sheetText();
-    const phone = sheet.slice(sheet.lastIndexOf("@media (max-width: 640px)"));
+    // The phone block that holds the toggle (later phone blocks of other screens may follow it).
+    const toggle = sheet.indexOf(".uw-search-toggle {\n    display: grid;");
+    expect(toggle).toBeGreaterThan(0);
+    const phone = sheet.slice(sheet.lastIndexOf("@media (max-width: 640px)", toggle));
     expect(phone).toContain(".uw-search-toggle {\n    display: grid;");
     expect(phone).toContain(".uw-top .uw-search.is-open {");
   });
