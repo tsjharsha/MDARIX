@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
+import { useEffect, useRef, useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import { Empty, Panel, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
 import { StatusBadge } from "./common";
 import { roleLabel } from "../../../app/roles";
 import { SignatureBasis } from "../../shared/Basis";
+import { formatDateTime } from "../../../app/dates";
 
 /**
  * The record a user may see: decisions in the selected investigation and the signatures on them.
@@ -64,6 +66,20 @@ export function AuditTab() {
 
 function Signatures({ decisionId }: { decisionId: string }) {
   const verification = useResource<any>(`/api/v1/governance/decisions/${decisionId}/signature-verification`);
+  const place = useRef<HTMLDivElement>(null);
+  // The panel opens below the decisions: bring it into view so the click visibly does something.
+  useEffect(() => {
+    place.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [decisionId]);
+  return (
+    <div ref={place}>
+      <SignaturesView verification={verification} />
+    </div>
+  );
+}
+
+/** The verification of one decision's signatures (rendered on its own in tests). */
+export function SignaturesView({ verification }: { verification: PanelSource & { data?: any } }) {
   const status = String(verification.data?.verification_status ?? "");
   // INVALID: at least one signature no longer matches what was signed - a problem, shown as one.
   const label =
@@ -88,6 +104,18 @@ function Signatures({ decisionId }: { decisionId: string }) {
         ) : undefined
       }
     >
+      {status === "VALID" && (
+        <p className="uw-seal" role="status">
+          <ShieldCheck size={24} aria-hidden="true" />
+          <span>
+            <strong>
+              {listOf(verification.data?.signatures).length}{" "}
+              {listOf(verification.data?.signatures).length === 1 ? "signature" : "signatures"}
+            </strong>{" "}
+            · unchanged since signing · checked when opened
+          </span>
+        </p>
+      )}
       <Table
         caption="Signatures"
         rows={listOf(verification.data?.signatures)}
@@ -95,8 +123,17 @@ function Signatures({ decisionId }: { decisionId: string }) {
         empty={{ title: "Not signed yet", detail: "Signatures appear once an authorized person signs." }}
         columns={[
           idColumn("Signature ID"),
+          {
+            key: "signer",
+            label: "Signer",
+            render: (row) => (
+              <span className="cc-trial-org">
+                <strong>{row.signer_name ?? "—"}</strong>
+                <small>{roleLabel(row.signer_role) || ""}</small>
+              </span>
+            ),
+          },
           { key: "decision", label: "Signed as", render: (row) => titleCase(String(row.decision ?? "—")) },
-          { key: "role", label: "Signer role", render: (row) => roleLabel(row.signer_role) || "—" },
           { key: "meaning", label: "Meaning", render: (row) => row.meaning ?? "—" },
           {
             key: "valid",
@@ -108,7 +145,7 @@ function Signatures({ decisionId }: { decisionId: string }) {
               />
             ),
           },
-          { key: "when", label: "Signed", render: (row) => formatDate(row.signed_at) },
+          { key: "when", label: "Signed", render: (row) => formatDateTime(row.signed_at) },
         ]}
       />
       {listOf(verification.data?.signatures).length > 0 && <SignatureBasis />}

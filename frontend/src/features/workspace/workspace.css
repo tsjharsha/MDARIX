@@ -9180,3 +9180,19 @@ details.uw-team-change[open] {
     grid-template-columns: 1fr;
   }
 }
+
+/* Decisions › Signatures: all valid is the strongest trust signal of the story, so it leads the panel. */
+.uw-seal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  color: var(--ms-ink);
+}
+.uw-seal > svg {
+  flex: none;
+  color: var(--ms-good);
+}
