@@ -174,6 +174,70 @@ def platform_tenant_id(db: Session):
     return row[0] if row else None
 
 
+def ensure_platform_tenant(db: Session, now: datetime) -> Tenant:
+    """The platform's own organization, created on first use: by scripts/create_platform_admin.py, or by the first
+    automatic trial approval on a server where no Platform Administrator was invited that way (a fresh install, CI)."""
+    import os
+
+    from backend.app.auth_router import PLATFORM_TENANT_KEY
+    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE
+    from backend.app.db.models.customer_lifecycle import Customer, TenantDataPlane
+
+    tenant = db.query(Tenant).filter(Tenant.tenant_key == PLATFORM_TENANT_KEY).first()
+    if tenant is not None:
+        return tenant
+    region = os.getenv("MDARIX_OPERATOR_REGION", "US")
+    customer = Customer(
+        id=uuid.uuid4(),
+        customer_identifier="MDARIX-OPERATOR",
+        legal_name=os.getenv("MDARIX_COMPANY_LEGAL_NAME", "").strip() or "MDARIX",
+        display_name="MDARIX Platform",
+        customer_type="OPERATOR",
+        country=os.getenv("MDARIX_OPERATOR_COUNTRY", "US"),
+        lifecycle_status="ACTIVE",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(customer)
+    db.flush()
+    tenant = Tenant(
+        id=uuid.uuid4(),
+        customer_id=customer.id,
+        tenant_key=PLATFORM_TENANT_KEY,
+        tenant_identifier=PLATFORM_TENANT_KEY,
+        name="MDARIX Platform",
+        display_name="MDARIX Platform",
+        tenant_slug="mdarix-platform",
+        tenant_type="STANDARD",
+        deployment_model="SHARED",
+        primary_region=region,
+        residency_region=region,
+        cross_border_processing_allowed=False,
+        provisioning_status="PROVISIONED",
+        status="ACTIVE",
+        lock_version=1,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(tenant)
+    db.flush()
+    db.add(
+        TenantDataPlane(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            database_ref=f"shared-control:{PLATFORM_TENANT_KEY}",
+            connection_secret_ref=SHARED_CONTROL_DATA_PLANE,
+            region=region,
+            residency_region=region,
+            status="ACTIVE",
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    db.flush()
+    return tenant
+
+
 def _usable(db: Session, platform_user_id, now: datetime):
     """The customer-approved grants of one colleague that are inside their window right now."""
     return db.query(SupportAccessGrant).filter(

@@ -519,11 +519,22 @@ def _decision(case_id) -> str:
     return f"/api/v1/investigations/{case_id}/decision"
 
 
+def _answer_challenge(client, case_id) -> None:
+    """Answer the challenge questions that hold the brief back, as its author would (B5-D3: a material question
+    blocks "Submit for review" until it is answered or marked not applicable)."""
+    path = f"/api/v1/investigations/{case_id}/challenge"
+    for key in _ok(client.get(path))["blocking"]:
+        answer = {"key": key, "text": "Checked against the records; the conclusion is limited to what they show."}
+        _ok(client.post(path + "/questions/answer", json=answer))
+
+
 def _submit(org, case_id, author: str = "investigator") -> dict:
-    """Compose the next version of the brief, write its narrative and send it to quality review."""
+    """Compose the next version of the brief, write its narrative, answer its challenge questions and send it to
+    quality review."""
     client, _ = org[author]
     _ok(client.post(_brief(case_id), json={}), 201)
     _ok(client.put(_brief(case_id) + "/draft", json=NARRATIVE))
+    _answer_challenge(client, case_id)
     return _ok(client.post(_brief(case_id) + "/submit", json={"comment": "Ready for quality review"}))
 
 
@@ -858,6 +869,7 @@ def golden(org):
     assert second["version"] == 2 and second["business_id"] != first["business_id"]
     edited = {"problem_statement": NARRATIVE["problem_statement"] + "; the pressure logs confirm the offset"}
     _ok(investigator.put(_brief(case_id) + "/draft", json=edited))
+    _answer_challenge(investigator, case_id)
     assert _ok(investigator.post(_brief(case_id) + "/submit", json={}))["status"] == "READY_FOR_REVIEW"
     approved = _accept(org, case_id, 2)
     assert _case_row(tenant_id, case_id).workflow_state == "READY_FOR_DECISION"
@@ -1420,6 +1432,7 @@ def test_09_contradicting_evidence_changes_the_leading_hypothesis(org):
     assert refreshed["content_hash"] != draft["content_hash"] and refreshed["hash_verified"] is True
 
     _ok(investigator.put(_brief(case_id) + "/draft", json=NARRATIVE))
+    _answer_challenge(investigator, case_id)
     submitted = _ok(investigator.post(_brief(case_id) + "/submit", json={}))
     assert submitted["content"]["leading_hypothesis"]["business_id"] == alternative["business_id"]
 
@@ -1544,6 +1557,7 @@ def test_11_a_risk_review_asking_for_more_evidence_blocks_submission_until_a_new
 
     second = review("NO_CHANGE_REQUIRED")
     assert _readiness(investigator, case_id)["risk_review"]["result"] == "PASS"
+    _answer_challenge(investigator, case_id)
     submitted = _ok(investigator.post(_brief(case_id) + "/submit", json={}))
     assert submitted["status"] == "READY_FOR_REVIEW"
     assert submitted["content"]["risk_review"]["review"]["business_id"] == second["business_id"]
@@ -1587,6 +1601,7 @@ def test_13_the_quality_reviewer_returns_the_brief_and_version_2_follows_with_ve
     second = _ok(investigator.post(_brief(case_id), json={}), 201)
     assert second["version"] == 2 and second["narrative"]["problem_statement"] == NARRATIVE["problem_statement"]
     _ok(investigator.put(_brief(case_id) + "/draft", json={"proposed_conclusion": "Sensor drift, confirmed by logs"}))
+    _answer_challenge(investigator, case_id)
     _ok(investigator.post(_brief(case_id) + "/submit", json={}))
     versions = {item["version"]: item["status"] for item in _ok(investigator.get(_brief(case_id)))["versions"]}
     assert versions == {1: "RETURNED", 2: "READY_FOR_REVIEW"}
@@ -1848,6 +1863,7 @@ def test_19_late_evidence_asks_for_an_impact_assessment_and_a_new_decision_super
     assert len(_ok(investigator.get(f"/api/v1/investigations/{case_id}/impact-assessments"))["items"]) == 1
     second_brief = _ok(investigator.post(_brief(case_id), json={}), 201)
     assert second_brief["version"] == 2
+    _answer_challenge(investigator, case_id)
     _ok(investigator.post(_brief(case_id) + "/submit", json={}))
     assert _ok(investigator.get(_brief(case_id) + "/versions/1"))["status"] == "SUPERSEDED"
     approved = _accept(org, case_id, 2)

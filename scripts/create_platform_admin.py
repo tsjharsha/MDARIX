@@ -19,68 +19,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-OPERATOR_TENANT_KEY = "MDARIX_PLATFORM"
-
 
 def _operator_tenant(db, now):
-    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE
-    from backend.app.db.models.customer_lifecycle import Customer, TenantDataPlane
-    from backend.app.db.models.foundation import Tenant
+    from backend.app.support_access import ensure_platform_tenant
 
-    tenant = db.query(Tenant).filter(Tenant.tenant_key == OPERATOR_TENANT_KEY).first()
-    if tenant is not None:
-        return tenant
-    legal_name = os.getenv("MDARIX_COMPANY_LEGAL_NAME", "").strip() or "MDARIX"
-    customer = Customer(
-        id=uuid.uuid4(),
-        customer_identifier="MDARIX-OPERATOR",
-        legal_name=legal_name,
-        display_name="MDARIX Platform",
-        customer_type="OPERATOR",
-        country=os.getenv("MDARIX_OPERATOR_COUNTRY", "US"),
-        lifecycle_status="ACTIVE",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(customer)
-    db.flush()
-    tenant = Tenant(
-        id=uuid.uuid4(),
-        customer_id=customer.id,
-        tenant_key=OPERATOR_TENANT_KEY,
-        tenant_identifier=OPERATOR_TENANT_KEY,
-        name="MDARIX Platform",
-        display_name="MDARIX Platform",
-        tenant_slug="mdarix-platform",
-        tenant_type="STANDARD",
-        deployment_model="SHARED",
-        primary_region=os.getenv("MDARIX_OPERATOR_REGION", "US"),
-        residency_region=os.getenv("MDARIX_OPERATOR_REGION", "US"),
-        cross_border_processing_allowed=False,
-        provisioning_status="PROVISIONED",
-        status="ACTIVE",
-        lock_version=1,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(tenant)
-    db.flush()
-    db.add(
-        TenantDataPlane(
-            id=uuid.uuid4(),
-            tenant_id=tenant.id,
-            database_ref=f"shared-control:{OPERATOR_TENANT_KEY}",
-            connection_secret_ref=SHARED_CONTROL_DATA_PLANE,
-            region=tenant.primary_region,
-            residency_region=tenant.residency_region,
-            status="ACTIVE",
-            created_at=now,
-            updated_at=now,
-        )
-    )
-    db.flush()
-    print(f"Created the MDARIX operator organization ({OPERATOR_TENANT_KEY}).")
-    return tenant
+    return ensure_platform_tenant(db, now)
 
 
 def main() -> int:
