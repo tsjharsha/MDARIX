@@ -488,7 +488,7 @@ test.describe("free trial journey", () => {
     // RCA tools: accepting the conclusion confirms the cause by ticking the supplier hypothesis and its category.
     const cause = decide.getByRole("group", { name: /Confirmed root cause/ });
     if (await cause.count()) {
-      await cause.getByRole("checkbox").first().check();
+      await cause.getByRole("checkbox", { name: /NovaSense/ }).check();
       await cause.getByLabel("Cause category").selectOption("MATERIAL");
     }
     await decide.getByRole("button", { name: "Continue to sign" }).click();
