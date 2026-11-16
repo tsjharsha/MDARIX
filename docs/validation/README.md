@@ -1,0 +1,402 @@
+# MDX-VAL-000 Validation document control and index
+
+| Field | Value |
+|---|---|
+| Document ID | MDX-VAL-000 |
+| Title | Validation document control and index |
+| Version | 0.10 |
+| Status | DRAFT |
+| Author (R) | Srinivas Telikicherla, QA/RA |
+| Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
+| Approver (A) | Sriharsha Telikicherla, Product & Engineering, system owner, as the second person (DC-R42: the quality approver is the author) |
+| Drafting | Drafted with software assistance; every line reviewed by Srinivas Telikicherla (DC-R43) |
+| Date | 14 Nov 2026 |
+| Code baseline | Product code at `628c624a`, plus these changes on branch `feat/b6b-validation-pack`: the SUPERSEDED banner in `validation/csa_package.py` and its test, and `cb75e8da` (the rule register refuses a version approved by its own builder, owner decision O3: `backend/app/rule_register/register.py` and its test), and `ef27c87e` (the same check made by staff account, owner decision O10), and the merge of `feat/b6a-speed-reviews` (cut-off fixes, 14 Nov 2026: the server-side Retry block for events held after a restore); release in preparation 0.11.04 (`VERSION` file still 0.10.94) |
+
+Change history
+
+| Version | Date | Change | By |
+|---|---|---|---|
+| 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after a software-assisted review, findings dispositioned by the author | Srinivas Telikicherla |
+| 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: one signature rule for every document and the header field "Drafting"; signing sequence; registers and legacy files; owner decisions (section 4) and codes (section 5) recorded here; rules renumbered in reading order | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Srinivas Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations") recorded as O7 to O16; MDX-VAL-012 interim template added to the index; PL scenario code; document versions updated | Srinivas Telikicherla |
+| 0.5 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all eight") recorded as O17 to O24; section 4 marked to be signed by the owner before the big-bang deploy, with its PDF for signature; section 3.3 indexes the approved specs copied into `docs/specs/`; OQ expected results and the OQ protocol and results IDs (MDX-VAL-007-P, -007-R) in the index | Srinivas Telikicherla |
+| 0.6 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve control-gap fixes and all recommendations") recorded as O25 to O31; section 4 co-signed by the system owner (O30); section 3.3 adds the B6b spec, the B3 plan and the W1 spec and the approval records (O29); index versions | Srinivas Telikicherla |
+| 0.7 | 13 Nov 2026 | Under the owner's approval of 12 Nov 2026 (O25 to O31, item 7: generator and document findings fixed in the next runs): O22 and O29 made consistent (section 3.3: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and each is recorded; checked line by line on 13 Nov 2026); the Authority-forms mapping workbook copied into `docs/specs/`; generated counts in section 3.4; index versions | Srinivas Telikicherla |
+| 0.8 | 14 Nov 2026 | Index rows for MDX-SUP-001 to -006, MDX-SOP-001 to -005, MDX-OPS-001 to -003 and MDX-CUS-001 to -006 (B6b Parts C to E, drafts 0.1; MDX-CUS-005 0.2 with the O34 checklist item); O32 to O34 recorded (section 4) | Srinivas Telikicherla |
+| 0.9 | 14 Nov 2026 | Owner decisions of 14 Nov 2026 ("Approved your recommendation") recorded as O35 to O38 (section 4); index versions of MDX-VAL-002 0.11, -010 0.4, -013 0.6, MDX-SUP-001 0.2, MDX-OPS-001 0.2 and -002 0.2 | Srinivas Telikicherla |
+| 0.10 | 14 Nov 2026 | Owner decision of 14 Nov 2026 ("All are approved") recorded as O39 (backup retention 30 daily + 12 monthly; MDX-SUP-001 OP-4 closed); scenario PL-59 traces REQ-CLK-001's different-days case (owner request of 14 Nov 2026); the Retry block built server-side (MDX-VAL-002 RSK-056, MDX-OPS-001 RR-05a); index versions of MDX-VAL-002 0.12, MDX-SUP-001 0.3, MDX-OPS-001 0.3 and -003 0.2; code baseline names the merged cut-off fixes | Srinivas Telikicherla |
+
+## 1. Purpose and scope
+
+This document sets how MDARIX's own validation documents are numbered, versioned, reviewed, signed, stored and
+retired, and lists them. It covers every document in this folder (`docs/validation/`) and the per-release records
+in `docs/validation/releases/<version>/`.
+
+It does not cover a customer's own validation records. Those stay with the customer.
+
+## 2. Rules
+
+Each rule has a number (DC-Rnn), so that a review comment, a deviation or a check can point to it.
+
+### 2.1 Place and format
+
+- **DC-R01** Every MDARIX validation document shall be kept in this repository under `docs/validation/` (owner
+  decision B6b-D2).
+- **DC-R02** The source of every document shall be a text file (Markdown, CSV or JSON).
+- **DC-R03** A Word, Excel or PDF copy shall be generated from the source at a tagged commit.
+- **DC-R04** A generated copy shall not be edited by hand.
+- **DC-R05** The master copy of the scenario register shall be [scenario-register.md](scenario-register.md) in this
+  folder (owner decision B6b-D3).
+- **DC-R06** A customer's filled templates, test logs and approvals shall not be committed to this repository.
+
+### 2.2 Numbering
+
+| Prefix | Used for | Examples |
+|---|---|---|
+| MDX-VAL | MDARIX validation documents | -000 this index, -001 Validation Master Plan, -002 product risk assessment, -003 GAMP 5 category justification, -004 URS, -005 FS/DS, -006 IQ, -007 OQ, -008 MDARIX PQ, -009 RTM, -010 deviation log, -011 Validation Summary Report, -012 release approval record, -013 consultant brief and question pack |
+| MDX-SUP | Supplier documents given to customers | -001 supplier pack, -002 GxP impact and shared responsibility, -003 Part 11 / Annex 11 assessment, -004 hosting assessment, -005 SOC 2 / ISO 27001 mapping, -006 trust facts |
+| MDX-SOP | MDARIX procedures | -001 SDLC, -002 change control, -003 incident response, -004 backup and business continuity, -005 access control |
+| MDX-OPS | Operational records | -001 recovery record, -002 monthly health report |
+| MDX-CUS | Templates for customers | -001 UAT/PQ, -002 migration plan, -003 migration report, -004 periodic review, -005 go-live checklist and support plan, -006 customer validation instructions |
+
+- **DC-R07** Each document shall carry an ID from the table above, or, for the four drafts moved in by owner decision O2, its legacy MDX-B10 ID (section 3.1).
+- **DC-R08** A document ID shall not be reused, even after the document is retired.
+- **DC-R09** A register (the scenario register, `signatures.csv`, the deviation log) shall be controlled by its git
+  history; it needs no document ID and no DC-R19 header.
+- **DC-R10** A file in this folder that predates this index and carries no document ID shall not be cited as
+  validation evidence until it is re-issued with an ID.
+- **DC-R11** Each requirement inside a document shall carry a document prefix and a number (for example VMP-R02).
+
+### 2.3 Versions and status
+
+- **DC-R12** A draft shall carry version 0.x.
+- **DC-R13** The first approved issue shall carry version 1.0.
+- **DC-R14** A later approved issue shall raise the version: 1.1 for a correction, 2.0 for a change of scope or
+  approach.
+- **DC-R15** Each document shall carry one of these statuses: DRAFT, IN REVIEW, APPROVED, SUPERSEDED, RETIRED.
+- **DC-R16** A document shall carry the status APPROVED only when its signed PDF is listed in
+  [signatures.csv](signatures.csv).
+- **DC-R17** An approved document shall not be changed in place.
+- **DC-R18** A correction to an approved document shall be a new version whose change history names the version it
+  replaces.
+
+### 2.4 Header
+
+- **DC-R19** Every document shall start with this header, followed by a change history table:
+
+```markdown
+| Field | Value |
+|---|---|
+| Document ID | MDX-XXX-nnn |
+| Title | |
+| Version | 0.1 |
+| Status | DRAFT |
+| Author (R) | name, role |
+| Reviewer | name, role |
+| Approver (A) | name, role |
+| Drafting | "Written by the author" or "Drafted with software assistance; every line reviewed by <name>" |
+| Date | d Mon yyyy |
+| Code baseline | tag or commit of the product code the document describes |
+```
+
+- **DC-R20** The author named in the header shall be a person.
+- **DC-R21** Where a draft was prepared with software assistance, the named author shall review every line before
+  the document goes for approval.
+- **DC-R22** Software shall not be named as author, reviewer or signer.
+- **DC-R23** A generated Word copy shall carry the same header fields as its source. (The Word generator comes with
+  B6b Part B.)
+
+### 2.5 Writing standard
+
+- **DC-R24** Each document shall state its purpose and scope in its first section.
+- **DC-R25** A requirement shall use "shall"; "may", "should" and "probably" shall not be used in a requirement.
+- **DC-R26** Each numbered requirement shall hold one requirement that can be checked as met or not met.
+- **DC-R27** Each product requirement shall be traced to a test and to its evidence (B6b Part B, RTM).
+- **DC-R28** No document shall name a competitor.
+- **DC-R29** No document shall state a price.
+- **DC-R30** No document shall say that MDARIX is "validated", "compliant", "aligned" or "certified" for every
+  customer, nor state a validation status that an approved VSR does not support (MDX-VAL-001, VMP-R44). MDARIX validates each release for its own intended use; each customer validates its own use.
+- **DC-R31** Before signature, the author shall check consistency, numbering, references and the signature block,
+  and record that check in the change history.
+
+Style (guidance, not a requirement): plain English, short sentences, one idea per sentence.
+
+### 2.6 Review and signature (owner decision B6b-D6)
+
+- **DC-R32** A document shall be signed as a PDF, by hand and scanned or with a PDF digital signature.
+- **DC-R33** MDARIX's own electronic signature shall not be used for MDARIX's own documents.
+- **DC-R34** Each signed PDF shall be stored as `docs/validation/signed/<document ID>_v<version>.pdf`, except a
+  generated per-release record, which is stored in its release folder `docs/validation/releases/<release>/`.
+- **DC-R35** Each signature shall be one row in [signatures.csv](signatures.csv) with: document ID, version, signer,
+  role, meaning, date (UTC), PDF path, the signed PDF's SHA-256 (`sha256`) and, where the signature approves
+  generated content, the SHA-256 of that content (`content_sha256`; for the OQ protocol, of its steps table as CSV,
+  owner decision O31). The two are never the same field.
+- **DC-R36** A signature row and its PDF shall be committed in the same commit.
+- **DC-R37** The PDF for signature shall be generated at the version it approves (1.0 for a first issue) with the
+  status line "APPROVED when signed below".
+- **DC-R38** The signed PDF shall be the approved record.
+- **DC-R39** The source shall change to the status APPROVED in the same commit that adds the signed PDF and its
+  `signatures.csv` row.
+- **DC-R40** The approver (A) of a document shall be a different person from its author (R) (MDX-VAL-001, VMP-R02).
+- **DC-R41** The quality approver (Srinivas Telikicherla, QA/RA; owner decision B6b-D1) shall approve every MDARIX
+  validation document that the quality approver did not write.
+- **DC-R42** A document that the quality approver wrote shall be approved by the system owner (Sriharsha
+  Telikicherla, Product & Engineering) as the second person.
+- **DC-R43** The header field "Drafting" of a document drafted with software assistance shall name the person who
+  reviewed every line.
+
+### 2.7 Retirement
+
+- **DC-R44** A retired or superseded document shall stay in the repository.
+- **DC-R45** A retired or superseded document shall carry a banner at the top that names its successor.
+- **DC-R46** A superseded document shall not be given to a customer or used as evidence.
+
+## 3. Document index
+
+| ID | Title | File | Version | Status |
+|---|---|---|---|---|
+| MDX-VAL-000 | Validation document control and index | this file | 0.10 | DRAFT; section 4 to be co-signed by the system owner and signed by the owner before the big-bang deploy |
+| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.8 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.12 | DRAFT |
+| MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.4 | DRAFT |
+| MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
+| MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.6 | DRAFT |
+| (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
+| (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
+| MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.5 | DRAFT |
+| MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.4 | DRAFT; log: DEV-0.11.04-001 and DEV-0.11.04-002 (both major, GxP risk high, retested, closed 13 Nov 2026) |
+| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.5 | DRAFT; to be signed by the owner before the big-bang deploy |
+| MDX-VAL-004, -005, -006, -007-P, -007-R, -009, -011, -012-&lt;release&gt; | URS, FS/DS, IQ record, OQ protocol (approved before execution, O20) and OQ results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
+| (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, source (`requirement` / `code`), confirmed by | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT: every row drafted from the code (`source` `code`; the counts, including the rows that say TO CONFIRM, are in section 3.4); each to be re-derived from its requirement by Sriharsha Telikicherla and confirmed by the owner (O27) |
+| (data, per release) | Executed IQ and scripted OQ results: step, scenario, executed by, date (UTC), result, evidence ID; the generator feeds them into the IQ record, the OQ results, the RTM and the VSR (no generated document is edited by hand) | `releases/<release>/executed-results.csv` | per release | none yet |
+| (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; counts in section 3.4 |
+| MDX-SUP-001 | Supplier pack | [MDX-SUP-001_SUPPLIER_PACK.md](MDX-SUP-001_SUPPLIER_PACK.md) | 0.3 | DRAFT |
+| MDX-SUP-002 | GxP impact assessment and shared-responsibility matrix | [MDX-SUP-002_GXP_IMPACT_AND_SHARED_RESPONSIBILITY.md](MDX-SUP-002_GXP_IMPACT_AND_SHARED_RESPONSIBILITY.md) | 0.1 | DRAFT |
+| MDX-SUP-003 | 21 CFR Part 11 assessment and EU GMP Annex 11 benchmark | [MDX-SUP-003_PART11_ANNEX11_ASSESSMENT.md](MDX-SUP-003_PART11_ANNEX11_ASSESSMENT.md) | 0.1 | DRAFT |
+| MDX-SUP-004 | Hosting-provider assessment (G8) | [MDX-SUP-004_HOSTING_PROVIDER_ASSESSMENT.md](MDX-SUP-004_HOSTING_PROVIDER_ASSESSMENT.md) | 0.1 | DRAFT |
+| MDX-SUP-005 | SOC 2 and ISO/IEC 27001 control mapping | [MDX-SUP-005_SOC2_ISO27001_CONTROL_MAPPING.md](MDX-SUP-005_SOC2_ISO27001_CONTROL_MAPPING.md) | 0.1 | DRAFT |
+| MDX-SUP-006 | Trust facts | [MDX-SUP-006_TRUST_FACTS.md](MDX-SUP-006_TRUST_FACTS.md) | 0.1 | DRAFT |
+| MDX-SOP-001 | Software development lifecycle | [MDX-SOP-001_SOFTWARE_DEVELOPMENT_LIFECYCLE.md](MDX-SOP-001_SOFTWARE_DEVELOPMENT_LIFECYCLE.md) | 0.1 | DRAFT |
+| MDX-SOP-002 | Change control | [MDX-SOP-002_CHANGE_CONTROL.md](MDX-SOP-002_CHANGE_CONTROL.md) | 0.1 | DRAFT |
+| MDX-SOP-003 | Incident response and complaints about MDARIX | [MDX-SOP-003_INCIDENT_RESPONSE.md](MDX-SOP-003_INCIDENT_RESPONSE.md) | 0.1 | DRAFT |
+| MDX-SOP-004 | Backup, recovery and business continuity | [MDX-SOP-004_BACKUP_AND_BUSINESS_CONTINUITY.md](MDX-SOP-004_BACKUP_AND_BUSINESS_CONTINUITY.md) | 0.1 | DRAFT |
+| MDX-SOP-005 | Access control | [MDX-SOP-005_ACCESS_CONTROL.md](MDX-SOP-005_ACCESS_CONTROL.md) | 0.1 | DRAFT |
+| MDX-OPS-001 | Recovery record (template) | [MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md](MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md) | 0.3 | DRAFT; first executed record at the next quarterly drill |
+| MDX-OPS-002 | Monthly service health report | [MDX-OPS-002_MONTHLY_HEALTH_REPORT.md](MDX-OPS-002_MONTHLY_HEALTH_REPORT.md) | 0.2 | DRAFT |
+| MDX-OPS-003 | Operational registers | [MDX-OPS-003_OPERATIONAL_REGISTERS.md](MDX-OPS-003_OPERATIONAL_REGISTERS.md); [registers/](registers/) | 0.2 | DRAFT |
+| MDX-CUS-001 | Customer UAT/PQ template | [MDX-CUS-001_UAT_PQ_TEMPLATE.md](MDX-CUS-001_UAT_PQ_TEMPLATE.md); Word and Excel log in `customer-templates/` | 0.1 | DRAFT |
+| MDX-CUS-002 | Data migration plan template | [MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md](MDX-CUS-002_DATA_MIGRATION_PLAN_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
+| MDX-CUS-003 | Data migration report template | [MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md](MDX-CUS-003_DATA_MIGRATION_REPORT_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
+| MDX-CUS-004 | Periodic review report template | [MDX-CUS-004_PERIODIC_REVIEW_TEMPLATE.md](MDX-CUS-004_PERIODIC_REVIEW_TEMPLATE.md); Word in `customer-templates/` | 0.1 | DRAFT |
+| MDX-CUS-005 | Go-live checklist and support plan | [MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md](MDX-CUS-005_GO_LIVE_CHECKLIST_AND_SUPPORT_PLAN.md); Word in `customer-templates/` | 00.2 | DRAFT |
+| MDX-CUS-006 | Customer validation instructions | [MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md](MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md); Word in `customer-templates/` | 0.1 | DRAFT |
+| (generated) | Word and Excel copies of MDX-CUS-001 to -006 | `customer-templates/`, written by `scripts/customer_templates.py` (DC-R03, DC-R04; `--check` lists missing or stale copies) | per source | generated, never edited by hand |
+
+Other files in this folder: [AI_GOLDEN_DATASET_QUALIFICATION.md](AI_GOLDEN_DATASET_QUALIFICATION.md) and
+[LOCAL_VALIDATION_DATASET.md](LOCAL_VALIDATION_DATASET.md) predate this index. They are kept for the AI release gate
+and the local data set; AI is off and out of scope (MDX-VAL-001, section 15). Neither is cited as validation
+evidence (DC-R10).
+
+### 3.1 Validation planning drafts of 8 Nov 2026
+
+MDX-VAL-001 and -002 reference these drafts, moved into this folder on 12 Nov 2026 (owner decision O2) unchanged:
+[MDX-B10-001](MDX-B10-001-Intended-Use-Statement.md) intended use, [MDX-B10-002](MDX-B10-002-Regulatory-Applicability-Matrix.md) regulatory applicability matrix,
+[MDX-B10-005](MDX-B10-005-Traceability-Structure.md) traceability structure and [MDX-B10-006](MDX-B10-006-Threat-Model.md) threat model. Each is version
+0.1, status DRAFT. They are now under version control; MDX-VAL-001 is not approved as 1.0 before they are approved
+(VMP-R01). The planning copies carry a pointer to these. MDX-B10-003 (validation plan) is superseded by MDX-VAL-001, and MDX-B10-004 (software risk assessment) by
+MDX-VAL-002; both carry a banner saying so.
+
+### 3.2 Superseded and corrected documents
+
+| Document | What happened | Successor |
+|---|---|---|
+| `docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md` and `.json` (MDARIX-CSA-MVP-1.0, never executed) | SUPERSEDED | MDX-VAL-001 now; the per-release pack (B6b Part B) |
+| `docs/compliance/CSA_MVP_VALIDATION_PROTOCOL.md` | SUPERSEDED | MDX-VAL-001 |
+| `docs/compliance/CSA_REQUIREMENTS_TRACEABILITY.md` | SUPERSEDED | The generated RTM (MDX-VAL-009, B6b Part B) |
+| `docs/compliance/CSA_CUSTOMER_IMPLEMENTATION_INSTRUCTIONS.md` | SUPERSEDED | [MDX-CUS-006](MDX-CUS-006_CUSTOMER_VALIDATION_INSTRUCTIONS.md) (0.1 DRAFT, 14 Nov 2026); the superseded file links it |
+| `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` | Corrected 12 Nov 2026 (no password expiry); current reference for the application controls | The Part 11 / Annex 11 assessment (MDX-SUP-003, draft 0.1) |
+
+### 3.3 Approved build specs under version control (owner decision O22)
+
+The approved specs that `requirements.csv` and the scenario register cite were copied on 12 Nov 2026 into
+`docs/specs/`, unchanged (git stores them with LF line endings, `.gitattributes`). From then on the copy in
+`docs/specs/` is the controlled one; each planning copy starts with a pointer line to it. On 12 Nov 2026 (owner
+decision O29) the B6b spec (up to its owner approval; its build-status sections stay in the planning copy), the B3
+execution plan (after the drafting-tool and folder references were removed from the planning copies) and the W1 spec
+were copied too, and every spec here received an "Approval record" section (date, the owner's approval words as
+recorded, approver, where recorded); a DRAFT status line in an approved spec now reads APPROVED.
+
+How O22 ("byte for byte") and O29 fit together: apart from the appended "Approval record" section, the status line is
+the only permitted change to the text of a copied spec, and it is recorded here. Each copy differs from its planning
+copy only in (a) the pointer line, which exists in the planning copy only, (b) the status line, from the draft wording
+to "APPROVED by the owner on <date> (see "Approval record")" (none for the B3 plan and the B9b spec, whose status line
+already read approved), and (c) the appended Approval record; checked line by line on 13 Nov 2026. The B6b spec copy
+stops at its owner approval; its build-status sections stay in the planning copy. Any other change is a new version
+under change control.
+
+The approvals were the owner's written replies, not signatures. The Authority-forms spec has no approval words
+recorded word for word; its Approval record cites the planning entry that records the approval of decisions D1 to
+D18 on 6 Nov 2026. Its mapping workbook, which the spec calls its rule book (decision D17), is copied beside it as
+[authority-forms-mapping.xlsx](../specs/authority-forms-mapping.xlsx) (13 Nov 2026, unchanged).
+
+| Controlled copy | Planning copy (pointer only) |
+|---|---|
+| [B2-case-design-spec.md](../specs/B2-case-design-spec.md) | `MDARIX-planning/b2-case-design/spec.md` |
+| [B4-rule-register-spec.md](../specs/B4-rule-register-spec.md) | `MDARIX-planning/b4-rule-register/spec.md` |
+| [B4b-questionnaire-config-spec.md](../specs/B4b-questionnaire-config-spec.md) | `MDARIX-planning/b4b-questionnaire-config/spec.md` |
+| [B4c-templates-change-impact-spec.md](../specs/B4c-templates-change-impact-spec.md) | `MDARIX-planning/b4c-templates-change-impact/spec.md` |
+| [B5-challenge-closed-loop-spec.md](../specs/B5-challenge-closed-loop-spec.md) | `MDARIX-planning/b5-challenge-closed-loop/spec.md` |
+| [B6a-speed-evidence-spec.md](../specs/B6a-speed-evidence-spec.md) | `MDARIX-planning/b6-speed-evidence/B6a-spec.md` |
+| [B7-routine-path-spec.md](../specs/B7-routine-path-spec.md) | `MDARIX-planning/b7-routine-path/spec.md` |
+| [B8-eu-gb-mir-execution-plan.md](../specs/B8-eu-gb-mir-execution-plan.md) | `MDARIX-planning/b8-eu-gb-mir/B8-execution-plan.md` |
+| [B9-markets-spec.md](../specs/B9-markets-spec.md) | `MDARIX-planning/b9-markets/spec.md` |
+| [B9b-other-countries-spec.md](../specs/B9b-other-countries-spec.md) | `MDARIX-planning/other-country-reports/spec.md` |
+| [RCA-tools-spec.md](../specs/RCA-tools-spec.md) | `MDARIX-planning/rca-tools/spec.md` |
+| [Q2-benchmark-spec.md](../specs/Q2-benchmark-spec.md) | `MDARIX-planning/q2-benchmark/spec.md` |
+| [AI-R-ai-ready-spec.md](../specs/AI-R-ai-ready-spec.md) | `MDARIX-planning/ai-ready/spec.md` |
+| [Device-classification-spec.md](../specs/Device-classification-spec.md) | `MDARIX-planning/device-classification/spec.md` |
+| [Authority-forms-spec.md](../specs/Authority-forms-spec.md) | `MDARIX-planning/authority-forms-spec/spec.md` |
+| [B6b-validation-pack-spec.md](../specs/B6b-validation-pack-spec.md) | `MDARIX-planning/b6-speed-evidence/B6b-spec.md` (build status continues there) |
+| [B3-emdr-execution-plan.md](../specs/B3-emdr-execution-plan.md) | `MDARIX-planning/b3-emdr/B3-execution-plan.md` |
+| [W1-product-supplier-360-spec.md](../specs/W1-product-supplier-360-spec.md) | `MDARIX-planning/w1-product-supplier-360/spec.md` |
+
+### 3.4 Generated counts
+
+The counts these documents state are generated from their sources by `scripts/validation_pack.py --update-counts`,
+never typed. The generator compares the block below with its sources on every run and lists a stale block as a check
+failure (rating-4 finding 9, 13 Nov 2026).
+
+<!-- generated counts: begin (python scripts/validation_pack.py --release <release> --update-counts) -->
+
+| Count | Value |
+|---|---|
+| Requirements (`requirements.csv`) | 75 |
+| Requirements, class A | 66 |
+| Requirements, class B | 8 |
+| Requirements, class C | 1 |
+| Class-A requirements without a negative scenario | 0 |
+| Class-A requirements whose negative scenarios are all future | 0 |
+| Scenarios in the register | 541 |
+| Scenarios marked future (not built) | 10 |
+| Scripted class-A OQ steps | 194 |
+| Class-A scenarios without an OQ expected result | 12 |
+| OQ expected results (`oq-expected-results.csv`) | 181 |
+| OQ expected results derived from the requirement | 3 |
+| OQ expected results drafted from the code | 178 |
+| OQ expected results confirmed by the owner | 0 |
+| OQ expected results whose text says TO CONFIRM | 21 |
+| Deviations in `deviation-log.csv` | 2 |
+| Deviations not closed | 0 |
+| Rows in `signatures.csv` | 0 |
+| MDARIX PQ steps (MDX-VAL-008) | 19 |
+
+<!-- generated counts: end -->
+
+## 4. Owner decisions in force
+
+**Signing status: to be co-signed by Sriharsha Telikicherla as system owner and signed by the owner before the big-bang deploy (owner decisions O19, O30).** The rules in force
+from the big-bang deploy rest on this section; until it is signed they are drafts. The PDF for signature is
+`signing/MDX-VAL-000-section-4.pdf` (generated, unsigned; `scripts/validation_signing_pdfs.py`).
+
+These documents cite "owner decision B6b-Dn" or "owner decision On". Each one is listed here, so that the signed
+copy of this document is the controlled record of it. The owner (Srinivas Telikicherla) approved D1 to D21 on
+12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026, and approved O7 to O16 on 12 Nov 2026 ("approve all B6b recommendations") and O17 to O24 on 12 Nov 2026 ("approve all eight") and O25 onward on 12 Nov 2026 ("approve control-gap fixes and all recommendations"). O5 is older (see its row). Items marked "consultant to confirm" are
+also questions in MDX-VAL-013.
+
+| ID | Decision |
+|---|---|
+| B6b-D1 | System owner: Sriharsha Telikicherla (Product & Engineering). Quality approver: Srinivas Telikicherla (QA/RA). Nobody approves their own work |
+| B6b-D2 | MDARIX validation documents live in the product repository under `docs/validation/`, tagged with each release; customers' filled copies never go there |
+| B6b-D3 | The master scenario register is `docs/validation/scenario-register.md`; the planning copy keeps a pointer only |
+| B6b-D4 | FMEA: severity, occurrence and detectability 1 to 5; RPN = S x O x D; class set by severity alone; action at RPN 40 or more, or S5 with D 3 or more (consultant to confirm) |
+| B6b-D5 | GAMP 5: Category 4 for MDARIX, Category 5 for anything written for one customer, Category 1 for infrastructure; not shown to a customer before the consultant confirms |
+| B6b-D6 | MDARIX's own documents are signed as PDFs (by hand and scanned, or a PDF digital signature), with the SHA-256 in `signatures.csv`; MDARIX's own e-signature is not used for them |
+| B6b-D7 | The quality approver signs a release approval record before every production deploy; for an emergency fix, a written OK before the deploy and the signed record within 1 working day. In force for every production deploy from the big-bang deploy onward, before MDX-VAL-001 is approved as 1.0 (owner, 12 Nov 2026; MDX-VAL-001 VMP-R41, OP-8 closed) |
+| B6b-D8 | Recovery point stated to customers: 24 hours today (daily encrypted backup, no point-in-time recovery); target 15 minutes with point-in-time recovery on pilot hosting |
+| B6b-D9 | EU GMP Annex 11 is assessed clause by clause as a benchmark; it binds EU pharmaceutical GMP only; MDARIX is never called "Annex 11 compliant" |
+| B6b-D10 | After a restore, every unsent outbox event older than the restore point is held (dead-lettered, audited); only those the mail provider's log shows as not sent are replayed |
+| B6b-D11 | Health-report uptime from the cloud monitoring uptime check; one fixed list of read-only production queries, approved once |
+| B6b-D12 | Excel files are written by a small standard-library writer, tested against the existing reader; no new dependency |
+| B6b-D13 | Documents: the PDF is saved from the approved Word copy. Records (recovery, health, approval): the product's PDF module |
+| B6b-D14 | Customers get 10 working days' notice of a change to a class-A function, a rule floor or a sub-processor; emergency security fixes are notified after |
+| B6b-D15 | The GxP workflow check of a real recovery runs on a scratch copy of the same backup, never as test data in production |
+| B6b-D16 | Until staging exists, formal execution runs on a controlled local environment (a clean test database built from the tagged commit), recorded as an IQ of that environment and labelled in the VSR |
+| B6b-D17 | Tests are tagged for class-A scenarios first; class B and C are reported as "automated suite, untagged", with coverage per class shown |
+| B6b-D18 | Review intervals: customer periodic review every 12 months; health report monthly; supplier re-assessment every 12 months |
+| B6b-D19 | The supplier pack and the release pack are shared under a non-disclosure agreement only; the public trust page carries only verified facts |
+| B6b-D20 | The consultant is engaged before Part A is approved, for Part A, the GxP impact and Part 11 / Annex 11 assessments and the first release pack; until then Part A stays DRAFT and is shared with no customer |
+| B6b-D21 | The test marker is `requirement(<scenario ID>)`, as registered in `pytest.ini`; `requirements.csv` maps REQ IDs to scenarios |
+| O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
+| O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (done 12 Nov 2026, commit `69248534`) |
+| O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added 12 Nov 2026, commit `cb75e8da`) |
+| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-039 by the privacy line of severity 4; RSK-029 by the privacy line, now severity 5 (O8) |
+| O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
+| O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |
+| O7 | Severity 5 includes the permanent loss of regulated records; severity 4 the loss of regulated records that can be recovered (owner, 12 Nov 2026; MDX-VAL-002 section 3.7) |
+| O8 | RSK-029 (formula injection in an exported CSV) has severity S5: data can leave the organisation (owner, 12 Nov 2026) |
+| O9 | A failure found only at the quarterly restore drill has detectability D4, not D2 (owner, 12 Nov 2026; MDX-VAL-002 section 3.3) |
+| O10 | The rule register's builder-and-approver check compares staff accounts (`approval.built_by_account`, `approval.approved_by_account`), not typed names (owner, 12 Nov 2026; MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`) |
+| O11 | A release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function the change touches (owner, 12 Nov 2026; MDX-VAL-001 VMP-R23, section 9.3; MDX-VAL-010 section 3) |
+| O12 | A release may go ahead with a class-A scenario of an Open risk row not passed, when the row has a risk acceptance signed by the quality approver (interim control, due date) listed in the release approval record; never for a critical failure (owner, 12 Nov 2026; MDX-VAL-001 VMP-R49; MDX-VAL-002 RA-R07, RA-R08). Limited by O18: only NOT RUN scenarios and Open rows; never a FAIL |
+| O13 | An interim release approval record template is used for every production deploy from the big-bang deploy until MDX-VAL-001 is approved as 1.0 (owner, 12 Nov 2026; [MDX-VAL-012 template](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md); generated by `scripts/validation_pack.py`) |
+| O14 | Few tests carry the `requirement` marker: stated as a known gap, with the tagging plan (owner, 12 Nov 2026; MDX-VAL-001 section 16.1, VMP-R94 to VMP-R96) |
+| O15 | The PL-xx scenario group is approved: scenarios for the 17 class-A requirements that had none and negative scenarios for 12 more, drafted for the owner's review of each expected result (owner, 12 Nov 2026; MDX-B10-005 OP-2; scenario register, PL-01 to PL-45; PL-46 split from PL-07 on 12 Nov 2026 for one condition per scenario) |
+| O16 | The validation-pack generator refuses a release that differs from `VERSION` outside a dry run, and warns in a dry run (owner, 12 Nov 2026; `scripts/validation_pack.py`) |
+| O17 | Big-bang gate: the class-A scenarios of the 20 MDX-VAL-002 rows that need action and are marked "Acceptable after verification" (RSK-001, -004 to -008, -022, -027, -029, -031, -033, -034, -039, -044, -050, -052 to -055, -066) run in the full end-to-end run of 30 Nov 2026; any still NOT RUN after it is listed in a risk acceptance signed before the deploy and listed in the release approval record (owner, 12 Nov 2026; MDX-VAL-001 VMP-R50b, VMP-R50c; MDX-VAL-012 template section 5). RSK-037 joined the action rows under O21 |
+| O18 | A risk acceptance covers only a class-A scenario that is NOT RUN or a risk row marked Open; a failed class-A test always blocks a release (owner, 12 Nov 2026; MDX-VAL-001 VMP-R49 to VMP-R50; MDX-VAL-012 template criteria 3 to 5) |
+| O19 | The owner signs the MDX-VAL-012 release approval template and section 4 of this document before the big-bang deploy; both are marked so, and their PDFs are produced ready for signature, unsigned (owner, 12 Nov 2026; `docs/validation/signing/`) |
+| O20 | Class-A OQ expected results carry concrete values (`oq-expected-results.csv`); the OQ protocol is approved (signed, with its SHA-256 in `signatures.csv`) before execution, and the generator refuses OQ results without that approval outside a dry run (owner, 12 Nov 2026; MDX-VAL-001 section 12; `scripts/validation_pack.py --oq-protocol`) |
+| O21 | RSK-037 (a backup fails silently; found only at the quarterly restore drill) re-scored D4 under O9: RPN 60, needs action (owner, 12 Nov 2026; MDX-VAL-002) |
+| O22 | The approved specs are copied into the repository under `docs/specs/` byte for byte, with a pointer line in each planning copy; `spec_ref` in `requirements.csv` cites them there (owner, 12 Nov 2026). With O29: the status line is the only permitted change to a copied spec's text, besides the appended Approval record, and it is recorded (section 3.3) |
+| O23 | `STAFF_ACCOUNTS` in `backend/app/rule_register/register.py` names the person accounts (Srinivas, Sriharsha), not roles; the 12 Nov 2026 back-fill of the account fields on rule versions approved on 11 Nov 2026 is a documented deviation (owner, 12 Nov 2026; `deviation-log.csv` DEV-0.11.04-001; MDX-VAL-002 RSK-065) |
+| O24 | For class-A requirements only test-level `requirement` markers count as verification; a file-level marker is shown as "file-level only, not verification" (owner, 12 Nov 2026; `validation/pack.py`) |
+| O25 | Control gaps found while drafting the OQ expected results are fixed before the full end-to-end run of 30 Nov 2026 on the big-bang line: RSK-036 (export download checks the requester; an expired export is refused at download), RSK-066 (purge only after the exit hand-back is documented; otherwise audit rows are not deleted before their retention date), RSK-011 (signer training applies to every organisation); RSK-026 (system-scope background jobs) reviewed: controls documented or a deviation logged; RSK-037 audit-chain check on restore in B6b Part D; RSK-004 and RSK-008 aligned with the B6a "Facts changed after signing: re-check" flag, the rest planned (owner, 12 Nov 2026; MDX-VAL-002) |
+| O26 | A scenario of a feature not built yet is marked "future: <item>" in the register Notes; it is not a scripted OQ step and never counts as verification (owner, 12 Nov 2026; scenario register; `validation/pack.py`) |
+| O27 | Every class-A OQ expected result is re-derived from its requirement (not from the code) by Sriharsha Telikicherla and confirmed by the owner, the 24 TO CONFIRM rows included; `oq-expected-results.csv` records `source` (`requirement` / `code`) and `confirmed_by`, and the generator treats a row drafted from the code or not confirmed as not yet approved: a check failure outside a dry run (owner, 12 Nov 2026; `validation/pack.py`) |
+| O28 | DEV-0.11.04-001 is classed major (a failure in a class-A function), with `found_in` from the allowed list (MDX-VAL-010 DL-R07) and a question to the consultant on the back-fill (owner, 12 Nov 2026; MDX-VAL-013 question 25) |
+| O29 | The B6b spec and the B3 plan are copied into `docs/specs/` after the drafting-tool name and folder references are removed from the planning copies; the W1 spec is copied too; every spec in `docs/specs/` carries an "Approval record" section (date, the owner's approval words as recorded, approver), and approved specs are no longer headed DRAFT (owner, 12 Nov 2026; section 3.3) |
+| O30 | Sriharsha Telikicherla co-signs section 4 of this document as system owner; the owner signs last (owner, 12 Nov 2026; `signing/MDX-VAL-000-section-4.pdf`) |
+| O31 | `signatures.csv` keeps the content hash (`content_sha256`) apart from the signed PDF's hash (`sha256`); the generator checks the OQ protocol approval against `content_sha256` (owner, 12 Nov 2026; DC-R35; `validation/pack.py`) |
+| O32 | REQ-BAK-002 (a backup older than 26 hours raises an alert) is accepted until B6b Part D builds its control; Part D built it: the backup-age check is tested (`tests/test_backup_age_check.py`, PL-26 and PL-27), so PL-26 is no longer "future" (owner, 14 Nov 2026) |
+| O33 | One small negative test each for REQ-CLK-001 and REQ-REC-003 (owner, 14 Nov 2026: "still one small test each"): PL-57 (`tests/test_legal_deadlines.py`) and PL-58 (`tests/test_cases_0_10_93_script.py`) |
+| O34 | Each pilot customer gets a separate UAT organisation that holds no live regulated records (MDX-CUS-001 UAT-R07); owner, 14 Nov 2026 |
+| O35 | REQ-CLK-001 reworded to match the code (revision B, one "shall"): when the moment of awareness falls on different days in the organisation's time zone and the authority's, the latest day is the earlier of the two latest days, ending at the earlier end; the earlier deadline wins, which is the safer side (owner, 14 Nov 2026; `requirements.csv`; MDX-VAL-002 RSK-002; `tests/test_legal_deadlines.py::test_the_earlier_day_of_the_two_time_zones_is_the_latest_day`; consultant question 18a in MDX-VAL-013) |
+| O36 | The deviation log has a `customer_scope` column: `all` for a deviation that concerns every customer (MDARIX-wide), or one customer code; the two existing rows are `all`. The generator checks the value and the monthly health report shows a customer only the deviations scoped `all` or to its own code (owner, 14 Nov 2026; MDX-VAL-010 DL-R01, DL-R08; MDX-OPS-002; `validation/pack.py`; `scripts/health_report.py`) |
+| O37 | The Part C time limits are confirmed as written: MDX-SOP-002 CC-R17 1 working day; MDX-SUP-001 SP-R02 10 working days; MDX-SOP-003 IR-R10 4 hours, IR-R15 1 working day from receipt and IR-R16 the same working day as that assessment ("IR-R15/16: 1 working day"), IR-R19 3 months; MDX-SOP-005 AC-R05 the last working day, AC-R06 3 months; MDX-SOP-004 BC-R19 monthly, with a trial or credit end within 60 days raised (owner, 14 Nov 2026; MDX-SUP-001 OP-5 closed) |
+| O38 | The roles that need two-factor sign-in in production are the standard list (Platform Administrator, Customer Administrator, Leader, Approver), with no production override of the list (owner, 14 Nov 2026) |
+| O39 | Backup retention is 30 daily + 12 monthly, as `docs/runbooks/BACKUP_AND_RESTORE.md` section 1 and `infrastructure/docker/backup/retention.sh` (since 0.10.88); `docs/compliance/DATA_RETENTION_SCHEDULE.md` (which said 14 days) and `legal/README.md` corrected, so erased data stays in backups up to about 13 months (owner, 14 Nov 2026; MDX-SUP-001 OP-4 closed) |
+
+## 5. Codes used in these documents
+
+| Code | Meaning |
+|---|---|
+| B2, B3, B4, B5, B7, B8, B9, B9b | Approved product builds: B2 import and migration; B3 FDA eMDR; B4 rule register; B5 investigation challenge loop; B7 routine complaint path; B8 EU and GB MIR files; B9 India, Canada and US roles; B9b other countries |
+| B6a | Approved build for speed and evidence (deadline list, back-entry, clock check, signed reviews, reason for change, trace, similar wording, Value Centre) |
+| B6b | This validation build. Parts A to E: A foundation (these documents); B per-release validation pack; C supplier pack and assessments; D recovery validation, health report and registers; E customer templates. "B6b B1" is item B1 of Part B (`requirements.csv`) |
+| MDX-B10-nnn | Validation planning drafts of 8 Nov 2026 (section 3.1) |
+| PT-nn, G-n | Penetration-test threats and threat-model gaps in MDX-B10-006 |
+| RSK-nnn | Failure modes in MDX-VAL-002 |
+| REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
+| IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6, PL followed by a number | Scenario IDs in the scenario register |
+| O1 to O39, B6b-D1 to -D21 | Owner decisions (section 4) |
+
+## 6. How the rules in section 2 are checked
+
+| Rules | Check | Evidence |
+|---|---|---|
+| Place, format, numbering, versions, header, writing standard (sections 2.1 to 2.5) | The author's pre-signature check (DC-R31), recorded in the change history; the reviewer's comments | Change history; signed PDF |
+| Traceability of product requirements (DC-R27) | The validation-pack generator refuses a requirement without a scenario and a class-A requirement without a negative scenario; the RTM shows each requirement as verified or not (B6b Part B) | RTM in the release folder |
+| Review, signature and signing sequence (section 2.6) | The approver checks the signature block against DC-R40 to DC-R43 before signing; each signature has its `signatures.csv` row | `signatures.csv`; git history |
+| Retirement (section 2.7) | Banner check at each document's next review | The superseded file in git |
+
+## 7. Signatures
+
+Unsigned. The signed PDF and its `signatures.csv` row are added after review (DC-R32 to DC-R36).
+
+| Role | Name | Meaning of signature | Signature | Date |
+|---|---|---|---|---|
+| Author (R) | Srinivas Telikicherla, QA/RA | I am responsible for this document and reviewed every line of the draft. | | |
+| Reviewer (C) | Independent CSV consultant | I reviewed this document; my comments are recorded. | | |
+| Approver (A), second person (DC-R42) | Sriharsha Telikicherla, Product & Engineering, system owner | I approve these document-control rules for use. | | |

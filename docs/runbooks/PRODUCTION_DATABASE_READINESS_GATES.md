@@ -10,7 +10,7 @@ Database for pilots: one managed PostgreSQL 16 with point-in-time recovery ([DEP
 | TLS | `POSTGRES_SSLMODE=verify-full` required in production | Startup check |
 | Schema at head | Readiness reports `down` when the schema is not the one the release needs | `/health/status` |
 | Connections | Direct connection, no transaction-mode pooler (the scheduler holds advisory locks on a session) | [DEPLOYMENT.md](DEPLOYMENT.md) |
-| Backups | Managed PITR plus nightly encrypted off-site dump; RPO 1 h, RTO 4 h | [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) |
+| Backups | Today: daily encrypted off-site dump and daily disk snapshot, no PITR, RPO 24 h; target with managed PITR on pilot hosting: RPO 15 min; RTO 4 h | [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) |
 | Monitoring | Alerts, uptime monitor on `/health/status`, backup age check | [39_OPERATIONAL_SUPPORT_RUNBOOK.md](../handover/39_OPERATIONAL_SUPPORT_RUNBOOK.md) |
 
 Still needs evidence on the real managed database: the first restore drill, a point-in-time recovery to a chosen

@@ -588,3 +588,61 @@ def test_an_older_trial_gets_the_severities_listed_audited_once_and_a_set_one_is
         bind_tenant(db, other)
         # The other trial is untouched until its own run.
         assert not any(row.severity for row in _sample_severities(db, other).values())
+
+
+SIGNED_FIELDS = (
+    "guide_version",
+    "answers",
+    "unknowns",
+    "suggestion",
+    "classification",
+    "override_reason",
+    "reason",
+    "signed_record_id",
+    "content_fingerprint",
+    "signed_by",
+    "signed_at",
+)
+
+
+@pytest.mark.requirement("PL-58")
+def test_the_upgrade_step_leaves_every_signed_record_unchanged():
+    # REQ-REC-003, negative (PL-58): the 0.10.93 upgrade step (--apply) runs over a trial set back to 0.10.92 whose
+    # sample holds signed Case checks and signatures, and commits what it changes. Every signed check's content and
+    # every signature record are as before.
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.db.models.intake import FirstContactCheck
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.trial.retention import purge_trial
+    from tests.test_free_trial import _approved_trial_client
+
+    def signed(db, tenant_id):
+        checks = {
+            row.id: tuple(getattr(row, field) for field in SIGNED_FIELDS)
+            for row in db.query(FirstContactCheck).filter(
+                FirstContactCheck.tenant_id == tenant_id, FirstContactCheck.signed_at.is_not(None)
+            )
+        }
+        records = {
+            row.id: (row.object_id, row.content_fingerprint, row.status, row.signature_meaning, row.signed_at)
+            for row in db.query(SignedApprovalRecord).filter(SignedApprovalRecord.tenant_id == tenant_id)
+        }
+        return checks, records
+
+    _user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        with SessionLocal() as db:
+            bind_tenant(db, tenant_id)
+            before = signed(db, tenant_id)
+            assert before[0], "the sample holds signed Case checks"
+            _as_0_10_92(db, tenant_id)
+            db.commit()
+            assert _script().apply_tenant(db, tenant_id), "the upgrade step changes the trial's Cases"
+        with SessionLocal() as db:
+            bind_tenant(db, tenant_id)
+            assert signed(db, tenant_id) == before
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:cases-0-10-93-cleanup")

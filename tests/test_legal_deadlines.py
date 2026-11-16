@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pytest
+
 from backend.app.intake import rules as intake_rules
 from backend.app.reportability import deadlines, rules
 
@@ -71,11 +73,16 @@ def test_great_britain_counts_day_1_across_the_start_of_british_summer_time():
     assert found.at == datetime(2026, 4, 7, 22, 59, 59, tzinfo=UTC)
 
 
+@pytest.mark.requirement("PL-59")
 def test_the_earlier_day_of_the_two_time_zones_is_the_latest_day():
-    # 00:30 in Brussels on Tue 10 Mar is still Mon 9 Mar in New York: the organization's day comes first.
+    # REQ-CLK-001 rev B, the different-days case (PL-59). 00:30 in Brussels on Tue 10 Mar is still Mon 9 Mar in New
+    # York (19:30 EDT): the organization's day comes first. Counted from the day after awareness, 15 days end on 25 Mar
+    # in Brussels and on 24 Mar in New York; the latest day is the earlier, 24 Mar. Its end in Brussels (23:59:59 CET
+    # = 22:59:59 UTC) comes before its end in New York (23:59:59 EDT = 03:59:59 UTC on 25 Mar), so it is the deadline.
     aware = datetime(2026, 3, 9, 23, 30, tzinfo=UTC)
     found = deadlines.count(aware, 15, rules.CALENDAR, "EU_NI", "America/New_York")
     assert found.day == date(2026, 3, 24) and found.zone == "Europe/Brussels"
+    assert found.at == datetime(2026, 3, 24, 22, 59, 59, tzinfo=UTC)
 
 
 def test_work_days_and_a_market_without_an_authority_zone():
@@ -110,3 +117,16 @@ def test_the_watch_clock_and_triage_count_the_same_way():
     triage = intake_rules.provisional_deadlines(aware, ["IN"], intake_rules.FLAGGED, now, own="IN", org_zone="UTC")[0]
     assert clock.due_label == triage["due_label"] == "Sat 7 Nov 2026, 18:29 UTC"
     assert clock.days_left == triage["days_left"] == 6
+
+
+@pytest.mark.requirement("PL-57")
+def test_the_later_end_of_the_two_time_zones_is_never_the_deadline():
+    # REQ-CLK-001, negative (PL-57). Expected result derived from the requirement, not the code: awareness 06:00 UTC on
+    # Tue 10 Nov 2026 is 10 Nov in New York (01:00 EST) and in India (11:30 IST). The US window is 30 calendar days
+    # after the day of awareness (21 CFR 803.50(a)): latest day Thu 10 Dec 2026 in both zones. Its end in the
+    # authority's zone is 23:59:59 EST = 04:59:59 UTC on 11 Dec; in the organisation's, 23:59:59 IST = 18:29:59 UTC on
+    # 10 Dec. The deadline is the earlier; the authority's later end is refused.
+    aware = datetime(2026, 11, 10, 6, 0, tzinfo=UTC)
+    found = deadlines.count(aware, 30, rules.CALENDAR, "US", "Asia/Kolkata")
+    assert found.at != datetime(2026, 12, 11, 4, 59, 59, tzinfo=UTC)
+    assert found.at == datetime(2026, 12, 10, 18, 29, 59, tzinfo=UTC) and found.day == date(2026, 12, 10)

@@ -8,7 +8,7 @@ benchmark and not a certification.
 
 Uptime 99.5% a month. Page loads: LCP at most 2.5 s, INP at most 200 ms (95th percentile). Server reads at most
 500 ms, writes (save, sign, approve) at most 1 s. A 5,000-row import in at most 60 s, a PDF in at most 10 s. Server
-errors below 0.1%. RPO at most 24 h (15 min before paid pilots), RTO at most 4 h. Backups 30 daily + 12 monthly,
+errors below 0.1%. RPO at most 24 h today (no point-in-time recovery), target 15 min with point-in-time recovery on pilot hosting (B6b-D8), RTO at most 4 h. Backups 30 daily + 12 monthly,
 off-server in another region, encrypted. Restore drill quarterly, rollback drill once, failure drills (worker,
 scheduler, e-mail) twice a year. Uptime checked every minute, an alert within 5 minutes by e-mail and phone.
 

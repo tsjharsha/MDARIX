@@ -29,9 +29,11 @@
     "note": "Starter, for your consultant to confirm."
   },
   "approval": {
-    "approved_by": "Owner",
+    "approved_by": "Srinivas",
+    "approved_by_account": "srinivas",
     "approved_on": "2026-11-11",
-    "built_by": "MDARIX engineering",
+    "built_by": "Sriharsha",
+    "built_by_account": "sriharsha",
     "release": "0.11.00",
     "note": "B9 spec approved 11 Nov 2026 (B9-D8, D10, D11, D12): role floors, starter, from the start."
   },

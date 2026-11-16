@@ -24,6 +24,193 @@ operator knows a release migrates the database.
   (`tests/test_e2e_workflow_scenarios.py`) now answer the material challenge questions before "Submit for review", as
   an investigator does; the gate (owner decision B5-D3) is unchanged.
 
+## [0.11.04] - not released yet
+
+B6b Part A: validation documents. MDARIX's own validation documents now live in the repository under
+`docs/validation/`, versioned with the code. All are drafts for the owner's review and signature; none is signed and
+none is to be given to a customer before the independent CSV consultant has reviewed it. One small code change (the
+rule register refuses a version approved by its own builder); no migration, no switch.
+
+B6b Part B: the per-release validation pack generator, the requirements (URS source) and the scenario tags. The
+pack is generated as a dry run only: its statuses are development results, not validation evidence.
+
+B6b Part C: the supplier pack, the assessments and MDARIX's own procedures, as unsigned drafts in docs/validation/ (no
+code).
+
+### Added
+- **Document control and index (MDX-VAL-000)**, `docs/validation/README.md`: document numbering (MDX-VAL, -SUP,
+  -SOP, -OPS, -CUS), versions and statuses, header template, writing standard, signing as a PDF with its SHA-256 in
+  `docs/validation/signatures.csv` (header only for now), retirement rule, document index.
+- **Validation Master Plan (MDX-VAL-001)**: scope, intended use, system description, roles (system owner:
+  Product & Engineering; quality approver: QA/RA), segregation-of-duties rules and a RACI per deliverable,
+  risk-based approach, risk classes A/B/C by severity, lifecycle and per-release validation, change impact, release
+  approval before every production deploy, 10-working-day customer change notice, environments, deliverables,
+  acceptance criteria, deviations. Replaces the planning draft MDX-B10-003.
+- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 67 failure modes with severity,
+  occurrence and detectability (1-5), RPN and an action rule, each linked to the threat model and to seed
+  requirement IDs. Replaces the planning draft MDX-B10-004.
+- **GAMP 5 category justification (MDX-VAL-003)**: Category 4 for MDARIX, Category 5 for anything written for one
+  customer, Category 1 for platform software.
+- **Owner decisions and codes** recorded in MDX-VAL-000 sections 4 and 5, so the signed index is their controlled
+  record; one signature rule for every document (the quality approver approves; the system owner approves what the
+  quality approver writes; a "Drafting" field names who reviewed a software-assisted draft).
+- **Consultant brief and question pack (MDX-VAL-013)**: what MDARIX is, what to confirm, the documents to review and
+  23 questions.
+- **Validation planning drafts MDX-B10-001, -002, -005, -006** moved into `docs/validation/` unchanged (owner
+  decision O2).
+- **Scenario rows B6-47 to B6-58** (validation pack, recovery check, health report, deviation log, release approval),
+  NOT RUN.
+- **Scenario register under version control**: `docs/validation/scenario-register.md` is now the master copy
+  (copied byte for byte from the planning folder, which keeps a pointer).
+- **Requirements (URS source)**, `docs/validation/requirements.csv`: 69 requirements (59 class A, 9 B, 1 C), one
+  "shall" statement each, with revision, class, source spec, RSK IDs, scenarios, negative scenarios and named tests.
+  The 34 risk rows without a requirement now name theirs (MDX-VAL-002).
+- **Validation-pack generator**, `scripts/validation_pack.py` (logic in `validation/pack.py`, with a small
+  standard-library XLSX writer `validation/xlsx_write.py` and a DOCX/PDF renderer `validation/docx_render.py`):
+  URS, FS/DS, IQ record, OQ protocol and results, RTM, G13 figures, draft VSR and release approval record, in
+  Markdown, Word, PDF, CSV and Excel, with a SHA-256 manifest, into `docs/validation/releases/<release>/`. The
+  release identity is an argument and must equal `VERSION` (a warning only in a dry run). It lists every traceability failure
+  (class-A requirement without a negative scenario, requirement without a scenario, unknown scenario, PASS without
+  evidence, marker with an unknown ID) and every deviation-rule failure, and writes nothing unless `--dry-run`. It
+  never overwrites a release folder holding a signed approval, and produces no release approval record while a
+  critical deviation is open. The same inputs give byte-identical files.
+- **Requirement markers in JUnit**: each `requirement(<scenario ID>)` marker is copied into the test's JUnit
+  properties (`validation/pytest_requirements.py`, imported by `tests/conftest.py`); `scripts/release_checks.ps1`
+  writes `artifacts/release-checks/junit.xml` and has a `-Full` switch for the whole suite.
+- **Class-A test tags**: 52 test files carry a file-level `requirement` marker with the scenarios of the class-A
+  requirements that name them.
+- **MDARIX PQ protocol (MDX-VAL-008)** and **deviation log and change-impact template (MDX-VAL-010)**, with
+  `docs/validation/deviation-log.csv` (header only).
+- **Interim release approval template (MDX-VAL-012)**, `docs/validation/MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md`:
+  the record the quality approver signs before every production deploy from the big-bang deploy until the Validation
+  Master Plan is approved (owner decision O13). The generated record now carries the same nine criteria for the
+  approver to initial, the risk acceptances for Open risk rows, the emergency-fix OK, the post-deploy check and the
+  interim basis. Consultant question 24.
+- **PL scenario group** (owner decision O15): PL-01 to PL-45 in the scenario register, NOT RUN, drafted for the
+  owner's review. Every class-A requirement now has a scenario and a negative scenario in `requirements.csv`.
+- **Interface checks mapped** (MDX-VAL-001 Annex F): accuracy, completeness, consistency, transformation, sequence,
+  duplicates and failure recovery for import, e-mail intake, authority files and the outbox, each to existing tests;
+  three gaps and three partial cells listed as tests to add.
+- **Concrete OQ expected results** (`docs/validation/oq-expected-results.csv`, owner decision O20): an input and a
+  concrete expected result (status and error codes, states, dates with zone, labels) for each of the 176 class-A
+  scenarios, with the test that asserts it; 24 rows marked TO CONFIRM for the owner. The OQ protocol
+  (MDX-VAL-007-P, `scripts/validation_pack.py --oq-protocol`) is generated apart from the results (MDX-VAL-007-R)
+  and carries a SHA-256; outside a dry run no OQ results are written without a signed protocol with that SHA-256.
+- **PDFs for the owner's signature** (O19): the release approval template and MDX-VAL-000 section 4, unsigned,
+  in `docs/validation/signing/` (`scripts/validation_signing_pdfs.py`).
+- **Approved build specs under version control** (O22): fifteen specs copied unchanged into `docs/specs/`;
+  `requirements.csv` cites them there.
+- **Deviation DEV-0.11.04-001** (O23): the 12 Nov back-fill of the rule-register account fields.
+- **Validation pack, run 6 (owner decisions O25 to O31, 12 Nov 2026):** the JUnit file carries the commit, a
+  clean/dirty tree mark and the marker-hook version, and the generator refuses a JUnit of another commit, a changed
+  tree or an older hook, and a changed working tree outside a dry run; executed IQ and scripted OQ results come from
+  `executed-results.csv` and fill the IQ record, the OQ results, the RTM ("scripted OQ") and the VSR, never typed into
+  a generated document; `oq-expected-results.csv` records `source` and `confirmed_by`, and a class-A result drafted
+  from the code or not confirmed by the owner is a check failure; `signatures.csv` keeps `content_sha256` apart from
+  the signed PDF's `sha256`; scenarios of features not built yet are marked "future" and never verify anything;
+  deviations need an allowed `found_in`. URS requirements for 21 CFR 11.50, 11.100 and 11.300 (REQ-P11-001 to -004,
+  scenarios PL-47 to PL-54). The B6b spec, the B3 plan and the W1 spec are in `docs/specs/`; every spec there has an
+  "Approval record".
+- **Validation pack, run 7 (rating-4 findings, 13 Nov 2026):** the OQ protocol approval is checked, not trusted:
+  its signer must be a named quality approver holding that role and its signed PDF must be stored with the row's
+  SHA-256; an executed OQ step must come after that approval and not from the approver, an IQ step not from the IQ
+  record's approver, every executor must be a named person and every evidence ID must resolve to a file in the release
+  folder's `evidence/` (listed with its SHA-256 in `evidence-index.csv`). The IQ record lists every rule-register
+  version with its content hash (recomputed) and file hash, and has a test-environment section (Python and key package
+  versions, which the JUnit hook now records, Node, marker hook, generator hashes). The generated change history names
+  who ran the generator (`--author`, else the git author), never a fixed name; the two founders are "Srinivas T." and
+  "Sriharsha T.", never the shared initials "S. T.". The generator reads and checks `pq-record.csv` and states the PQ
+  outcome in the VSR. Counts in MDX-VAL-000 and MDX-VAL-001 are a generated block (`--update-counts`), and a stale
+  block is a check failure. The OQ log's result columns come from the executed results.
+- **Supplier pack and assessments (B6b Part C), drafts 0.1, unsigned:** supplier pack (MDX-SUP-001); GxP impact
+  assessment and shared-responsibility matrix (MDX-SUP-002); 21 CFR Part 11 clause-by-clause assessment with an EU GMP
+  Annex 11 benchmark (MDX-SUP-003); hosting-provider assessment of Google Cloud and Zoho, decision proposed "approved
+  with conditions" for the free-trial phase only (MDX-SUP-004); SOC 2 and ISO/IEC 27001:2022 control mapping, "mapped"
+  only (MDX-SUP-005); trust facts, each with its evidence (MDX-SUP-006).
+- **MDARIX procedures (B6b Part C), drafts 0.1, unsigned:** software development lifecycle (MDX-SOP-001); change
+  control with re-test rules, the 10-working-day change notice and the emergency path (MDX-SOP-002); incident response
+  and complaints about MDARIX (MDX-SOP-003); backup, recovery and business continuity (MDX-SOP-004); access control
+  (MDX-SOP-005).
+- **Recovery check, health report, registers** (B6b Part D): `scripts/recovery_check.py` checks a restored database
+  before anyone signs in (audit chain of every organisation, configuration against the signed snapshot, outbox hold
+  "held after restore", clock, erasures, recovery window; JSON/PDF record and a summary per organisation);
+  `scripts/health_report.py` writes each customer's monthly report from the registers only; registers in
+  `docs/validation/registers/`; backup-age alert tested (REQ-BAK-002, owner decision O32); negative tests PL-57
+  (REQ-CLK-001) and PL-58 (REQ-REC-003) (O33).
+- **Customer templates (B6b Part E):** MDX-CUS-001 (UAT/PQ, with an Excel log), MDX-CUS-002 and -003 (data migration
+  plan and report, on the B2 import), MDX-CUS-004 (periodic review, every 12 months), MDX-CUS-005 (go-live checklist
+  and support plan) and MDX-CUS-006 (customer validation instructions, replacing the superseded
+  `docs/compliance/CSA_CUSTOMER_IMPLEMENTATION_INSTRUCTIONS.md`), each 0.1 DRAFT; Word and Excel copies generated by
+  `scripts/customer_templates.py` into `docs/validation/customer-templates/` (`--check` for stale copies);
+  `tests/test_customer_templates.py`.
+### Changed
+- **Owner decisions of 14 Nov 2026 (O35 to O38):** REQ-CLK-001 revision B states what the code does (the earlier of
+  the two latest days when awareness falls on different days in the two time zones, ending at the earlier end), with
+  consultant question 18a; the deviation log gains `customer_scope` (`all` or a customer code), checked by
+  `scripts/validation_pack.py`, and `scripts/health_report.py` shows a customer only the deviations scoped `all` or to
+  its own code (a row without a valid scope refuses the report); Part C time limits confirmed as written; production
+  two-factor roles are the standard list. A held notification is never sent with the console "Retry": planned code
+  control (cut-off fixes, 14 Nov 2026), the restore runbook until it is merged.
+- **Held notifications after a restore:** with the cut-off fixes merged, the console Retry refuses an event held after
+  a restore (409 `HELD_AFTER_RESTORE`) unless a NOT_DELIVERED mail-log check recorded after the hold exists
+  (`POST /platform-admin/console/dead-letters/mail-log-check`), and `scripts/replay_outbox.py` now applies the same
+  rule and audits its refusal (`OUTBOX_RETRY_REFUSED`). RSK-056, MDX-OPS-001 RR-05/RR-05a and the restore runbook
+  (section 2, step 6) describe the built control; the console button to record the check is still to build.
+- **Backup retention (owner decision O39):** the data retention schedule and `legal/README.md` say 30 daily + 12
+  monthly, as the backup runbook and `retention.sh` since 0.10.88 (they said 14 days on the server and up to 90 days
+  off-site), so erased data stays in backups up to about 13 months; MDX-SUP-001 OP-4 closed.
+- **REQ-CLK-001's different-days case traced:** scenario PL-59 on
+  `tests/test_legal_deadlines.py::test_the_earlier_day_of_the_two_time_zones_is_the_latest_day`, which now also checks
+  the deadline's moment; its OQ expected result is drafted from the requirement and not confirmed.
+- **Run 7 documents:** RSK-036, RSK-066 and RSK-011 "Acceptable after verification" after the control-gap fixes
+  (the retention-trigger claim removed; the trial-only training rule of 31 Oct 2026 superseded); RSK-026 "Acceptable after
+  verification" with its fix and tests, deviation DEV-0.11.04-002 open until the owner accepts it; RSK-065 a procedural control (D4); PQ 0.5 (two-person rule reconciled with executor independence; CAPA
+  effectiveness and trends steps); spec copies: the status line is the only change to the copied text, recorded.
+- **Run 6 documents:** DEV-0.11.04-001 reclassified major (GxP risk high); MDX-VAL-000 section 4 co-signed by the
+  system owner (signing PDF regenerated); VMP-R42a (the first pack executes every class-A scenario); PQ 0.4 (six more
+  steps, intended-use coverage); release-approval criterion 9 checkable before signing, with a post-deploy section;
+  RSK-004 and RSK-008 aligned with the "Facts changed after signing: re-check" flag; RSK-040 occurrence 4 and RSK-028
+  severity 5, with the reasons.
+- **Owner decisions O17 to O24 of 12 Nov 2026** recorded in MDX-VAL-000 section 4: big-bang gate for the action
+  rows marked "Acceptable after verification"; a risk acceptance covers only NOT RUN scenarios and Open rows, and a
+  failed class-A test always blocks a release (the generator lists it as a check failure); RSK-037 re-scored D4
+  (RPN 60, needs action); the template and section 4 signed by the owner before the big-bang deploy.
+- **Rule-register staff accounts** are the two persons (labels `sriharsha`, `srinivas`), not role names (O23).
+- **Only test-level `requirement` markers verify a class-A requirement** (O24): the JUnit hook writes a file-level
+  marker as `requirement_file`; the RTM shows "file-level only, not verification".
+- **Generator:** the per-release record is MDX-VAL-012-&lt;release&gt;, apart from the template; the JUnit is copied
+  into the release folder and hashed in the record; the VSR holds the class-A verification counts, the people and
+  the R9-R12 references the plan asks for; every generated document has a Reviewer field and a change history.
+- **Documents:** VMP-R23, VMP-R49 and VMP-R50 split into single statements; PL-07 split (PL-46 added); REQ-RPT-004,
+  -EXP-001, -BAK-001 and -SIG-001 at revision B; PQ steps cite the scenarios they exercise; what a signer re-enters
+  at each signing stated exactly.
+- **Scenario register statuses normalised** to the five values (NOT RUN, PASS, FAIL, BLOCKED, REQUIRES HUMAN
+  DECISION); run notes and partial results moved to a new Notes column.
+- **Rule register: a second person approves, by account.** `backend/app/rule_register/register.py` refuses a rule
+  version unless `approval.built_by_account` and `approval.approved_by_account` are two different staff accounts
+  (`STAFF_ACCOUNTS`), the approver's account may approve rule content and the names shown are the accounts' names;
+  typed names are no longer compared (owner decisions O3 and O10, MDX-VAL-002 RSK-065). Every shipped rule file names
+  both accounts and still loads.
+- **Validation-pack generator refuses a release/`VERSION` mismatch** outside a dry run (exit 1, nothing written);
+  a dry run still only warns (owner decision O16).
+- **Risk assessment re-scored** (owner decisions O7 to O9): severity 5 now includes the permanent loss of regulated
+  records and severity 4 a recoverable loss (RSK-037, RSK-040 to S5); RSK-029 to S5; a failure found only at the
+  quarterly restore drill has detectability 4 (RSK-039, RSK-040). 32 rows now need action.
+- **Validation Master Plan** (owner decisions O11, O12, O14): a release is gated on each change's own risk in its
+  change-impact assessment (VMP-R23, section 9.3); VMP-R49 allows a release with a signed risk acceptance for an
+  Open row, never for a critical failure; the few tagged tests are stated as a known gap with a tagging plan
+  (VMP-R94 to VMP-R96).
+- **Password expiry claim corrected.** `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` said passwords expire
+  after 90 days; the code has no password expiry (owner decision). It now states that, with the breached-password
+  refusal and the sign-in lockout; MFA for signatures is described as on by default and refused off in production.
+- **RPO stated one way everywhere**: 24 hours today (daily encrypted backup and disk snapshot, no point-in-time
+  recovery); target 15 minutes with point-in-time recovery on pilot hosting. Corrected in
+  `docs/runbooks/BACKUP_AND_RESTORE.md` (it said 1 hour), `PRODUCTION_DATABASE_READINESS_GATES.md`,
+  `PRODUCTION_SECURITY_AND_DR.md` and handover 38.
+- **MVP-1.0 CSA package retired.** `docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md` (never executed), its protocol,
+  the hand-kept traceability table and the customer IQ instructions carry a SUPERSEDED banner pointing to
+  `docs/validation/`. The banner is part of the generator (`validation/csa_package.py`), so regenerating keeps it.
+
 ## [0.11.03] - not released yet
 
 B6a: deadline protection, speed, reviews and trace. Part A (deadline protection, G18 and G19): legal reporting clocks

@@ -12,7 +12,8 @@ from lxml import etree
 
 from backend.app.authority_reports import forms, mir_rules, mir_xml
 
-pytestmark = pytest.mark.unit
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = [pytest.mark.unit, pytest.mark.requirement("B8-05", "B8-15", "B8-24", "B8-26")]
 
 NOW = datetime(2026, 11, 12, 9, 30, tzinfo=timezone.utc)
 PERIOD = {"country_incidents": 1, "eea_incidents": 2, "world_incidents": 3}

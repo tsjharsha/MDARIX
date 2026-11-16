@@ -19,7 +19,8 @@ from backend.app.mail_in import processing, receiver
 from tests.test_free_trial import _approved_trial_client
 from tests.test_intake_triage_api import INTAKE, _ok
 
-pytestmark = pytest.mark.db
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = [pytest.mark.db, pytest.mark.requirement("EM-01", "EM-02", "EM-05", "EM-07", "EM-08", "EM-17", "EM-18")]
 
 
 @pytest.fixture(scope="module")

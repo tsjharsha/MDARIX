@@ -1,13 +1,15 @@
 # Backup and restore
 
-Targets: lose at most **1 hour** of database changes (RPO) and be back within **4 hours** (RTO).
+Targets (owner decision B6b-D8, 12 Nov 2026): **RPO 24 hours today**: production has a daily encrypted backup and a
+daily disk snapshot and **no point-in-time recovery** (`legal/SUBPROCESSORS.md`). **Target RPO 15 minutes**, with
+point-in-time recovery on pilot hosting. Be back within **4 hours** (RTO). State the RPO to customers in these words.
 
 MDARIX keeps three things: the control database (identities, audit trail, signatures, every shared-plane tenant's
 records), any dedicated tenant databases, and uploaded files. Two independent layers protect them.
 
 | Layer | What | How often | Kept |
 |---|---|---|---|
-| 1. Managed database | Point-in-time recovery of every database (provider feature) | continuous | 7+ days |
+| 1. Managed database (pilot hosting; today's production has none) | Point-in-time recovery of every database (provider feature) | continuous | 7+ days |
 | 1. Managed database | Automated snapshots | daily | 14+ days |
 | 1. File bucket (pilots: `MDARIX_OBJECT_STORAGE_PROVIDER=s3`) | Object versioning in the bucket that holds uploaded files | every write | 90 days of old versions (lifecycle rule) |
 | 2. MDARIX backup | Encrypted logical dump of every database (plus the `objects` volume when files are stored locally), copied off-site | daily (cron) | Local: every backup of the last 30 days, then the newest of each of 12 months, and always the newest (0.10.88); off-site: the bucket lifecycle rule (set it to the same: see 3) |
@@ -24,8 +26,8 @@ Erased data stays in these backups for that period; see section 4.
 
 Layer 2 does not depend on the database provider, so it also covers a lost account or a provider outage.
 
-**File RPO.** Database changes are protected to the minute by point-in-time recovery; uploaded files are not part of
-it. With the pilot choice, files in an S3 bucket with versioning, a stored file is durable as soon as the upload
+**File RPO.** With a managed database (pilot hosting), database changes are protected to the minute by point-in-time
+recovery; today's production has none (RPO 24 hours, above). Uploaded files are not part of it. With the pilot choice, files in an S3 bucket with versioning, a stored file is durable as soon as the upload
 finishes and an overwritten or deleted one can be recovered from its previous version, so the file RPO is
 effectively zero for the provider's own failures. Files are *not* in the daily layer-2 dump in that setup: losing the
 bucket's account loses them, which is why the bucket has versioning and the backup bucket lives in another account.
@@ -105,13 +107,47 @@ files are stored locally, and `MANIFEST.sha256`. Database connections use the ap
    privileges), with only those two steps of the migrate job (its full command would also migrate the live
    dedicated databases from the drill's registry):
    `docker compose -f docker-compose.prod.yml --env-file .env.production run --rm -e POSTGRES_DB=mdarix_restore_drill migrate sh -c "python scripts/grant_runtime_privileges.py && python scripts/set_rls_system_token.py"`.
-4. `python scripts/reapply_erasures.py --dry-run` on the drill database — record the count of pending
-   re-applications (it should list erasures made after the backup's timestamp).
-5. Checks: `alembic current` shows the release's head; row counts of `tenants`, `auth_users`, `audit_events`,
-   `investigations`, `evidence` match the source at backup time; `SELECT count(*) FROM pg_policies` matches; a
-   restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`); the clock check
-   (`python scripts/clock_check.py` with `POSTGRES_DB=mdarix_restore_drill`, B6a G19) is ok within 1 s.
-6. Record the date, backup timestamp, duration and results in the operations log; drop the drill database.
+4. **Keep the worker and the scheduler stopped.** Never start the `background` service (outbox worker and scheduler,
+   `scripts/run_background.py`) or `up -d` against the drill database: an outbox event would be sent a second time,
+   and a scheduled job would write into the copy before it is checked.
+5. **Recovery check** (B6b Part D, `scripts/recovery_check.py`), with `POSTGRES_DB=mdarix_restore_drill` and the
+   owner's credentials, in the migrate job as in step 3 (add `-v "$PWD/restore-work:/work"`):
+   `python scripts/recovery_check.py --database mdarix_restore_drill --restored-copy --backup-dir /backups/<timestamp> --erasure-log /work/erasure_log.jsonl --out /work/recovery-check`
+   (`--restore-point <timestamp>` when the folder is not mounted; `--source-counts /work/counts.json` when the
+   source's counts were written with `--write-counts` at backup time). It checks, in order: the manifest; that no
+   background service ran on the copy; the schema head; the policy and forced row-level-security counts; the row
+   counts of every table; **the audit chain of every organisation** (RSK-037); each organisation's configuration
+   against its latest signed snapshot (a difference with no change event after the snapshot is flagged); the
+   **outbox hold** (every unsent event of the copy is dead-lettered with the reason "held after restore" and one
+   audit record per organisation, owner decision B6b-D10; those that occurred after the backup's folder time were
+   written while the dump ran and are flagged; with `--restored-copy` only, and never while a background service
+   writes heartbeats); organisations on a dedicated database (listed: run the check on each restored copy); the clock (B6a G19, limit 1 s);
+   the erasure dry-run (step 2 of section 4); and each organisation's recovery window. It writes a JSON and a PDF
+   record and one customer summary PDF per organisation (that organisation's lines only). Exit 0 PASS, 1 FAIL, 2
+   usage error, 3 PASS WITH FLAGS. **A FAIL stops the recovery**; every FLAG gets a written explanation in the recovery record.
+   `--dry-run` lists the events it would hold and changes nothing.
+6. **Held notifications.** For each held event, check the mail provider's log and record what it showed, as a
+   Platform Administrator: `POST /platform-admin/console/dead-letters/mail-log-check` with the event ids, `result`
+   `NOT_DELIVERED` (or `DELIVERED`) and the provider log reference as `reason` (audited as `OUTBOX_MAIL_LOG_CHECKED`;
+   the console has no button for it yet, so make the call with the signed-in session). Then replay only those
+   recorded as not delivered, with the console "Retry" (Platform Admin > Operations > Queues & jobs) or
+   `python scripts/replay_outbox.py <event id> --reason "<provider log reference>: not sent"`. Both refuse an event
+   held after a restore with `HELD_AFTER_RESTORE` unless a NOT_DELIVERED check recorded after the hold exists, and
+   audit the refusal (`OUTBOX_RETRY_REFUSED`). A missed daily deadline list is sent again by the next day's run; do
+   not replay it.
+7. A restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`).
+8. **Sign in with MFA once per role** used by customers (Platform Administrator, customer administrator, reviewer,
+   regulatory reviewer), on the drill copy only.
+9. **One GxP workflow on a scratch copy** of the same backup, never as test data in production (owner decision
+   B6b-D15): create a complaint, assess one market, sign it. Restore the scratch copy as in step 2 under another
+   name; drop it afterwards.
+10. **Reconcile** the recovery check's counts with the source (or explain each difference: written after the
+    backup, or the check's own hold records).
+11. **Recovery record** (MDX-OPS-001, `docs/validation/MDX-OPS-001_RECOVERY_RECORD_TEMPLATE.md`): the system owner
+    executes and fills it; the quality approver reviews and signs it; the check's JSON and PDF are attached. Add a
+    row to the Drill record below and a `RESTORE_DRILL` entry to the operations log
+    (`docs/validation/registers/operations-log.csv`).
+12. Drop the drill database and the scratch copy.
 
 CI runs the same drill on every change (`prod-stack` job): a backup with the BYPASSRLS login and one through the
 system scope, each restored into a scratch database and checked with `alembic current` and row counts.
@@ -124,8 +160,17 @@ system scope, each restored into a scratch database and checked with `alembic cu
 | 2026-10-16 | **Production** (`mdarix.in`, release 0.10.14), backup `20261016T161019Z` taken right after go-live, downloaded from the Delhi bucket (`/prod`) to a workstation | Restored on the workstation with the release's own backup image into a throw-away PostgreSQL 16 (pgvector) as a non-superuser owner, in 7 s; the private key never left the workstation. Manifest verified; schema head `md45trialexit`, 217 tables, 317 policies, 149 tables with forced RLS, tenants (1) and accounts (2) identical to the live database. Audit events: 0 in the backup, 10 live, all written after the backup (the two Platform Administrators activating and enrolling MFA from 16:14 UTC). No files archive yet (no uploads). Not run: steps 3 and 4 (grants, token, erasure dry-run), which need the application's settings on the workstation. Drill database, image and copy deleted afterwards. |
 | 2026-10-05 | Throw-away PostgreSQL 16 with TLS (`verify-full`) and a **non-superuser** owner (CREATEROLE only), as on a managed service; schema md25 | Migrations, runtime role and backup role ran as that owner; the owner could not grant BYPASSRLS, so the backup read through the system scope; restored as the owner into a fresh database: md25 head, 117 policies, 117 tables with forced RLS, tenants, accounts and the token hash identical. Same result with a BYPASSRLS backup login. The files archive restored into an empty folder. A wrong system token failed the run before dumping, with an alert attempt. |
 | 2026-11-03 | **Production** (`mdarix.com`, release 0.10.84), backup `20261103T151005Z` (taken by the upgrade to 0.10.84), copied from the VM's `/var/backups/mdarix` to a workstation | Manifest verified. The backup was restored with the release's own backup image (built from v0.10.84) into a throw-away PostgreSQL 16 (pgvector) with a **non-superuser** owner, in **32 s**. The private key was mounted read-only and piped in, never written or shown. Schema head `tr16codelists`, 249 tables, 346 policies, 178 tables with forced RLS; 7 tenants (6 trials, the same as the live refresh list), 25 accounts, 5,264 complaints, 65 signed approval records, 2,411 audit events; 17,499 reference codes and 1,931 IMDRF codes (the 0.10.77 load). **Steps 3 and 4 run this time:** application role privileges re-granted, a drill-only system token stored, `reapply_erasures.py --dry-run` gave 0 pending, 0 skipped, 0 failed. The whole drill took 7 min 19 s against the RTO of 4 h. The backup was 2 h 45 min old at the drill, against the RPO of 24 h. Drill database, containers, image and copy deleted afterwards; the temporary copy on the VM was removed. |
+| 2026-11-13 (UTC) | Local test database `mdarix_b6b_test` (schema head `tr31othercountries`), dumped with `pg_dump -Fc` at 20261113T195955Z and restored into the scratch database `mdarix_b6b_restore_test` (same local PostgreSQL 16; no encryption, no production data) | First run of `scripts/recovery_check.py` (B6b Part D). The first run held the unsent outbox events of 4 organisations (one audit record each) and then stopped on a defect in its clock step (fixed, with a test). The second run: worker stopped PASS; schema head PASS; policy and forced-table counts equal to the source PASS; audit chain of all 72 organisations PASS (191 events); configuration PASS; outbox hold PASS (nothing left to hold); clock ok PASS; erasure dry-run PASS (0 pending); row counts FLAG: `audit_events` 191 against 187 in the source, explained by the 4 hold records of the first run. Result PASS WITH FLAGS (exit 2 then; 3 since the code review). Not a recovery validation (D5 waits for the quarterly drill on a production backup copy). |
 
 ## 3. Recovering production
+
+Every recovery below, before anyone signs in: keep the `background` service stopped (start only `migrate`, `api`,
+`web` and `mail-in`; `mail-in` may stay stopped too), run the recovery check (section 2, step 5) against the
+restored database, re-apply erasures (section 4), replay held notifications only from the provider's log (section 2,
+step 6), and only then start `background`. A FAIL stops the recovery. The system owner fills the recovery record
+(MDX-OPS-001) and the quality approver signs it; each organisation gets its customer summary (recovery window to
+back-enter, held notifications), and the event goes into the incident register
+(`docs/validation/registers/incidents.csv`).
 
 | Situation | Action |
 |---|---|
@@ -172,5 +217,7 @@ files: run step 2 after a file-only restore too.
 ## 5. After any restore
 
 `docker compose -f docker-compose.prod.yml --env-file .env.production exec api python -m backend.app.config_check`,
-check readiness (DEPLOYMENT.md, section 5) and `/health/status`, sign in as a Platform Administrator, and open one
-customer's Product 360 and audit trail before announcing recovery.
+check readiness (DEPLOYMENT.md, section 5) and `/health/status`, sign in with MFA as a Platform Administrator and as
+one user of each customer role, and open one customer's Product 360 and audit trail before announcing recovery. The
+recovery check (section 2, step 5) has passed, or each of its flags is explained in the signed recovery record,
+before the `background` service is started. Send each organisation its customer summary.

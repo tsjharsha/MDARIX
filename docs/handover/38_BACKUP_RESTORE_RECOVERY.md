@@ -2,8 +2,9 @@
 
 The procedure, schedule and evidence are in [docs/runbooks/BACKUP_AND_RESTORE.md](../runbooks/BACKUP_AND_RESTORE.md):
 
-- **Managed database:** point-in-time recovery for the control database and every dedicated data plane, plus daily
-  snapshots.
+- **Managed database (pilot hosting):** point-in-time recovery for the control database and every dedicated data
+  plane, plus daily snapshots. Today's production has no point-in-time recovery: RPO 24 hours, target 15 minutes
+  (owner decision B6b-D8).
 - **MDARIX backup** (`docker compose --profile backup run --rm backup`, daily from cron): an encrypted (age) logical
   dump of every database and the uploaded files, with a SHA-256 manifest, copied off-site.
 - **Keys** (connector, MFA, object storage, RLS system token, age identity) are backed up separately from the data.

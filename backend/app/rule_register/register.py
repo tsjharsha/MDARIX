@@ -63,6 +63,15 @@ GENERIC_RULES = {"OTHER": "OTHER-floor"}
 ROLE_RULES = {("US", "IMPORTER"): "US-IMP-floor", ("US", "USER_FACILITY"): "US-UF-floor"}
 
 
+# Staff accounts that build or approve rule versions: account -> (name shown, may approve rule content). One entry per
+# person; a change to this list is a code change under change control.
+# shortcut: a controlled list in code, not the platform's database accounts (the register loads without a database);
+# move to the platform accounts when rule versions get an in-app approval path.
+# Owner decision O23 (12 Nov 2026): the accounts are the two persons, labelled by name (no platform user IDs exist
+# for them in the seed data); the 12 Nov back-fill of these fields is deviation DEV-0.11.04-001.
+STAFF_ACCOUNTS = {"sriharsha": ("Sriharsha", False), "srinivas": ("Srinivas", True)}
+
+
 class RegisterError(ValueError):
     """The register's files are wrong: every problem, each naming its file."""
 
@@ -103,6 +112,19 @@ def _problems(entries: list[tuple[str, dict]]) -> list[str]:
             problems.append(f"{name}: unknown kind {entry['kind']}")
         if entry["change"].get("kind") not in CHANGE_KINDS:
             problems.append(f"{name}: change.kind is one of {', '.join(CHANGE_KINDS)}")
+        approval = entry["approval"]
+        # B6b owner decisions O3 and O10 (RSK-065): a second person approves, compared by account, never by typed name
+        built, approved = (STAFF_ACCOUNTS.get(approval.get(k)) for k in ("built_by_account", "approved_by_account"))
+        if not built or not approved:
+            problems.append(
+                f"{name}: approval.built_by_account and approval.approved_by_account must be staff accounts"
+            )
+        elif approval["approved_by_account"] == approval["built_by_account"] or not approved[1]:
+            problems.append(
+                f"{name}: approval.approved_by_account must be an approver account other than the builder's"
+            )
+        elif (approval.get("built_by"), approval.get("approved_by")) != (built[0], approved[0]):
+            problems.append(f"{name}: approval.built_by and approval.approved_by must be the accounts' names")
         if standards.STARTER_MARK not in str(entry["review"].get("note")):
             problems.append(f"{name}: review.note keeps the starter mark")
         for source in entry["source"]:

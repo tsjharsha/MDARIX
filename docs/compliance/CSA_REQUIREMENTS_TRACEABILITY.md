@@ -1,5 +1,7 @@
 # CSA requirements-to-test traceability
 
+> **SUPERSEDED (12 Nov 2026, B6b).** This hand-kept MVP-1.0 table is retired. Do not give it to a customer or use it as evidence. Traceability is generated per release from `requirements.csv`, the [scenario register](../validation/scenario-register.md) and test results (MDX-VAL-009, B6b Part B); see [docs/validation/README.md](../validation/README.md).
+
 | Requirement | Verification tests | Evidence | Acceptance |
 |---|---|---|---|
 | MDX-SEC-001 Tenant authorization | IQ-002, OQ-001, PQ-003 | Health traces, isolation traces, browser evidence | No foreign data or unauthorized action |

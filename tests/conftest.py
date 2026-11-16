@@ -19,6 +19,11 @@ import os
 import subprocess
 from pathlib import Path
 
+from validation.pytest_requirements import (  # noqa: F401  (B6b B4: markers and release identity into JUnit)
+    _junit_release_identity,
+    pytest_runtest_setup,
+)
+
 os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
 # The unit selection runs with no database at all: MDARIX_TEST_NO_DATABASE=1 points every connection at a closed port,
 # so a test marked unit that reaches the database fails at once instead of passing on a developer's machine.

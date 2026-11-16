@@ -24,7 +24,8 @@ from tests.test_market_assessment_api import (
 )
 from tests.test_reporting_capa_api import _complaint
 
-pytestmark = pytest.mark.db
+# B6b B3: scenarios this file verifies (its register row names it, or it is the group's own test file).
+pytestmark = [pytest.mark.db, pytest.mark.requirement("B6-36", "B6-37")]
 TODAY = datetime.now(timezone.utc).date()
 
 

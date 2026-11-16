@@ -6,7 +6,9 @@
   Runs, in order: targeted pytest, ruff, vitest, tsc, the production build, the Playwright journeys on the production
   bundle (chromium only), the k6 smoke with the SLO thresholds (the two pages included when a session is given), and
   the three load measures. Each step's output goes to artifacts/release-checks/<step>.log; the summary (versions,
-  timings, pass/fail) is written to artifacts/release-checks-<version>.json for the release evidence (B6b).
+  timings, pass/fail) is written to artifacts/release-checks-<version>.json for the release evidence (B6b). The pytest
+  step also writes artifacts/release-checks/junit.xml, with each test's requirement markers as properties (B6b B4);
+  -Full runs the whole suite instead of the targeted files.
 
   It never deploys, pushes or sends anything. Run it from the repository root with the test database's POSTGRES_DB
   set in the environment (the app reads the repository's .env by itself).
@@ -15,6 +17,7 @@
   $env:POSTGRES_DB = "mdarix_r1_test"; .\scripts\release_checks.ps1
   .\scripts\release_checks.ps1 -Skip playwright,k6,load     # the quick set
   .\scripts\release_checks.ps1 -DryRun                      # list the steps and write the JSON, run nothing
+  .\scripts\release_checks.ps1 -Full -Only pytest            # the whole pytest suite (the release-pack regression run)
   $env:K6_BASE_URL = "http://127.0.0.1:8007"; $env:K6_SESSION = "<a test session cookie>"; .\scripts\release_checks.ps1 -Only k6
 #>
 param(
@@ -27,7 +30,8 @@ param(
         "tests/test_oversight_provisional.py",
         "tests/test_b6a_deadline_list.py"
     ),
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Full
 )
 
 $ErrorActionPreference = "Continue"
@@ -41,6 +45,8 @@ $python = if (Test-Path "$root\.venv\Scripts\python.exe") { "$root\.venv\Scripts
 $version = (Get-Content "$root\VERSION" -Raw).Trim()
 $logs = Join-Path $root "artifacts\release-checks"
 New-Item -ItemType Directory -Force $logs | Out-Null
+# A junit.xml left by an earlier run is never reported as this run's.
+Remove-Item (Join-Path $logs "junit.xml") -ErrorAction SilentlyContinue
 
 function Invoke-Measures {
     $env:MDARIX_TRIAL_LOAD_MEASURE = "1"
@@ -59,7 +65,10 @@ function Invoke-K6 {
 }
 
 $steps = [ordered]@{
-    "pytest"     = { & $python -m pytest @PytestFiles -q -p no:cacheprovider }
+    "pytest"     = {
+        $files = if ($Full) { @() } else { $PytestFiles }
+        & $python -m pytest @files -q -p no:cacheprovider "--junitxml=$(Join-Path $logs 'junit.xml')"
+    }
     "ruff"       = { & $python -m ruff check . }
     "vitest"     = { Push-Location frontend; npx vitest run; $c = $LASTEXITCODE; Pop-Location; $global:LASTEXITCODE = $c }
     "tsc"        = { Push-Location frontend; npx tsc --noEmit -p .; $c = $LASTEXITCODE; Pop-Location; $global:LASTEXITCODE = $c }
@@ -108,6 +117,8 @@ $summary = [ordered]@{
     commit         = Get-VersionOf { git -C $root rev-parse --short HEAD }
     branch         = Get-VersionOf { git -C $root rev-parse --abbrev-ref HEAD }
     dry_run        = [bool]$DryRun
+    full_suite     = [bool]$Full
+    junit          = $(if (Test-Path (Join-Path $logs "junit.xml")) { "artifacts/release-checks/junit.xml" } else { $null })
     started_at     = $started.ToUniversalTime().ToString("o")
     finished_at    = (Get-Date).ToUniversalTime().ToString("o")
     machine        = "local (not CI); numbers are local, in-process, not production"

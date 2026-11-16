@@ -152,7 +152,7 @@ def build_package(release: str = "MVP-1.0") -> dict:
             "Obtain QA and system-owner approval.",
         ],
         "approval": {"system_owner": "PENDING", "quality_reviewer": "PENDING", "approval_date": None},
-        "status": "READY_FOR_EXECUTION",
+        "status": "SUPERSEDED",  # retired by B6b (docs/validation/MDX-VAL-001); never executed
         "document_control": {
             "document_id": "MDARIX-CSA-MVP-1.0",
             "version": "1.0",
@@ -237,9 +237,19 @@ Customer-specific requirements, infrastructure qualification, access controls, b
 """
 
 
+SUPERSEDED_BANNER = (
+    "> **SUPERSEDED (12 Nov 2026, B6b).** This MVP-1.0 package was never executed and is retired. Do not give it to a "
+    "customer or use it as evidence. The current plan is "
+    "[MDX-VAL-001](../validation/MDX-VAL-001_VALIDATION_MASTER_PLAN.md); the document index is "
+    "[docs/validation/README.md](../validation/README.md)."
+)
+
+
 def render_markdown(package: dict) -> str:
     lines = [
         f"# {package['package_id']}",
+        "",
+        SUPERSEDED_BANNER,
         "",
         f"Release: `{package['release']}`",
         f"Status: **{package['status']}**",
