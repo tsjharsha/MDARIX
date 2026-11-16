@@ -77,7 +77,8 @@ class PlatformAiSettings(BaseModel):
 
 class UserAiAccess(BaseModel):
     ai_access: str = Field(pattern="^(ACTIVE|INACTIVE)$")
-    reason: str = Field(min_length=5, max_length=1000)
+    # TO-1 spec 3.6.1: a reason of at least 10 characters.
+    reason: str = Field(min_length=10, max_length=1000)
 
 
 class BulkUserAiAccess(UserAiAccess):
@@ -469,13 +470,18 @@ def list_user_ai_access(tenant_id: uuid.UUID, request: Request, db: Session = De
     """Each person of a free trial with their own AI flag (Platform Administrator only)."""
     from backend.app.db.models.foundation import AuthUser
 
+    from genai.provider import trial_chain_names
+
     _require_platform_admin(request, db)
-    _trial_tenant_for_platform(db, tenant_id)
+    tenant = _trial_tenant_for_platform(db, tenant_id)
     rows = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).order_by(AuthUser.display_name).all()
     return {
+        # Both must agree (TO-1 3.6.1): while the trial has not switched AI on, no person has AI.
+        "organization_on": bool(tenant.ai_processing_allowed),
+        "trial_chain_on": bool(trial_chain_names()),
         "items": [
             {"user_id": str(row.id), "display_name": row.display_name, "ai_access": row.ai_access} for row in rows
-        ]
+        ],
     }
 
 

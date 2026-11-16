@@ -270,12 +270,13 @@ def test_an_empty_trial_chain_means_zero_calls_for_a_trial(trial, chain_on, monk
 def test_only_a_platform_administrator_sets_a_persons_ai_flag(trial):
     url = f"/api/v1/platform-admin/tenants/{trial['tenant_id']}/users/{trial['user_id']}/ai-access"
     body = {"ai_access": "INACTIVE", "reason": "Trial person asked for no AI"}
+    short = {"ai_access": "INACTIVE", "reason": "No AI pls"}  # 9 characters: TO-1 asks for at least 10
     # The trial's own administrator is refused, on the single and the bulk endpoint.
     assert trial["client"].put(url, json=body).status_code == 403
     bulk = f"/api/v1/platform-admin/tenants/{trial['tenant_id']}/users/ai-access"
     assert trial["client"].put(bulk, json={**body, "user_ids": [str(trial["user_id"])]}).status_code == 403
     admin = authenticated_client()
-    assert admin.put(url, json={"ai_access": "INACTIVE", "reason": "no"}).status_code == 422  # reason too short
+    assert admin.put(url, json=short).status_code == 422  # reason too short
     changed = admin.put(url, json=body)
     try:
         assert changed.status_code == 200, changed.text
@@ -290,11 +291,15 @@ def test_only_a_platform_administrator_sets_a_persons_ai_flag(trial):
             )
             assert event.old_values == {"ai_access": "ACTIVE"} and event.new_values == {"ai_access": "INACTIVE"}
             assert event.reason == body["reason"] and event.actor_ref and event.created_at
-        listed = admin.get(bulk).json()["items"]
+        listing = admin.get(bulk).json()
+        assert listing["organization_on"] is False and "trial_chain_on" in listing
+        listed = listing["items"]
         assert {"user_id": str(trial["user_id"]), "ai_access": "INACTIVE"}.items() <= next(
             item for item in listed if item["user_id"] == str(trial["user_id"])
         ).items()
-        back = admin.put(bulk, json={"ai_access": "ACTIVE", "reason": "Back on", "user_ids": [str(trial["user_id"])]})
+        back = admin.put(
+            bulk, json={"ai_access": "ACTIVE", "reason": "Back on for the trial", "user_ids": [str(trial["user_id"])]}
+        )
         assert back.status_code == 200 and back.json()["items"][0]["changed"] is True
     finally:
         _set_user(trial["user_id"], "ACTIVE")
