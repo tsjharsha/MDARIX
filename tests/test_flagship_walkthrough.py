@@ -408,6 +408,7 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
             "outcome": "ACCEPT_CONCLUSION",
             "rationale": "The sensor drift explains the reading; service replaces the sensor.",
             "root_cause_attribution": "DEVICE_RELATED",
+            "root_cause_category": "MATERIAL",
             "residual_unknowns_acknowledged": True,
             "password": COLLEAGUE_PASSWORD,
         },

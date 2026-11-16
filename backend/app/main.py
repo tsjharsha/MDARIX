@@ -104,6 +104,7 @@ from backend.app.evidence_workflow.requests import router as evidence_requests_r
 from backend.app.case_challenge.router import router as case_challenge_router
 from backend.app.closed_loop.router import router as closed_loop_router
 from backend.app.case_intelligence.router import router as case_intelligence_router
+from backend.app.rca.router import router as rca_router
 from backend.app.case_reviews.next_steps import router as case_next_steps_router
 from backend.app.case_reviews.router import router as case_reviews_router
 from backend.app.decision_brief.router import router as decision_brief_router
@@ -534,6 +535,7 @@ app.include_router(evidence_inventory_router)  # Case evidence: inventory, links
 app.include_router(evidence_requests_router)  # Evidence requests to colleagues, roles and suppliers
 app.include_router(case_intelligence_router)  # Case intelligence: hypotheses, unknowns, chains, observations
 app.include_router(case_challenge_router)  # B5a: rule drafts and challenge questions
+app.include_router(rca_router)  # RCA tools: fishbone, 5 Whys, Pareto, the version at the event date
 app.include_router(closed_loop_router)  # B5b: Did it work? after a signed decision
 app.include_router(case_reviews_router)  # Risk and regulatory reviews: policy, requests, reviewers, dashboard
 app.include_router(case_next_steps_router)  # Next steps of a case (the old decision options as actions)

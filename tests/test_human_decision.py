@@ -94,6 +94,7 @@ def _body(brief: dict, **changes) -> dict:
         "outcome": "ACCEPT_CONCLUSION",
         "rationale": RATIONALE,
         "root_cause_attribution": "DEVICE_RELATED",
+        "root_cause_category": "MATERIAL",
         "password": PASSWORD,
     }
     body.update(changes)

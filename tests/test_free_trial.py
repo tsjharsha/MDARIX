@@ -1672,6 +1672,7 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
         "brief_content_hash": view["content_hash"],
         "outcome": "ACCEPT_CONCLUSION",
         "rationale": "The supplier change and the inspection results support the proposed conclusion.",
+        "root_cause_category": "MATERIAL",
         "password": PASSWORD,
     }
     # The decision is signed only with its root-cause attribution (tr02); undetermined only with a reason.

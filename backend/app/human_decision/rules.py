@@ -199,6 +199,11 @@ class SignPayload(BaseModel):
     # The root-cause attribution (tr02, T-G36): required for every new signature; "undetermined" needs its reason.
     root_cause_attribution: str | None = Field(default=None, max_length=30)
     attribution_reason: str | None = Field(default=None, max_length=4000)
+    # RCA tools (RCA-D1, D4): the hypotheses the signer ticks as the accepted root cause, and their category (or
+    # NOT_DETERMINED with the reason). Nothing is pre-ticked; checked in the endpoint.
+    root_cause_hypothesis_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    root_cause_category: str | None = Field(default=None, max_length=20)
+    root_cause_reason: str | None = Field(default=None, max_length=4000)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, min_length=6, max_length=12)
 

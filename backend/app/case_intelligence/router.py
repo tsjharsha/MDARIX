@@ -378,6 +378,9 @@ def _hypothesis_items(
                 "created_by_name": created_by_name,
                 "created_at": _iso(row.created_at),
                 "superseded": superseded,
+                # RCA fishbone (trrcatools): the cause category and the FMEA failure mode a person gave it.
+                "cause_category": row.cause_category,
+                "failure_mode_id": str(row.failure_mode_id) if row.failure_mode_id else None,
                 "kind_label": rules.kind_label(
                     row.origin, row.human_status, created_by_name=created_by_name, judged_by_name=judged_by_name
                 ),
@@ -1244,12 +1247,21 @@ def _chain_views(db: Session, control_db: Session | None, tenant_id, case: Inves
                 "origin": origin,
                 "origin_label": rules.chain_origin_label(origin),
                 "status": chain.status,
+                "method": chain.method,
                 "created_by_name": _name(names, chain.created_by),
                 "created_at": _iso(chain.created_at),
                 "updated_at": _iso(chain.updated_at),
                 "source_ai_execution_id": str(chain.source_ai_execution_id) if chain.source_ai_execution_id else None,
                 "nodes": [
-                    {"id": str(node.id), "sequence": node.sequence_number, "label": node.label}
+                    {
+                        "id": str(node.id),
+                        "sequence": node.sequence_number,
+                        "label": node.label,
+                        # RCA 5 Whys: the hypothesis a why is (never a root cause).
+                        "hypothesis_id": (
+                            str(node.lifecycle_object_id) if node.lifecycle_object_type == "HYPOTHESIS" else None
+                        ),
+                    }
                     for node in nodes
                     if node.failure_chain_id == chain.id
                 ],
@@ -1391,6 +1403,7 @@ def _store_chain(
     links: list[dict],
     source_ai_execution_id=None,
     now: datetime,
+    method: str = "CHAIN",
 ) -> FailureChain:
     """A chain, its steps (in order) and its links. ``links`` hold from/to indexes into ``labels``."""
     chain = FailureChain(
@@ -1402,6 +1415,7 @@ def _store_chain(
         origin=origin,
         created_by=person.user_id,
         source_ai_execution_id=source_ai_execution_id,
+        method=method,
         created_at=now,
         updated_at=now,
     )
