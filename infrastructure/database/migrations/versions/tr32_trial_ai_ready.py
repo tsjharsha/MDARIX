@@ -35,6 +35,7 @@ FEATURE_KEYS = (
     "evidence_extraction",
     "code_suggestions",
     "decision_advisory",
+    "regulatory_drafting",
 )
 NEW_TABLES = ("ai_calls", "ai_output_reviews")
 OUTCOMES = ("ANSWERED", "FAILED", "INVALID_OUTPUT")

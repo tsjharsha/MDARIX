@@ -9,7 +9,8 @@ into a record. **HIGH** (AI decides) is not allowed: declaring a feature HIGH fa
 A feature may call a model only when every level allows it (all off by default):
 
 * platform: ``MDARIX_AI_FEATURES`` lists it (comma-separated, default empty), read on every call;
-* offered: ``decision_advisory`` is not offered (owner decision AI-D5) whatever the switches say;
+* offered: ``decision_advisory`` (owner decision AI-D5) and ``regulatory_drafting`` (the regulatory copilot, owner
+  decision of 14 Nov 2026: not offered until AI qualification) are not offered whatever the switches say;
 * organisation: ``tenants.ai_processing_allowed`` and ``tenants.ai_features[feature]`` (``genai/governance.py``).
 """
 
@@ -99,6 +100,15 @@ _DECLARED = (
         "MEDIUM",
         "Be offered at all until the owner says so (AI-D5).",
         "decision-advisory-1",
+        offered=False,
+    ),
+    Feature(
+        "regulatory_drafting",
+        "Regulatory drafting",
+        "Draft regulatory document sections (such as an IFU) from a case, for a person to review.",
+        "MEDIUM",
+        "Be offered at all until AI is qualified (owner decision, 14 Nov 2026).",
+        "regulatory-drafting-1",
         offered=False,
     ),
 )

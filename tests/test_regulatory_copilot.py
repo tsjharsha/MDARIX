@@ -28,7 +28,8 @@ def _draft(client, **changes):
 
 def test_without_a_configured_provider_the_draft_is_rules_only():
     body = _draft(role_client("INVESTIGATOR")[0])
-    assert body["status"] == "RULES_ONLY" and body["reason_code"] == "GENAI_PROVIDER_NOT_CONFIGURED"
+    # Not offered comes first (owner, 14 Nov 2026), before whether a provider is configured.
+    assert body["status"] == "RULES_ONLY" and body["reason_code"] == "GENAI_FEATURE_NOT_OFFERED"
     assert body["human_review_required"] is True and body["authoritative"] is False
     assert body["user_message"]
     sections = [item for item in body["draft"]["sections"] if item.get("section_id")]
@@ -52,6 +53,21 @@ def test_a_refused_model_gives_the_layout_with_the_reason(monkeypatch, reason, c
     body = _draft(role_client("INVESTIGATOR")[0])
     assert body["status"] == "RULES_ONLY" and body["reason_code"] == code
     assert "URLError" not in body["user_message"]
+
+
+def test_the_copilot_is_not_offered_and_never_reaches_a_model(monkeypatch):
+    """Owner decision, 14 Nov 2026: the regulatory copilot stays not offered until AI qualification, whatever the
+    switches say; the rules draft is shown with the reason and no model request is made."""
+    from genai import provider as provider_module
+
+    sent = []
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "groq")
+    monkeypatch.setenv("MDARIX_GENAI_API_KEY", "dev-key")
+    monkeypatch.setenv("MDARIX_AI_FEATURES", "ask,summaries,case_analysis,drafting,regulatory_drafting")
+    monkeypatch.setattr(provider_module.request, "urlopen", lambda *args, **kwargs: sent.append(args))
+    body = _draft(role_client("INVESTIGATOR")[0])
+    assert body["status"] == "RULES_ONLY" and body["reason_code"] == "GENAI_FEATURE_NOT_OFFERED"
+    assert body["user_message"] and sent == []
 
 
 def test_the_model_drafts_from_the_case_and_its_citations_are_checked(monkeypatch, seeded):
