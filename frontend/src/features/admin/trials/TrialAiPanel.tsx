@@ -159,7 +159,9 @@ export function TrialAiPanel({
           </div>
         )}
       </Panel>
-      <TrialAiMetrics tenantId={detail.tenant_id} />
+      <div id="trial-ai-metrics">
+        <TrialAiMetrics tenantId={detail.tenant_id} />
+      </div>
     </>
   );
 }

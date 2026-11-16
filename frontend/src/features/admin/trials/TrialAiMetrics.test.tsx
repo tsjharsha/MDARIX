@@ -34,15 +34,22 @@ describe("story step 9: a trial's AI metrics for the Platform Administrator", ()
     expect(aiMetricsPath("t 1")).toBe("/api/v1/platform-admin/trial-organizations/t%201/ai-metrics");
     const html = renderToStaticMarkup(<TrialAiMetrics tenantId="t-1" />);
     expect(html).toContain("82%");
-    expect(html).toContain("of 50,000 this month");
-    expect(html).toMatch(/freellmapi[\s\S]*Resting[\s\S]*omniroute[\s\S]*Ready/);
+    expect(html).toContain("of this month&#x27;s AI allowance");
+    // Generic provider labels only: internal service names never reach the screen.
+    expect(html).toMatch(/Provider 1 · primary[\s\S]*Resting[\s\S]*Provider 2 · fallback[\s\S]*Ready/);
+    expect(html).not.toContain("freellmapi");
+    expect(html).not.toContain("omniroute");
+    // The refused count is labelled as refused; tokens are not shown twice.
+    expect(html).toContain("Stopped by the rules");
+    expect(html).not.toContain("Answered from rules");
+    expect(html).not.toContain("Tokens used");
     expect(html).toContain("A user&#x27;s AI set Inactive");
     expect(html).toContain("Trial user asked for no AI");
     expect(html).toContain("Answered");
   });
 
-  it("puts each switch change in plain words and colours the use", async () => {
-    const { switchChange, usageTone } = await import("./TrialAiMetrics");
+  it("puts each switch change in plain words", async () => {
+    const { switchChange } = await import("./TrialAiMetrics");
     const base = { at: null, actor: "x", reason: null, old_values: null, details: {} };
     expect(
       switchChange({ ...base, action: "AI_PROCESSING_SETTING_CHANGED", new_values: { ai_processing_allowed: true } }),
@@ -63,6 +70,21 @@ describe("story step 9: a trial's AI metrics for the Platform Administrator", ()
         details: { value: true, count: 4 },
       }),
     ).toBe("Everyone set Active: 4 changed");
-    expect([usageTone(10), usageTone(80), usageTone(100)]).toEqual(["good", "warning", "critical"]);
+    expect(
+      switchChange({
+        ...base,
+        action: "TRIAL_USER_AI_ACCESS_CHANGED",
+        new_values: { ai_access: true },
+        details: { user_name: "Priya N." },
+      }),
+    ).toBe("Priya N.'s AI set Active");
+    expect(
+      switchChange({
+        ...base,
+        action: "TRIAL_USER_AI_ACCESS_CHANGED",
+        new_values: { ai_access: true },
+        details: { user_name: "Priya N." },
+      }),
+    ).toBe("Priya N.'s AI set Active");
   });
 });

@@ -8,17 +8,17 @@
 }
 
 .to-hero {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  border: 1px solid var(--ac-line);
-  border-radius: var(--ac-radius);
+  padding: 18px 20px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
 }
-.to-hero h2 {
+.to-hero h1 {
   margin: 2px 0 6px;
-  color: var(--ac-navy);
+}
+.to-hero h1:focus {
+  outline: none;
 }
 .to-next {
   margin: 0;
@@ -31,7 +31,10 @@
   gap: 6px;
 }
 .to-days {
-  font-size: var(--ms-fs-24);
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-34);
+  font-stretch: 112%;
+  line-height: 1.08;
   color: var(--ac-navy);
 }
 
@@ -60,8 +63,10 @@
 }
 .to-card {
   padding: 14px 16px;
-  border: 1px solid var(--ac-line);
-  border-radius: var(--ac-radius);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
 }
 .to-card h3 {
   margin: 0 0 8px;
@@ -128,4 +133,11 @@
   .to-hero-side {
     align-items: flex-start;
   }
+}
+
+/* The AI panel sits right under the trial header: it is the reason for the demo step. */
+.to-ai-slot {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
 }

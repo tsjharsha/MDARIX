@@ -268,4 +268,29 @@ describe("run 2: grace period and the AI slot", () => {
     expect(withPanel).toContain("AI panel for OrbitCare Devices");
     expect(withPanel).not.toContain("AI is off for free trials");
   });
+
+  it("opens with the trial name as the page title and the AI panel right under it, before the actions", () => {
+    const html = renderToStaticMarkup(
+      <TrialDetailView
+        detail={trial()}
+        history={[
+          {
+            id: "e1",
+            action: "TRIAL_EXTENDED",
+            actor_ref: null,
+            created_at: "2026-11-10T09:00:00+00:00",
+            details: { reason: "Owner asked for more time" },
+          },
+        ]}
+        onAction={() => undefined}
+        aiPanel={() => <p>AI panel here</p>}
+      />,
+    );
+    expect(html).toMatch(/<h1 tabindex="-1">OrbitCare Devices<\/h1>/);
+    expect(html.indexOf("AI panel here")).toBeLessThan(html.indexOf("Trial actions"));
+    expect(html).toContain("AI use this month");
+    // Sample counts in words, and the history says why.
+    expect(html).toContain("<dt>Complaints</dt>");
+    expect(html).toContain("Owner asked for more time");
+  });
 });

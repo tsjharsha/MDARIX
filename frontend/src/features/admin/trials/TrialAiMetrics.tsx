@@ -2,6 +2,7 @@ import { Activity, Gauge, ShieldCheck } from "lucide-react";
 import { BarList, Empty, Panel, RingMeter, StatTile, ToneBadge } from "../console/charts";
 import type { Slice, Tone } from "../console/dashboardModel";
 import { formatDate, useResource } from "../../customer-admin/shared";
+import { formatDateTime } from "../../../app/dates";
 import "./trialAi.css";
 
 /*
@@ -50,9 +51,6 @@ const CHAIN_WORDS: Record<ChainLink["state"], [string, Tone]> = {
 
 const words = (code: string) => code.charAt(0).toUpperCase() + code.slice(1).toLowerCase().replace(/_/g, " ");
 
-/** The use tone: plenty left, getting close (80%), or used up. */
-export const usageTone = (percent: number): Tone => (percent >= 100 ? "critical" : percent >= 80 ? "warning" : "good");
-
 export const slices = (counts: Record<string, number>, tone: (key: string) => Tone): Slice[] =>
   Object.entries(counts)
     .sort(([, a], [, b]) => b - a)
@@ -69,7 +67,7 @@ export function switchChange(event: SwitchEvent): string {
     case "AI_FEATURE_SETTING_CHANGED":
       return `${words(String(event.details.feature ?? "A feature"))} turned ${after.enabled ? "on" : "off"}`;
     case "TRIAL_USER_AI_ACCESS_CHANGED":
-      return `A user's AI set ${after.ai_access ? "Active" : "Inactive"}${event.details.bulk ? " (set all)" : ""}`;
+      return `${typeof event.details.user_name === "string" && event.details.user_name ? `${event.details.user_name}'s` : "A user's"} AI set ${after.ai_access ? "Active" : "Inactive"}${event.details.bulk ? " (set all)" : ""}`;
     case "TRIAL_AI_ACCESS_BULK_CHANGED":
       return `Everyone set ${event.details.value ? "Active" : "Inactive"}: ${Number(event.details.count ?? 0)} changed`;
     default:
@@ -85,13 +83,12 @@ export function TrialAiMetrics({ tenantId }: { tenantId: string }) {
       {data && (
         <>
           <div className="to-ai-metrics">
-            <RingMeter value={data.usage.tokens_used} total={data.usage.limit} label="of the trial's AI limit" />
+            <RingMeter value={data.usage.tokens_used} total={data.usage.limit} label="of this month's AI allowance" />
             <StatTile
-              label="Tokens used"
-              value={data.usage.tokens_used}
-              detail={`of ${data.usage.limit.toLocaleString()} this month`}
+              label="Requests"
+              value={data.usage.requests}
+              detail="AI requests this month"
               icon={<Gauge size={18} />}
-              tone={usageTone(data.usage.percent)}
             />
             <StatTile
               label="Model calls"
@@ -100,9 +97,9 @@ export function TrialAiMetrics({ tenantId }: { tenantId: string }) {
               icon={<Activity size={18} />}
             />
             <StatTile
-              label="Answered from rules"
+              label="Stopped by the rules"
               value={data.usage.refused}
-              detail="refused before any AI service was called"
+              detail="Questions refused before any AI call"
               icon={<ShieldCheck size={18} />}
             />
           </div>
@@ -131,7 +128,9 @@ export function TrialAiMetrics({ tenantId }: { tenantId: string }) {
                   {data.chain.map((link) => (
                     <li key={link.name}>
                       <span className="to-ai-chain-pos">{link.position}</span>
-                      <code>{link.name}</code>
+                      <span>
+                        Provider {link.position} · {link.position === 1 ? "primary" : "fallback"}
+                      </span>
                       <ToneBadge tone={CHAIN_WORDS[link.state][1]} label={CHAIN_WORDS[link.state][0]} />
                       {link.resting_until && <small className="ac-muted">until {formatDate(link.resting_until)}</small>}
                     </li>
@@ -152,7 +151,7 @@ export function TrialAiMetrics({ tenantId }: { tenantId: string }) {
                 <li key={`${event.action}-${event.at}-${index}`}>
                   <strong>{switchChange(event)}</strong>
                   <span className="ac-muted">
-                    {event.actor} · {event.at ? formatDate(event.at) : "—"}
+                    {event.actor} · {event.at ? formatDateTime(event.at) : "—"}
                   </span>
                   {event.reason && <q>{event.reason}</q>}
                 </li>

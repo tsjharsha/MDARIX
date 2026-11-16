@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, CalendarPlus, Repeat, ShieldOff, Sparkles, Trash2 } from "lucide-react";
 import { Panel, ToneBadge } from "../console/charts";
 import { Drawer, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
@@ -118,6 +118,12 @@ export function TrialDetailView({
   onOpenCustomers?: () => void;
   source?: { state: "loading" | "ready" | "error" | "forbidden"; error?: string; reload?: () => void };
 }) {
+  const title = useRef<HTMLHeadingElement>(null);
+  const shownId = detail?.tenant_id;
+  // The page title takes focus when a trial opens, so keyboard and screen-reader users start at its name.
+  useEffect(() => {
+    if (shownId) title.current?.focus();
+  }, [shownId]);
   if (!detail)
     return (
       <Panel title="Trial" source={source}>
@@ -127,16 +133,18 @@ export function TrialDetailView({
   const { dates, people, sample, activity } = detail;
   return (
     <>
-      <header className="to-hero">
+      <header className="ac-page-head to-hero">
         <div>
           <p className="ac-eyebrow">
             {detail.tenant_business_id ?? "Trial"} · {detail.plan ?? "Converted"}
             {sample.sample_only ? " · Sample only" : ""}
           </p>
-          <h2>{detail.name}</h2>
+          <h1 ref={title} tabIndex={-1}>
+            {detail.name}
+          </h1>
           <p className="to-next">{detail.next_step}</p>
         </div>
-        <div className="to-hero-side">
+        <aside className="to-hero-side">
           <ToneBadge tone={stateTone(detail.state)} label={STATE_LABELS[detail.state] ?? detail.state} />
           {detail.state !== "CONVERTED" && detail.state !== "DATA_DELETED" && (
             <strong className="to-days">
@@ -145,8 +153,27 @@ export function TrialDetailView({
                 : "Ended"}
             </strong>
           )}
-        </div>
+          {aiPanel && (
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => document.getElementById("trial-ai-metrics")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              AI use this month
+            </button>
+          )}
+        </aside>
       </header>
+
+      <section className="to-ai-slot" aria-label="AI and usage" data-slot="trial-ai">
+        {aiPanel ? (
+          aiPanel({ detail, onChanged: onAiChanged })
+        ) : (
+          <p className="to-ai" role="note">
+            <Sparkles size={14} aria-hidden="true" /> {detail.ai.line}
+          </p>
+        )}
+      </section>
 
       <div className="to-actions" role="group" aria-label="Trial actions">
         {ACTIONS.map((action) => {
@@ -246,7 +273,7 @@ export function TrialDetailView({
           <dl>
             {Object.entries(sample.sample_counts ?? {}).map(([kind, count]) => (
               <span key={kind} className="to-count">
-                <dt>{kind}</dt>
+                <dt>{sampleKindLabel(kind)}</dt>
                 <dd>{count}</dd>
               </span>
             ))}
@@ -271,23 +298,18 @@ export function TrialDetailView({
         </section>
       </div>
 
-      <section className="to-ai-slot" aria-label="AI and usage" data-slot="trial-ai">
-        {aiPanel ? (
-          aiPanel({ detail, onChanged: onAiChanged })
-        ) : (
-          <p className="to-ai" role="note">
-            <Sparkles size={14} aria-hidden="true" /> {detail.ai.line}
-          </p>
-        )}
-      </section>
-
       <Panel eyebrow="History" title="What happened in this trial">
         {history.length ? (
           <ol className="to-history">
             {history.map((event) => (
               <li key={event.id}>
                 <strong>{eventLabel(event.action)}</strong>
-                <small>{formatDateTime(event.created_at)}</small>
+                <small>
+                  {formatDateTime(event.created_at)}
+                  {typeof event.details?.reason === "string" && event.details.reason
+                    ? ` · ${event.details.reason}`
+                    : ""}
+                </small>
               </li>
             ))}
           </ol>
@@ -314,6 +336,9 @@ const EVENT_LABELS: Record<string, string> = {
   SUBSCRIPTION_CHANGED: "Plan changed",
   TRIAL_OWNER_PROMOTED: "Owner became Customer Administrator",
 };
+
+/** A sample count's kind in plain words ("complaints" -> "Complaints", "capa_records" -> "Capa records"). */
+export const sampleKindLabel = (kind: string) => (kind.charAt(0).toUpperCase() + kind.slice(1)).replace(/_/g, " ");
 
 /** An audit action in plain words ("TRIAL_EXTENDED" -> "Trial extended"). */
 export const eventLabel = (action: string) =>
