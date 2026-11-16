@@ -7,7 +7,15 @@ import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from 
 import { safeText } from "../../../app/displayId";
 import { roleLabel, roleNote, WORKFLOW_ROLE_CODES } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { useNavigation, usePanelFlag, usePanelState, useWorkspace, type SessionContext } from "../workspaceContext";
+import {
+  useNavigation,
+  usePanelFlag,
+  usePanelState,
+  useRcaMethods,
+  useWorkspace,
+  type SessionContext,
+} from "../workspaceContext";
+import { CauseFields } from "./caseIntelligence/RootCause";
 import {
   aiDisclosure,
   briefLines,
@@ -618,7 +626,12 @@ function DecisionFormPanel({
   const residual = residualUnknowns(brief);
   const current = context.current_decision ?? null;
   const supersedes = current ? String(current.id ?? "") || null : null;
-  const problems = decisionFormProblems(form, { acknowledgementRequired: ackRequired, supersedes: !!current });
+  const causes = useRcaMethods();
+  const problems = decisionFormProblems(form, {
+    acknowledgementRequired: ackRequired,
+    supersedes: !!current,
+    causes,
+  });
   const hash = hashState(brief);
   const briefVersionId = String(brief.id ?? "");
   const briefContentHash = String(brief.content_hash ?? "");
@@ -835,6 +848,7 @@ function DecisionFormPanel({
             </label>
           )}
         </fieldset>
+        {causes && <CauseFields investigationId={investigationId} form={form} outcome={form.outcome} set={set} />}
         {current && (
           <>
             <p className="ca-note-box">

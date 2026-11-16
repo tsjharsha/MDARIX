@@ -22,6 +22,10 @@ const isObject = (value: unknown): value is Record<string, any> =>
 
 export const INTELLIGENCE_VIEWS = [
   "Hypotheses",
+  // RCA tools: the read-only overview (MDARIX_RCA_INTELLIGENCE), the fishbone and the 5 Whys (MDARIX_RCA_METHODS).
+  "Overview",
+  "Fishbone",
+  "5 Whys",
   // B5a: drafts and questions drawn by rule from the records (hidden while the switch is off).
   "Challenge",
   "Contradictions",

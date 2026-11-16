@@ -10,6 +10,7 @@ import { ApiError, describeError } from "../../app/apiClient";
 import { actionsOf, briefLines, shortHash } from "./decisionBrief";
 import { textProblem } from "./intelligence";
 import { dueAtFromDay } from "./caseWorkflow";
+import { causeBody, causeProblem } from "./rca";
 import { dueState, priorityRank } from "./tasks";
 
 export const APPROVALS_TAB = "Approvals";
@@ -456,6 +457,10 @@ export type DecisionForm = {
   /** The root-cause attribution (tr02): required; "undetermined" needs its reason. */
   attribution: string;
   attributionReason: string;
+  /** RCA tools: the hypotheses ticked as the accepted root cause and their category (nothing pre-ticked). */
+  rootCauseCategory: string;
+  rootCauseReason: string;
+  rootCauseHypotheses: string[];
 };
 
 /** The root-cause attributions a decision is signed with (backend/app/complaint_disposition/rules.py). */
@@ -547,6 +552,9 @@ export const emptyDecisionForm = (): DecisionForm => ({
   supersedeReason: "",
   attribution: "",
   attributionReason: "",
+  rootCauseCategory: "",
+  rootCauseReason: "",
+  rootCauseHypotheses: [],
 });
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -567,7 +575,7 @@ export function chosenFollowUps(form: DecisionForm, order: readonly string[] = F
  */
 export function decisionFormProblems(
   form: DecisionForm,
-  context: { acknowledgementRequired: boolean; supersedes: boolean },
+  context: { acknowledgementRequired: boolean; supersedes: boolean; causes?: boolean },
 ): string[] {
   const problems: string[] = [];
   if (!code(form.outcome)) problems.push("Choose an outcome.");
@@ -589,6 +597,8 @@ export function decisionFormProblems(
   if (!form.attribution) problems.push("Choose the root-cause attribution.");
   else if (form.attribution === "UNDETERMINED" && form.attributionReason.trim().length < 10)
     problems.push("Undetermined: say in at least 10 characters why the cause cannot be attributed.");
+  const cause = causeProblem(form, code(form.outcome), context.causes === true);
+  if (cause) problems.push(cause);
   if (context.supersedes) {
     const reason = textProblem(form.supersedeReason, "why this decision supersedes the current one", {
       min: SUPERSEDE_REASON_MIN,
@@ -639,6 +649,7 @@ export function decisionDraftBody(form: DecisionForm, context: SignContext) {
     residual_unknowns_acknowledged: form.acknowledged === true,
     root_cause_attribution: form.attribution || null,
     ...(form.attribution === "UNDETERMINED" ? { attribution_reason: form.attributionReason.trim() } : {}),
+    ...causeBody(form),
     ...(supersedes ? { supersedes_decision_id: supersedes, supersede_reason: form.supersedeReason.trim() } : {}),
   };
 }

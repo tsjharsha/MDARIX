@@ -8942,3 +8942,222 @@ details.uw-team-change[open] {
 .rr-used {
   margin-top: 12px;
 }
+
+/* RCA tools (RootCause.tsx): flat operational screens (G-2): lines and fills only, no gradients or glow. */
+.rca-panel .ac-note {
+  max-width: 72ch;
+}
+.rca-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: var(--ac-ink-2);
+}
+.rca-fishbone {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  gap: 10px;
+}
+.rca-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border-top: 3px solid var(--ac-teal);
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+}
+.rca-column header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.rca-column h3,
+.rca-uncategorised h3 {
+  margin: 0;
+  font-size: var(--ms-fs-14);
+}
+.rca-card-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 8px;
+}
+.rca-uncategorised {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.rca-cause {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.rca-cause header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+.rca-cause p {
+  margin: 0;
+}
+.rca-cause.is-confirmed {
+  border-left: 3px solid var(--ac-good);
+}
+.rca-cause.is-ruled-out .rca-cause-text {
+  color: var(--ac-muted);
+  text-decoration: line-through;
+}
+.rca-evidence {
+  display: flex;
+  gap: 10px;
+  font-size: var(--ms-fs-12);
+}
+.rca-for {
+  color: var(--ac-good);
+}
+.rca-against {
+  color: var(--ac-critical);
+}
+.rca-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  color: var(--ac-ink-2);
+}
+.rca-counts strong {
+  color: var(--ac-ink);
+  font-size: var(--ms-fs-16);
+}
+.rca-lines,
+.rca-versions,
+.rca-tick-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rca-line {
+  display: grid;
+  grid-template-columns: minmax(130px, auto) 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.rca-line-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.rca-version {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ac-line);
+}
+.rca-version > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.rca-version-flags {
+  justify-items: start;
+}
+.rca-whys {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.rca-whys header {
+  display: flex;
+  justify-content: space-between;
+}
+.rca-whys ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rca-why {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ac-line);
+  background: var(--ac-surface);
+}
+.rca-why.is-problem {
+  border-left-color: var(--ac-critical);
+}
+.rca-why-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.rca-why-text {
+  display: grid;
+  gap: 2px;
+}
+.rca-pareto {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.rca-pareto li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) 3fr 3ch minmax(90px, auto);
+  align-items: center;
+  gap: 10px;
+}
+.rca-pareto-bar {
+  height: 14px;
+  border-radius: 3px;
+  background: var(--ac-track);
+}
+.rca-pareto-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ac-teal);
+}
+.rca-pareto li.is-none .rca-pareto-bar span {
+  background: var(--ac-neutral);
+}
+.rca-pareto-count {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rca-pareto-cum {
+  color: var(--ac-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.rca-sign .rca-tick-list label {
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .rca-line,
+  .rca-version,
+  .rca-pareto li {
+    grid-template-columns: 1fr;
+  }
+}

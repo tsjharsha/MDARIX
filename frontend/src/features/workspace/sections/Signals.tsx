@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from "react";
-import { ResolutionTrend } from "./Dispositions";
+import { ResolutionWithCauses } from "./caseIntelligence/RootCause";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
 import { Tabs, listOf, useResource } from "../../customer-admin/shared";
@@ -71,7 +71,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
         {active === "Complaint list" && <ComplaintList />}
         {active === "Trends" && <Trends />}
         {active === "Trend check" && <TrendCheck onOpenSignal={openSignal} />}
-        {active === "By resolution" && <ResolutionTrend />}
+        {active === "By resolution" && <ResolutionWithCauses />}
         {active === "Detection rules" && <DetectionRules onOpenSignal={openSignal} />}
       </Tabs>
     </>

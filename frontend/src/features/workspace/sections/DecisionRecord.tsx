@@ -161,6 +161,15 @@ export function DecisionRecordDrawer({
                 "Recorded before root-cause attribution"}
               {safeText(decision.attribution_reason) ? `: ${decision.attribution_reason}` : ""}
             </p>
+            <h3>Confirmed root-cause category</h3>
+            <p className="uw-intel-statement">
+              {safeText(decision.root_cause_category_label) ?? "Not categorised"}
+              {Array.isArray(decision.root_cause_hypothesis_ids) && decision.root_cause_hypothesis_ids.length
+                ? ` (${decision.root_cause_hypothesis_ids.length} accepted ${
+                    decision.root_cause_hypothesis_ids.length === 1 ? "hypothesis" : "hypotheses"
+                  })`
+                : ""}
+            </p>
           </section>
           <section className="ca-drawer-section" aria-label="Signature">
             <h3>Signature</h3>
