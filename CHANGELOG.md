@@ -108,6 +108,9 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   code taken off on a follow-up is listed as "removed here; FDA keeps the earlier value"; a follow-up's changes are
   measured against the reports sent before it, never a later one; its draft PDF lays out the changes-only file it
   will send; an approved, frozen file's Download XML is never blocked by today's Settings.
+- `scripts/refresh_trial_story.py` lists "SAMPLE-RV-09's US report with its eMDR file" only when `--apply` adds it:
+  the listing now runs the same step and undoes it, so a trial made while the code lists were not loaded (no file
+  can be built) is no longer listed as owed on every run.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
