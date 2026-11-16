@@ -46,15 +46,22 @@ def _owed(db: Session, tenant_id) -> list[tuple]:
 
 
 def refresh(db: Session, tenant_id, apply: bool, now: datetime | None = None, control_db: Session | None = None) -> int:
-    """How many sample reports 0.10.96 gives an eMDR file; with ``apply`` they get it (the caller commits)."""
+    """How many sample reports 0.10.96 gives an eMDR file; with ``apply`` they get it (the caller commits). Without
+    ``apply`` the database is left as it was (control-plane sessions are only read)."""
     from backend.app.authority_reports import forms, router, worksheet
     from backend.app.db.models.foundation import SignedApprovalRecord
     from backend.app.human_decision.rules import signature_hash
     from backend.app.trial.sample_reports import US_ENTRIES, _coded, _entries, _freeze_us
 
-    owed = _owed(db, tenant_id)
     if not apply:
-        return len(owed)
+        # The count is what apply does, then undone: a report gets no file without the code lists loaded, so an owed
+        # report is not counted (the listing said "would add" on every run while apply left it as it was).
+        savepoint = db.begin_nested()
+        try:
+            return refresh(db, tenant_id, apply=True, now=now, control_db=control_db)
+        finally:
+            savepoint.rollback()
+    owed = _owed(db, tenant_id)
     control_db = control_db or db
     done = 0
     for obligation, snapshot in owed:
