@@ -8,3 +8,5 @@ f63ee455e2b39bd4e1a64bb9c9307334f5e6eab2
 a18048f12f02ff8eb60a98f579bd382c31ad369f
 # 0.10.88: Prettier on sessionEndedOnSave.test.ts
 ff9680206b504f31f0425a77f010ddc30fe6e9ee
+# ruff format of tr28_trial_market_roles.py and test_release_b_0_10_72.py (demo line)
+4e4ffaca7be3921753adcb2b14a45fd4c97d152b
