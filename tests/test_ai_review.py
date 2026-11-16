@@ -137,15 +137,96 @@ def test_a_rejected_result_is_never_used_and_reviews_are_append_only():
             db.flush()
 
 
-def test_an_observation_a_model_proposed_reaches_the_decision_brief_only_after_review():
+def _model_observations(row_id, count: int) -> tuple[uuid.UUID, list[tuple[uuid.UUID, str]]]:
+    """``count`` observations one model extraction (``row_id``) proposed on the case's evidence."""
     from backend.app.db.models.evidence_intelligence import EvidenceObservation
+
+    case_id, tenant_id = _case()
+    made = [(uuid.uuid4(), f"MODEL OBSERVATION {uuid.uuid4().hex[:8]}") for _ in range(count)]
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        evidence_id = db.execute(
+            text("SELECT id FROM evidence WHERE tenant_id = :t LIMIT 1"), {"t": tenant_id}
+        ).scalar()
+        for observation_id, statement in made:
+            db.add(
+                EvidenceObservation(
+                    id=observation_id,
+                    tenant_id=tenant_id,
+                    evidence_id=evidence_id,
+                    investigation_id=case_id,
+                    statement=statement,
+                    observation_type="EXPLICIT_SOURCE_STATEMENT",
+                    extraction_method="GENAI",
+                    ai_execution_id=row_id,
+                )
+            )
+        db.commit()
+    return case_id, made
+
+
+def _brief_facts(case_id) -> list[str]:
     from backend.app.db.models.foundation import Investigation
     from backend.app.decision_brief import compose
 
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        return [item["statement"] for item in compose.facts_section(db, db.get(Investigation, case_id), [])]
+
+
+def test_each_observation_a_model_proposed_is_reviewed_on_its_own_before_it_feeds_the_brief():
     client = authenticated_client()
     row_id = _model_result("MODEL EXTRACTION")
+    case_id, made = _model_observations(row_id, 3)
+    (accepted, accepted_text), (edited, edited_text), (rejected, rejected_text) = made
+    statements = {text_ for _, text_ in made}
+    try:
+        assert not statements & set(_brief_facts(case_id)), "an unreviewed observation never feeds the brief"
+        listed = client.get(f"/api/v1/investigations/{case_id}/intelligence/observations?page_size=200")
+        assert listed.status_code == 200, listed.text
+        mine = {item["id"]: item for item in listed.json()["items"] if item["statement"] in statements}
+        assert len(mine) == 3
+        assert {item["ai_label"] for item in mine.values()} == {"AI proposal, not reviewed"}
+        assert {item["ai_review_state"] for item in mine.values()} == {"NOT_REVIEWED"}
+        # Accepting the extraction run as a whole does not make its observations evidence.
+        assert _review(client, row_id, decision="ACCEPTED").status_code == 200
+        assert not statements & set(_brief_facts(case_id))
+        # One by one: accept one, edit one, reject one.
+        assert _review(client, accepted, decision="ACCEPTED").status_code == 200
+        person = "The person's own reading of the evidence."
+        assert (
+            _review(client, edited, decision="EDITED", edited_text=person, reason="Model overstated it").status_code
+            == 200
+        )
+        assert _review(client, rejected, decision="REJECTED", reason="Not in the source document").status_code == 200
+        facts = _brief_facts(case_id)
+        assert accepted_text in facts and person in facts
+        assert edited_text not in facts and rejected_text not in facts
+        states = {
+            item["id"]: (item["ai_review_state"], item["ai_label"])
+            for item in client.get(f"/api/v1/investigations/{case_id}/intelligence/observations?page_size=200").json()[
+                "items"
+            ]
+            if item["id"] in mine
+        }
+        assert states == {
+            str(accepted): ("ACCEPTED", None),
+            str(edited): ("EDITED", None),
+            str(rejected): ("REJECTED", None),
+        }
+        history = client.get(f"/api/v1/ai-outputs/{edited}/reviews").json()
+        assert history["state"] == "EDITED" and history["items"][0]["subject_type"] == "evidence_observation"
+    finally:
+        _review(client, row_id, decision="REJECTED", reason="Test cleanup: not this case's extraction")
+        for observation_id, _ in made:
+            _review(client, observation_id, decision="REJECTED", reason="Test cleanup: not this case's extraction")
+
+
+def test_an_observation_a_person_wrote_is_not_an_ai_output():
+    from backend.app.db.models.evidence_intelligence import EvidenceObservation
+
     case_id, tenant_id = _case()
-    statement = f"MODEL OBSERVATION {uuid.uuid4().hex[:8]}"
+    human = uuid.uuid4()
     with SessionLocal() as db:
         bind_system(db, "test")
         evidence_id = db.execute(
@@ -153,35 +234,18 @@ def test_an_observation_a_model_proposed_reaches_the_decision_brief_only_after_r
         ).scalar()
         db.add(
             EvidenceObservation(
-                id=uuid.uuid4(),
+                id=human,
                 tenant_id=tenant_id,
                 evidence_id=evidence_id,
                 investigation_id=case_id,
-                statement=statement,
+                statement="Written by the investigator.",
                 observation_type="EXPLICIT_SOURCE_STATEMENT",
-                extraction_method="GENAI",
-                ai_execution_id=row_id,
+                extraction_method="HUMAN",
             )
         )
         db.commit()
-
-    def facts():
-        with SessionLocal() as db:
-            bind_system(db, "test")
-            case = db.get(Investigation, case_id)
-            return [item["statement"] for item in compose.facts_section(db, case, [])]
-
-    try:
-        assert statement not in facts()
-        labelled = client.get(f"/api/v1/investigations/{case_id}/intelligence/observations?page_size=200")
-        assert labelled.status_code == 200, labelled.text
-        mine = [item for item in labelled.json()["items"] if item["statement"] == statement]
-        assert mine and mine[0]["ai_label"] == "AI proposal, not reviewed"
-        assert mine[0]["ai_execution_id"] == str(row_id)
-        assert _review(client, row_id, decision="ACCEPTED").status_code == 200
-        assert statement in facts()
-    finally:
-        _review(client, row_id, decision="REJECTED", reason="Test cleanup: not this case's extraction")
+    response = _review(authenticated_client(), human, decision="ACCEPTED")
+    assert response.status_code == 404 and response.json()["detail"]["code"] == "AI_OUTPUT_NOT_FOUND"
 
 
 def test_the_case_record_labels_a_model_result_until_a_person_reviews_it():

@@ -267,55 +267,87 @@ def test_an_empty_trial_chain_means_zero_calls_for_a_trial(trial, chain_on, monk
     _refused(trial, chain_on, trial["sample"], code="GENAI_OFF_FOR_FREE_TRIAL")
 
 
-def test_only_a_platform_administrator_sets_a_persons_ai_flag(trial):
-    url = f"/api/v1/platform-admin/tenants/{trial['tenant_id']}/users/{trial['user_id']}/ai-access"
-    body = {"ai_access": "INACTIVE", "reason": "Trial person asked for no AI"}
-    short = {"ai_access": "INACTIVE", "reason": "No AI pls"}  # 9 characters: TO-1 asks for at least 10
-    # The trial's own administrator is refused, on the single and the bulk endpoint.
+TRIALS = "/api/v1/platform-admin/trial-organizations"
+
+
+def _audits(tenant_id, action):
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        return (
+            db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == action)
+            .order_by(AuditEvent.created_at.desc())
+            .all()
+        )
+
+
+def test_only_a_platform_administrator_sets_a_users_ai_switch(trial):
+    url = f"{TRIALS}/{trial['tenant_id']}/users/{trial['user_id']}/ai-access"
+    bulk = f"{TRIALS}/{trial['tenant_id']}/ai-access"
+    body = {"active": False, "reason": "Trial user asked for no AI"}
+    # The trial's own administrator is refused, on the single and the bulk route.
     assert trial["client"].put(url, json=body).status_code == 403
-    bulk = f"/api/v1/platform-admin/tenants/{trial['tenant_id']}/users/ai-access"
-    assert trial["client"].put(bulk, json={**body, "user_ids": [str(trial["user_id"])]}).status_code == 403
+    assert trial["client"].put(bulk, json=body).status_code == 403
     admin = authenticated_client()
-    assert admin.put(url, json=short).status_code == 422  # reason too short
+    refusals = len(_audits(trial["tenant_id"], "TRIAL_ACTION_REFUSED"))
+    short = admin.put(url, json={"active": False, "reason": "No AI pls"})  # 9 characters: at least 10
+    assert short.status_code == 422 and short.json()["detail"]["code"] == "REASON_TOO_SHORT"
+    assert len(_audits(trial["tenant_id"], "TRIAL_ACTION_REFUSED")) == refusals + 1
     changed = admin.put(url, json=body)
     try:
         assert changed.status_code == 200, changed.text
-        assert changed.json() == {"user_id": str(trial["user_id"]), "ai_access": "INACTIVE", "changed": True}
-        with SessionLocal() as db:
-            bind_system(db, "test")
-            event = (
-                db.query(AuditEvent)
-                .filter(AuditEvent.action == "AI_USER_ACCESS_CHANGED", AuditEvent.entity_id == trial["user_id"])
-                .order_by(AuditEvent.created_at.desc())
-                .first()
-            )
-            assert event.old_values == {"ai_access": "ACTIVE"} and event.new_values == {"ai_access": "INACTIVE"}
-            assert event.reason == body["reason"] and event.actor_ref and event.created_at
-        listing = admin.get(bulk).json()
-        assert listing["organization_on"] is False and "trial_chain_on" in listing
-        listed = listing["items"]
-        assert {"user_id": str(trial["user_id"]), "ai_access": "INACTIVE"}.items() <= next(
-            item for item in listed if item["user_id"] == str(trial["user_id"])
-        ).items()
-        back = admin.put(
-            bulk, json={"ai_access": "ACTIVE", "reason": "Back on for the trial", "user_ids": [str(trial["user_id"])]}
+        assert changed.json() == {"user_id": str(trial["user_id"]), "active": False, "changed": True}
+        event = next(
+            e for e in _audits(trial["tenant_id"], "TRIAL_USER_AI_ACCESS_CHANGED") if e.entity_id == trial["user_id"]
         )
-        assert back.status_code == 200 and back.json()["items"][0]["changed"] is True
+        assert event.old_values == {"ai_access": True} and event.new_values == {"ai_access": False}
+        assert event.reason == body["reason"] and event.actor_ref and "bulk" not in event.details
+        assert admin.put(url, json=body).json()["changed"] is False  # already Inactive: nothing audited
+        listing = admin.get(f"{TRIALS}/{trial['tenant_id']}/users/ai-access").json()
+        assert listing["organization_on"] is False and "trial_chain_on" in listing
+        mine = next(item for item in listing["items"] if item["user_id"] == str(trial["user_id"]))
+        assert mine["active"] is False
+        back = admin.put(bulk, json={"active": True, "reason": "Back on for the whole trial"})
+        assert back.status_code == 200 and back.json()["changed"] >= 1 and back.json()["active"] is True
+        summary = _audits(trial["tenant_id"], "TRIAL_AI_ACCESS_BULK_CHANGED")[0]
+        assert summary.details == {"count": back.json()["changed"], "value": True}
+        assert _audits(trial["tenant_id"], "TRIAL_USER_AI_ACCESS_CHANGED")[0].details["bulk"] is True
     finally:
         _set_user(trial["user_id"], "ACTIVE")
 
 
-def test_the_person_flag_is_not_offered_for_a_paid_organization():
+def test_a_user_of_another_organization_is_refused_and_audited(trial):
+    admin = authenticated_client()
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        stranger = db.query(AuthUser).filter(AuthUser.tenant_id != trial["tenant_id"]).first()
+    refusals = len(_audits(trial["tenant_id"], "TRIAL_ACTION_REFUSED"))
+    response = admin.put(
+        f"{TRIALS}/{trial['tenant_id']}/users/{stranger.id}/ai-access",
+        json={"active": False, "reason": "Not a user of this trial"},
+    )
+    assert response.status_code == 404 and response.json()["detail"]["code"] == "USER_NOT_FOUND"
+    assert len(_audits(trial["tenant_id"], "TRIAL_ACTION_REFUSED")) == refusals + 1
+
+
+def test_the_user_switch_is_not_offered_for_a_paid_organization():
     admin = authenticated_client()
     with SessionLocal() as db:
         bind_system(db, "test")
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first()
         person = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id).first()
     response = admin.put(
+        f"{TRIALS}/{tenant.id}/users/{person.id}/ai-access",
+        json={"active": False, "reason": "Not for paid organizations"},
+    )
+    assert response.status_code == 409 and response.json()["detail"]["code"] == "AI_USER_FLAG_TRIAL_ONLY"
+    assert _audits(tenant.id, "TRIAL_ACTION_REFUSED")[0].details["code"] == "AI_USER_FLAG_TRIAL_ONLY"
+    # The old route names are gone: one name only.
+    old = admin.put(
         f"/api/v1/platform-admin/tenants/{tenant.id}/users/{person.id}/ai-access",
         json={"ai_access": "INACTIVE", "reason": "Not for paid organizations"},
     )
-    assert response.status_code == 409 and response.json()["detail"]["code"] == "AI_USER_FLAG_TRIAL_ONLY"
+    assert old.status_code in (404, 405)
 
 
 # ----------------------------------------------------------------------------------- trial and feature switch (C6)

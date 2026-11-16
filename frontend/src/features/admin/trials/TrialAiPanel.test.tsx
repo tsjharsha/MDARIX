@@ -10,16 +10,16 @@ import {
 } from "./TrialAiPanel";
 
 const PEOPLE: TrialAiPerson[] = [
-  { user_id: "u1", display_name: "Asha", ai_access: "ACTIVE" },
-  { user_id: "u2", display_name: "Ravi", ai_access: "INACTIVE" },
-  { user_id: "u3", display_name: "Meena", ai_access: "ACTIVE" },
+  { user_id: "u1", display_name: "Asha", active: true },
+  { user_id: "u2", display_name: "Ravi", active: false },
+  { user_id: "u3", display_name: "Meena", active: true },
 ];
 
 describe("TO-1 part 4: AI per person in a trial", () => {
   it("changes only the people whose switch differs", () => {
-    expect(peopleToChange(PEOPLE, "INACTIVE").map((person) => person.user_id)).toEqual(["u1", "u3"]);
-    expect(peopleToChange(PEOPLE, "ACTIVE", "u2").map((person) => person.user_id)).toEqual(["u2"]);
-    expect(peopleToChange(PEOPLE, "ACTIVE", "u1")).toEqual([]);
+    expect(peopleToChange(PEOPLE, false).map((person) => person.user_id)).toEqual(["u1", "u3"]);
+    expect(peopleToChange(PEOPLE, true, "u2").map((person) => person.user_id)).toEqual(["u2"]);
+    expect(peopleToChange(PEOPLE, true, "u1")).toEqual([]);
   });
 
   it("needs a reason of at least 10 characters", () => {
@@ -27,14 +27,14 @@ describe("TO-1 part 4: AI per person in a trial", () => {
     expect(aiAccessReasonProblem("  Asked for no AI  ")).toBeNull();
   });
 
-  it("sends one person to the single route and several to the bulk route", () => {
-    expect(aiAccessRequest("t-1", [PEOPLE[1]], "ACTIVE", " Back on for the trial ")).toEqual({
-      path: "/api/v1/platform-admin/tenants/t-1/users/u2/ai-access",
-      body: { ai_access: "ACTIVE", reason: "Back on for the trial" },
+  it("sends one user to the single route and 'set all' to the trial's bulk route (TO-1 3.6.1 names)", () => {
+    expect(aiAccessRequest("t-1", true, " Back on for the trial ", "u2")).toEqual({
+      path: "/api/v1/platform-admin/trial-organizations/t-1/users/u2/ai-access",
+      body: { active: true, reason: "Back on for the trial" },
     });
-    expect(aiAccessRequest("t-1", [PEOPLE[0], PEOPLE[2]], "INACTIVE", "Trial owner asked")).toEqual({
-      path: "/api/v1/platform-admin/tenants/t-1/users/ai-access",
-      body: { ai_access: "INACTIVE", reason: "Trial owner asked", user_ids: ["u1", "u3"] },
+    expect(aiAccessRequest("t-1", false, "Trial owner asked")).toEqual({
+      path: "/api/v1/platform-admin/trial-organizations/t-1/ai-access",
+      body: { active: false, reason: "Trial owner asked" },
     });
   });
 

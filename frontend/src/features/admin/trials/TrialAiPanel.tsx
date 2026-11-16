@@ -9,21 +9,20 @@ import "./trialAi.css";
  * Part 4 of Trial organizations (TO-1 spec 3.6.1): AI per trial and the per-person AI switch, as one self-contained
  * panel for the slot `data-slot="trial-ai"` on a trial's page (`TrialDetail.tsx`, passed to `TrialOrganizations` as
  * `trialAiPanel`). Only a Platform Administrator reaches it; the server checks that again on every change and audits
- * each one (AI_USER_ACCESS_CHANGED). A person has AI only when the trial switched AI on AND their switch is Active.
+ * each one (TRIAL_USER_AI_ACCESS_CHANGED). A person has AI only when the trial switched AI on AND their switch is Active.
  */
 
 export const AI_ACCESS_REASON_MIN = 10;
 
-export type AiAccess = "ACTIVE" | "INACTIVE";
-export type TrialAiPerson = { user_id: string; display_name: string | null; ai_access: AiAccess };
+export type TrialAiPerson = { user_id: string; display_name: string | null; active: boolean };
 export type TrialAiAccessList = { organization_on: boolean; trial_chain_on: boolean; items: TrialAiPerson[] };
 
-export const aiAccessPath = (tenantId: string) =>
-  `/api/v1/platform-admin/tenants/${encodeURIComponent(tenantId)}/users/ai-access`;
+const trialPath = (tenantId: string) => `/api/v1/platform-admin/trial-organizations/${encodeURIComponent(tenantId)}`;
+export const aiAccessPath = (tenantId: string) => `${trialPath(tenantId)}/users/ai-access`;
 
 /** The people a change to `target` would change (unchanged people are not sent, so nothing is audited for them). */
-export const peopleToChange = (people: TrialAiPerson[], target: AiAccess, only?: string) =>
-  people.filter((person) => person.ai_access !== target && (!only || person.user_id === only));
+export const peopleToChange = (people: TrialAiPerson[], target: boolean, only?: string) =>
+  people.filter((person) => person.active !== target && (!only || person.user_id === only));
 
 export function aiAccessReasonProblem(reason: string): string | null {
   return reason.trim().length >= AI_ACCESS_REASON_MIN
@@ -31,18 +30,15 @@ export function aiAccessReasonProblem(reason: string): string | null {
     : `Give a reason of at least ${AI_ACCESS_REASON_MIN} characters; it is kept in the trial's audit trail.`;
 }
 
-/** The request for a change: one person (single route) or several (bulk route). */
-export function aiAccessRequest(tenantId: string, changing: TrialAiPerson[], target: AiAccess, reason: string) {
-  const body = { ai_access: target, reason: reason.trim() };
-  return changing.length === 1
-    ? {
-        path: `/api/v1/platform-admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(changing[0].user_id)}/ai-access`,
-        body,
-      }
-    : { path: aiAccessPath(tenantId), body: { ...body, user_ids: changing.map((person) => person.user_id) } };
+/** The request for a change: one user (single route) or everyone in the trial (bulk route). */
+export function aiAccessRequest(tenantId: string, target: boolean, reason: string, only?: string) {
+  const body = { active: target, reason: reason.trim() };
+  return only
+    ? { path: `${trialPath(tenantId)}/users/${encodeURIComponent(only)}/ai-access`, body }
+    : { path: `${trialPath(tenantId)}/ai-access`, body };
 }
 
-type Pending = { target: AiAccess; only?: string };
+type Pending = { target: boolean; only?: string };
 
 export function TrialAiPanel({
   detail,
@@ -68,7 +64,7 @@ export function TrialAiPanel({
     const reasonProblem = aiAccessReasonProblem(reason);
     if (reasonProblem) return setProblem(reasonProblem);
     if (!changing.length) return setPending(null);
-    const request = aiAccessRequest(detail.tenant_id, changing, pending.target, reason);
+    const request = aiAccessRequest(detail.tenant_id, pending.target, reason, pending.only);
     setBusy(true);
     try {
       await send(request.path, "PUT", request.body);
@@ -81,7 +77,7 @@ export function TrialAiPanel({
       setBusy(false);
     }
   };
-  const word = (target: AiAccess) => (target === "ACTIVE" ? "Active" : "Inactive");
+  const word = (target: boolean) => (target ? "Active" : "Inactive");
   return (
     <>
       {/* The server's own line about AI for this trial, shown even while the people are read. */}
@@ -106,7 +102,7 @@ export function TrialAiPanel({
             type="button"
             className="ac-secondary"
             disabled={!people.length}
-            onClick={() => open({ target: "ACTIVE" })}
+            onClick={() => open({ target: true })}
           >
             Set all Active
           </button>
@@ -114,7 +110,7 @@ export function TrialAiPanel({
             type="button"
             className="ac-secondary"
             disabled={!people.length}
-            onClick={() => open({ target: "INACTIVE" })}
+            onClick={() => open({ target: false })}
           >
             Set all Inactive
           </button>
@@ -124,18 +120,16 @@ export function TrialAiPanel({
             <li key={person.user_id}>
               <span>{person.display_name || "Unnamed person"}</span>
               <ToneBadge
-                tone={person.ai_access === "ACTIVE" ? "good" : "neutral"}
-                label={`AI: ${word(person.ai_access)}`}
+                tone={person.active ? "good" : "neutral"}
+                label={`AI: ${word(person.active)}`}
               />
               <button
                 type="button"
                 className="ac-secondary"
-                aria-label={`Set ${person.display_name || "this person"} ${person.ai_access === "ACTIVE" ? "Inactive" : "Active"}`}
-                onClick={() =>
-                  open({ target: person.ai_access === "ACTIVE" ? "INACTIVE" : "ACTIVE", only: person.user_id })
-                }
+                aria-label={`Set ${person.display_name || "this person"} ${word(!person.active)}`}
+                onClick={() => open({ target: !person.active, only: person.user_id })}
               >
-                {person.ai_access === "ACTIVE" ? "Set Inactive" : "Set Active"}
+                Set {word(!person.active)}
               </button>
             </li>
           ))}

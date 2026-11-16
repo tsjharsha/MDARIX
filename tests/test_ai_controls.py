@@ -114,8 +114,11 @@ def groq(monkeypatch):
     provider_module._COOLDOWN_UNTIL.clear()
 
 
+REAUTH = "backend.app.governance_router.verify_signing_credentials"
+
+
 @pytest.fixture
-def tenant():
+def tenant(monkeypatch):
     """The synthetic tenant with AI switched on explicitly, its original policy restored afterwards.
 
     AI processing is off for new organizations (md23), so tests that need a model opt in the way an administrator
@@ -132,15 +135,18 @@ def tenant():
     from tests.support_grants import grant_support_access
 
     grant_support_access(tenant_id, areas=("CONFIGURATION",))  # the customer approved Configuration access
-    switched = authenticated_client().put(
-        f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
-        json={
-            "ai_processing_allowed": True,
-            "use_default_budget": True,
-            "acknowledgement": True,
-            "reason": "Tests switch AI on for the synthetic organization",
-        },
-    )
+    # Switching on is signature-grade (password + authenticator code); its own tests cover the check.
+    with monkeypatch.context() as signed:
+        signed.setattr(REAUTH, lambda *args, **kwargs: None)
+        switched = authenticated_client().put(
+            f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
+            json={
+                "ai_processing_allowed": True,
+                "use_default_budget": True,
+                "acknowledgement": True,
+                "reason": "Tests switch AI on for the synthetic organization",
+            },
+        )
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
     # The organization's switch for the feature these tests use (tenants.ai_features, genai/features.py).
     _set(tenant_id, ai_features={"ask": True})
@@ -320,6 +326,10 @@ def test_a_long_document_is_cut_to_the_models_limit_and_the_cut_is_reported():
 
 
 def _latest_setting_event(tenant_id):
+    return _latest_event(tenant_id, "AI_PROCESSING_SETTING_CHANGED")
+
+
+def _latest_event(tenant_id, action):
     from backend.app.db.models.foundation import AuditEvent
 
     db = SessionLocal()
@@ -327,7 +337,7 @@ def _latest_setting_event(tenant_id):
     try:
         return (
             db.query(AuditEvent)
-            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "AI_PROCESSING_SETTING_CHANGED")
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == action)
             .order_by(AuditEvent.chain_seq.desc())
             .first()
         )
@@ -416,7 +426,7 @@ def test_in_production_ai_is_switched_on_only_when_the_release_gate_is_met(tenan
     assert off.status_code == 200 and off.json()["ai_processing_allowed"] is False
 
 
-def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement():
+def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement(monkeypatch):
     platform = authenticated_client()
     code = f"AIOFF{uuid.uuid4().hex[:6].upper()}"
     created = platform.post(
@@ -433,6 +443,13 @@ def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the
     refused = platform.put(url, json=body)
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
     assert platform.put(url, json={"monthly_token_budget": 1000, "reason": "Budget only"}).status_code == 200
+    # The Platform Administrator's switch-on needs the password and an authenticator code too (owner, 16 Nov).
+    unsigned = platform.put(url, json={**body, "acknowledgement": True})
+    assert unsigned.status_code == 403 and unsigned.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
+    assert platform.get(url).json()["ai_processing_allowed"] is False
+    refusal = _latest_event(uuid.UUID(created.json()["id"]), "SIGNATURE_REAUTHENTICATION_FAILED")
+    assert refusal.details == {"attempt": "AI_PROCESSING_SWITCH_ON"}
+    monkeypatch.setattr(REAUTH, lambda *args, **kwargs: None)
     switched = platform.put(url, json={**body, "acknowledgement": True})
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True
     event = _latest_setting_event(uuid.UUID(created.json()["id"]))

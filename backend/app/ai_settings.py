@@ -24,9 +24,7 @@ itself on needs the same); only features this server
 allows (``MDARIX_AI_FEATURES``) and offers can be turned on. Each change is audited ``AI_FEATURE_SETTING_CHANGED`` with
 the feature, its intended use and its risk.
 
-Per-person AI flag for free trials (``auth_users.ai_access``): only a Platform Administrator sets it, for one person
-or many, with a reason; each change is audited ``AI_USER_ACCESS_CHANGED`` with the old and new value. New people are
-ACTIVE. It has no effect for paid organizations.
+The per-user AI switch for free trials is in ``access/platform_trials.py``.
 """
 
 from __future__ import annotations
@@ -73,16 +71,9 @@ class PlatformAiSettings(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
     acknowledgement: bool = False
     trial_acknowledgement: bool = False
-
-
-class UserAiAccess(BaseModel):
-    ai_access: str = Field(pattern="^(ACTIVE|INACTIVE)$")
-    # TO-1 spec 3.6.1: a reason of at least 10 characters.
-    reason: str = Field(min_length=10, max_length=1000)
-
-
-class BulkUserAiAccess(UserAiAccess):
-    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    # Switching AI processing on is signature-grade for the Platform Administrator too (owner, 16 Nov).
+    password: str | None = Field(default=None, max_length=256)
+    mfa_code: str | None = Field(default=None, max_length=16)
 
 
 def _models_in_use() -> list[dict]:
@@ -347,7 +338,11 @@ def get_platform_ai_settings(tenant_id: uuid.UUID, request: Request, db: Session
 
 @router.put("/platform-admin/tenants/{tenant_id}/ai-settings")
 def update_platform_ai_settings(
-    tenant_id: uuid.UUID, payload: PlatformAiSettings, request: Request, db: Session = Depends(get_db)
+    tenant_id: uuid.UUID,
+    payload: PlatformAiSettings,
+    request: Request,
+    db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     platform_admin = _require_platform_admin(request, db)
     tenant = db.get(Tenant, tenant_id)
@@ -367,6 +362,9 @@ def update_platform_ai_settings(
     _require_acknowledgement(switching_on, payload.acknowledgement)
     if not trial:
         require_release_gate(switching_on)
+    if switching_on:
+        _require_reauthentication(db, ctx, request, payload, tenant.id, "AI_PROCESSING_SWITCH_ON")
+        tenant = db.get(Tenant, tenant_id)
     if payload.ai_processing_allowed is not None:
         tenant.ai_processing_allowed = payload.ai_processing_allowed
     if payload.use_default_budget:
@@ -400,113 +398,6 @@ def update_platform_ai_settings(
     )
     db.commit()
     return _settings(db, tenant_id)
-
-
-# ------------------------------------------------------------------------------------- per-person AI flag (trials)
-
-
-def _trial_tenant_for_platform(db: Session, tenant_id: uuid.UUID) -> Tenant:
-    tenant = db.get(Tenant, tenant_id)
-    if tenant is None:
-        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
-    if not governance.is_free_trial(db, tenant_id):
-        # The flag is for free trials only; for a paid organization it has no effect, so it is not offered.
-        raise HTTPException(
-            409,
-            detail={
-                "code": "AI_USER_FLAG_TRIAL_ONLY",
-                "message": "The per-person AI flag applies to free trials only.",
-            },
-        )
-    return tenant
-
-
-def _set_user_ai_access(
-    db: Session, platform_admin, tenant_id: uuid.UUID, user_ids, value: str, reason: str, request: Request
-) -> list[dict]:
-    from backend.app.db.models.foundation import AuthUser
-
-    wanted = list(dict.fromkeys(user_ids))
-    people = {
-        row.id: row for row in db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.id.in_(wanted)).all()
-    }
-    missing = [str(item) for item in wanted if item not in people]
-    if missing:
-        raise HTTPException(
-            404, detail={"code": "USER_NOT_FOUND", "message": "One or more people are not in this organization"}
-        )
-    now = datetime.now(timezone.utc)
-    changed = []
-    for user_id in wanted:
-        person = people[user_id]
-        before = person.ai_access or governance.USER_AI_ACTIVE
-        if before == value:
-            changed.append({"user_id": str(user_id), "ai_access": value, "changed": False})
-            continue
-        person.ai_access = value
-        person.updated_at = now
-        db.add(
-            make_audit_event(
-                tenant_id=tenant_id,
-                actor_ref=str(platform_admin.id),
-                action="AI_USER_ACCESS_CHANGED",
-                entity_type="AuthUser",
-                entity_id=user_id,
-                details={"source": "PLATFORM_ADMIN", "user_id": str(user_id)},
-                request=request,
-                reason=reason,
-                old_values={"ai_access": before},
-                new_values={"ai_access": value},
-                created_at=now,
-            )
-        )
-        changed.append({"user_id": str(user_id), "ai_access": value, "changed": True})
-    db.commit()
-    return changed
-
-
-@router.get("/platform-admin/tenants/{tenant_id}/users/ai-access")
-def list_user_ai_access(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    """Each person of a free trial with their own AI flag (Platform Administrator only)."""
-    from backend.app.db.models.foundation import AuthUser
-
-    from genai.provider import trial_chain_names
-
-    _require_platform_admin(request, db)
-    tenant = _trial_tenant_for_platform(db, tenant_id)
-    rows = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).order_by(AuthUser.display_name).all()
-    return {
-        # Both must agree (TO-1 3.6.1): while the trial has not switched AI on, no person has AI.
-        "organization_on": bool(tenant.ai_processing_allowed),
-        "trial_chain_on": bool(trial_chain_names()),
-        "items": [
-            {"user_id": str(row.id), "display_name": row.display_name, "ai_access": row.ai_access} for row in rows
-        ],
-    }
-
-
-@router.put("/platform-admin/tenants/{tenant_id}/users/{user_id}/ai-access")
-def set_user_ai_access(
-    tenant_id: uuid.UUID, user_id: uuid.UUID, payload: UserAiAccess, request: Request, db: Session = Depends(get_db)
-):
-    """Set one person's AI flag in a free trial (Platform Administrator only; audited with the reason)."""
-    platform_admin = _require_platform_admin(request, db)
-    _trial_tenant_for_platform(db, tenant_id)
-    changed = _set_user_ai_access(db, platform_admin, tenant_id, [user_id], payload.ai_access, payload.reason, request)
-    return changed[0]
-
-
-@router.put("/platform-admin/tenants/{tenant_id}/users/ai-access")
-def set_users_ai_access(
-    tenant_id: uuid.UUID, payload: BulkUserAiAccess, request: Request, db: Session = Depends(get_db)
-):
-    """Set many people's AI flag in a free trial at once (Platform Administrator only; one audit event each)."""
-    platform_admin = _require_platform_admin(request, db)
-    _trial_tenant_for_platform(db, tenant_id)
-    changed = _set_user_ai_access(
-        db, platform_admin, tenant_id, payload.user_ids, payload.ai_access, payload.reason, request
-    )
-    return {"items": changed}
 
 
 # ------------------------------------------------------------------------------------------------- AI status

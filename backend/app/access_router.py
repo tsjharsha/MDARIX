@@ -23,6 +23,7 @@ from backend.app.access import (
     platform_reference_data,
     platform_subscriptions,
     platform_tenants,
+    platform_trials,
     session,
     tenant_settings,
 )
@@ -38,6 +39,7 @@ for _module in (
     platform_customers,
     platform_onboarding,
     platform_tenants,
+    platform_trials,
     platform_customer_admins,
     platform_customer_accounts,
     platform_accounts,

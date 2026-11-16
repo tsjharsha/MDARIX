@@ -106,9 +106,9 @@ export function ObservationsView({
                   originLabel={row.origin_label}
                 />
                 <span>{safeText(row.statement) ?? "—"}</span>
-                {row.ai_label && row.ai_execution_id ? (
+                {row.ai_label ? (
                   <AiReviewActions
-                    outputId={row.ai_execution_id}
+                    outputId={row.id}
                     text={row.statement}
                     disabled={!canReview}
                     onReviewed={() => observations.reload()}

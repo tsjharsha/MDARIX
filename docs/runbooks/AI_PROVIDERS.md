@@ -206,8 +206,10 @@ then restart the API. `tests/test_ai_r_zero_calls.py` proves each level gives ze
   record (`source_system = MDARIX_SAMPLE`, text still matching the sample). Typed text (the Ask question) is capped
   at 300 characters. No request may write the sample marker (422).
 - The trial's owner switches AI on with a second acknowledgement (sample data only, free AI services, possibly
-  outside India); a Platform Administrator sets each person's flag (`PUT /api/v1/platform-admin/tenants/{id}/users/
-  {user_id}/ai-access`, or `.../users/ai-access` for many), with a reason; audited.
+  outside India); a Platform Administrator sets each user's switch (`PUT /api/v1/platform-admin/trial-organizations/{id}/
+  users/{user_id}/ai-access`, or `.../trial-organizations/{id}/ai-access` for everyone; body `{active, reason}`),
+  audited `TRIAL_USER_AI_ACCESS_CHANGED`; switching AI on (trial owner or Platform Administrator) needs the password
+  and an authenticator code.
 - Owner items before any trial sees AI: provider terms checked and recorded in the register; the trial agreement,
   terms, privacy policy and sub-processor list updated (they promise AI off in trials today); the production pause
   lifted for installing FreeLLMAPI beside MDARIX (loopback only, pinned version).
