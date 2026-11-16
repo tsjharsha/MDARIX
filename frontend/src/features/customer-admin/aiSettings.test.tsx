@@ -1,6 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "./aiSettings";
+import {
+  MASKING_SUMMARY,
+  aiAcknowledgement,
+  aiFeaturePayload,
+  aiSettingsPayload,
+  featureLock,
+  providerLabel,
+} from "./aiSettings";
+import { AiFeatures } from "./sections/Security";
 import { ConfirmDialog } from "./shared";
 
 describe("AI processing switch", () => {
@@ -50,5 +58,64 @@ describe("AI processing switch", () => {
     expect(html).toContain('type="checkbox"');
     expect(html).toContain("will be sent to Anthropic");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Turn AI on<\/button>/);
+  });
+});
+
+describe("re-authentication and per-feature switches (C6, C12)", () => {
+  it("sends the password and authenticator code when a customer administrator turns AI on", () => {
+    expect(aiSettingsPayload(true, "Pilot needs AI now", true, { password: "pw", mfaCode: " 123456 " })).toEqual({
+      ai_processing_allowed: true,
+      reason: "Pilot needs AI now",
+      acknowledgement: true,
+      password: "pw",
+      mfa_code: "123456",
+    });
+    expect(aiSettingsPayload(true, "Trial tries AI", true, { password: "pw", mfaCode: "" }, true)).toMatchObject({
+      trial_acknowledgement: true,
+    });
+    expect(aiSettingsPayload(false, "Pilot paused AI", false, { password: "pw", mfaCode: "1" })).toEqual({
+      ai_processing_allowed: false,
+      reason: "Pilot paused AI",
+    });
+  });
+
+  it("turns one feature on with the proof, off without it, and keeps AI processing as it is", () => {
+    expect(aiFeaturePayload(true, "ask", true, "Turn on Ask", { password: "pw", mfaCode: "1" })).toEqual({
+      ai_processing_allowed: true,
+      reason: "Turn on Ask",
+      features: { ask: true },
+      password: "pw",
+      mfa_code: "1",
+    });
+    expect(aiFeaturePayload(false, "ask", false, "Turn off Ask")).toEqual({
+      ai_processing_allowed: false,
+      reason: "Turn off Ask",
+      features: { ask: false },
+    });
+    expect(() => aiFeaturePayload(true, "ask", true, "Turn on Ask")).toThrow(/password/);
+  });
+
+  it("locks a feature the service does not offer or allow, and shows it off", () => {
+    const base = { key: "x", label: "X", intended_use: "u", never: "n", risk: "LOW" as const, enabled: false };
+    expect(featureLock({ ...base, offered: false, platform_allowed: false })).toBe("Not offered");
+    expect(featureLock({ ...base, offered: true, platform_allowed: false })).toBe("Not available on this service");
+    expect(featureLock({ ...base, offered: true, platform_allowed: true })).toBeNull();
+    const html = renderToStaticMarkup(
+      <AiFeatures
+        features={[
+          {
+            ...base,
+            key: "regulatory_drafting",
+            label: "Regulatory drafting",
+            offered: false,
+            platform_allowed: false,
+          },
+          { ...base, key: "ask", label: "Ask MDARIX", offered: true, platform_allowed: true },
+        ]}
+        onSwitch={() => undefined}
+      />,
+    );
+    expect(html).toContain("Off · Not offered");
+    expect(html).toContain("Off · turn on");
   });
 });

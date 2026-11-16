@@ -1,0 +1,19 @@
+/* TO-1 part 4: the per-person AI switches on a trial's page. Flat (G-2). */
+.to-ai-people {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.to-ai-people li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ms-line-control);
+}
+.to-ai-people li > span:first-child {
+  flex: 1 1 12rem;
+}

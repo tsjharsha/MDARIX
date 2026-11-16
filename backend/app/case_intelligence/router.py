@@ -1746,6 +1746,8 @@ def _observation_view(
         else None,
         "created_at": _iso(row.created_at),
         "ai_review_state": "NOT_REVIEWED" if not_reviewed else None,
+        # The output a person accepts, edits or rejects (POST /api/v1/ai-outputs/{id}/review).
+        "ai_execution_id": str(row.ai_execution_id) if row.ai_execution_id else None,
         "ai_label": UNREVIEWED_LABEL if not_reviewed else None,
     }
 

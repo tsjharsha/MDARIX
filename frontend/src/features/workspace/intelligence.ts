@@ -838,6 +838,9 @@ export type Observation = {
   quality_status?: string | null;
   limitations?: unknown;
   created_at?: string | null;
+  /** "AI proposal, not reviewed" while nobody accepted or edited the model's extraction, with its output id. */
+  ai_label?: string | null;
+  ai_execution_id?: string | null;
 };
 
 export type ObservationFilter = { kind: string; origin: string };

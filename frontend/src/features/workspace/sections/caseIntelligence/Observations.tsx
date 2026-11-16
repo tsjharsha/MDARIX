@@ -6,6 +6,7 @@ import { titleCase } from "../../../admin/console/dashboardModel";
 import { Drawer, Table, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { StatementKind } from "../../../shared/StatementKind";
+import { AiReviewActions } from "../../../shared/AiReview";
 import { STATEMENT_KIND, statementOriginLabel } from "../../../shared/epistemic";
 import { useCan, usePanelFlag } from "../../workspaceContext";
 import {
@@ -38,6 +39,7 @@ export function ObservationsView({
   readOnly: boolean;
 }) {
   const canWork = useCan("investigation.work") && !readOnly;
+  const canReview = useCan("ai.run") && !readOnly;
   const observations = useResource<{ items?: Observation[] | null }>(intelligencePath(investigationId, "observations"));
   const [filter, setFilter] = useState<ObservationFilter>(EMPTY_OBSERVATION_FILTER);
   const [recording, setRecording] = usePanelFlag("record-observation");
@@ -104,6 +106,14 @@ export function ObservationsView({
                   originLabel={row.origin_label}
                 />
                 <span>{safeText(row.statement) ?? "—"}</span>
+                {row.ai_label && row.ai_execution_id ? (
+                  <AiReviewActions
+                    outputId={row.ai_execution_id}
+                    text={row.statement}
+                    disabled={!canReview}
+                    onReviewed={() => observations.reload()}
+                  />
+                ) : null}
               </span>
             ),
           },

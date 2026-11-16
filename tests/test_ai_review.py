@@ -177,6 +177,7 @@ def test_an_observation_a_model_proposed_reaches_the_decision_brief_only_after_r
         assert labelled.status_code == 200, labelled.text
         mine = [item for item in labelled.json()["items"] if item["statement"] == statement]
         assert mine and mine[0]["ai_label"] == "AI proposal, not reviewed"
+        assert mine[0]["ai_execution_id"] == str(row_id)
         assert _review(client, row_id, decision="ACCEPTED").status_code == 200
         assert statement in facts()
     finally:
