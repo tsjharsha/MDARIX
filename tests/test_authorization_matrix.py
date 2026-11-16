@@ -127,6 +127,9 @@ ADMIN_ROUTES_FOR = {
     "/api/v1/admin/support-access": set(),
     "/api/v1/admin/support-access/{grant_id}/activity": set(),
 }  # a long real-pipeline run; tenant scope in test_evaluation_router.py
+# Customer administration that a free trial's owner also runs (AI-R decision T5: the trial admin switches trial AI on,
+# acknowledged and audited; ai_settings._settings_admin). Nobody else without an administrator role.
+TRIAL_OWNER_ADMIN_ROUTES = {"/api/v1/admin/ai-settings"}
 
 _WORK = {RECORDS_WRITE, AI_RUN, DATA_EXPORT}
 _EVIDENCE = {EVIDENCE_REVIEW, EVIDENCE_REQUEST}
@@ -626,6 +629,8 @@ def test_administration_opens_only_to_its_administrators(world, actor):
         allowed = platform_admin if platform else customer_admin
         if path in ADMIN_ROUTES_FOR:
             allowed = bool(roles & ADMIN_ROUTES_FOR[path])
+        if path in TRIAL_OWNER_ADMIN_ROUTES and actor == "owner":
+            allowed = True
         if allowed and method != "GET":
             continue  # positive checks read only: an administrator's write would change the shared fixtures
         rows.append((method, path, route, allowed))

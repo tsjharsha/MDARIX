@@ -51,6 +51,10 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/triage/{kind}/{record_id}/confirm-qms"),
     ("POST", "/api/v1/triage/{kind}/{record_id}/exclude-threat"),
     ("POST", "/api/v1/triage/{kind}/{record_id}/record"),
+    # AI-R C6: switching AI (or an AI feature) on asks for the password and authenticator code again; a refusal keeps
+    # the AI settings form (test_ai_trial_gate.py, test_ai_controls.py).
+    ("PUT", "/api/v1/admin/ai-settings"),
+    ("PUT", "/api/v1/platform-admin/tenants/{tenant_id}/ai-settings"),
 }
 
 
