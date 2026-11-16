@@ -325,6 +325,9 @@ def test_a_trial_admin_switches_ai_on_only_with_the_trial_acknowledgement(trial,
     monkeypatch.setenv("MDARIX_AI_TRIAL_CHAIN", "freellmapi")
     missing = client.put("/api/v1/admin/ai-settings", json=body)
     assert missing.status_code == 422 and missing.json()["detail"]["code"] == "AI_TRIAL_ACKNOWLEDGEMENT_REQUIRED"
+    unsigned = client.put("/api/v1/admin/ai-settings", json={**body, "trial_acknowledgement": True})
+    assert unsigned.status_code == 403  # switching on needs the password and authenticator code (C6)
+    monkeypatch.setattr("backend.app.governance_router.verify_signing_credentials", lambda *args, **kwargs: None)
     try:
         switched = client.put("/api/v1/admin/ai-settings", json={**body, "trial_acknowledgement": True})
         assert switched.status_code == 200, switched.text

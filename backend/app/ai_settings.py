@@ -19,7 +19,8 @@ with a second acknowledgement (``trial_acknowledgement``: sample data only, free
 owner decisions AI-D14a, T5, T7); its requests still carry sample data only (``genai/sample_gate.py``).
 
 Per-feature switches (``features``, ``tenants.ai_features``): a customer administrator turns a feature on with a
-reason and a fresh re-authentication (password and authenticator code, as for a signature); only features this server
+reason and a fresh re-authentication (password and authenticator code, as for a signature; switching AI processing
+itself on needs the same); only features this server
 allows (``MDARIX_AI_FEATURES``) and offers can be turned on. Each change is audited ``AI_FEATURE_SETTING_CHANGED`` with
 the feature, its intended use and its risk.
 
@@ -210,7 +211,7 @@ def _feature_changes(tenant: Tenant, features: dict[str, bool] | None) -> dict[s
     return changes
 
 
-def _require_reauthentication(db: Session, ctx, request: Request, payload, tenant_id) -> None:
+def _require_reauthentication(db: Session, ctx, request: Request, payload, tenant_id, attempt: str) -> None:
     """Turning AI or a feature on is signature-grade: the current password and an authenticator code."""
     from backend.app.governance_router import verify_signing_credentials
 
@@ -222,7 +223,7 @@ def _require_reauthentication(db: Session, ctx, request: Request, payload, tenan
                 action=action,
                 entity_type="Tenant",
                 entity_id=tenant_id,
-                details={"attempt": "AI_FEATURE_SWITCH_ON"},
+                details={"attempt": attempt},
                 request=request,
             )
         )
@@ -300,8 +301,9 @@ def update_customer_ai_settings(
         # The release gate is about the paid provider; trial AI is never qualified (decision T4).
         require_release_gate(switching_on)
     changes = _feature_changes(tenant, payload.features)
-    if any(after for _, after in changes.values()):
-        _require_reauthentication(db, ctx, request, payload, tenant.id)
+    if switching_on or any(after for _, after in changes.values()):
+        attempt = "AI_PROCESSING_SWITCH_ON" if switching_on else "AI_FEATURE_SWITCH_ON"
+        _require_reauthentication(db, ctx, request, payload, tenant.id, attempt)
         tenant = db.get(Tenant, admin.tenant_id)
     _apply_features(db, tenant, changes, str(admin.id), request, payload.reason)
     before = {"ai_processing_allowed": tenant.ai_processing_allowed}

@@ -355,7 +355,12 @@ def test_a_customer_administrator_switches_ai_off_for_their_organization_with_a_
     assert "acknowledgement" not in (event.details or {})  # switching off needs no acknowledgement
 
 
-def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
+def signed_off(monkeypatch) -> None:
+    """The signature-grade check passes (its own tests cover the password and the code)."""
+    monkeypatch.setattr("backend.app.governance_router.verify_signing_credentials", lambda *args, **kwargs: None)
+
+
+def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant, monkeypatch):
     from tests.test_business_permissions import _client_with_role
 
     _set(tenant, ai_processing_allowed=False)
@@ -364,6 +369,10 @@ def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
     refused = admin.put("/api/v1/admin/ai-settings", json=body)
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
     assert _usage(tenant)["ai_processing_allowed"] is False
+    # Switching on is signature-grade: refused without the password and authenticator code (C6).
+    unsigned = admin.put("/api/v1/admin/ai-settings", json={**body, "acknowledgement": True})
+    assert unsigned.status_code == 403 and _usage(tenant)["ai_processing_allowed"] is False
+    signed_off(monkeypatch)
     switched = admin.put("/api/v1/admin/ai-settings", json={**body, "acknowledgement": True})
     assert switched.status_code == 200, switched.text
     answer = switched.json()
@@ -398,6 +407,7 @@ def test_in_production_ai_is_switched_on_only_when_the_release_gate_is_met(tenan
 
     ready = {"ready": True, "met": 4, "total": 4, "enforced": True, "bars": [], "message": "ready"}
     monkeypatch.setattr(ai_release_gate, "status", lambda models=None, files=None: ready)
+    signed_off(monkeypatch)
     switched = admin.put("/api/v1/admin/ai-settings", json=body)
     assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
     # Switching off is never gated.
