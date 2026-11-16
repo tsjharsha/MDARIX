@@ -524,12 +524,32 @@ function TriageDrawer({
               <CheckCircle2 size={15} aria-hidden="true" /> Triage record
               {record.version ? ` · version ${record.version}` : ""}
             </h3>
-            <p>
-              Harm now {record.severity_label ?? label(record.severity) ?? "—"}
-              {record.potential_severity ? ` · if it happened again ${label(record.potential_severity)}` : ""} · event
-              owner {record.event_owner_name} · triage owner {record.triage_owner_name}
-              {record.backup_owner_name ? ` · backup ${record.backup_owner_name}` : ""}
-            </p>
+            <dl className="uw-tr-fields">
+              <div>
+                <dt>Harm now</dt>
+                <dd>{record.severity_label ?? label(record.severity) ?? "—"}</dd>
+              </div>
+              {record.potential_severity && (
+                <div>
+                  <dt>If it happened again</dt>
+                  <dd>{label(record.potential_severity)}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Event owner</dt>
+                <dd>{record.event_owner_name}</dd>
+              </div>
+              <div>
+                <dt>Triage owner</dt>
+                <dd>{record.triage_owner_name}</dd>
+              </div>
+              {record.backup_owner_name && (
+                <div>
+                  <dt>Backup</dt>
+                  <dd>{record.backup_owner_name}</dd>
+                </div>
+              )}
+            </dl>
             <p>
               {record.containment?.choices?.length
                 ? `${record.containment.choices.map((code) => CONTAINMENT.find((c) => c.code === code)?.label ?? code).join(", ")}: `

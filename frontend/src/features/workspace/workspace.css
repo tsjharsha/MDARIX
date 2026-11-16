@@ -9222,3 +9222,19 @@ details.uw-team-change[open] {
     animation: ac-rise 180ms ease-out both;
   }
 }
+
+/* Triage record: each fact on its own line (harm, if it happened again, owners). */
+.uw-tr-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: 10px 20px;
+  margin: 0;
+}
+.uw-tr-fields dt {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+}
+.uw-tr-fields dd {
+  margin: 0;
+}
