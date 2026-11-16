@@ -411,7 +411,7 @@
   font-family: var(--ms-font-display);
   font-size: var(--ms-fs-34);
   font-stretch: 112%;
-  font-weight: 760;
+  font-weight: var(--ms-fw-display);
   line-height: 1.08;
   letter-spacing: -0.015em;
 }

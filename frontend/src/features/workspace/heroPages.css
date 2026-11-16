@@ -41,13 +41,13 @@
   min-height: 40px;
   height: auto;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: var(--ms-radius-md);
   font-weight: var(--ms-fw-semibold);
 }
 .uw-hybrid .ac-main .ac-primary {
   border-color: var(--ms-teal);
   background: var(--ms-teal);
-  box-shadow: 0 6px 16px -8px rgb(8 118 128 / 60%);
+  box-shadow: none;
 }
 .uw-hybrid .ac-main .ac-primary:hover {
   filter: brightness(1.07);
@@ -106,14 +106,6 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 30% 20%, rgb(63 224 214 / 35%), transparent 60%),
-    linear-gradient(150deg, var(--ms-hero-2), var(--ms-hero));
-  box-shadow: var(--ms-shadow-hero);
-  color: var(--ms-glow);
 }
 
 /* ---------- Clock pills, cells and the glance (the complaint list and Home) ---------- */
@@ -709,7 +701,7 @@
   background: var(--ms-line);
 }
 .uw-hybrid .uw-wt-bar > i.is-on {
-  background: linear-gradient(90deg, var(--ms-teal-mark), color-mix(in srgb, var(--ms-teal-mark) 70%, var(--ms-glow)));
+  background: var(--ms-teal-mark);
 }
 .uw-hybrid .uw-wt-bar > i.is-cur {
   background: var(--ms-mint);
@@ -1386,7 +1378,7 @@
   height: 96px;
   padding: 26px;
   border-radius: 20px;
-  background: linear-gradient(150deg, var(--ms-mint), transparent);
+  background: var(--ms-mint);
   color: var(--ms-teal);
 }
 .uw-hybrid .uw-gs-card > :not(svg:first-child) {
@@ -1751,7 +1743,7 @@
   width: 64px;
   height: 64px;
   border-radius: 18px;
-  background: radial-gradient(circle at 30% 25%, var(--ms-surface), var(--ms-mint) 70%);
+  background: var(--ms-mint);
   box-shadow: inset 0 0 0 1px var(--ms-mint-line);
   color: var(--ms-teal);
 }
@@ -1836,7 +1828,7 @@
 .uw-hybrid .hx-glance {
   padding: 16px 18px;
   border-color: var(--ms-line);
-  background: linear-gradient(100deg, var(--ms-surface), var(--ms-subtle));
+  background: var(--ms-surface);
 }
 .uw-hybrid .hx-segbar {
   height: 16px;
@@ -1973,7 +1965,7 @@
   display: grid;
   gap: 10px;
   border-color: color-mix(in srgb, var(--ms-teal-mark) 50%, var(--ms-line));
-  background: linear-gradient(160deg, var(--ms-mint), var(--ms-surface) 55%);
+  background: var(--ms-mint);
 }
 .uw-hybrid .uw-rail-next > h2 {
   color: var(--ms-teal);

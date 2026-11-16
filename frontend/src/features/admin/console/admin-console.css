@@ -283,8 +283,12 @@
 }
 .ac-page-head h1 {
   margin-top: 2px;
-  font-size: var(--ms-fs-24);
-  font-weight: 700;
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-34);
+  font-stretch: 112%;
+  font-weight: var(--ms-fw-display);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
   color: var(--ac-navy);
 }
 .ac-page-head p:not(.ac-eyebrow) {
@@ -1366,7 +1370,7 @@ th.num .table-sort {
   overflow: hidden;
   border: 1px solid var(--ac-line);
   border-radius: var(--ac-radius);
-  background: linear-gradient(180deg, var(--ac-surface) 0%, var(--ac-surface) 55%, var(--ac-page) 100%);
+  background: var(--ac-surface);
   color: var(--ac-ink);
   text-align: left;
   transition:

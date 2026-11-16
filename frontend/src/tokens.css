@@ -114,6 +114,8 @@
   --ms-fw-regular: 400;
   --ms-fw-semibold: 600;
   --ms-fw-bold: 700;
+  /* Page titles in the display face (design rule R1). */
+  --ms-fw-display: 760;
 
   /* Spacing, 4 to 48. */
   --ms-space-1: 4px;
