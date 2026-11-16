@@ -65,7 +65,7 @@
   font-family: var(--ms-font-display);
   font-size: var(--ms-fs-20);
   font-stretch: 125%;
-  font-weight: 800;
+  font-weight: var(--ms-fw-display);
   letter-spacing: 0.03em;
   color: var(--ms-white);
 }
