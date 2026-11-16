@@ -462,15 +462,6 @@ export function SignupForm() {
             options={DEVICE_CLASSES}
             onChange={answer("deviceClass")}
           />
-          <label className="auth-field su-wide">
-            Devices you make
-            <input
-              maxLength={200}
-              placeholder="For example: infusion pumps, patient monitors"
-              value={profile.deviceTypes}
-              onChange={(e) => answer("deviceTypes")(e.target.value)}
-            />
-          </label>
           <div className="auth-field su-wide" role="group" aria-labelledby="su-markets">
             <span id="su-markets">Markets you sell in</span>
             <div className="auth-checks">
@@ -486,36 +477,50 @@ export function SignupForm() {
               ))}
             </div>
           </div>
-          <Choice
-            label="Where complaints are handled today"
-            value={profile.complaintSystem}
-            options={COMPLAINT_SYSTEMS}
-            onChange={answer("complaintSystem")}
-          />
-          <Choice
-            label="Complaints received"
-            value={profile.complaintVolume}
-            options={COMPLAINT_VOLUMES}
-            onChange={answer("complaintVolume")}
-          />
-          <div className="su-wide">
-            <Choice
-              label="Data you plan to use in the trial"
-              value={profile.trialData}
-              options={TRIAL_DATA}
-              onChange={answer("trialData")}
-            />
-          </div>
-          <label className="auth-field su-wide">
-            What would you like to evaluate?
-            <textarea
-              rows={3}
-              maxLength={1000}
-              placeholder="For example: faster complaint trending, CAPA effectiveness evidence"
-              value={profile.evaluationGoal}
-              onChange={(e) => answer("evaluationGoal")(e.target.value)}
-            />
-          </label>
+          <details className="su-more su-wide">
+            <summary>Tell us more (optional)</summary>
+            <div className="su-fields">
+              <label className="auth-field su-wide">
+                Devices you make
+                <input
+                  maxLength={200}
+                  placeholder="For example: infusion pumps, patient monitors"
+                  value={profile.deviceTypes}
+                  onChange={(e) => answer("deviceTypes")(e.target.value)}
+                />
+              </label>
+              <Choice
+                label="Where complaints are handled today"
+                value={profile.complaintSystem}
+                options={COMPLAINT_SYSTEMS}
+                onChange={answer("complaintSystem")}
+              />
+              <Choice
+                label="Complaints received"
+                value={profile.complaintVolume}
+                options={COMPLAINT_VOLUMES}
+                onChange={answer("complaintVolume")}
+              />
+              <div className="su-wide">
+                <Choice
+                  label="Data you plan to use in the trial"
+                  value={profile.trialData}
+                  options={TRIAL_DATA}
+                  onChange={answer("trialData")}
+                />
+              </div>
+              <label className="auth-field su-wide">
+                What would you like to evaluate?
+                <textarea
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="For example: faster complaint trending, CAPA effectiveness evidence"
+                  value={profile.evaluationGoal}
+                  onChange={(e) => answer("evaluationGoal")(e.target.value)}
+                />
+              </label>
+            </div>
+          </details>
           <label className="auth-check auth-check-required su-wide su-confirm">
             <input
               type="checkbox"

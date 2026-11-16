@@ -10785,6 +10785,15 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--auth-teal);
   font-weight: 600;
 }
+/* Step 2's optional questions wait behind one fold, so the form does not look like paperwork on first sight. */
+.su-more > summary {
+  cursor: pointer;
+  color: var(--auth-teal);
+  font-weight: 600;
+}
+.su-more[open] > summary {
+  margin-bottom: 12px;
+}
 /* The trial's four facts as chips, read in one glance before the form. */
 .su-facts {
   display: flex;
