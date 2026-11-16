@@ -5,7 +5,9 @@ Before 0.10.64 a new trial's bell held 12 alerts (ten triage targets due within 
 already done what the story does not need open:
 
 - **Triage:** every flagged sample record has a finished triage record, except the urgent intake SAMPLE-URG-01 and
-  the flagship SAMPLE-RV-11 (the story's two triage steps).
+  the flagship SAMPLE-RV-11 (the story's two triage steps). The nine it finishes carry the sample author's severity
+  (T-M13, ``SAMPLE_TRIAGE_SEVERITY``, confirmed by the owner on 14 Nov 2026); scripts/cases_0_10_93.py gives a trial
+  created before that the same severities where none is set.
 - **Tasks:** the first-contact tasks the sample author left (SAMPLE-CALL-02's QMS complaint never linked, the
   follow-ups) are due two working days from the story's day, never overdue on day 0. The overdue reply on SAMPLE-RV-08
   stays: it is the story's escalation, and it goes to the trial owner (oversight/service.py).
@@ -31,6 +33,21 @@ logger = logging.getLogger("mdarix.trial.sample_calm")
 # on it would pass to RV-11 when it is attached (T-D8) and tick the story's triage step for the person.
 STORY_TRIAGE = ("SAMPLE-URG-01", FLAGSHIP, "SAMPLE-CASE-11")
 CLOSED_EVENT = "SAMPLE-RV-09"
+# T-M13 (owner, 14 Nov 2026): the severity the sample author gives each sample triage record it finishes. Where the
+# quality system gave a severity the level matches it, so a market assessment's harm level (pre-filled from the QMS
+# severity, else from the triage record) reads the same; "Not known yet" pre-fills nothing. SAMPLE-RT-05 is Serious
+# like SAMPLE-CALL-02, the same occurrence.
+SAMPLE_TRIAGE_SEVERITY = {
+    "SAMPLE-RV-01": "CRITICAL",
+    "SAMPLE-RV-02": "NOT_KNOWN",
+    "SAMPLE-RV-06": "CRITICAL",
+    "SAMPLE-RV-07": "NEGLIGIBLE",
+    "SAMPLE-RV-08": "NOT_KNOWN",
+    "SAMPLE-RV-10": "SERIOUS",
+    "SAMPLE-RT-05": "SERIOUS",
+    "SAMPLE-CALL-03": "NOT_KNOWN",
+    "SAMPLE-RJ-02": "SERIOUS",
+}
 TASK_DAYS = 2
 
 
@@ -112,6 +129,7 @@ def _finish_triage(db: Session, tenant_id, now: datetime) -> int:
         record.no_action_reason = record.no_action_reason or (
             "Sample: triaged by the MDARIX sample author; no immediate action needed beyond the complaint's own steps."
         )
+        record.severity = record.severity or SAMPLE_TRIAGE_SEVERITY.get(name)
         record.completed_by, record.completed_at, record.updated_at = author, now, now
         # 0.10.93 (B2 spec 9.2): a finished sample triage is fast-track and keeps its first version, as the upgrade
         # gives the triage of a trial created before it (scripts/cases_0_10_93.py lists nothing for a new trial).
@@ -123,6 +141,35 @@ def _finish_triage(db: Session, tenant_id, now: datetime) -> int:
         done += 1
     db.flush()
     return done
+
+
+def triage_record_names(db: Session, tenant_id, records) -> dict:
+    """Each triage record's id -> the name the sample gives its subject (a Case's reference, a complaint's identifier,
+    a set-aside row's complaint id), as ``_finish_triage`` reads it."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.models.ingestion import ImportQuarantineRow
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake.service import COMPLAINT, INTAKE, QUARANTINE
+
+    wanted: dict = {}
+    for record in records:
+        wanted.setdefault(record.subject_kind, {})[record.subject_id] = record.id
+    names: dict = {}
+    for kind, model, column in (
+        (INTAKE, IntakeEvent, IntakeEvent.reference),
+        (COMPLAINT, Complaint, Complaint.complaint_identifier),
+    ):
+        ids = wanted.get(kind) or {}
+        if ids:
+            for subject_id, name in db.query(model.id, column).filter(model.tenant_id == tenant_id, model.id.in_(ids)):
+                names[ids[subject_id]] = name
+    ids = wanted.get(QUARANTINE) or {}
+    if ids:
+        for subject_id, row in db.query(ImportQuarantineRow.id, ImportQuarantineRow.row).filter(
+            ImportQuarantineRow.tenant_id == tenant_id, ImportQuarantineRow.id.in_(ids)
+        ):
+            names[ids[subject_id]] = str((row or {}).get("complaint_id") or "") or None
+    return names
 
 
 def _tasks_due_later(db: Session, tenant_id, now: datetime) -> int:

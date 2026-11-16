@@ -39,13 +39,26 @@ def _when_runtime_exists(statement: str) -> str:
     )
 
 
-def upgrade():
+def _present(table: str) -> bool:
+    return bool(op.get_bind().exec_driver_sql("SELECT to_regclass(%s) IS NOT NULL", (f"public.{table}",)).scalar())
+
+
+def restrict_runtime_writes(system_scope: bool = True) -> None:
+    """Every change of this migration (also used for legacy organization databases, which may lack a table: it is
+    skipped). A legacy database without system scope keeps only the revokes: nothing could write its plane registry."""
     for table in READ_ONLY_FOR_RUNTIME:
-        op.execute(_when_runtime_exists(f"REVOKE INSERT, UPDATE, DELETE ON public.{table} FROM mdarix_runtime;"))
+        if _present(table):
+            op.execute(_when_runtime_exists(f"REVOKE INSERT, UPDATE, DELETE ON public.{table} FROM mdarix_runtime;"))
+    if not system_scope or not _present("tenant_data_planes"):
+        return
     op.execute("ALTER TABLE public.tenant_data_planes ENABLE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE public.tenant_data_planes FORCE ROW LEVEL SECURITY")
     for name, command, clause in PLANE_POLICIES:
         op.execute(f"CREATE POLICY {name} ON public.tenant_data_planes FOR {command} {clause}")
+
+
+def upgrade():
+    restrict_runtime_writes()
 
 
 def downgrade():

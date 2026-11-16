@@ -684,6 +684,10 @@ class Decision(Base):
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_decisions_version_of_product",
         ),
+        # DB-1 (tr24a).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id"], ["products.tenant_id", "products.id"], name="fk_decisions_product_id_tenant"
+        ),
         CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "decision_identifier", name="uq_decisions_tenant_identifier"),
@@ -770,6 +774,12 @@ class InvestigationBrief(Base):
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_investigation_briefs_version_of_product",
         ),
+        # DB-1 (tr24a).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id"],
+            ["products.tenant_id", "products.id"],
+            name="fk_investigation_briefs_product_id_tenant",
+        ),
         CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint(
@@ -806,6 +816,12 @@ class AssuranceResult(Base):
             ["tenant_id", "product_id", "product_version_id"],
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_assurance_results_version_of_product",
+        ),
+        # DB-1 (tr24a).
+        ForeignKeyConstraint(
+            ["tenant_id", "product_id"],
+            ["products.tenant_id", "products.id"],
+            name="fk_assurance_results_product_id_tenant",
         ),
         CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "ai_execution_id"], ["ai_executions.tenant_id", "ai_executions.id"]),
