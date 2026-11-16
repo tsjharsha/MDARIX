@@ -11,6 +11,7 @@ import { TraceLink } from "./TraceValue";
 import { useCanRunAi, useWorkspace } from "../workspaceContext";
 import "./decide.css";
 import "../../shared/statement-kind.css";
+import { AiWaiting } from "../../shared/AiWaiting";
 
 export type GiveGroup = { scope: "PRODUCT" | "ORGANIZATION" | "EVENT"; title: string; things: WorksheetField[][] };
 
@@ -248,12 +249,13 @@ export function AiCodeSuggestions({
           {reply?.ai.label ??
             "AI can propose IMDRF codes from the complaint's own words. You enter each one; nothing is entered for you."}
         </p>
-        <button type="button" className="ac-secondary" disabled={asking} onClick={() => void ask()}>
+        <button type="button" className="ac-secondary ac-ai" disabled={asking} onClick={() => void ask()}>
           <Sparkles size={15} aria-hidden="true" />{" "}
           {asking ? "Suggesting…" : reply ? "Suggest again" : "Suggest IMDRF codes with AI"}
         </button>
       </div>
-      {reply && (
+      {asking && <AiWaiting label="Suggesting IMDRF codes" />}
+      {reply && !asking && (
         <AiCodeSuggestionList
           detail={detail}
           reply={reply}

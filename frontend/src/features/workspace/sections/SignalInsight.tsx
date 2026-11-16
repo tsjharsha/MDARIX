@@ -18,6 +18,7 @@ import {
 import { InlineError } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
 import { AiReviewActions } from "../../shared/AiReview";
+import { AiWaiting } from "../../shared/AiWaiting";
 
 /**
  * What a signal's complaints have in common (from their records, or written by AI and checked sentence by sentence;
@@ -52,13 +53,17 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
       source={insight}
       action={
         canRunAi ? (
-          <button type="button" className="ac-secondary" disabled={busy} onClick={() => void write()}>
+          <button type="button" className="ac-secondary ac-ai" disabled={busy} onClick={() => void write()}>
             <Sparkles size={15} aria-hidden="true" /> {busy ? "Writing…" : ai ? "Write again" : "Write an AI summary"}
           </button>
         ) : undefined
       }
     >
-      {summary && <SummaryView summary={summary} canReview={canRunAi} />}
+      {busy ? (
+        <AiWaiting label="Writing the summary" />
+      ) : (
+        summary && <SummaryView summary={summary} canReview={canRunAi} />
+      )}
       <InlineError text={error} />
       {insight.data && <TrendLine trend={insight.data.trend} />}
     </Panel>

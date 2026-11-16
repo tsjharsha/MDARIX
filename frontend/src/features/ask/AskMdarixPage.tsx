@@ -10,6 +10,7 @@ import { TrustBadge } from "../workspace/sections/TrustBadge";
 import { onQuestionHanded, pendingQuestion, takeQuestion } from "./pendingQuestion";
 import { useAiBanner } from "../workspace/useAiStatus";
 import { AiReviewActions } from "../shared/AiReview";
+import { AiWaiting } from "../shared/AiWaiting";
 
 // Questions Ask answers well with or without AI: the counting ones get the fixed-rule answers of Getting started
 // (backend/app/trial/insight_questions.py ASK_TOPICS), the last searches the case's evidence.
@@ -183,7 +184,7 @@ export function AskMdarixPage({
           </p>
         )}
       </section>
-      {result && <AskAnswer result={result} />}
+      {loading ? <AiWaiting label="Searching your records" /> : result && <AskAnswer result={result} />}
     </div>
   );
 }

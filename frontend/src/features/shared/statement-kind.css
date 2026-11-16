@@ -146,3 +146,35 @@
   display: grid;
   gap: 2px;
 }
+
+/* Waiting for a live AI answer: a counter and three skeleton lines, flat (AiWaiting.tsx). */
+.ai-waiting {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed var(--ms-ai-line);
+  border-radius: var(--ms-radius-md);
+}
+.ai-waiting p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ms-ai);
+  font-weight: 600;
+}
+.ai-waiting .ac-skeleton {
+  height: 12px;
+}
+.ai-waiting .ac-skeleton.is-short {
+  width: 60%;
+}
+
+/* Every "start AI" button looks the same: the AI hue, never the teal of a normal action (design rule R4). */
+.ac-secondary.ac-ai,
+.uw-hybrid .ac-main .ac-secondary.ac-ai {
+  border-color: var(--ms-ai-line);
+  background: var(--ms-ai-bg);
+  color: var(--ms-ai);
+}
