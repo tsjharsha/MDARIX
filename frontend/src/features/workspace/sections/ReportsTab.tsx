@@ -41,7 +41,7 @@ import {
 } from "./Reports";
 import { ListViewPicker } from "./Views";
 import { STARTER_LABEL } from "../../shared/standards";
-import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
+import { AiCodeSuggestions, ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
 import { FollowUps } from "./FollowUps";
 import { MirFiles, MirNeeds } from "./MirFiles";
 import { PersonalAtSend, personalBody } from "./PersonalAtSend";
@@ -461,6 +461,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           {/* 0.10.96 (B3): a submitted US report's chain and "Start follow-up #n"; on a follow-up, what it sends. */}
           <FollowUps detail={detail} canWrite={write} onChanged={changed} onOpen={openReport} />
           {write && <ConfirmAllCodes detail={detail} onChanged={changed} />}
+          {write && <AiCodeSuggestions detail={detail} onChanged={changed} />}
           {write && <ThingsToGive detail={detail} onChanged={changed} canEdit={write} />}
           {/* 0.10.83 (D2.8): the approver reads what they approve, then approves below it. */}
           {approving && (

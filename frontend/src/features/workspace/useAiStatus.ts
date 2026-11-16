@@ -27,9 +27,10 @@ export function useAiBanner(): AiBanner | null {
  * Whether AI really answers for the organization now (GET /api/v1/ai/status): true or false once known, null while
  * loading. A status that cannot be read counts as false, so nothing starts in the AI's name on a guess.
  */
-export function useAiReady(): boolean | null {
+export function useAiReady(enabled = true): boolean | null {
   const [ready, setReady] = useState<boolean | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     let current = true;
     requestJson<AiStatus>(AI_STATUS_PATH)
       .then(
@@ -40,6 +41,6 @@ export function useAiReady(): boolean | null {
     return () => {
       current = false;
     };
-  }, []);
+  }, [enabled]);
   return ready;
 }

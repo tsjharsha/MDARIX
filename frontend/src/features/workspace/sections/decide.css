@@ -826,3 +826,44 @@
 .tr-hash {
   font-family: ui-monospace, monospace;
 }
+
+/* AI code suggestions (AI-R part D): flat (G-2), the AI label dashed violet like every AI proposal. */
+.rp-ai-suggest-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rp-ai-codes {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.rp-ai-codes li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--ms-line-control);
+}
+.rp-ai-code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.rp-ai-confidence {
+  display: inline-block;
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ms-line);
+  overflow: hidden;
+}
+.rp-ai-confidence > span {
+  display: block;
+  height: 100%;
+  background: var(--ms-ai);
+}

@@ -5,6 +5,7 @@ import { tabParam, withTabParam } from "./workspaceAddress";
 import { placeOf, tabParts, type Navigation, type Opens } from "../../app/linkTable";
 import { requestJson } from "../../app/apiClient";
 import type { ResolvedCase } from "./savedContext";
+import { useAiReady } from "./useAiStatus";
 
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
@@ -483,11 +484,18 @@ export function useCan(permission: BusinessPermission): boolean {
   return !Array.isArray(granted) || granted.includes(permission);
 }
 
-/** Whether to offer an AI action: the role may run AI and the workspace is not a free trial, whose AI is off (the
- * server refuses it there either way: genai/governance.py, GENAI_OFF_FOR_FREE_TRIAL). */
+/** Whether to offer an AI action: the role may run AI and, in a free trial, the server says AI answers now (the
+ * trial chain set, AI switched on for the organization and for this user; on the sample data only). The server
+ * decides each run either way (genai/governance.py). */
+export function canRunAi(allowed: boolean, trial: boolean, trialReady: boolean | null): boolean {
+  return allowed && (!trial || trialReady === true);
+}
+
 export function useCanRunAi(): boolean {
   const value = useContext(WorkspaceContext);
-  return useCan("ai.run") && !value?.isTrial;
+  const allowed = useCan("ai.run");
+  const trial = Boolean(value?.isTrial);
+  return canRunAi(allowed, trial, useAiReady(allowed && trial));
 }
 
 const text = (value: unknown): string | null =>

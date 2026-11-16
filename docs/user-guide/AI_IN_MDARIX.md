@@ -12,7 +12,7 @@ below allows it; every step in MDARIX also works by hand, and Ask MDARIX always 
 | Case analysis | Propose an analysis, competing explanations and challenges for an investigation | Medium: a proposal you may turn into a record | State a root cause as fact, or rank explanations as decided |
 | Drafting | Draft the investigation brief from reviewed analysis | Medium | Enter a Decision Brief or a report unreviewed |
 | Evidence extraction | Propose observations from an evidence document, each with its source | Medium | Become evidence before a person accepts it |
-| Code suggestions | Propose IMDRF codes from the complaint text | Medium | Be confirmed by "Confirm all codes" (not built yet) |
+| Code suggestions | Propose IMDRF codes for a report's code fields from the complaint's own words, each with a confidence and the quoted words, from the loaded IMDRF release only (report page, "Suggest IMDRF codes with AI"); a person enters each code in its field | Medium | Be entered without a person, or by "Confirm all codes" |
 | Decision advisory | Advice beside a decision | — | **Not offered** |
 | Regulatory drafting (the regulatory copilot) | Draft regulatory document sections | — | **Not offered** until AI is qualified; the rules draft is shown |
 
