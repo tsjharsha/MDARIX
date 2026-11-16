@@ -49,8 +49,7 @@ export function CaseIntelligencePanel({
   return (
     <>
       <p className="ac-note">
-        Every statement shows what kind it is and who made it. AI interpretations are suggestions to review, never facts
-        or signed records; a person's judgement is recorded with its reason.
+        Every statement shows its kind and its author. AI suggestions are never facts.
       </p>
       {readOnly && (
         <p className="ac-message tone-warning" role="note">

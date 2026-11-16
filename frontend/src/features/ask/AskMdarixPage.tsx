@@ -337,11 +337,11 @@ export function AskAnswer({ result }: { result: any }) {
         <dl>
           <dt>Interaction</dt>
           <dd>{result.interaction_id ?? "—"}</dd>
-          <dt>Context policy</dt>
+          <dt>Rules for what the AI may read</dt>
           <dd>{response.grounding?.policy_version ?? "—"}</dd>
-          <dt>Scoped to investigation</dt>
+          <dt>Limited to this investigation</dt>
           <dd>{scopeLabel(grounded)}</dd>
-          <dt>Field policy</dt>
+          <dt>Fields the AI may read</dt>
           <dd>{response.grounding?.field_policy ?? "—"}</dd>
         </dl>
       </details>

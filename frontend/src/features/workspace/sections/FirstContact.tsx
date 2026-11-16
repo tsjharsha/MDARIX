@@ -1096,7 +1096,6 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
   const followUp = item.tasks.find((task) => task.type === "FIRST_CONTACT_FOLLOW_UP" && task.open);
   const review = item.signed?.classification === "SERVICE_ONLY" && !item.signed.review_outcome;
   const voided = item.status === "VOIDED";
-  const row = guide.table.find((entry) => entry.row === item.outcome_row);
   return (
     <div className="uw-dp">
       {item.header && <CaseHeaderView header={item.header} status={item.status_label ?? null} />}
@@ -1246,7 +1245,6 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
           <h3>Suggestion</h3>
           <p className="uw-fc-outcome">
             <strong>{item.suggestion_label}</strong>
-            {row ? ` (row ${row.row}: ${row.answers})` : ""}
             {item.signed ? `. Signed: ${item.signed.classification_label}, version ${item.signed.version}.` : ""}
           </p>
         </section>
@@ -1748,9 +1746,9 @@ function SignedBefore({ item, onDone }: { item: IntakeItem; onDone: () => void }
     }
   };
   return (
-    <section className="ca-drawer-section" aria-label="Signed before 0.10.93: escalate">
+    <section className="ca-drawer-section" aria-label="Signed before escalation existed: escalate now">
       <h3>
-        <Siren size={15} aria-hidden="true" /> Signed before 0.10.93: escalate
+        <Siren size={15} aria-hidden="true" /> Signed before escalation existed: escalate now
       </h3>
       <p>
         Signed {item.signed?.classification_label?.toLowerCase() ?? "a complaint"} before a signature made the complaint

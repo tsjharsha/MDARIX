@@ -127,7 +127,7 @@ describe("the Case check drawer (spec 4.4)", () => {
       "Provisional: US 30 days, due Wed 9 Dec 2026, 23:59 EST",
       "The ten questions",
       "Suggestion",
-      "row 1: a Yes on questions 1-3, and a repair is needed",
+      "a Yes on questions 1-3, and a repair is needed",
       "Your classification",
       "Complaint and service (suggested)",
       "Inquiry",
@@ -142,6 +142,8 @@ describe("the Case check drawer (spec 4.4)", () => {
     // Six classifications, three disabled with their reason.
     expect(html.match(/name="classification"/g)).toHaveLength(6);
     expect(html.match(/<input type="radio" disabled="" name="classification"/g)).toHaveLength(3);
+    // The suggestion line is plain words; the outcome table row stays in its fold.
+    expect(html).toMatch(/<p class="uw-fc-outcome"><strong>Complaint and service<\/strong><\/p>/);
   });
 
   it("signs a complaint as 'Sign and escalate' with the escalation panel and the duplicate choice", () => {
@@ -193,7 +195,7 @@ describe("the Case check drawer (spec 4.4)", () => {
     expect(html).not.toContain("Waiting for internal team");
   });
 
-  it("offers 'Signed before 0.10.93: escalate' on a Case signed a complaint and never linked (SAMPLE-CALL-02)", () => {
+  it("offers 'Signed before escalation existed: escalate now' on a Case signed a complaint and never linked (SAMPLE-CALL-02)", () => {
     const signedBefore = item({
       reference: "SAMPLE-CALL-02",
       draft: false,
@@ -202,13 +204,13 @@ describe("the Case check drawer (spec 4.4)", () => {
       likely_complaints: [{ id: "c5", ref: "SAMPLE-RT-05", reasons: ["same product", "same lot"], same_day: true }],
     });
     const html = render(<CheckBody item={signedBefore} guide={guide} onChanged={vi.fn()} />, ALL);
-    expect(html).toContain("Signed before 0.10.93: escalate");
+    expect(html).toContain("Signed before escalation existed: escalate now");
     expect(html).toMatch(/name="attach" checked=""\/>Attach this case to SAMPLE-RT-05/);
     expect(html).toContain(">Escalate</button>");
     expect(html).not.toContain("Sign and escalate");
     // Without case.classify, or once escalated, nothing is offered.
     expect(render(<CheckBody item={signedBefore} guide={guide} onChanged={vi.fn()} />, ["case.log"])).not.toContain(
-      "Signed before 0.10.93",
+      "Signed before escalation existed",
     );
     const done = { ...signedBefore, escalate_signed: false };
     expect(render(<CheckBody item={done} guide={guide} onChanged={vi.fn()} />, ALL)).not.toContain("Signed before");
