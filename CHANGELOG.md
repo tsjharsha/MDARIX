@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Automatic trial approval on a fresh server.** On a server where no Platform Administrator had been invited with
+  `scripts/create_platform_admin.py` (a new install, the CI browser job), there was no platform organization for the
+  automatic-approval account, so every sign-up was told "Your trial is being prepared" and then stayed pending without
+  a word. The approval now creates the platform organization when it is missing (the same code the script uses).
+
 ## [0.10.96] - not released yet (ships in the big-bang release)
 
 B3: the US eMDR complete for manufacturers (initial report). No migration. The API and web images change.
