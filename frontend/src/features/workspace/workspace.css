@@ -4467,15 +4467,23 @@ div.uw-task-count:hover {
 .uw-case-choices label.is-disabled {
   color: var(--ac-muted);
 }
+/* The story's turning point (Case -> Complaint) gets weight: mint panel, display-face heading. */
 .uw-case-escalation {
   display: grid;
   gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--ac-serious);
-  border-radius: var(--ac-radius);
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-mint);
 }
 .uw-case-escalation h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-20);
+  font-stretch: 112%;
 }
 .uw-cp-origin {
   margin: 2px 0 0;

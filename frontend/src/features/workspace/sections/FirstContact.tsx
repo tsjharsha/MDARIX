@@ -1,7 +1,18 @@
 import { SampleDates } from "../../../app/chips";
 import { useContext, useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
-import { CheckCircle2, Copy, FileWarning, Hourglass, Link2, PhoneCall, Siren, Unlink, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  FileWarning,
+  Hourglass,
+  Link2,
+  PhoneCall,
+  Siren,
+  Unlink,
+  Wrench,
+} from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { requestJson } from "../../../app/apiClient";
@@ -1780,7 +1791,10 @@ function EscalationPanel({
 }) {
   return (
     <section className="uw-case-escalation" aria-label="This case becomes a complaint">
-      <h3>This case becomes a complaint</h3>
+      <h3>
+        Case <ArrowRight size={18} aria-hidden="true" /> Complaint
+        <span className="ca-sr-only">: this case becomes a complaint</span>
+      </h3>
       <p>
         Nothing is typed again. {item.reference} keeps its reference and its awareness time, and its clock keeps
         running.
