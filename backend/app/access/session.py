@@ -34,6 +34,7 @@ from backend.app.cell_link import licence_state
 from backend.app.deployment_role import deployment_role
 from backend.app.feature_set import (
     B6_SWITCHES,
+    RCA_SWITCHES,
     B9_SWITCHES,
     challenge,
     closed_loop,
@@ -316,6 +317,8 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "b9": {name.removeprefix("MDARIX_B9_").lower(): switched_on(name) for name in B9_SWITCHES},
         # B6a: deadline_list (downloads on Oversight) and late_entry (the reason and duplicate check on Log a case).
         "b6": {name.removeprefix("MDARIX_B6_").lower(): switched_on(name) for name in B6_SWITCHES},
+        # RCA tools: methods (fishbone, 5 Whys, Pareto, the cause at signing) and intelligence (overview, event date).
+        "rca": {name.removeprefix("MDARIX_RCA_").lower(): switched_on(name) for name in RCA_SWITCHES},
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
         # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import

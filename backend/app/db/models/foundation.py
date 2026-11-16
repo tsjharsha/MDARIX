@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -443,6 +444,13 @@ class Risk(TenantOwned, Base):
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
+    # RCA tools (trrcatools, Part E): the estimate the harm rate is compared with, imported or entered by a person.
+    hazard: Mapped[str | None] = mapped_column(Text)
+    harm: Mapped[str | None] = mapped_column(Text)
+    severity: Mapped[str | None] = mapped_column(String(40))
+    estimated_probability = mapped_column(Numeric)
+    estimate_source: Mapped[str | None] = mapped_column(String(20))
+    match_codes: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     __table_args__ = (
         # DB-1 (tr23).
         ForeignKeyConstraint(
@@ -450,6 +458,14 @@ class Risk(TenantOwned, Base):
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_risks_version_of_product",
         ),
+        CheckConstraint(
+            "estimated_probability IS NULL OR (estimated_probability > 0 AND estimated_probability <= 1)",
+            name="estimated_probability_range",
+        ),
+        CheckConstraint(
+            "estimate_source IS NULL OR estimate_source IN ('IMPORTED', 'ENTERED')", name="estimate_source_known"
+        ),
+        CheckConstraint("jsonb_typeof(match_codes) = 'object'", name="match_codes_object"),
         CheckConstraint("product_version_id IS NULL OR product_id IS NOT NULL", name="version_needs_product"),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
@@ -526,8 +542,22 @@ class Hypothesis(TenantOwned, Base):
     # B5 (tr26): the rule (H-1..H-5) and its version behind a draft a person adopted; NULL when a person wrote it.
     draft_rule: Mapped[str | None] = mapped_column(String(10))
     draft_rule_version: Mapped[int | None] = mapped_column(Integer)
+    # RCA tools (trrcatools): the fishbone category and the FMEA failure mode a possible cause names.
+    cause_category: Mapped[str | None] = mapped_column(String(20))
+    failure_mode_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
+        ForeignKeyConstraint(
+            ["tenant_id", "failure_mode_id"],
+            ["failure_modes.tenant_id", "failure_modes.id"],
+            name="fk_hypotheses_failure_mode_id_tenant",
+        ),
+        Index("ix_hypotheses_tenant_failure_mode", "tenant_id", "failure_mode_id"),
+        CheckConstraint(
+            "cause_category IS NULL OR cause_category IN ('PEOPLE', 'PROCESS', 'METHOD', 'MATERIAL', 'MACHINE', "
+            "'ENVIRONMENT', 'SOFTWARE')",
+            name="cause_category_known",
+        ),
         CheckConstraint("origin in ('ai','human','system')", name="hypothesis_origin_allowed"),
         UniqueConstraint("tenant_id", "id", name="uq_hypotheses_tenant_id_id"),
     )
@@ -574,9 +604,12 @@ class FailureChain(Base):
     origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
     created_by: Mapped[str | None] = mapped_column(String(255))
     source_ai_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # RCA tools (trrcatools): CHAIN, or FIVE_WHYS (node 1 the problem, each next node answers "why?").
+    method: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'CHAIN'"))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "id", name="uq_failure_chains_tenant_id_id"),
+        CheckConstraint("method IN ('CHAIN', 'FIVE_WHYS')", name="method_known"),
     )
 
 
@@ -675,6 +708,10 @@ class Decision(Base):
     # UNDETERMINED with a reason); required for new signatures, empty on decisions signed before 0.10.53.
     root_cause_attribution: Mapped[str | None] = mapped_column(String(30))
     attribution_reason: Mapped[str | None] = mapped_column(Text)
+    # RCA tools (trrcatools): what the decision maker ticked while signing, the accepted hypotheses and their cause
+    # category (or NOT_DETERMINED, the reason in the signed snapshot). Empty on decisions signed before RCA.
+    root_cause_category: Mapped[str | None] = mapped_column(String(20))
+    root_cause_hypothesis_ids: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     __table_args__ = (
         # DB-1 (tr23).
         ForeignKeyConstraint(
@@ -682,6 +719,12 @@ class Decision(Base):
             ["product_versions.tenant_id", "product_versions.product_id", "product_versions.id"],
             name="fk_decisions_version_of_product",
         ),
+        CheckConstraint(
+            "root_cause_category IS NULL OR root_cause_category IN ('PEOPLE', 'PROCESS', 'METHOD', 'MATERIAL', "
+            "'MACHINE', 'ENVIRONMENT', 'SOFTWARE', 'NOT_DETERMINED')",
+            name="root_cause_category_known",
+        ),
+        CheckConstraint("jsonb_typeof(root_cause_hypothesis_ids) = 'array'", name="root_cause_hypothesis_ids_array"),
         # DB-1 (tr24a).
         ForeignKeyConstraint(
             ["tenant_id", "product_id"], ["products.tenant_id", "products.id"], name="fk_decisions_product_id_tenant"

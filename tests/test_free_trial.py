@@ -1653,8 +1653,16 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
     open_items = [item for item in (unknowns["items"] if isinstance(unknowns, dict) else unknowns)]
     assert len(open_items) == 2 and {item["status"] for item in open_items} == {"open"}
     chains = user.get(f"{base}/failure-chains").json()
-    stored = chains["stored"]
+    stored = [chain for chain in chains["stored"] if chain["method"] == "CHAIN"]
     assert len(stored) == 1 and "(Sample)" in stored[0]["name"]
+    # RCA tools (spec 8.6): the fishbone has the supplier under Material and the ward settings under Environment, and
+    # the 5 Whys runs from the problem to the supplier change with the bench test still unknown.
+    grid = user.get(f"/api/v1/investigations/{case_id}/rca/fishbone").json()
+    columns = {column["code"]: column["causes"] for column in grid["categories"]}
+    assert len(columns["MATERIAL"]) == 1 and len(columns["ENVIRONMENT"]) == 1 and not grid["uncategorised"]
+    (whys,) = user.get(f"/api/v1/investigations/{case_id}/rca/five-whys").json()["items"]
+    assert len(whys["nodes"]) == 5 and whys["links"][0]["state"] == "UNKNOWN"
+    assert whys["nodes"][-1]["hypothesis"]["id"] == columns["MATERIAL"][0]["id"]
 
     readiness = user.get(f"/api/v1/investigations/{case_id}/readiness").json()
     steps = {step["key"]: step for step in readiness["steps"]}
@@ -1678,6 +1686,7 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
         "brief_content_hash": view["content_hash"],
         "outcome": "ACCEPT_CONCLUSION",
         "rationale": "The supplier change and the inspection results support the proposed conclusion.",
+        "root_cause_category": "MATERIAL",
         "password": PASSWORD,
     }
     # The decision is signed only with its root-cause attribution (tr02); undetermined only with a reason.

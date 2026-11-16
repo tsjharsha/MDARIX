@@ -23,6 +23,7 @@ from backend.app.db.models.stage3 import ContextSnapshot
 from backend.app.db.models.workflow import WorkflowTask
 from backend.app.decision_brief import rules as brief_rules
 from backend.app.human_decision import rules
+from backend.app.rca import rules as rca_rules
 from backend.app.workflow.labels import role_label
 
 logger = logging.getLogger("mdarix.human_decision")
@@ -139,6 +140,40 @@ def legacy_decision_count(db: Session, case: Investigation) -> int:
         )
         .count()
     )
+
+
+def accepted_causes(db: Session, case: Investigation, ids) -> list[dict] | None:
+    """The hypotheses a signer ticked as the accepted root cause, as bound into the snapshot; None when one is not a
+    current hypothesis of this case (another case's or organization's, superseded or retired). Never changes them."""
+    from backend.app.db.models.foundation import Hypothesis
+
+    wanted = [uuid.UUID(str(item)) for item in ids or ()]
+    if not wanted:
+        return []
+    rows = {
+        row.id: row
+        for row in db.query(Hypothesis).filter(
+            Hypothesis.tenant_id == case.tenant_id,
+            Hypothesis.investigation_id == case.id,
+            Hypothesis.id.in_(wanted),
+        )
+    }
+    if any(
+        item not in rows
+        or str(rows[item].status or "").lower() == "superseded"
+        or str(rows[item].human_status or "").upper() == "RETIRED"
+        for item in wanted
+    ):
+        return None
+    return [
+        {
+            "id": str(item),
+            "business_id": rows[item].business_id,
+            "statement": rows[item].statement,
+            "cause_category": rows[item].cause_category,
+        }
+        for item in wanted
+    ]
 
 
 def current_decision(db: Session, case: Investigation, *, lock: bool = False) -> Decision | None:
@@ -391,6 +426,10 @@ def decision_view(
         "attribution_reason": decision.attribution_reason,
         # Decisions signed before 0.10.53 carry none.
         "attribution_note": None if decision.root_cause_attribution else "Recorded before root-cause attribution",
+        # RCA tools: what the signer ticked; decisions signed before RCA read "Not categorised" (never rewritten).
+        "root_cause_category": decision.root_cause_category,
+        "root_cause_category_label": rca_rules.category_label(decision.root_cause_category),
+        "root_cause_hypothesis_ids": list(decision.root_cause_hypothesis_ids or ()),
         "conditions": decision.conditions,
         "follow_up_actions": [_follow_up_action_view(item) for item in decision.follow_up_actions or ()],
         "residual_unknowns": list(decision.residual_unknowns or ()),

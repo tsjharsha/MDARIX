@@ -8,7 +8,7 @@ import { withTabParam } from "../workspaceAddress";
 import { parseSignalsTab } from "../signals";
 import { SignalInbox } from "./SignalInbox";
 import { TrendCheck } from "./TrendCheck";
-import { ResolutionTrend } from "./Dispositions";
+import { ResolutionWithCauses } from "./caseIntelligence/RootCause";
 import { Trends } from "./Signals";
 
 export const TRENDS_TABS = NEW_PLACES.Trends.tabs;
@@ -53,7 +53,7 @@ export function TrendsSection({ tab }: { tab?: string }) {
           />
         )}
         {active === "Over time" && <Trends />}
-        {active === "By resolution" && <ResolutionTrend />}
+        {active === "By resolution" && <ResolutionWithCauses />}
       </Tabs>
     </>
   );

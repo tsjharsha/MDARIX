@@ -601,6 +601,18 @@ def sign_decision(
     attribution = collapse(payload.root_cause_attribution).upper() or None
     attribution_reason = collapse(payload.attribution_reason) or None
     problem = problem or attribution_problem(attribution, attribution_reason)
+    from backend.app.feature_set import switched_on
+    from backend.app.rca import rules as rca_rules
+
+    cause_category = collapse(payload.root_cause_category).upper() or None
+    cause_reason = collapse(payload.root_cause_reason) or None
+    problem = problem or rca_rules.root_cause_problem(
+        outcome=payload.outcome,
+        category=cause_category,
+        reason=cause_reason,
+        ticked=list(payload.root_cause_hypothesis_ids),
+        methods_on=switched_on("MDARIX_RCA_METHODS"),
+    )
     if problem:
         raise error(422, "DECISION_INVALID", problem)
     actor = governance.session_actor(control_db, ctx)
@@ -670,6 +682,13 @@ def sign_decision(
         refuse(409, *supersede)
     content = row.content or {}
     residual = rules.residual_unknowns(content)
+    accepted = service.accepted_causes(data, case, payload.root_cause_hypothesis_ids)
+    if accepted is None:
+        raise error(
+            422,
+            "ROOT_CAUSE_HYPOTHESIS_INVALID",
+            "Tick only current hypotheses of this investigation that are not retired",
+        )
     if residual and not payload.residual_unknowns_acknowledged:
         raise error(
             422,
@@ -724,6 +743,8 @@ def sign_decision(
             "outcome": payload.outcome,
             # Bound into the signature through the snapshot's hash.
             "root_cause_attribution": {"code": attribution, "reason": attribution_reason},
+            # RCA tools: the confirmed cause as the signer ticked it, bound the same way.
+            "root_cause": {"category": cause_category, "reason": cause_reason, "hypotheses": accepted},
         }
     )
     snapshot_digest = rules.snapshot_hash(snapshot)
@@ -766,6 +787,8 @@ def sign_decision(
         supersedes_decision_id=current.id if current is not None else None,
         root_cause_attribution=attribution,
         attribution_reason=attribution_reason,
+        root_cause_category=cause_category,
+        root_cause_hypothesis_ids=[item["id"] for item in accepted],
     )
     data.add(decision)
     data.flush()
@@ -952,6 +975,8 @@ def sign_decision(
                 "brief_content_hash": version,
                 "outcome": payload.outcome,
                 "root_cause_attribution": attribution,
+                "root_cause_category": cause_category,
+                "root_cause_hypothesis_ids": [item["id"] for item in accepted],
                 "follow_ups": rules.follow_up_types(follow_up_actions),
                 "supersedes_decision_id": str(current.id) if current is not None else None,
                 "signer_role": role,

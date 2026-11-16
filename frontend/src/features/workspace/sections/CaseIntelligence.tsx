@@ -7,7 +7,8 @@ import { HistoryView } from "./caseIntelligence/History";
 import { HypothesesView } from "./caseIntelligence/Hypotheses";
 import { ObservationsView } from "./caseIntelligence/Observations";
 import { UnknownsView } from "./caseIntelligence/Unknowns";
-import { useChallenge } from "../workspaceContext";
+import { FishboneView, FiveWhysView, OverviewView } from "./caseIntelligence/RootCause";
+import { useChallenge, useRcaIntelligence, useRcaMethods } from "../workspaceContext";
 
 // The views live in ./caseIntelligence/, one file per view; the chain drawing stays importable from here.
 export { ChainDiagram, ChainLegend } from "./caseIntelligence/FailureChain";
@@ -37,7 +38,14 @@ export function CaseIntelligencePanel({
   readOnly?: boolean;
 }) {
   const challenge = useChallenge();
-  const views = challenge ? INTELLIGENCE_VIEWS : INTELLIGENCE_VIEWS.filter((item) => item !== "Challenge");
+  const methods = useRcaMethods();
+  const overview = useRcaIntelligence();
+  const hidden = new Set<string>([
+    ...(challenge ? [] : ["Challenge"]),
+    ...(methods ? [] : ["Fishbone", "5 Whys"]),
+    ...(overview ? [] : ["Overview"]),
+  ]);
+  const views = INTELLIGENCE_VIEWS.filter((item) => !hidden.has(item));
   return (
     <>
       <p className="ac-note">
@@ -58,6 +66,15 @@ export function CaseIntelligencePanel({
             startAdding={adding}
             onAddingShown={onAddingShown}
           />
+        )}
+        {view === "Overview" && overview && (
+          <OverviewView investigationId={investigationId} caseLabel={caseLabel} onView={onView} methods={methods} />
+        )}
+        {view === "Fishbone" && methods && (
+          <FishboneView investigationId={investigationId} caseLabel={caseLabel} readOnly={readOnly} />
+        )}
+        {view === "5 Whys" && methods && (
+          <FiveWhysView investigationId={investigationId} caseLabel={caseLabel} readOnly={readOnly} onView={onView} />
         )}
         {view === "Challenge" && challenge && (
           <ChallengeView investigationId={investigationId} caseLabel={caseLabel} readOnly={readOnly} />

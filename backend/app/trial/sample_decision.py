@@ -68,6 +68,8 @@ SAMPLE_HYPOTHESES = (
         "statement": "The NovaSense pressure sensors fitted from Rev B (supplier change SAMPLE-CHG-014) read high at "
         "the upper pressure range and set off pressure alarms during infusion. (Sample)",
         "human_status": "PARTIALLY_SUPPORTED",
+        # RCA fishbone category (spec 8.6): the sensor is a material.
+        "cause_category": "MATERIAL",
         "reason": "The change record and the incoming inspection of lots 003 and 004 support it; the bench test of "
         "returned pumps that would confirm it is still to be done.",
         "evidence": (
@@ -84,6 +86,7 @@ SAMPLE_HYPOTHESES = (
         "statement": "Ward pressure-limit settings or use of the pump, not the pump itself, set off the alarms "
         "(for example occlusion limits set too low). (Sample)",
         "human_status": "WEAKLY_SUPPORTED",
+        "cause_category": "ENVIRONMENT",
         "reason": "The rise sits in lots 003 and 004 and not in lots 001 and 002 used on the same wards, which speaks "
         "against a ward setting; the alarm settings of the returned pumps have not been checked yet.",
         "evidence": (
@@ -126,6 +129,41 @@ SAMPLE_CHAIN = {
         (2, 3, "UNKNOWN", None, "Not shown until returned pumps are bench-tested."),
         (3, 4, "PARTIALLY_SUPPORTED", "SAMPLE-EV-003", "Alarm complaints rose in lots 003 and 004 after Rev B."),
     ),
+}
+
+
+# RCA tools (spec 8.6): the sample author's 5 Whys from the problem down, with the bench test still unknown. Its last
+# why names the supplier hypothesis; it is not a root cause (only a signed decision confirms one).
+SAMPLE_FIVE_WHYS = {
+    "problem": "Pressure alarms interrupt infusion on OrbitCare 300 Rev B (Sample)",
+    # (why, state, evidence, rationale)
+    "whys": (
+        (
+            "The pump reads pressure above its limit during infusion",
+            "UNKNOWN",
+            None,
+            "Not shown until returned pumps are bench-tested.",
+        ),
+        (
+            "Sensors reading 4-6% high reach lots 003 and 004",
+            "PARTIALLY_SUPPORTED",
+            "SAMPLE-EV-002",
+            "Inspection found high readings in lots 003 and 004.",
+        ),
+        (
+            "Incoming inspection was cut from 32 to 13 sensors per lot",
+            "SUPPORTED",
+            "SAMPLE-EV-001",
+            "The change record.",
+        ),
+        (
+            "The supplier change SAMPLE-CHG-014 was accepted with reduced sampling",
+            "SUPPORTED",
+            "SAMPLE-EV-001",
+            "The change record states both.",
+        ),
+    ),
+    "last_why_is": "supplier",
 }
 
 
@@ -245,7 +283,7 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
     from backend.app.access.permissions import EVIDENCE_REVIEW, INVESTIGATION_WORK
     from backend.app.case_intelligence import router as intelligence
     from backend.app.case_intelligence import rules
-    from backend.app.db.models.foundation import Evidence, Hypothesis, HypothesisEvidence, Unknown
+    from backend.app.db.models.foundation import Evidence, FailureChainNode, Hypothesis, HypothesisEvidence, Unknown
     from backend.app.trial.sample_data import SAMPLE_SOURCE
 
     ctx = SimpleNamespace(correlation_id=None)
@@ -273,6 +311,7 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
             status_changed_by=person.user_id,
             status_changed_at=created,
             created_by=person.user_id,
+            cause_category=item["cause_category"],
             created_at=created,
             updated_at=created,
             # The sample's own, so its clock moves it (sample_clock.py moves only rows of the sample's source).
@@ -419,12 +458,53 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
         },
         new_values={"name": chain.name, "nodes": list(SAMPLE_CHAIN["nodes"])},
     )
+    whys = list(SAMPLE_FIVE_WHYS["whys"])
+    five_whys = intelligence._store_chain(
+        db,
+        tenant_id=case.tenant_id,
+        case=case,
+        person=person,
+        name=f"5 Whys: {SAMPLE_FIVE_WHYS['problem']}",
+        origin=rules.CHAIN_ORIGIN_HUMAN,
+        labels=[SAMPLE_FIVE_WHYS["problem"], *(why for why, *_ in whys)],
+        links=[
+            {
+                "from_index": index,
+                "to_index": index + 1,
+                "state": state,
+                "evidence_id": evidence[identifier].id if identifier in evidence else None,
+                "rationale": why,
+            }
+            for index, (_, state, identifier, why) in enumerate(whys)
+        ],
+        now=next(clock),
+        method="FIVE_WHYS",
+    )
+    last = (
+        db.query(FailureChainNode)
+        .filter(FailureChainNode.tenant_id == case.tenant_id, FailureChainNode.failure_chain_id == five_whys.id)
+        .order_by(FailureChainNode.sequence_number.desc())
+        .first()
+    )
+    last.lifecycle_object_type = "HYPOTHESIS"
+    last.lifecycle_object_id = hypotheses[SAMPLE_FIVE_WHYS["last_why_is"]].id
+    record(
+        permission=INVESTIGATION_WORK,
+        object_type=rules.OBJECT_FAILURE_CHAIN,
+        object_id=five_whys.id,
+        entity_type="FailureChain",
+        event_type=rules.EVENT_CREATED,
+        to_value=rules.CHAIN_STATUS_DRAFT,
+        details={"business_id": five_whys.business_id, "method": "FIVE_WHYS", "whys": len(whys), "sample": True},
+        new_values={"problem": SAMPLE_FIVE_WHYS["problem"], "whys": [why for why, *_ in whys]},
+    )
     db.flush()
     return {
         "hypotheses": len(hypotheses),
         "evidence_links": links,
         "unknowns": len(SAMPLE_UNKNOWNS),
         "failure_chains": 1,
+        "five_whys": 1,
     }
 
 

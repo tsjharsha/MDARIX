@@ -95,6 +95,12 @@ _RULE_REGISTER_API = (re.compile(r"^/api/v1/rule-register(/|$)"),)
 _B9_API = {
     "MDARIX_B9_INDIA": (re.compile(r"^/api/v1/reports/[^/]+/india-chain/?$"),),
     "MDARIX_B9_CANADA": (re.compile(r"^/api/v1/reports/[^/]+/canada-chain/?$"),),
+    # RCA tools (spec 8.2): methods (fishbone, 5 Whys, Pareto) and intelligence (the version at the event date).
+    "MDARIX_RCA_METHODS": (
+        re.compile(r"^/api/v1/investigations/[^/]+/rca/(fishbone|causes|five-whys)(/|$)"),
+        re.compile(r"^/api/v1/rca/pareto/?$"),
+    ),
+    "MDARIX_RCA_INTELLIGENCE": (re.compile(r"^/api/v1/investigations/[^/]+/rca/event-versions/?$"),),
 }
 
 
@@ -138,7 +144,10 @@ B6_SWITCHES = {
     "MDARIX_B6_SIMILAR_WORDING": True,
     "MDARIX_B6_VALUE_CENTRE": True,
 }
-SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES, **B6_SWITCHES}
+# RCA tools switches and their defaults (spec 8.2, all on): off, their routes answer 404 and their screens hide;
+# signed categories stay readable and signing works without the cause fields.
+RCA_SWITCHES = {"MDARIX_RCA_METHODS": True, "MDARIX_RCA_INTELLIGENCE": True}
+SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES, **B6_SWITCHES, **RCA_SWITCHES}
 
 
 def switched_on(name: str | None) -> bool:

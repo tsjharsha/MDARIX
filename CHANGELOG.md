@@ -10,6 +10,34 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Unreleased: RCA tools
+
+Root-cause methods and investigation intelligence (RCA spec, Parts A and C). No AI is used. Migration `trrcatools`
+(`tr3x_trial_rca_tools.py`, additive; downgrade refuses while any new column holds a value). Switches:
+`MDARIX_RCA_METHODS` and `MDARIX_RCA_INTELLIGENCE` (both on; off, their routes answer 404 and their screens hide).
+
+#### Added
+- **Fishbone.** Investigations › Intelligence › Fishbone: the case's hypotheses in seven category columns (People,
+  Process, Method, Material, Machine, Environment; Software for software products). A one-line quick add creates a
+  proposed hypothesis; wording that states a cause as established is refused. A cause may name a failure mode of the
+  FMEA and shows the risks it can lead to. Ruled-out causes stay visible, struck through, with the reason.
+- **5 Whys.** A failure chain with the method FIVE_WHYS: the problem, then 2 to 7 whys, each link with its state and
+  evidence or "Unknown: what would show it?" (one click opens a question). The last why may name a hypothesis; it is
+  never a root cause and never changes a hypothesis.
+- **The confirmed cause at signing.** The decision maker ticks the hypotheses accepted as the root cause and their
+  category, or "Not determined" with a reason; required when accepting a conclusion. Bound into the signed snapshot
+  and stored on the decision; no hypothesis changes. Decisions signed before read "Not categorised" and are never
+  changed; a superseding decision re-categorises.
+- **Pareto of confirmed causes.** Trends › By resolution: complaints, each once under its current confirmed cause
+  (latest signed decision, else the signed service-level attribution), largest first with the cumulative share and the
+  80% mark; "No confirmed cause yet" always shown. Counts only, never a rate. Route `GET /api/v1/rca/pareto`.
+- **Overview and the version at the event date.** Investigations › Intelligence › Overview: each in-scope complaint's
+  version at its event date (else awareness date), from the complaint or its lot, else "Version unknown" (a date
+  never chooses a version), flagged when the version was released after the event; then one read-only list of facts
+  with their source, hypotheses with evidence for and against, open contradictions, open unknowns and the 5 Whys,
+  each opening its record.
+- The trial sample case carries the fishbone categories and a 5 Whys.
+
 ### Unreleased: Trial organizations
 
 TO-1 parts 1 to 3: one Platform Admin page for free trials, and the customer lists show pilot and paying customers

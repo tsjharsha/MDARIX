@@ -147,6 +147,9 @@ export type SessionContext = {
     similar_wording?: boolean;
     value_centre?: boolean;
   };
+  /** RCA tools (MDARIX_RCA_*, feature_set.RCA_SWITCHES): fishbone, 5 Whys, Pareto and the cause at signing
+   * (methods); the overview and the version at the event date (intelligence). */
+  rca?: { methods?: boolean; intelligence?: boolean };
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -425,6 +428,15 @@ export function useB9India(): boolean {
 }
 
 /** B9: Canada's chain and official form show only while the server has MDARIX_B9_CANADA on. */
+/** RCA tools: shown only while the server says they are on (an older server has no RCA API). */
+export function useRcaMethods(): boolean {
+  return useContext(WorkspaceContext)?.session?.rca?.methods === true;
+}
+
+export function useRcaIntelligence(): boolean {
+  return useContext(WorkspaceContext)?.session?.rca?.intelligence === true;
+}
+
 export function useB9Canada(): boolean {
   return useContext(WorkspaceContext)?.session?.b9?.canada === true;
 }
