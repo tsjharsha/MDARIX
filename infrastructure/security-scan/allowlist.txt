@@ -1,0 +1,95 @@
+# Findings of scripts/security_scan.sh reviewed as false positives (or accepted), so they do not return in each run.
+# One finding pattern per line, four fields separated by " | ":
+#
+#   tool | rule id | location contains (or *) | reason
+#
+# tool:      semgrep, bandit, pip-audit, npm-audit, gitleaks, trivy, zap-baseline, zap-api, schemathesis, nuclei,
+#            cross-tenant, testssl, observatory
+# rule id:   the id the summary prints (check id, test id, CVE/GHSA, ZAP plugin id, template id)
+# location:  part of the file:line, URL, package or image the summary prints; * matches every location
+# reason:    required; why it is not a real problem here. Name who reviewed it and the date.
+#
+# The summary counts matched findings as "allow-listed" instead of under their severity, and refuses a line without
+# a reason. Remove a line once the finding no longer appears or the reason no longer holds.
+semgrep | python.lang.security.use-defused-xml-parse.use-defused-xml-parse | scripts/security_scan_summary.py | parses only the JUnit XML that the scan tools wrote on this machine, never uploaded or remote input; stdlib only by design (build run, 2026-11-14)
+#
+# Remaining scan findings reviewed in MDARIX-planning/security-scans/sql-text-review.md (#34).
+semgrep | python.django.security.injection.ssrf.ssrf-injection-requests.ssrf-injection-requests | backend/app/case_intelligence/router.py | false positive: `requests` is a local dict of supplier evidence requests, not the HTTP library (sql-text-review #32/#34, 2026-11-14)
+bandit | B113 | backend/app/case_intelligence/router.py | false positive: dict.get on a local variable named `requests`, no HTTP call (sql-text-review #32/#34, 2026-11-14)
+bandit | B113 | backend/app/evidence_workflow/inventory.py | false positive: dict.get on a local variable named `requests`, no HTTP call (sql-text-review #32/#34, 2026-11-14)
+bandit | B113 | backend/app/oversight/closure.py | false positive: dict.get on a local variable named `requests`, no HTTP call (sql-text-review #32/#34, 2026-11-14)
+bandit | B113 | backend/app/trial/retention.py | false positive: dict.get on a local variable named `requests`, no HTTP call (sql-text-review #32/#34, 2026-11-14)
+bandit | B113 | backend/app/trial/story.py | false positive: dict.get on a local variable named `requests`, no HTTP call (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure | auth/service.py:128 | false positive: logs a file path, never a password or token (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure | backend/app/auth_router.py:1104 | false positive: logs an exception type name, never a password or token (sql-text-review #32/#34, 2026-11-14)
+semgrep | javascript.browser.security.open-redirect.js-open-redirect | frontend/src/features/auth/AuthPage.tsx | false positive: returnTo always passes safeReturnTo (must start with /, not //, no backslash or control characters, same origin; otherwise /app) (sql-text-review #32/#34, 2026-11-14)
+bandit | B314 | regulatory_intelligence/estar.py | false positive: checks only XML that MDARIX generated itself (generate_estar_package), never uploaded input (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.lang.security.use-defused-xml-parse.use-defused-xml-parse | backend/app/trial/xlsx.py | stdlib ElementTree fetches no external entities (no XXE); expat limits entity amplification; the module caps unpacked size (60 MB), part size (5 MB), compression ratio (100), element count and depth (64). Optional: defusedxml at the next dependency update (sql-text-review #32/#34, 2026-11-14)
+bandit | B314 | backend/app/trial/xlsx.py | stdlib ElementTree fetches no external entities (no XXE); expat limits entity amplification; the module caps unpacked size (60 MB), part size (5 MB), compression ratio (100), element count and depth (64). Optional: defusedxml at the next dependency update (sql-text-review #32/#34, 2026-11-14)
+bandit | B108 | backend/app/scheduler.py | accepted risk: fixed heartbeat file path inside the container (MDARIX_SCHEDULER_HEARTBEAT_FILE overrides it) (sql-text-review #32/#34, 2026-11-14)
+bandit | B108 | scripts/backup_validation_dataplanes.py | accepted risk: /tmp path inside the database container that receives the dump by docker cp, in an operator backup-validation script (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args | object_storage/service.py:246 | accepted risk: runs MDARIX_MALWARE_SCANNER_COMMAND (operator setting) as an argument list, no shell; file content on stdin, 15 s timeout; no user value reaches the arguments (sql-text-review #32/#34, 2026-11-14)
+bandit | B615 | scripts/prepare_embedding_cache.py | false positive: snapshot_download passes revision=LOCAL_EMBEDDING_REVISION, a pinned commit hash (retrieval/embedding_provider.py); bandit cannot see through the constant (sql-text-review #32/#34, 2026-11-14)
+#
+# Hand-written SQL text (#32): no user value is formatted into SQL; values are bound. Per file, so a new file still shows up.
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/data_plane_router.py | table and field names come from literal names or a constant tuple; tenant, search text and limit are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/data_plane_router.py | table and field names come from literal names or a constant tuple; tenant, search text and limit are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/product360/links.py | constant SQL and constant fragments (_VERSION, literal where clauses); product, version, statuses, ids, limit and offset are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/product360/links.py | constant SQL and constant fragments (_VERSION, literal where clauses); product, version, statuses, ids, limit and offset are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/product360/service.py | constant fragments (on_version, covers); tenant, product and version are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/product360/service.py | constant fragments (on_version, covers); tenant, product and version are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/stage3_router.py | tables and columns come from the constant _COUNT_TABLES, _DAILY and _BREAKDOWNS maps and constant _VERSION_* clauses; tenant, dates and version id are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/stage3_router.py | tables and columns come from the constant _COUNT_TABLES, _DAILY and _BREAKDOWNS maps and constant _VERSION_* clauses; tenant, dates and version id are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/tenant_export.py | schema and table come from the catalog or the constant READABLE_TABLES (also checked in the catalog) and are double-quoted; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/tenant_export.py | schema and table come from the catalog or the constant READABLE_TABLES (also checked in the catalog) and are double-quoted; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/tenant_purge.py | tables come from tenant_tables() (catalog, quoted) or the constant PERSONAL_ACCOUNT_TABLES checked against the catalog; tenant and user id are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/tenant_purge.py | tables come from tenant_tables() (catalog, quoted) or the constant PERSONAL_ACCOUNT_TABLES checked against the catalog; tenant and user id are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/trial/retention.py | the constant TRIAL_DATA_TABLES filtered by the catalog; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/trial/retention.py | the constant TRIAL_DATA_TABLES filtered by the catalog; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/trial/sample_clock.py | tables from the sample-removal plan (catalog); date and time columns from the catalog, quoted; interval, days, tenant and ids are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/trial/sample_clock.py | tables from the sample-removal plan (catalog); date and time columns from the catalog, quoted; interval, days, tenant and ids are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/trial/sample_removal.py | tables and columns come from the plan and the catalog's foreign keys (_foreign_keys), plus the literal report_jobs; tenant and ids are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | backend/app/trial/sample_removal.py | tables and columns come from the plan and the catalog's foreign keys (_foreign_keys), plus the literal report_jobs; tenant and ids are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | graph/service.py | table and columns come from NODE_TYPES after clean_entity_type refuses any type not on that allow-list; tenant and id are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | graph/service.py | table and columns come from NODE_TYPES after clean_entity_type refuses any type not on that allow-list; tenant and id are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | infrastructure/database/seeds/master_data_v1.py | _insert: the table and keyword names are literals in the seed's calls; values are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | infrastructure/database/seeds/master_data_v1.py | _insert: the table and keyword names are literals in the seed's calls; values are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | ingestion/normalization/service.py | literal table lists and the constant REVISION_KEY_SQL fragment; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | ingestion/normalization/service.py | literal table lists and the constant REVISION_KEY_SQL fragment; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | retrieval/service.py | constant filter strings; the dimension is int(metadata.dimension) from the provider, not the request; vector, types and dates are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | retrieval/service.py | constant filter strings; the dimension is int(metadata.dimension) from the provider, not the request; vector, types and dates are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/cell_install.py | operator script: table from the catalog (_tenant_tables), quoted; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | scripts/cell_install.py | operator script: table from the catalog (_tenant_tables), quoted; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/initialize_data_planes.py | operator script: a loop over a literal list of tables; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | scripts/initialize_data_planes.py | operator script: a loop over a literal list of tables; tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/inventory_validation_dataset.py | operator script: the constant DATA_TABLES, also in the inspector, quoted (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | scripts/inventory_validation_dataset.py | operator script: the constant DATA_TABLES, also in the inspector, quoted (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/move_tenant_to_cell.py | operator script: column names from a literal tuple; values and id are bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | scripts/move_tenant_to_cell.py | operator script: column names from a literal tuple; values and id are bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/validate_validation_dataset.py | operator script: table from the inspector or the constant MINIMUM_COUNTS through _quoted (doubles "); tenant is bound (sql-text-review #32/#34, 2026-11-14)
+bandit | B608 | scripts/validate_validation_dataset.py | operator script: table from the inspector or the constant MINIMUM_COUNTS through _quoted (doubles "); tenant is bound (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | backend/app/db/models/master.py | fixed server default md_master.next_business_id('<prefix>') with a literal prefix (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/configure_backup_role.py | operator script: role from MDARIX_BACKUP_DB_USER checked as a plain name; database from current_database(), schemas from pg_namespace; password through quote_literal (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/configure_runtime_role.py | operator script: role checked as a plain name; password through quote_literal (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/migrate_data_planes.py | operator script: tables are the literals customers/tenants and the constant CONTROL_ONLY; role from MDARIX_DB_RUNTIME_USER, double-quoted (H-1: name not yet checked) (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/prepare_test_environment.py | test tooling: database name from POSTGRES_DB, must end in _test, quoted (H-2: embedded " not escaped) (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/upgrade_data_planes.py | operator script: role checked against ^[a-z][a-z0-9_]{2,62}$ and quoted; GRANTs are literals (D-1 is a separate, non-security defect) (sql-text-review #32/#34, 2026-11-14)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | source_simulator/persistent_store.py | development-only simulator: database name must match [a-z][a-z0-9_]{1,62} before use (sql-text-review #32/#34, 2026-11-14)
+bandit | B314 | scripts/security_scan_summary.py | parses only the JUnit XML that the scan tools wrote on this machine, never uploaded or remote input (same finding as the semgrep line above) (build run, 2026-11-14)
+#
+# urlopen (B310): every URL is a constant, an operator setting or an operator script's argument; none comes from a request. See the review.
+bandit | B310 | backend/app/alerts.py | URL is the operator setting MDARIX_ALERT_WEBHOOK (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | backend/app/cell_link.py | URL is the operator setting MDARIX_PLATFORM_URL (TLS with MDARIX_PLATFORM_CA_FILE) (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | backend/app/scheduler.py | URL is the operator setting MDARIX_SCHEDULER_HEARTBEAT_URL (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | communication/email/resend_provider.py | URL is the constant https endpoint of the mail provider (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | genai/provider.py | URL is the provider's built-in https URL or the operator setting MDARIX_GENAI_*_BASE_URL; no request sets it (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | genai/validation.py | URL is the same provider base_url (constant or operator setting) (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | integration/api_contract.py | fetch_page refuses non-http(s) endpoints; its only callers build http://<host>:<port> from the constant PROVIDER_PORTS for the local simulators (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | integration/simulator_ingestion.py | URL built from the constant PROVIDER_PORTS for the local simulators (host defaults to 127.0.0.1) (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/benchmark_api.py | operator script: URL from --base-url (default 127.0.0.1) (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/load_source_templates.py | operator script: URL from --host and the constant simulator ports (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/production_smoke.py | operator script: URL from --base (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/seed_provider_simulators.py | operator script: URL from the constant simulator ports (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/validate_local_stack.py | operator script: URL from environment settings with 127.0.0.1 defaults (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/validate_mvp_validation_matrix.py | operator script: URL is a literal 127.0.0.1 simulator address (sql-text-review #34 B310 review, 2026-11-14)
+bandit | B310 | scripts/validate_production_operations.py | operator script: URL from MDARIX_OPERATIONAL_URLS or MDARIX_APP_URL (sql-text-review #34 B310 review, 2026-11-14)

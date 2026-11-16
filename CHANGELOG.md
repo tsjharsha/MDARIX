@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Added
+
+- **Free security scans for the test release** (`scripts/security_scan.sh`, runbook `docs/runbooks/SECURITY_SCANS.md`):
+  static checks of the code, libraries, images and git history, and attack-style API scans against a local test copy
+  only, with a one-page summary per release and an allow-list for reviewed false positives. Manual job on the
+  self-hosted runner; reports stay on the laptop. No product change.
+
 ### Unreleased: RCA tools
 
 Root-cause methods and investigation intelligence (RCA spec, Parts A and C). No AI is used. Migration `trrcatools`
