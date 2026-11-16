@@ -19,12 +19,13 @@
       "provider": "omniroute",
       "kind": "gateway",
       "chain": "trial",
-      "upstream_from": "body:model",
+      "upstream_from": "headers:x-omniroute-provider,x-omniroute-model",
+      "cache_header": "x-omniroute-cache",
       "terms_link": null,
       "date_checked": null,
       "region": "loopback on the MDARIX server",
       "checked_by": null,
-      "notes": "Self-hosted gateway; only vetted upstreams in its combo."
+      "notes": "Self-hosted gateway; only vetted upstreams in its combo. Reply format read from its published source (release v3.8.54, 16 Nov 2026), never by calling it: the provider alias is in X-OmniRoute-Provider and the model in X-OmniRoute-Model; the body 'model' is the bare upstream model name (or the requested name when its echo setting is on); a cached reply says X-OmniRoute-Cache: HIT and is discarded. Register rows for its upstreams use OmniRoute's provider aliases (e.g. groq)."
     },
     {
       "provider": "groq",

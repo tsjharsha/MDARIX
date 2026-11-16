@@ -40,7 +40,13 @@ def _register(**overrides) -> dict:
     }
     rows = [
         {"provider": "freellmapi", "kind": "gateway", "chain": "trial", "upstream_from": "header:x-routed-via"},
-        {"provider": "omniroute", "kind": "gateway", "chain": "trial", "upstream_from": "body:model"},
+        {
+            "provider": "omniroute",
+            "kind": "gateway",
+            "chain": "trial",
+            "upstream_from": "headers:x-omniroute-provider,x-omniroute-model",
+            "cache_header": "x-omniroute-cache",
+        },
         {**upstream, "provider": "groq", "direct": True},
         {**upstream, "provider": "cerebras"},
         {**upstream, "provider": "mistral", "commercial_use": False},
@@ -60,6 +66,10 @@ class _Reply(io.BytesIO):
 
     def __exit__(self, *args):
         return False
+
+
+# OmniRoute names the upstream in two headers (its published source, release v3.8.54; never called).
+OMNI_CEREBRAS = {"X-OmniRoute-Provider": "cerebras", "X-OmniRoute-Model": "m-2", "X-OmniRoute-Cache": "MISS"}
 
 
 def _answer(text: str = "From the sample records.", model: str = "m-1") -> dict:
@@ -220,7 +230,7 @@ def test_a_refused_key_moves_on_rests_an_hour_and_alerts(chain, monkeypatch):
     alerts = []
     monkeypatch.setattr("backend.app.alerts.send_alert", lambda title, body: alerts.append(title))
     chain["state"]["replies"][FREELLMAPI] = _http_error(FREELLMAPI, 401)
-    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer(model="cerebras/m-2"))
+    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer(), OMNI_CEREBRAS)
     result = _ask()
     assert result.provider == "omniroute" and result.upstream_provider == "cerebras"
     assert provider_module._COOLDOWN_UNTIL["freellmapi"] - provider_module.time.time() > 3000
@@ -234,10 +244,25 @@ def test_a_refused_key_moves_on_rests_an_hour_and_alerts(chain, monkeypatch):
 def test_a_reply_from_an_unvetted_or_unnamed_upstream_is_discarded(chain, monkeypatch, headers):
     monkeypatch.setattr("backend.app.alerts.send_alert", lambda title, body: None)
     chain["state"]["replies"][FREELLMAPI] = _Reply(_answer("SECRET UNVETTED TEXT"), headers)
-    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer("Vetted answer.", model="cerebras/m-2"))
+    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer("Vetted answer."), OMNI_CEREBRAS)
     result = _ask()
     assert result.output["answer"] == "Vetted answer."
     assert result.attempts[0]["outcome"] == "UPSTREAM_NOT_VETTED"
+
+
+def test_omniroute_names_its_upstream_in_headers_not_in_the_body_model(monkeypatch):
+    monkeypatch.setattr(vetted, "load", lambda path=None: _register())
+    # Groq's own model ids carry a slash: the body "model" must not be read as "provider/model".
+    found = vetted.identify(
+        "omniroute",
+        headers={"X-OmniRoute-Provider": "groq", "X-OmniRoute-Model": "openai/gpt-oss-120b"},
+        raw={"model": "openai/gpt-oss-120b"},
+    )
+    assert (found.provider, found.model) == ("groq", "openai/gpt-oss-120b")
+    with pytest.raises(vetted.UpstreamNotVetted):
+        vetted.identify("omniroute", headers={}, raw={"model": "cerebras/m-2"})
+    with pytest.raises(vetted.UpstreamNotVetted, match="cache"):
+        vetted.identify("omniroute", headers={**OMNI_CEREBRAS, "X-OmniRoute-Cache": "HIT"}, raw={})
 
 
 def test_every_provider_failing_gives_the_rules_answer(chain):
@@ -256,7 +281,7 @@ def test_the_total_deadline_ends_the_chain(chain, monkeypatch):
 
 def test_a_structured_request_moves_on_at_once_after_an_invalid_answer(chain):
     chain["state"]["replies"][FREELLMAPI] = _Reply(_answer("not json"), {"x-routed-via": "cerebras/m-1"})
-    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer('{"ok": true}', model="cerebras/m-2"))
+    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer('{"ok": true}'), OMNI_CEREBRAS)
     result = _ask(json_output=True)
     assert result.provider == "omniroute" and result.attempts[0]["outcome"] == "INVALID_OUTPUT"
 
@@ -270,7 +295,7 @@ def test_a_paid_organization_never_reaches_a_free_provider(chain, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     # The free providers would answer; the paid one is down.
     chain["state"]["replies"][FREELLMAPI] = _Reply(_answer(), {"x-routed-via": "cerebras/m-1"})
-    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer(model="cerebras/m-2"))
+    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer(), OMNI_CEREBRAS)
     chain["state"]["replies"][GROQ] = _Reply(_answer())
     with pytest.raises(GenAIUnavailable):
         _ask(GenAIProvider(max_retries=0))

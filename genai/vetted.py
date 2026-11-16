@@ -4,7 +4,7 @@
 
 * a **gateway** (``freellmapi``, ``omniroute``): self-hosted software that forwards a request to an upstream. It may
   stand in the trial chain; the upstream that actually answered is read from its reply (``upstream_from``:
-  FreeLLMAPI's ``X-Routed-Via: <platform>/<model>`` header, OmniRoute's ``model`` field) and must be vetted;
+  FreeLLMAPI's ``X-Routed-Via: <platform>/<model>`` header, OmniRoute's ``X-OmniRoute-Provider`` and ``X-OmniRoute-Model`` headers) and must be vetted;
 * an **upstream** (``groq`` and the platforms behind the gateways): a model provider whose terms were read. It is
   usable only when commercial use is allowed, it does not train on the data (or an opt-out is confirmed) and the
   check is under ``refuse_after_days`` old (a warning from ``warn_after_days``). ``direct: true`` lets it stand in the
@@ -112,6 +112,16 @@ def warnings(names, register: dict | None = None, today: date | None = None) -> 
     return found
 
 
+def _header(headers, name: str | None) -> str | None:
+    """A reply header by name, whatever its case (the HTTP reply's headers, or a plain dict in tests)."""
+    if not headers or not name:
+        return None
+    value = headers.get(name)
+    if value is None and isinstance(headers, dict):
+        value = next((item for key, item in headers.items() if str(key).lower() == name.lower()), None)
+    return str(value) if value is not None else None
+
+
 def _split(value: str | None) -> tuple[str, str | None] | None:
     text = str(value or "").strip()
     if "/" not in text:
@@ -135,8 +145,17 @@ def identify(gateway: str, *, headers=None, raw: dict | None = None, configured_
         model = (raw or {}).get("model") or configured_model
         return Upstream(gateway, gateway, str(model) if model else None)
     source = str(row.get("upstream_from") or "")
+    cache = _header(headers, row.get("cache_header"))
+    if cache and cache.strip().upper() != "MISS":
+        raise UpstreamNotVetted(f"{gateway} answered from its cache: the upstream is not identifiable")
     if source.startswith("header:"):
-        value = (headers or {}).get(source.split(":", 1)[1]) if headers is not None else None
+        value = _header(headers, source.split(":", 1)[1])
+    elif source.startswith("headers:"):
+        # Provider and model in two headers (OmniRoute: X-OmniRoute-Provider, X-OmniRoute-Model). Its body "model"
+        # is the upstream's bare model name (e.g. "openai/gpt-oss-120b" from Groq), so it cannot name the provider.
+        provider_header, model_header = source.split(":", 1)[1].split(",", 1)
+        platform, model = _header(headers, provider_header), _header(headers, model_header)
+        value = f"{platform.strip()}/{model.strip()}" if platform and model and platform.strip() else None
     elif source.startswith("body:"):
         value = (raw or {}).get(source.split(":", 1)[1])
     else:

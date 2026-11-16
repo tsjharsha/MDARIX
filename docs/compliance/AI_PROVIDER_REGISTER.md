@@ -45,7 +45,7 @@ never use this chain, and the chain never holds a paid provider. Sample data may
 The machine-readable register is `genai/vetted_providers.json` (read by the code, under AI change control: a new or
 changed row is a Major change). An upstream may answer only when commercial use is allowed, it does not train on the
 data (or an opt-out is confirmed), and its terms were checked less than 12 months ago (a warning from 6 months,
-decision T8). A reply whose actual upstream (FreeLLMAPI's `X-Routed-Via`, OmniRoute's `model` field) is not vetted is
+decision T8). A reply whose actual upstream (FreeLLMAPI's `X-Routed-Via`, OmniRoute's `X-OmniRoute-Provider` and `X-OmniRoute-Model` headers; a cached OmniRoute reply is discarded) is not vetted is
 discarded unread. Free-model results never count as qualification.
 
 | Provider | Kind | Terms link | Commercial use | Trains on data | Region | Date checked | Checked by |
