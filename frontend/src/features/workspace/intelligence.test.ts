@@ -463,3 +463,13 @@ describe("AI status", () => {
     expect(aiNoticeOf({ ai_notice: null })).toBeNull();
   });
 });
+
+describe("the order of the intelligence views", () => {
+  it("opens on the Overview and shows the method first, then the working views", async () => {
+    const { INTELLIGENCE_VIEWS: views, shownIntelligenceView } = await import("./intelligence");
+    expect(views.slice(0, 5)).toEqual(["Overview", "Fishbone", "5 Whys", "Hypotheses", "Failure chain"]);
+    // A view switched off never opens: the first shown one does.
+    expect(shownIntelligenceView(["Hypotheses", "Unknowns"], "Overview")).toBe("Hypotheses");
+    expect(shownIntelligenceView(["Overview", "Unknowns"], "Unknowns")).toBe("Unknowns");
+  });
+});

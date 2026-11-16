@@ -20,21 +20,26 @@ const isObject = (value: unknown): value is Record<string, any> =>
 // ---------------------------------------------------------------------------------------------------------------
 // The Intelligence tab of Investigations and its views
 
+// The method first, in the order a reader follows it (Overview opens), then the working views.
 export const INTELLIGENCE_VIEWS = [
-  "Hypotheses",
   // RCA tools: the read-only overview (MDARIX_RCA_INTELLIGENCE), the fishbone and the 5 Whys (MDARIX_RCA_METHODS).
   "Overview",
   "Fishbone",
   "5 Whys",
-  // B5a: drafts and questions drawn by rule from the records (hidden while the switch is off).
-  "Challenge",
+  "Hypotheses",
+  "Failure chain",
   "Contradictions",
   "Unknowns",
-  "Failure chain",
   "Observations",
+  // B5a: drafts and questions drawn by rule from the records (hidden while the switch is off).
+  "Challenge",
   "History",
 ] as const;
 export type IntelligenceView = (typeof INTELLIGENCE_VIEWS)[number];
+
+/** The view to show: the one asked for when it is shown, else the first shown (a switched-off view never opens). */
+export const shownIntelligenceView = (views: readonly IntelligenceView[], requested: IntelligenceView) =>
+  views.includes(requested) ? requested : (views[0] ?? requested);
 
 export const INTELLIGENCE_TAB = "Intelligence";
 

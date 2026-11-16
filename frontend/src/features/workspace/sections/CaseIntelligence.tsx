@@ -1,5 +1,5 @@
 import { Tabs } from "../../customer-admin/shared";
-import { INTELLIGENCE_VIEWS, type IntelligenceView } from "../intelligence";
+import { INTELLIGENCE_VIEWS, shownIntelligenceView, type IntelligenceView } from "../intelligence";
 import { ChallengeView } from "./caseIntelligence/Challenge";
 import { ContradictionsView } from "./caseIntelligence/Contradictions";
 import { FailureChainView } from "./caseIntelligence/FailureChain";
@@ -21,7 +21,7 @@ export { ChainDiagram, ChainLegend } from "./caseIntelligence/FailureChain";
 export function CaseIntelligencePanel({
   investigationId,
   caseLabel,
-  view,
+  view: requested,
   onView,
   adding = false,
   onAddingShown,
@@ -46,11 +46,10 @@ export function CaseIntelligencePanel({
     ...(overview ? [] : ["Overview"]),
   ]);
   const views = INTELLIGENCE_VIEWS.filter((item) => !hidden.has(item));
+  const view = shownIntelligenceView(views, requested);
   return (
     <>
-      <p className="ac-note">
-        Every statement shows its kind and its author. AI suggestions are never facts.
-      </p>
+      <p className="ac-note">Every statement shows its kind and its author. AI suggestions are never facts.</p>
       {readOnly && (
         <p className="ac-message tone-warning" role="note">
           This investigation is closed: its intelligence can be read but not changed.

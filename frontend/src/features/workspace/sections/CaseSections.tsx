@@ -75,7 +75,7 @@ export function CaseSections({
   const [active, setActive] = useState<CaseSection>(() => offeredTab(requested, CASE_SECTIONS, "Summary"));
   const [part, setPart] = useState<string | null>(() => tabParam(requested, "part"));
   const view = tabParam(requested, "view");
-  const [intelView, setIntelView] = useState<IntelligenceView>(isIntelligenceView(view) ? view : "Hypotheses");
+  const [intelView, setIntelView] = useState<IntelligenceView>(isIntelligenceView(view) ? view : "Overview");
   // What a link carried: a review to open, a follow-up or an assessment of the decision (the former tabs' own forms).
   const [requestedReview] = useState(() => parseReviewsTab(renamed(requested, "Reviews")));
   const [requestedDecision] = useState(() => parseDecisionTab(renamed(requested, "Decision")));
