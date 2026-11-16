@@ -9023,7 +9023,11 @@ details.uw-team-change[open] {
   color: var(--ac-good);
 }
 .rca-against {
-  color: var(--ac-critical);
+  color: var(--ms-ink-2);
+}
+/* Red means overdue or critical only (design rule R3); a zero count recedes. */
+.rca-evidence .is-zero {
+  color: var(--ms-muted);
 }
 .rca-counts {
   display: flex;
@@ -9102,7 +9106,7 @@ details.uw-team-change[open] {
   background: var(--ac-surface);
 }
 .rca-why.is-problem {
-  border-left-color: var(--ac-critical);
+  border-left-color: var(--ms-teal-mark);
 }
 .rca-why-link {
   display: flex;
@@ -9131,13 +9135,13 @@ details.uw-team-change[open] {
 }
 .rca-pareto-bar {
   height: 14px;
-  border-radius: 3px;
+  border-radius: var(--ms-radius-pill);
   background: var(--ac-track);
 }
 .rca-pareto-bar span {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--ms-radius-pill);
   background: var(--ac-teal);
 }
 .rca-pareto li.is-none .rca-pareto-bar span {

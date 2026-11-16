@@ -255,8 +255,10 @@ export function CauseCard({ cause, onChange }: { cause: FishboneCause; onChange?
       <p className="rca-cause-text">{cause.statement}</p>
       {cause.ruled_out && cause.ruled_out_reason && <p className="uw-intel-reason">Reason: {cause.ruled_out_reason}</p>}
       <p className="rca-evidence">
-        <span className="rca-for">{cause.evidence_for} for</span>
-        <span className="rca-against">{cause.evidence_against} against</span>
+        <span className={cause.evidence_for ? "rca-for" : "rca-for is-zero"}>{cause.evidence_for} for</span>
+        <span className={cause.evidence_against ? "rca-against" : "rca-against is-zero"}>
+          {cause.evidence_against} against
+        </span>
       </p>
       {cause.failure_mode ? (
         <p className="ac-muted">
