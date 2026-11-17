@@ -137,6 +137,8 @@ TRIAL_OWNER_ADMIN_ROUTES = {
     # Validation evidence and its release validation pack (E2): what a trial's owner shows a customer's validation lead.
     "/api/v1/admin/validation-evidence",
     "/api/v1/admin/validation-evidence/pack",
+    # AI governance, read only (E1): like the AI settings, admin_or_trial_owner (colleague 403: test_ai_governance.py).
+    "/api/v1/admin/ai-governance",
 }
 
 _WORK = {RECORDS_WRITE, AI_RUN, DATA_EXPORT}
