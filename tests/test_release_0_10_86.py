@@ -276,7 +276,9 @@ def test_a_pending_exit_request_and_an_open_mvp_request_stay_listed_behind_500_n
         with SessionLocal() as db:
             bind_system(db, "test: 0.10.86 request lists")
             listed = early_exit.overview(db)
-            assert listed[0]["id"] == str(pending) and listed[0]["status"] == "PENDING"
+            # Pending requests come first; others the shared test database holds may be pending too.
+            waiting = [item["id"] for item in listed if item["status"] == "PENDING"]
+            assert str(pending) in waiting and all(item["status"] == "PENDING" for item in listed[: len(waiting)])
             assert str(opened) in [item["id"] for item in mvp_request.overview(db)["items"]]
     finally:
         with SessionLocal() as db:
