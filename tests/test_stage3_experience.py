@@ -1,6 +1,9 @@
 import re
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from backend.app.stage3_router import (
     agent_catalog,
     product_version_story,
@@ -34,10 +37,12 @@ def test_story_not_found_is_non_disclosing():
         def first(self):
             return None
 
-    result = story_view("foreign-investigation", EmptyDB(), EmptyDB(), _ctx())
-    assert result["status"] == "NOT_FOUND"
-    assert "tenant-a" == result["tenant_id"]
-    assert "foreign" not in result["message"].lower()
+    # Owner decision 2 (10 Nov): another organization's or an unknown id answers 404, the same for both.
+    with pytest.raises(HTTPException) as missing:
+        story_view("foreign-investigation", EmptyDB(), EmptyDB(), _ctx())
+    assert missing.value.status_code == 404
+    assert missing.value.detail["code"] == "INVESTIGATION_NOT_FOUND"
+    assert "foreign" not in missing.value.detail["message"].lower()
 
 
 def test_signal_detail_is_tenant_scoped_and_non_disclosing_when_missing():

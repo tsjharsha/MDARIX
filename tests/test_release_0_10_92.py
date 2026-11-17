@@ -108,7 +108,13 @@ def test_a_sample_contact_a_person_reviewed_stops_the_clock(fresh):
     _ok(
         user.post(
             f"{INTAKE}/{call['id']}/check/review",
-            json={"outcome": "AGREED", "note": "Service only: agreed with the sample author.", "password": PASSWORD},
+            json={
+                "outcome": "AGREED",
+                "note": "Service only: agreed with the sample author.",
+                # S-2 (B2): agreeing closes the service-only case, which needs its resolution summary.
+                "resolution_summary": "Replacement cuff sent; the customer confirmed it fits.",
+                "password": PASSWORD,
+            },
         )
     )
     with _data(tenant_id) as db:
