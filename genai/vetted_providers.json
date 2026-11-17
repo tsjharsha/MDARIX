@@ -9,11 +9,11 @@
       "kind": "gateway",
       "chain": "trial",
       "upstream_from": "header:x-routed-via",
-      "terms_link": null,
-      "date_checked": null,
+      "terms_link": "self-hosted open-source software (no provider terms; loopback only)",
+      "date_checked": "2026-11-17",
       "region": "loopback on the MDARIX server",
-      "checked_by": null,
-      "notes": "Self-hosted router, bound to 127.0.0.1. Only vetted upstream keys are entered in it; its key for MDARIX is scoped to vetted models."
+      "checked_by": "Srinivas (owner)",
+      "notes": "Self-hosted router, bound to 127.0.0.1. Only vetted upstream keys are entered in it; its key for MDARIX is scoped to vetted models. Upstream names in X-Routed-Via: groq, cloudflare, openrouter."
     },
     {
       "provider": "omniroute",
@@ -21,24 +21,60 @@
       "chain": "trial",
       "upstream_from": "headers:x-omniroute-provider,x-omniroute-model",
       "cache_header": "x-omniroute-cache",
-      "terms_link": null,
-      "date_checked": null,
+      "terms_link": "self-hosted open-source software (no provider terms; loopback only)",
+      "date_checked": "2026-11-17",
       "region": "loopback on the MDARIX server",
-      "checked_by": null,
-      "notes": "Self-hosted gateway; only vetted upstreams in its combo. Reply format read from its published source (release v3.8.54, 16 Nov 2026), never by calling it: the provider alias is in X-OmniRoute-Provider and the model in X-OmniRoute-Model; the body 'model' is the bare upstream model name (or the requested name when its echo setting is on); a cached reply says X-OmniRoute-Cache: HIT and is discarded. Register rows for its upstreams use OmniRoute's provider aliases (e.g. groq)."
+      "checked_by": "Srinivas (owner)",
+      "notes": "Self-hosted gateway; only vetted upstreams in its combo. Reply format read from its published source (release v3.8.52, 19 Oct 2026; no v3.8.54 exists), never by calling it: the provider alias is in X-OmniRoute-Provider and the model in X-OmniRoute-Model; the body 'model' is the bare upstream model name (or the requested name when its echo setting is on); a cached reply says X-OmniRoute-Cache: HIT and is discarded. Register rows for its upstreams use OmniRoute's provider aliases (groq, cloudflare-ai)."
     },
     {
       "provider": "groq",
       "kind": "upstream",
       "chain": "trial",
       "direct": true,
-      "terms_link": null,
-      "date_checked": null,
-      "region": null,
-      "commercial_use": null,
-      "trains_on_data": null,
-      "checked_by": null,
-      "notes": "Called directly as the last provider of the trial chain. Not vetted until the owner records its terms."
+      "terms_link": "https://console.groq.com/docs/legal/services-agreement",
+      "date_checked": "2026-11-17",
+      "region": "USA (Google Cloud)",
+      "commercial_use": true,
+      "trains_on_data": "no",
+      "checked_by": "Srinivas (owner)",
+      "notes": "Called directly as the last provider of the trial chain, and behind OmniRoute. Services Agreement (last modified 22 Jun 2026): 'Groq is not permitted to use Inputs or Outputs for training'. Data: https://console.groq.com/docs/your-data"
+    },
+    {
+      "provider": "cloudflare",
+      "kind": "upstream",
+      "chain": "trial",
+      "terms_link": "https://www.cloudflare.com/terms/",
+      "date_checked": "2026-11-17",
+      "region": "not stated by the provider",
+      "commercial_use": true,
+      "trains_on_data": "no",
+      "checked_by": "Srinivas (owner)",
+      "notes": "Cloudflare Workers AI behind FreeLLMAPI (FreeLLMAPI's name). 'Cloudflare does not use Customer Content processed by Workers AI to train AI models.' Data: https://developers.cloudflare.com/workers-ai/platform/data-usage/"
+    },
+    {
+      "provider": "cloudflare-ai",
+      "kind": "upstream",
+      "chain": "trial",
+      "terms_link": "https://www.cloudflare.com/terms/",
+      "date_checked": "2026-11-17",
+      "region": "not stated by the provider",
+      "commercial_use": true,
+      "trains_on_data": "no",
+      "checked_by": "Srinivas (owner)",
+      "notes": "The same Cloudflare Workers AI behind OmniRoute (OmniRoute's provider alias); same terms as the 'cloudflare' row."
+    },
+    {
+      "provider": "openrouter",
+      "kind": "upstream",
+      "chain": "trial",
+      "terms_link": "https://openrouter.ai/terms",
+      "date_checked": "2026-11-17",
+      "region": "not stated by the provider",
+      "commercial_use": true,
+      "trains_on_data": "opt_out_confirmed",
+      "checked_by": "Srinivas (owner)",
+      "notes": "Behind FreeLLMAPI only. Usable only with the account's privacy setting that blocks providers which train on data (owner set it before creating the key). Data: https://openrouter.ai/docs/guides/privacy/provider-logging"
     }
   ]
 }
