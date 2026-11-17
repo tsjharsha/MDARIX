@@ -169,7 +169,8 @@ def identify(gateway: str, *, headers=None, raw: dict | None = None, configured_
     problem = upstream_problem(upstream_row, register)
     if problem:
         raise UpstreamNotVetted(f"{gateway} answered through {platform}: {problem}")
+    # A "models" list is an allowlist: present and empty means no model is vetted yet (review G13: fail closed).
     allowed_models = upstream_row.get("models")
-    if allowed_models and model not in allowed_models:
+    if allowed_models is not None and model not in allowed_models:
         raise UpstreamNotVetted(f"{gateway} answered through {platform} with a model not in its vetted list")
     return Upstream(gateway, platform, model)

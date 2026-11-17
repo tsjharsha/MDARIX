@@ -46,7 +46,9 @@ The machine-readable register is `genai/vetted_providers.json` (read by the code
 changed row is a Major change). An upstream may answer only when commercial use is allowed, it does not train on the
 data (or an opt-out is confirmed), and its terms were checked less than 12 months ago (a warning from 6 months,
 decision T8). A reply whose actual upstream (FreeLLMAPI's `X-Routed-Via`, OmniRoute's `X-OmniRoute-Provider` and `X-OmniRoute-Model` headers; a cached OmniRoute reply is discarded) is not vetted is
-discarded unread. Free-model results never count as qualification.
+discarded unread. Free-model results never count as qualification. An upstream that routes to many models
+(OpenRouter) also has a `models` allowlist in its row: only the model ids listed there may answer, and an empty list
+lets none answer (review G13). The owner adds each free model after testing it with the training opt-out set.
 
 | Provider | Kind | Terms link | Commercial use | Trains on data | Region | Date checked | Checked by |
 |---|---|---|---|---|---|---|---|

@@ -1,5 +1,5 @@
 {
-  "about": "Vetted AI providers for the free-trial chain (owner decision AI-D19). Read by genai/vetted.py; people read docs/compliance/AI_PROVIDER_REGISTER.md. A new or changed row is a Major AI change. An upstream may answer only when commercial_use is true, trains_on_data is 'no' or 'opt_out_confirmed', and date_checked is under 12 months old (a warning from 6 months). Rows with nulls are not vetted yet: the owner fills them after reading each provider's terms.",
+  "about": "Vetted AI providers for the free-trial chain (owner decision AI-D19). Read by genai/vetted.py; people read docs/compliance/AI_PROVIDER_REGISTER.md. A new or changed row is a Major AI change. An upstream may answer only when commercial_use is true, trains_on_data is 'no' or 'opt_out_confirmed', and date_checked is under 12 months old (a warning from 6 months). Rows with nulls are not vetted yet: the owner fills them after reading each provider's terms. A 'models' list is an allowlist of the upstream's model ids: an empty list lets no model answer (OpenRouter: the owner adds each free model after testing it).",
   "version": 1,
   "warn_after_days": 183,
   "refuse_after_days": 365,
@@ -73,6 +73,7 @@
       "region": "not stated by the provider",
       "commercial_use": true,
       "trains_on_data": "opt_out_confirmed",
+      "models": [],
       "checked_by": "Srinivas (owner)",
       "notes": "Behind FreeLLMAPI only. Usable only with the account's privacy setting that blocks providers which train on data (owner set it before creating the key). Data: https://openrouter.ai/docs/guides/privacy/provider-logging"
     }

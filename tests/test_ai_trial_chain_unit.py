@@ -323,6 +323,24 @@ def test_the_shipped_register_vets_only_the_owner_confirmed_upstreams():
     for unvetted in ("gemini/flash", "nvidia/llama", "cohere/command"):
         with pytest.raises(vetted.UpstreamNotVetted):
             vetted.identify("freellmapi", headers={"x-routed-via": unvetted}, raw={})
+    # Review G13: OpenRouter routes to any model, so its row carries an allowlist; empty = no model answers yet.
+    openrouter = next(item for item in register["providers"] if item["provider"] == "openrouter")
+    assert isinstance(openrouter.get("models"), list)
+    with pytest.raises(vetted.UpstreamNotVetted, match="not in its vetted list"):
+        vetted.identify("freellmapi", headers={"x-routed-via": "openrouter/some-vendor/any-model:free"}, raw={})
+
+
+def test_an_upstream_model_allowlist_admits_only_its_models(monkeypatch):
+    register = vetted.load()
+    rows = [
+        {**row, "models": ["vendor/listed-model:free"]} if row["provider"] == "openrouter" else row
+        for row in register["providers"]
+    ]
+    monkeypatch.setattr(vetted, "load", lambda path=None: {**register, "providers": rows})
+    found = vetted.identify("freellmapi", headers={"x-routed-via": "openrouter/vendor/listed-model:free"}, raw={})
+    assert (found.provider, found.model) == ("openrouter", "vendor/listed-model:free")
+    with pytest.raises(vetted.UpstreamNotVetted):
+        vetted.identify("freellmapi", headers={"x-routed-via": "openrouter/vendor/other-model:free"}, raw={})
 
 
 def test_an_old_terms_check_warns_at_six_months_and_refuses_at_twelve():
