@@ -54,7 +54,7 @@ in the footer, on `/contact` and in every email.
 - Email: the SMTP provider configured in `MDARIX_SMTP_HOST` sends account, trial and notification emails. Resend is
   used only if inbound evidence email is switched on.
 - AI: only providers listed in `MDARIX_GENAI_CONTRACTED_PROVIDERS` (under a no-training, limited-retention
-  agreement) or self-hosted models receive content in staging and production; free tiers are refused by the server.
+  agreement) or self-hosted models receive content in staging and production; free tiers are refused by the server, except vetted providers in the free-trial chain, which receive synthetic sample data only.
   List each contracted provider as a subprocessor.
 - Error reporting: Sentry, only if `MDARIX_SENTRY_DSN` is set. Request bodies and cookies are not sent.
 
@@ -113,7 +113,7 @@ not behind support access (`docs/runbooks/SUPPORT_ACCESS.md`).
 **Not offered today** (the documents should not promise them): single sign-on (OIDC/SAML), certifications such as
 ISO 27001, SOC 2 or HIPAA attestation, a validated (GxP/Part 11) system, data residency choices beyond the chosen
 hosting region, and dedicated databases for free trials (trials share the platform; each paid pilot gets a dedicated database
-hosted and run by MDARIX). AI is off for free trials and the server refuses to switch it on for them.
+hosted and run by MDARIX). In a free trial, AI works on the synthetic sample data only, through the vetted trial chain (`MDARIX_AI_TRIAL_CHAIN`, `genai/vetted_providers.json`); the server refuses edited or customer records from a trial.
 
 ## What the lawyer still has to produce
 

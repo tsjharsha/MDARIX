@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial and no fees are charged. Once the company is registered, these terms will be updated with the company's details and we will tell you by email.
 
-Last updated: 19 October 2026
+Last updated: 17 November 2026
 
 These terms govern your organization's use of the MDARIX product investigation platform (the "Service"), which the founder of MDARIX, operating it ("MDARIX", "we", "us"), provides. "Customer" or "you" means the organization that signs up for the Service. "Users" are the people the customer allows to use it.
 
@@ -35,7 +35,7 @@ The Service is for professionals aged 18 or over, acting for their organization.
 
 3.1 The Service supports your quality and regulatory processes. It does not replace them. It does not decide whether an event is reportable, set regulatory deadlines, or make product, field-action or regulatory decisions. Those decisions are made, and signed, by your authorized people, and they remain your responsibility.
 
-3.2 Some features use artificial intelligence. AI output can be incomplete or wrong. It is labelled as AI output and must be reviewed by a qualified person before anyone relies on it. AI features are off until your administrator switches them on, and stay off for free trials during the product validation phase.
+3.2 Some features use artificial intelligence. AI output can be incomplete or wrong. It is labelled as AI output and must be reviewed by a qualified person before anyone relies on it. AI features are off until your administrator switches them on. In a free trial they work on the trial's synthetic sample data only, as the trial agreement describes.
 
 3.3 The Service is not offered as a validated (GxP or 21 CFR Part 11) computerized system. If your processes require validation, you are responsible for validating your use of the Service. We will provide reasonable information to help you, as agreed in writing.
 

@@ -5,7 +5,7 @@ configured today. This is a factual inventory for the privacy notice and the dat
 text; the website does not show this file. Fill in each provider, legal entity and region when it is contracted, and
 keep the list current: a new provider is added here before it receives any data.
 
-Status below: production at https://mdarix.in, as configured on 16 October 2026.
+Status below: production at https://mdarix.in, as configured on 16 October 2026; the free-trial AI row added 17 November 2026 for the release that switches trial AI on.
 
 | Service | Provider | Purpose | Data categories | Region | Used when |
 |---|---|---|---|---|---|
@@ -16,8 +16,9 @@ Status below: production at https://mdarix.in, as configured on 16 October 2026.
 | Email delivery (SMTP) | Zoho ZeptoMail, Zoho Corporation Private Limited (`smtp.zeptomail.in`) | Account activation, password reset, trial and notification emails | Recipient name and email address; email content (no quality records) | India (Zoho's Indian data centres) | Always |
 | Mailboxes | Zoho Mail, Zoho Corporation Private Limited | The operator's own mailboxes (support@mdarix.in, privacy@mdarix.in and similar) that receive questions, requests and grievances | Whatever people write to those addresses: name, email address, message content | India (Zoho's Indian data centres) | Always |
 | AI model provider(s) | Each provider in `MDARIX_GENAI_CONTRACTED_PROVIDERS` (see `docs/compliance/AI_PROVIDER_REGISTER.md`) | Drafting and analysis features, only for organizations whose administrator switched AI on | Text of the quality records sent with a request, masked per the organization's settings | None: AI is switched off for every organization at launch (AI release gate) | Only when AI is switched on for an organization (off by default) |
+| AI model processing, free-trial sample data only | Groq, Inc. (direct and through the self-hosted OmniRoute gateway); Cloudflare, Inc. (Workers AI, through the self-hosted FreeLLMAPI and OmniRoute gateways); OpenRouter, Inc. (through FreeLLMAPI, account set to exclude providers that train on data). Terms checked 17 Nov 2026: `genai/vetted_providers.json`, `MDARIX-planning/whif-demo/ai-provider-terms.md` | AI features on a free trial's built-in sample data (Ask, summaries, code suggestions, investigation proposals) | Synthetic sample text only; no personal data and no customer content (the server refuses edited or customer records from a trial) | Groq: USA. Cloudflare and OpenRouter: not stated by the provider | Only when MDARIX switches AI on for a trial organization and its users (`MDARIX_AI_TRIAL_CHAIN` set) |
 | Error reporting | Sentry (`MDARIX_SENTRY_DSN`) | Diagnosing server errors | Error messages, stack traces and request paths; request bodies and cookies are not sent | Not used (`MDARIX_SENTRY_DSN` not set) | Only if `MDARIX_SENTRY_DSN` is set |
 | Inbound email (evidence by email) | Resend (`RESEND_API_KEY`) | Receives evidence sent to the organization's inbound address | Email content and attachments sent in, sender address | Not used (inbound evidence email switched off) | Only if inbound evidence email is switched on |
 
-Self-hosted AI models (for example on the MDARIX server itself) are not subprocessors. Payment processing is not part
+Self-hosted AI models and the self-hosted AI gateways FreeLLMAPI and OmniRoute (run on the MDARIX server, reachable from that server only) are not subprocessors; the model providers behind them are listed above. Payment processing is not part
 of the product today.

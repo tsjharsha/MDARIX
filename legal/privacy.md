@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
 
-Last updated: 21 October 2026
+Last updated: 17 November 2026
 
 This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a free trial or a demo, or use the MDARIX product investigation platform (the "Service").
 
@@ -50,7 +50,9 @@ We do not sell personal data and do not use it for advertising.
 
 ## Artificial intelligence features
 
-AI features are off for a new organization until its administrator switches them on, and they stay off for free trials during the product validation phase. When they are on, the text of the records needed for a request is sent to an AI provider we have contracted, masked according to the organization's settings. We use only providers that have agreed not to train their models on that content and to keep it for a limited period, or models we host ourselves. AI output is always labelled as such and is never treated as a verified fact or a decision.
+AI features are off for a new organization until its administrator switches them on. For a paying organization, when they are on, the text of the records needed for a request is sent to an AI provider we have contracted, masked according to the organization's settings; we use only providers that have agreed not to train their models on that content and to keep it for a limited period, or models we host ourselves.
+
+In a free trial, AI works on the trial's built-in sample data only. That data is synthetic: it contains no personal data and none of your data, and the server refuses to send your own or edited records from a trial. These sample requests may be processed by the AI services listed below under "AI services for free-trial sample data", whose terms allow business use and do not allow them to train on the content we send; some of them process it outside India. No personal data is sent to them. AI output is always labelled as such and is never treated as a verified fact or a decision.
 
 ## Who we share it with
 
@@ -59,11 +61,16 @@ We use service providers to run the Service. Each receives only what it needs fo
 - **Google Cloud** (Google Cloud India Private Limited): hosting, database, file storage and encrypted backups, in India.
 - **Zoho** (Zoho Corporation Private Limited, India): delivery of the emails we send, such as invitations, password resets and trial reminders (ZeptoMail), and our mailboxes, such as support@mdarix.in and privacy@mdarix.in (Zoho Mail), from Zoho's data centres in India. ZeptoMail receives the recipient's name and email address and the email's content. Quality records are never sent by email.
 
+AI services for free-trial sample data (only when AI is switched on for a trial; they receive synthetic sample text only, never personal data or customer content):
+- **Groq** (Groq, Inc.): AI model processing, in the USA.
+- **Cloudflare Workers AI** (Cloudflare, Inc.): AI model processing; region not stated by the provider.
+- **OpenRouter** (OpenRouter, Inc.): routing to AI models whose providers do not train on the content; region not stated by the provider.
+
 We will update this list before any other provider receives personal data. We may also disclose personal data where the law requires it, or to protect our rights, our users or the public.
 
 ## Where it is processed
 
-The Service and its data are hosted in India, by Google Cloud in its Mumbai region, with encrypted backup copies in its Delhi region. Our emails are sent and received through Zoho's data centres in India. We do not transfer personal data outside India.
+The Service and its data are hosted in India, by Google Cloud in its Mumbai region, with encrypted backup copies in its Delhi region. Our emails are sent and received through Zoho's data centres in India. We do not transfer personal data outside India. (Free-trial AI requests carry only synthetic sample data with no personal data; see "Artificial intelligence features".)
 
 ## How long we keep it
 
