@@ -502,16 +502,17 @@ def test_the_ai_status_of_a_trial_follows_the_chain_the_organization_and_the_per
 TYPED = "Ann Roy, 12 Hill Road, Pune 411001, phone 98200 00000"
 
 
-def _sample_row(tenant_id, table):
+def _sample_row(tenant_id, table, chunked=False):
+    """An unedited sample row; ``chunked`` only evidence with search chunks (W1d's SAMPLE-EV-006 has none)."""
+    from backend.app.db.models.evidence_intelligence import EvidenceChunk
+
     model = sample_gate._model_for(table)
     with SessionLocal() as db:
         bind_system(db, "test")
-        row = (
-            db.query(model)
-            .filter(model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE)
-            .order_by(model.id)
-            .all()
-        )
+        query = db.query(model).filter(model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE)
+        if chunked:
+            query = query.filter(model.id.in_(db.query(EvidenceChunk.evidence_id)))
+        row = query.order_by(model.id).all()
         return next(
             item.id
             for item in row
@@ -544,7 +545,7 @@ def test_real_text_typed_into_any_sent_column_of_a_sample_record_is_refused(tria
     from backend.app.db.models.evidence_intelligence import EvidenceChunk
 
     record_table = "evidence" if table == "evidence_chunks" else table
-    record_id = _sample_row(trial["tenant_id"], record_table)
+    record_id = _sample_row(trial["tenant_id"], record_table, chunked=table == "evidence_chunks")
     model = EvidenceChunk if table == "evidence_chunks" else sample_gate._model_for(table)
     length = getattr(model.__table__.columns[column].type, "length", None) or len(TYPED)
     typed = [TYPED] if column == "other_lots" else TYPED[:length]
