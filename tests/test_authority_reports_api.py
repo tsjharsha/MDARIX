@@ -404,6 +404,43 @@ def test_an_export_carries_the_form_version_the_starter_mark_and_the_practice_la
     assert "MDARIX NEVER SUBMITS" in text
 
 
+def test_an_approved_snapshot_renders_once_and_every_download_is_audited(trial, monkeypatch):  # review P2
+    from backend.app.authority_reports import emdr_pdf, render
+    from backend.app.authority_reports import router as reports_router
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.tenant_scope import bind_system
+
+    user = trial["user"]
+    finished = _items(user)[("SAMPLE-RV-09", "US", "INITIAL")]
+    snapshot = next(
+        row for row in _ok(user.get(f"{REPORTS}/{finished['id']}"))["snapshots"] if row["state"] == "APPROVED"
+    )
+    reports_router._RENDERED.clear()
+    renders = []
+    for module in (render, emdr_pdf):
+        original = module.render
+        monkeypatch.setattr(module, "render", lambda *a, _o=original, **k: renders.append(1) or _o(*a, **k))
+    path = f"{REPORTS}/{finished['id']}/worksheet.pdf"
+    first = user.get(path, params={"snapshot": snapshot["id"]})
+    second = user.get(path, params={"snapshot": snapshot["id"]})
+    assert first.status_code == second.status_code == 200 and first.content == second.content
+    assert first.headers["content-disposition"] == second.headers["content-disposition"]
+    assert len(renders) == 1
+    user.get(path)  # the draft is rendered every time: it can change
+    user.get(path)
+    assert len(renders) == 3
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        audited = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.entity_id == uuid.UUID(finished["id"]), AuditEvent.action == "REPORT_WORKSHEET_DOWNLOADED"
+            )
+            .count()
+        )
+    assert audited >= 4
+
+
 def test_another_organization_reads_none_of_it(trial):  # TA-2b.5
     other, _, _ = _approved_trial_client()
     mine = _items(trial["user"])[("SAMPLE-RV-09", "US", "INITIAL")]
