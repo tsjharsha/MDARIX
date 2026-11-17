@@ -66,7 +66,9 @@ def test_the_sample_case_reads_as_the_sample_tells_it(trial):
     assert "Precision Sensors Ltd (Sample)" in rev_a_suppliers
     lots = {item["ref"].rsplit("-", 1)[-1]: item for item in facts["lots"].values()}
     assert lots["003"]["version_id"] == rev_b["id"] and lots["003"]["units_released"] == 150
-    assert len(facts["hypotheses"]) == 2 and all(item["draft_rule"] is None for item in facts["hypotheses"])
+    # The sample author's two hypotheses, beside the one pre-recorded AI proposal (sample_ai.py).
+    assert sorted(item["origin"] for item in facts["hypotheses"]) == ["AI", "HUMAN", "HUMAN"]
+    assert all(item["draft_rule"] is None for item in facts["hypotheses"])
     assert len(facts["unknowns"]) == 2 and all(item["open"] for item in facts["unknowns"])
     assert all(item["origin"] == "SAMPLE" for item in facts["complaints"])
     assert facts["conclusion"] and "NovaSense" in facts["conclusion"]
