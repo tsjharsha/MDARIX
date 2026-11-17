@@ -930,6 +930,8 @@ export function FlagshipView({
     go(place.section, place.tab);
   };
   const tenStep = story.sample;
+  // W2: before the first step, one calm screen with one button; the steps and the rest open on request.
+  const fresh = done === 0 && run.current === 0 && picked === null && !run.finished;
   const yoursNext = () => {
     if (story.yours) chooseDataSource?.(IMPORTED_SOURCE);
     else open("Import your data");
@@ -941,14 +943,23 @@ export function FlagshipView({
           Getting started
         </h1>
         <p>Follow one sample investigation from the signal to the action, in seven steps.</p>
+        {fresh && (
+          <div className="ca-action-row uw-gs-start">
+            <button type="button" className="ac-primary uw-os-go" disabled={busy} onClick={() => void start(0)}>
+              {flagshipCopy(run, 0, aiReady).b} <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <p className="uw-gs-practice">{practiceLine(true)}</p>
-        <div className="uw-gs-prog" aria-hidden="true">
-          <ProgressArc done={done} size={64} decorative />
-          <b className="uw-num">
-            {done}
-            <small>/{FLAGSHIP_STEPS}</small>
-          </b>
-        </div>
+        {!fresh && (
+          <div className="uw-gs-prog" aria-hidden="true">
+            <ProgressArc done={done} size={64} decorative />
+            <b className="uw-num">
+              {done}
+              <small>/{FLAGSHIP_STEPS}</small>
+            </b>
+          </div>
+        )}
       </header>
       <BedsideScene className="uw-gs-scene" />
     </MonitorBand>
@@ -1049,6 +1060,60 @@ export function FlagshipView({
       </>
     );
   }
+  const moreStories = (
+    <>
+      {tenStep && tenStep.current > 0 && !tenStep.finished && folded && (
+        <p className="uw-wt-hint">
+          You started the PulseWatch 410 story ({stepCount(tenStep)}).{" "}
+          <button type="button" className="ac-link" onClick={() => setFolded(false)}>
+            Continue it
+          </button>
+        </p>
+      )}
+      <details
+        className="uw-story-more uw-flagship-more"
+        open={!folded}
+        onToggle={(event) => setFolded(!(event.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>More sample stories (optional)</summary>
+        {!folded && (
+          <>
+            <p className="uw-wt-hint">
+              Is it reportable? Follow one complaint from the call to the submission (PulseWatch 410, 10 steps).
+            </p>
+            <StoryView story={story} folded />
+            {more}
+          </>
+        )}
+      </details>
+    </>
+  );
+  if (fresh)
+    return (
+      <div className="uw-os">
+        {header}
+        <section className="uw-wt uw-flagship-card uw-gs-calm" aria-labelledby="uw-wt-title">
+          <div className="uw-wt-head">
+            <h2 id="uw-wt-title">The sample investigation</h2>
+            <h3 className="uw-os-part">{run.investigation.question}</h3>
+            <span className="ms-chip is-sample">Sample data</span>
+            <span className="uw-wt-count uw-num">{flagshipBarParts(run).join(" · ")}</span>
+          </div>
+          <p className="uw-wt-lead">
+            About ten minutes. Each step opens the real screen on the sample records and ticks only from what you save.
+          </p>
+          <details className="uw-story-more">
+            <summary>See the seven steps</summary>
+            <ol className="uw-gs-steps">
+              {run.steps.map((step) => (
+                <li key={step.key}>{step.label}</li>
+              ))}
+            </ol>
+          </details>
+        </section>
+        {moreStories}
+      </div>
+    );
   return (
     <div className="uw-os">
       {header}
@@ -1118,30 +1183,7 @@ export function FlagshipView({
           <div className={`uw-os-main${previewing ? " is-preview" : ""}`}>{body}</div>
         </div>
       </section>
-      {tenStep && tenStep.current > 0 && !tenStep.finished && folded && (
-        <p className="uw-wt-hint">
-          You started the PulseWatch 410 story ({stepCount(tenStep)}).{" "}
-          <button type="button" className="ac-link" onClick={() => setFolded(false)}>
-            Continue it
-          </button>
-        </p>
-      )}
-      <details
-        className="uw-story-more uw-flagship-more"
-        open={!folded}
-        onToggle={(event) => setFolded(!(event.currentTarget as HTMLDetailsElement).open)}
-      >
-        <summary>More sample stories (optional)</summary>
-        {!folded && (
-          <>
-            <p className="uw-wt-hint">
-              Is it reportable? Follow one complaint from the call to the submission (PulseWatch 410, 10 steps).
-            </p>
-            <StoryView story={story} folded />
-            {more}
-          </>
-        )}
-      </details>
+      {moreStories}
     </div>
   );
 }

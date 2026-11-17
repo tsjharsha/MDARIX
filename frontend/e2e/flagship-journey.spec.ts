@@ -61,7 +61,8 @@ async function ticked(page: Page, done: number) {
 }
 
 const card = (page: Page) => page.getByRole("region", { name: "The sample investigation" });
-const main = (page: Page) => card(page).locator("button.ac-primary");
+// W2: before the first step the one main button sits in the page's band, above the card.
+const main = (page: Page) => page.locator(".uw-os button.ac-primary");
 
 /** Getting started, then the selected step's one main button. */
 async function next(page: Page, label: string | RegExp) {

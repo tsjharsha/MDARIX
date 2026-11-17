@@ -143,6 +143,16 @@ describe("Getting started leads with the flagship", () => {
     expect(html).toContain("OrbitCare 300 · Rev B · SAMPLE-INV-001 · Step 1 of 7");
   });
 
+  it("W2: before the first step, one calm screen: the button in the band, the steps folded", () => {
+    reads.data[ONE_STORY_PATH] = story(flagship());
+    const html = render(<OneStory />);
+    expect(primaries(html)).toHaveLength(1);
+    expect(html).toMatch(/uw-gs-head.*Start the sample investigation/s);
+    expect(html).toContain("<summary>See the seven steps</summary>");
+    expect(html).not.toContain("uw-os-rail");
+    expect(html).not.toContain("<dt>Why</dt>");
+  });
+
   it("keeps the PulseWatch story inside the closed fold, with a line to continue it", () => {
     const html = render(<FlagshipView story={story(flagship(), 4)} run={flagship()} more={<p>Explore cards</p>} />);
     expect(html).toContain("<summary>More sample stories (optional)</summary>");
