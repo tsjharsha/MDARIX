@@ -11,7 +11,9 @@ import {
   hubPlace,
   hubTab,
   inDataShown,
+  PRODUCT_VIEWS,
   productTab,
+  productViews,
   rateText,
   supplierTab,
   type Origin,
@@ -111,6 +113,21 @@ describe("the page's address", () => {
     expect(hubPlace("Supplier 360?supplier=X").tab).toBe("Supplier 360");
     // An unknown list is ignored rather than trusted.
     expect(hubPlace("Product 360?product=P&list=passwords").list).toBeNull();
+  });
+
+  it("offers Connected second and Sources (simulated) last in a free trial only (W5)", () => {
+    expect(PRODUCT_VIEWS).toEqual([
+      "Overview",
+      "Connected",
+      "Configuration",
+      "Lots",
+      "Changes",
+      "Records",
+      "Version story",
+      "Sources (simulated)",
+    ]);
+    expect(productViews(false)).toEqual(["Overview", "Configuration", "Lots", "Changes", "Records", "Version story"]);
+    expect(hubPlace("Product 360?product=P&view=Lots&scope=COMPONENT_LOT:c:L").scope).toBe("COMPONENT_LOT:c:L");
   });
 });
 
