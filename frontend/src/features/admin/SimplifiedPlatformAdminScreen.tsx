@@ -21,7 +21,7 @@ import {
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
-import { TrialOrganizations, type TrialSection } from "./trials/TrialOrganizations";
+import { TrialOrganizations, trialFromAddress, type TrialSection } from "./trials/TrialOrganizations";
 import { trialAiPanel } from "./trials/TrialAiPanel";
 import "./console/admin-console.css";
 
@@ -67,11 +67,14 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
   // Website demo requests, only where the website offers them and the server serves their route.
   const websiteDemos = websiteDemoRequestsOffered(featureSet);
   const [location, setLocation] = useState<Location>(() =>
-    initialSection === NEW_CUSTOMER
-      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" }, SECTIONS)
-      : (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
-        ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection }, SECTIONS)
-        : locationFor(initialSection, SECTIONS),
+    // A trial's page in the address (?trial=<id>, F-T5) opens under Trial organizations.
+    trialFromAddress()
+      ? locationFor({ domain: TRIAL_ORGANIZATIONS, item: "Trials" }, SECTIONS)
+      : initialSection === NEW_CUSTOMER
+        ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" }, SECTIONS)
+        : (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
+          ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection }, SECTIONS)
+          : locationFor(initialSection, SECTIONS),
   );
   // "New customer" (the dashboard button, or the former create-customer screen) opens the wizard on Customers.
   const [createCustomer, setCreateCustomer] = useState(initialSection === NEW_CUSTOMER);
@@ -80,6 +83,8 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  // An open trial page stands alone: the list's heading and tabs return with "Back to trials" (hero review 2, F-T1).
+  const [trialDetail, setTrialDetail] = useState(false);
   const [message, setMessage] = useState<{ tone: "good" | "critical"; text: string } | null>(null);
 
   const searchResults = useMemo(() => {
@@ -261,67 +266,71 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
           ) : (
             activeDomain && (
               <>
-                <div className="ac-page-head">
-                  <div>
-                    <p className="ac-eyebrow">Platform administration · {activeDomain[1]}</p>
-                    <h1>{activeDomain[0]}</h1>
-                    {/* One line on what the open section is for (Data & Integrations has its own step guide). */}
-                    {sectionGuide(activeDomain[0], location.item, websiteDemos) && (
-                      <p className="ac-muted">{sectionGuide(activeDomain[0], location.item, websiteDemos)}</p>
-                    )}
-                  </div>
-                </div>
-                <div
-                  className="ac-tabs"
-                  role="tablist"
-                  aria-label={`${activeDomain[0]} sections`}
-                  onKeyDown={(event) => {
-                    // Arrow keys, Home and End move between the sections (WAI-ARIA tabs pattern).
-                    const items = activeDomain[3] as readonly string[];
-                    const next = nextTabIndex(event.key, Math.max(0, items.indexOf(location.item)), items.length);
-                    if (next === null) return;
-                    event.preventDefault();
-                    setLocation({ domain: activeDomain[0], item: items[next] });
-                    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-                    buttons[next]?.focus();
-                  }}
-                >
-                  {(() => {
-                    const tab = (item: string) => {
-                      const step = dataIntegrationStep(item);
-                      return (
-                        <button
-                          type="button"
-                          role="tab"
-                          key={item}
-                          tabIndex={location.item === item ? 0 : -1}
-                          aria-selected={location.item === item}
-                          className={location.item === item ? "selected" : ""}
-                          onClick={() => setLocation({ domain: activeDomain[0], item })}
-                        >
-                          {step && (
-                            <span className="ac-tab-step" aria-hidden="true">
-                              {step.number}
+                {!(location.domain === TRIAL_ORGANIZATIONS && trialDetail) && (
+                  <>
+                    <div className="ac-page-head">
+                      <div>
+                        <p className="ac-eyebrow">Platform administration · {activeDomain[1]}</p>
+                        <h1>{activeDomain[0]}</h1>
+                        {/* One line on what the open section is for (Data & Integrations has its own step guide). */}
+                        {sectionGuide(activeDomain[0], location.item, websiteDemos) && (
+                          <p className="ac-muted">{sectionGuide(activeDomain[0], location.item, websiteDemos)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      className="ac-tabs"
+                      role="tablist"
+                      aria-label={`${activeDomain[0]} sections`}
+                      onKeyDown={(event) => {
+                        // Arrow keys, Home and End move between the sections (WAI-ARIA tabs pattern).
+                        const items = activeDomain[3] as readonly string[];
+                        const next = nextTabIndex(event.key, Math.max(0, items.indexOf(location.item)), items.length);
+                        if (next === null) return;
+                        event.preventDefault();
+                        setLocation({ domain: activeDomain[0], item: items[next] });
+                        const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                        buttons[next]?.focus();
+                      }}
+                    >
+                      {(() => {
+                        const tab = (item: string) => {
+                          const step = dataIntegrationStep(item);
+                          return (
+                            <button
+                              type="button"
+                              role="tab"
+                              key={item}
+                              tabIndex={location.item === item ? 0 : -1}
+                              aria-selected={location.item === item}
+                              className={location.item === item ? "selected" : ""}
+                              onClick={() => setLocation({ domain: activeDomain[0], item })}
+                            >
+                              {step && (
+                                <span className="ac-tab-step" aria-hidden="true">
+                                  {step.number}
+                                </span>
+                              )}
+                              {item}
+                            </button>
+                          );
+                        };
+                        const items = activeDomain[3] as readonly string[];
+                        // Data & Integrations is a sequence: each stage keeps its name and its numbered steps together.
+                        if (!items.every((item) => dataIntegrationStep(item)))
+                          return items.map((item) => <Fragment key={item}>{tab(item)}</Fragment>);
+                        return DATA_INTEGRATION_STAGES.map((stage) => (
+                          <span className="ac-tab-group" key={stage.stage}>
+                            <span className="ac-tab-stage" aria-hidden="true">
+                              {stage.stage}
                             </span>
-                          )}
-                          {item}
-                        </button>
-                      );
-                    };
-                    const items = activeDomain[3] as readonly string[];
-                    // Data & Integrations is a sequence: each stage keeps its name and its numbered steps together.
-                    if (!items.every((item) => dataIntegrationStep(item)))
-                      return items.map((item) => <Fragment key={item}>{tab(item)}</Fragment>);
-                    return DATA_INTEGRATION_STAGES.map((stage) => (
-                      <span className="ac-tab-group" key={stage.stage}>
-                        <span className="ac-tab-stage" aria-hidden="true">
-                          {stage.stage}
-                        </span>
-                        {stage.sections.map((item) => tab(item))}
-                      </span>
-                    ));
-                  })()}
-                </div>
+                            {stage.sections.map((item) => tab(item))}
+                          </span>
+                        ));
+                      })()}
+                    </div>
+                  </>
+                )}
                 <div className="ac-workspace" role="tabpanel" aria-label={location.item}>
                   <SectionErrorBoundary
                     name={`${activeDomain[0]} · ${location.item}`}
@@ -340,6 +349,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                         onSection={(item) => setLocation({ domain: TRIAL_ORGANIZATIONS, item })}
                         websiteDemos={websiteDemos}
                         trialAiPanel={trialAiPanel}
+                        onDetail={setTrialDetail}
                         onOpenCustomers={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })}
                       />
                     ) : isAreaDomain(location.domain) ? (

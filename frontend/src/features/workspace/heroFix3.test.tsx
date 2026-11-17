@@ -84,7 +84,12 @@ describe("F-A1: the trial AI-off line says why", () => {
   });
 
   it("names the account when only the person's AI is off, and keeps the old line with no services", () => {
-    const user = aiStatusBanner({ enabled: false, reason_code: "USER_AI_INACTIVE", trial: true, sample_data_only: true })!;
+    const user = aiStatusBanner({
+      enabled: false,
+      reason_code: "USER_AI_INACTIVE",
+      trial: true,
+      sample_data_only: true,
+    })!;
     expect(user.title).toBe("AI is not switched on for your account");
     const none = aiStatusBanner({ enabled: false, reason_code: "PROVIDER_UNAVAILABLE", trial: true })!;
     expect(none.title).toBe("AI is off for free trials");

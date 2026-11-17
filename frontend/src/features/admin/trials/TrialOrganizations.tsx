@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock, ClipboardList, Hourglass, Inbox, LogOut, X } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../console/charts";
 import { Table, formatDate, useResource } from "../../customer-admin/shared";
@@ -23,6 +23,20 @@ type Open = { kind: "trial"; id: string } | { kind: "workspace"; id: string } | 
 
 const STRIP_ICONS = [Inbox, Hourglass, CalendarClock, ClipboardList, LogOut];
 
+/** The trial named in the address (``?trial=<id>``), so a trial's page can be reloaded or bookmarked (F-T5). */
+export function trialFromAddress(search = typeof window === "undefined" ? "" : window.location.search): string | null {
+  return new URLSearchParams(search).get("trial") || null;
+}
+
+/** Keep the open trial in the address without adding a history step; anything else in it stays. */
+function rememberTrial(id: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set("trial", id);
+  else url.searchParams.delete("trial");
+  if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+}
+
 /**
  * Trial organizations: every free-trial link in one place, and only those. Requests and their approval, the trials
  * with one detail page each (extend, end early, convert, support access, delete data), how trials end, and feedback.
@@ -34,6 +48,8 @@ export function TrialOrganizations({
   websiteDemos = false,
   onOpenCustomers,
   trialAiPanel,
+  onDetail,
+  initialTrial = trialFromAddress(),
 }: {
   section: TrialSection;
   onSection: (section: TrialSection) => void;
@@ -42,38 +58,53 @@ export function TrialOrganizations({
   onOpenCustomers?: () => void;
   /** Part 4 (AI and usage) on each trial's page, when the AI build provides it (TrialDetail ``TrialAiPanel``). */
   trialAiPanel?: TrialAiPanel;
+  /** Told whether a trial's own page is open, so the console can leave out the list's heading and tabs (F-T1). */
+  onDetail?: (open: boolean) => void;
+  /** The trial whose page opens first (from the address). */
+  initialTrial?: string | null;
 }) {
   const counts = useResource<TrialCounts>(`${TRIAL_ORGS_PATH}/summary`);
-  const [open, setOpen] = useState<Open>(null);
+  const [open, setOpen] = useState<Open>(initialTrial ? { kind: "trial", id: initialTrial } : null);
   const [trialState, setTrialState] = useState("");
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
-  useEffect(() => setOpen(null), [section]);
+  // Another section closes the open page (not the first render, which may open a trial from the address).
+  const shownSection = useRef(section);
+  useEffect(() => {
+    if (shownSection.current !== section) setOpen(null);
+    shownSection.current = section;
+  }, [section]);
+  useEffect(() => rememberTrial(open?.kind === "trial" ? open.id : null), [open]);
+  const detailOpen = open?.kind === "trial";
+  useEffect(() => onDetail?.(detailOpen), [onDetail, detailOpen]);
+  useEffect(() => () => onDetail?.(false), [onDetail]);
   const notify = (text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone });
 
   return (
     <ColumnScopeProvider scope="admin:Trial organizations">
       <div className="cc-area">
-        <section className="to-strip" aria-label="Trials at a glance">
-          {STRIP.map((item, index) => {
-            const Icon = STRIP_ICONS[index];
-            const value = counts.data ? counts.data[item.key] : null;
-            return (
-              <StatTile
-                key={item.key}
-                label={item.label}
-                value={value}
-                detail={item.section === "Trials" ? "Show these trials" : `Open ${item.section}`}
-                tone={item.key === "ending_soon" && value ? "warning" : undefined}
-                icon={<Icon size={18} />}
-                onOpen={() => {
-                  setTrialState(item.state);
-                  setOpen(null);
-                  onSection(item.section as TrialSection);
-                }}
-              />
-            );
-          })}
-        </section>
+        {!detailOpen && (
+          <section className="to-strip" aria-label="Trials at a glance">
+            {STRIP.map((item, index) => {
+              const Icon = STRIP_ICONS[index];
+              const value = counts.data ? counts.data[item.key] : null;
+              return (
+                <StatTile
+                  key={item.key}
+                  label={item.label}
+                  value={value}
+                  detail={item.section === "Trials" ? "Show these trials" : `Open ${item.section}`}
+                  tone={item.key === "ending_soon" && value ? "warning" : undefined}
+                  icon={<Icon size={18} />}
+                  onOpen={() => {
+                    setTrialState(item.state);
+                    setOpen(null);
+                    onSection(item.section as TrialSection);
+                  }}
+                />
+              );
+            })}
+          </section>
+        )}
         {message && (
           <div className={`ac-message tone-${message.tone}`} role="status">
             {message.text}
