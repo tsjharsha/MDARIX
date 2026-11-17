@@ -1376,6 +1376,9 @@ def _tenant_audit(db: Session, admin: AuthUser, tenant_id: uuid.UUID, request: R
         .limit(100)
         .all()
     )
+    from backend.app.access.platform_trials import _names
+
+    names = _names(db, {row.actor_ref for row in rows})
     return {
         "tenant_id": str(tenant_id),
         "complete": tenant_id in opened,
@@ -1386,6 +1389,8 @@ def _tenant_audit(db: Session, admin: AuthUser, tenant_id: uuid.UUID, request: R
                 "entity_type": row.entity_type,
                 "entity_id": str(row.entity_id) if row.entity_id else None,
                 "actor_ref": row.actor_ref,
+                # The person's name for the trial history; a system actor (no account) has none.
+                "actor_name": names.get(str(row.actor_ref)),
                 "details": row.details or {},
                 "created_at": row.created_at,
                 "immutable": True,
