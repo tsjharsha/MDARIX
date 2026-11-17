@@ -23,6 +23,8 @@ export type SummaryCheck = {
   planned_on: string | null;
   signed_at: string | null;
   result_summary: string | null;
+  /** What the check measures, as planned (W1c). */
+  criteria?: string | null;
 };
 export type SummaryCapa = {
   id: string;
@@ -91,6 +93,8 @@ export type DecisionSummary = {
   capas?: SummaryCapa[];
   next?: SummaryNext[];
   worked?: Worked;
+  /** Before a decision is signed: the product's risk file (W1c; once signed it is in `affects.risks`). */
+  risks?: Array<{ ref: string; description: string; status: string | null }>;
 };
 
 export const NOT_RECORDED = "Not recorded";

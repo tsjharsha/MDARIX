@@ -9398,3 +9398,92 @@ details.uw-team-change[open] {
     grid-template-columns: 1fr;
   }
 }
+
+/* W1b: the six questions of an investigation, in order; flat (G-2). */
+.uw-question-guide ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+  margin: 0 0 var(--ms-space-3);
+  padding: 0;
+  list-style: none;
+}
+.uw-question-guide button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px var(--ms-space-3);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+  cursor: pointer;
+}
+.uw-question-guide button[aria-current] {
+  border-color: var(--ms-teal);
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-question-guide .uw-num,
+.uw-question .uw-num,
+.uw-ibrief-part h3 .uw-num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ms-teal);
+  color: #fff;
+  font-size: var(--ms-fs-12);
+}
+.uw-question {
+  display: flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+  margin: var(--ms-space-4) 0 var(--ms-space-2);
+  font-size: var(--ms-fs-16);
+}
+
+/* W1c: the Investigation Brief, one page readable on a projector (1280×720) and in print. */
+.uw-ibrief-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--ms-space-3) var(--ms-space-4);
+}
+.uw-ibrief-part h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+  margin: 0 0 6px;
+  font-size: var(--ms-fs-16);
+}
+.uw-ibrief-part ul {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: var(--ms-fs-14);
+  line-height: 1.45;
+}
+.uw-ibrief-part.part-problem,
+.uw-ibrief-part.part-decision {
+  grid-column: 1 / -1;
+}
+@media print {
+  body.uw-print-brief * {
+    visibility: hidden;
+  }
+  body.uw-print-brief .uw-ibrief,
+  body.uw-print-brief .uw-ibrief * {
+    visibility: visible;
+  }
+  body.uw-print-brief .uw-ibrief {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  body.uw-print-brief .uw-no-print {
+    display: none;
+  }
+}
