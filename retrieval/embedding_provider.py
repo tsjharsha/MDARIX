@@ -3,6 +3,8 @@ import math
 import os
 import re
 import threading
+import time
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +28,9 @@ DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / ".model-cache"
 # the container: in a container limited to fewer CPUs they compete (12 texts/s instead of 19 in a 1.5-CPU container
 # on an 8-CPU host, 0.10.42), and an embedding run never takes more than one CPU from the API and the database.
 LOCAL_EMBEDDING_THREADS = 1
+# A model that could not be loaded is not tried again for this long (review O2): each try took about 0.4 s and logged
+# errors on every evidence search.
+LOAD_RETRY_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -84,6 +89,7 @@ class LocalModelEmbeddingProvider:
 
     _model = None
     _lock = threading.Lock()
+    _failed: tuple[float, str] | None = None  # (when, why) the last load failed
 
     def model_metadata(self) -> EmbeddingMetadata:
         return EmbeddingMetadata(
@@ -98,34 +104,47 @@ class LocalModelEmbeddingProvider:
     def _load(cls):
         if cls._model is not None:
             return cls._model
+        failed = cls._failed
+        if failed is not None and time.monotonic() - failed[0] < LOAD_RETRY_SECONDS:
+            raise EmbeddingUnavailable(failed[1])
         with cls._lock:
             if cls._model is None:
                 try:
-                    from fastembed import TextEmbedding
-                except ImportError as exc:  # pragma: no cover - dependency is in requirements.txt
-                    from backend.app.runtime_env import is_production_like
-
-                    if is_production_like():
-                        # Production-like images must carry both the runtime and the pinned model.  Do not
-                        # silently fall back to an install/download path when the optional runtime is absent.
-                        raise EmbeddingUnavailable(
-                            "The local embedding runtime is not installed; a staging or production server never "
-                            "downloads the model (the image carries it)"
-                        ) from exc
-                    raise EmbeddingUnavailable("fastembed is not installed") from exc
-                cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
-                try:
-                    # Offline, from the prepared cache only: no server or developer machine downloads model weights at
-                    # run time (DEV-02, 0.10.86), where they could be swapped or blocked.
-                    cls._model = TextEmbedding(
-                        LOCAL_EMBEDDING_MODEL,
-                        cache_dir=cache_dir,
-                        local_files_only=True,
-                        threads=LOCAL_EMBEDDING_THREADS,
-                    )
-                except Exception as missing:
-                    raise EmbeddingUnavailable(model_missing_message(cache_dir)) from missing
+                    cls._model = cls._load_model()
+                except EmbeddingUnavailable as exc:
+                    cls._failed = (time.monotonic(), str(exc))
+                    raise
+                cls._failed = None
         return cls._model
+
+    @classmethod
+    def _load_model(cls):
+        """The pinned model from the prepared cache (EmbeddingUnavailable when it cannot be loaded)."""
+        try:
+            from fastembed import TextEmbedding
+        except ImportError as exc:  # pragma: no cover - dependency is in requirements.txt
+            from backend.app.runtime_env import is_production_like
+
+            if is_production_like():
+                # Production-like images must carry both the runtime and the pinned model.  Do not
+                # silently fall back to an install/download path when the optional runtime is absent.
+                raise EmbeddingUnavailable(
+                    "The local embedding runtime is not installed; a staging or production server never "
+                    "downloads the model (the image carries it)"
+                ) from exc
+            raise EmbeddingUnavailable("fastembed is not installed") from exc
+        cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
+        try:
+            # Offline, from the prepared cache only: no server or developer machine downloads model weights at
+            # run time (DEV-02, 0.10.86), where they could be swapped or blocked.
+            return TextEmbedding(
+                LOCAL_EMBEDDING_MODEL,
+                cache_dir=cache_dir,
+                local_files_only=True,
+                threads=LOCAL_EMBEDDING_THREADS,
+            )
+        except Exception as missing:
+            raise EmbeddingUnavailable(model_missing_message(cache_dir)) from missing
 
     @staticmethod
     def _rounded(vector) -> list[float]:
@@ -139,8 +158,13 @@ class LocalModelEmbeddingProvider:
         return [self._rounded(vector) for vector in model.passage_embed([text or "" for text in texts])]
 
     def embed_query(self, text: str) -> list[float]:
-        model = self._load()
-        return self._rounded(next(iter(model.query_embed([text or ""]))))
+        # The same question (an investigation's, read on every workspace view) is embedded once per process.
+        return list(_query_vector(self._load(), text or ""))
+
+
+@lru_cache(maxsize=512)
+def _query_vector(model, text: str) -> tuple[float, ...]:
+    return tuple(LocalModelEmbeddingProvider._rounded(next(iter(model.query_embed([text])))))
 
 
 EmbeddingProvider = DeterministicEmbeddingProvider | LocalModelEmbeddingProvider

@@ -80,6 +80,7 @@ def test_the_scheduler_check_degrades_after_fifteen_minutes_of_silence(job_row):
         readiness._scheduler(job_row)
     check = readiness._check("scheduler", lambda: readiness._scheduler(job_row))
     assert check["ok"] is False and check["error"] == "RuntimeError"
+    assert check["reason"] == "STALE"  # review O1: the reason, not only the exception class
 
 
 def test_a_500_carries_the_request_id_in_body_and_header():
@@ -198,3 +199,14 @@ def test_the_outbox_and_email_checks_degrade_on_lag_and_failing_delivery(monkeyp
 def test_readiness_reports_the_outbox_as_a_component(fresh_cache):
     names = [item["name"] for item in TestClient(app).get("/health/ready").json()["checks"]]
     assert "outbox" in names
+
+
+def test_a_failed_check_logs_its_whole_reason_and_reports_its_code(caplog):
+    def broken():
+        raise RuntimeError("UNREACHABLE: plane-7")
+
+    with caplog.at_level("WARNING", logger="backend.app.readiness"):
+        check = readiness._check("data_planes", broken)
+    assert check["reason"] == "UNREACHABLE" and "plane-7" not in str(check)
+    assert "UNREACHABLE: plane-7" in caplog.text
+    assert readiness._check("x", lambda: (_ for _ in ()).throw(ValueError("odd text")))["reason"] == "FAILED"

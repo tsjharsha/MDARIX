@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -50,11 +51,16 @@ def _check(name: str, func) -> dict:
         detail = func() or {}
         return {"name": name, "ok": True, **detail, "ms": round((time.perf_counter() - started) * 1000, 1)}
     except Exception as exc:  # a probe must report, never raise
-        logger.warning("Readiness check %s failed: %s", name, type(exc).__name__)
+        # The log has the whole reason (review O1); the report only its leading code (NOT_REPORTED, STALE, ...), so it
+        # names no host, database or count.
+        message = str(exc)
+        head = message.split(":", 1)[0].strip()
+        logger.warning("Readiness check %s failed: %s: %s", name, type(exc).__name__, message)
         return {
             "name": name,
             "ok": False,
             "error": type(exc).__name__,
+            "reason": head if re.fullmatch(r"[A-Z][A-Z0-9_]+", head) else "FAILED",
             "ms": round((time.perf_counter() - started) * 1000, 1),
         }
 
@@ -66,7 +72,7 @@ def _database() -> dict:
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
     expected = expected_schema_head()
     if expected and version != expected:
-        raise RuntimeError(f"schema at {version}, this build needs {expected}")
+        raise RuntimeError(f"SCHEMA_MISMATCH: schema at {version}, this build needs {expected}")
     return {"schema": version}
 
 
@@ -100,9 +106,9 @@ def _data_planes() -> dict:
         if not plane_schema_ok(database_ref, secret_ref):
             outdated.append(database_ref)
     if failed:
-        raise RuntimeError(f"unreachable: {', '.join(failed)}")
+        raise RuntimeError(f"UNREACHABLE: {', '.join(failed)}")
     if outdated:
-        raise RuntimeError(f"schema not at head (run scripts/migrate_data_planes.py): {', '.join(outdated)}")
+        raise RuntimeError(f"SCHEMA_OUTDATED: run scripts/migrate_data_planes.py for {', '.join(outdated)}")
     return {"dedicated": len(set(planes))}
 
 
@@ -132,6 +138,25 @@ def _worker() -> dict:
     if status["state"] != "RUNNING":
         raise RuntimeError(status["state"])
     return {"seconds_since": status["seconds_since"]}
+
+
+_embedding_checked = False  # the pinned model was found once: its files do not change while the process runs
+
+
+def _embedding_model() -> dict:
+    """The pinned local embedding model is in the cache (review O2): without it evidence search falls back to
+    structured matches only. Hashing the weights is done until it has passed once."""
+    global _embedding_checked
+    from retrieval.embedding_provider import local_model_problem
+
+    if (os.getenv("MDARIX_EMBEDDING_PROVIDER") or "local").strip().lower() == "deterministic":
+        return {"provider": "deterministic"}
+    if not _embedding_checked:
+        problem = local_model_problem()
+        if problem:
+            raise RuntimeError(f"MODEL_MISSING: {problem}")
+        _embedding_checked = True
+    return {"provider": "local"}
 
 
 # The outbox's queue lag: how long the longest-waiting event that is due has waited. The worker cycles every few
@@ -184,7 +209,7 @@ def _email(failing: int = 0) -> dict:
     if delivery_off():
         return {"delivery": "off"}  # a demo or local run that must not e-mail anyone: by design, not a fault
     if not smtp_configuration_status().get("configured"):
-        raise RuntimeError("SMTP not configured")
+        raise RuntimeError("NOT_CONFIGURED: SMTP has no host, account or sender")
     if failing:
         raise RuntimeError(f"DELIVERY_FAILING: {failing} e-mail(s) waiting to be retried")
     return {}
@@ -243,6 +268,7 @@ def readiness_report() -> dict:
             outbox,
             _check("scheduler", _scheduler),
             _check("email", lambda: _email(outbox.get("email_failing", 0))),
+            _check("embedding_model", _embedding_model),
         ]
         status = "ready" if database["ok"] else "not_ready"
         if status == "ready" and not all(item["ok"] for item in others):
