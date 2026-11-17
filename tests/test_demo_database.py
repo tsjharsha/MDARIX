@@ -20,6 +20,7 @@ demo_database = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(demo_database)
 
 PASSWORD = "Whif demo password 2026!"
+MFA_KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"  # a test key, as an authenticator app shows one
 
 
 @pytest.mark.unit
@@ -78,10 +79,12 @@ def demo():
     if not name.startswith(demo_database.PREFIX) or name in (demo_database.TEMPLATE, demo_database.RESTORE):
         pytest.skip("needs POSTGRES_DB=mdarix_whif_dbtest (it is dropped and created again)")
     os.environ[demo_database.PASSWORD_ENV] = PASSWORD
+    os.environ[demo_database.MFA_KEY_ENV] = MFA_KEY
     try:
         first = demo_database.reset(name)
     finally:
         os.environ.pop(demo_database.PASSWORD_ENV, None)
+        os.environ.pop(demo_database.MFA_KEY_ENV, None)
     return first
 
 
@@ -102,6 +105,12 @@ def _client():
     client = TestClient(app)
     signed = client.post("/api/v1/auth/signin", json={"email": demo_database.DEMO_TRIAL_EMAIL, "password": PASSWORD})
     assert signed.status_code == 200, signed.text
+    # The trial owner's authenticator is enrolled by the reset (F2): the sign-in asks for its code.
+    assert signed.json()["mfa_required"] is True
+    from auth import totp
+
+    verified = client.post("/api/v1/auth/mfa/verify", json={"code": totp.current_code(MFA_KEY)})
+    assert verified.status_code == 200, verified.text
     return client
 
 
@@ -110,6 +119,7 @@ def test_reset_is_fast_and_leaves_one_curated_trial(demo):
     from backend.app.db.models.foundation import Tenant
 
     assert demo["total_seconds"] < 60 and demo["accounts_active"] is True
+    assert demo["trial_owner_authenticator"] is True
     db = _db()
     try:
         trials = db.query(Tenant).filter(Tenant.tenant_key.like("TRIAL_%")).all()
@@ -254,6 +264,33 @@ def test_the_trial_user_sees_the_ai_proposals_labelled_on_the_case(demo):
     fishbone = client.get(f"/api/v1/investigations/{case.id}/rca/fishbone")
     assert fishbone.status_code == 200, fishbone.text
     assert "PROCESS" in fishbone.text
+
+
+@pytest.mark.db
+def test_the_trial_owner_is_a_named_person_with_an_authenticator(demo):
+    """F2: turning AI on and signing need an authenticator code, so the reset enrols the presenter's; F-H2: the
+    greeting reads as a person's name."""
+    from backend.app import mfa
+    from backend.app.db.models.foundation import AuthUser
+
+    db = _db()
+    try:
+        owner = db.query(AuthUser).filter(AuthUser.username == demo_database.DEMO_TRIAL_EMAIL).one()
+        assert mfa.is_enrolled(owner) and owner.mfa_required is True
+        assert owner.display_name == demo_database.DEMO_TRIAL_NAME == "Asha Rao (fictional)"
+    finally:
+        db.close()
+
+
+@pytest.mark.unit
+def test_a_key_that_is_not_base32_is_refused_before_anything_is_stored():
+    class Person:
+        id = uuid.uuid4()
+        mfa_secret_encrypted = None
+
+    with pytest.raises(Exception):
+        demo_database._enrol_authenticator(Person(), "not a key!", None)
+    assert Person.mfa_secret_encrypted is None
 
 
 @pytest.mark.db

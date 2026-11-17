@@ -17,6 +17,9 @@ refused before any connection is made. Run with the database owner's credentials
    (``trial.service.approve_request``), which seeds the trial sample story; its invitation e-mail is never sent.
    With ``MDARIX_WHIF_DEMO_PASSWORD`` set, both demo accounts can sign in with it (never printed); otherwise they stay
    invited. The Platform Administrator sets up MFA at first sign-in, as on every server.
+   With ``MDARIX_WHIF_DEMO_MFA_KEY`` set (the base32 key the presenter keeps in an authenticator app, never printed),
+   the trial owner's authenticator is enrolled with it, so switching AI on and signing work on stage; otherwise the
+   presenter sets one up under My Account › Security after the reset (turning AI on and signing need its code).
 
 ``backup-check``: ``pg_dump`` of the demo database into ``--out``, restored into ``mdarix_whif_restore``, row counts
 compared table by table, the audit hash chain verified there, then ``mdarix_whif_restore`` (only) is dropped.
@@ -46,6 +49,9 @@ DEMO_TRIAL_EMAIL = "quality.lead@asteria-demo.example"
 DEMO_ADMIN_EMAIL = "platform.admin@whif-demo.example"
 DEMO_PROFILE = {"job_title": "Head of Quality and Regulatory (fictional)", "country": "India"}
 PASSWORD_ENV = "MDARIX_WHIF_DEMO_PASSWORD"
+MFA_KEY_ENV = "MDARIX_WHIF_DEMO_MFA_KEY"
+# A fictional person, so the greeting and avatar read as a name ("Good morning, Asha", "AR").
+DEMO_TRIAL_NAME = "Asha Rao (fictional)"
 
 
 class Refused(SystemExit):
@@ -121,6 +127,20 @@ def _activate(db, user, password: str, now: datetime) -> None:
     user.email_verified = True
 
 
+def _enrol_authenticator(user, key: str, now: datetime) -> None:
+    """Enrol ``user``'s authenticator with ``key`` (base32, as an authenticator app shows it), as a finished set-up
+    would: sign-in, turning AI on and signing then ask for its code."""
+    from auth import totp
+
+    key = key.replace(" ", "").upper()
+    totp.code_at(key, 0)  # a key that is not base32 fails here, before anything is stored
+    user.mfa_secret_encrypted = totp.encrypt_secret(key, str(user.id))
+    user.mfa_pending_secret_encrypted = None
+    user.mfa_last_step = None
+    user.mfa_required = True
+    user.mfa_enrolled_at = now
+
+
 def seed_demo(db, now: datetime | None = None) -> dict:
     """The platform organization, its administrator and the curated demo trial, in the database ``db`` is bound to.
     The trial goes through the product's approval, so its sample story is the one every new trial gets. Commits."""
@@ -164,7 +184,7 @@ def seed_demo(db, now: datetime | None = None) -> dict:
     request = OnboardingRequest(
         id=uuid.uuid4(),
         email=DEMO_TRIAL_EMAIL,
-        display_name="Demo Quality Lead (fictional)",
+        display_name=DEMO_TRIAL_NAME,
         organization=DEMO_ORGANIZATION,
         status="PENDING_REVIEW",
         profile={**DEMO_PROFILE, "no_patient_data_confirmed": True},
@@ -184,6 +204,9 @@ def seed_demo(db, now: datetime | None = None) -> dict:
     if password:
         _activate(db, admin, password, now)
         _activate(db, trial_user, password, now)
+    mfa_key = os.getenv(MFA_KEY_ENV, "")
+    if mfa_key:
+        _enrol_authenticator(trial_user, mfa_key, now)
     db.commit()
     return {
         "tenant_id": approval["tenant_id"],
@@ -191,6 +214,7 @@ def seed_demo(db, now: datetime | None = None) -> dict:
         "trial_user": DEMO_TRIAL_EMAIL,
         "platform_admin": DEMO_ADMIN_EMAIL,
         "accounts_active": bool(password),
+        "trial_owner_authenticator": bool(mfa_key),
     }
 
 

@@ -49,25 +49,34 @@ export function ConsentBanner() {
     remember("sessionStorage", DISMISSED_KEY, "1");
     setVisible(false);
   };
+  return <ConsentNotice onAccept={accept} onDismiss={dismiss} />;
+}
+
+/** The notice itself: one line, its details in a fold. Exported for its test. */
+export function ConsentNotice({ onAccept, onDismiss }: { onAccept: () => void; onDismiss: () => void }) {
   return (
     <section className="consent-banner" role="dialog" aria-label="Privacy and data-use notice">
+      {/* One line, so it never hides the first screen (hero review 2, F-H4); the rest is in "Read more". */}
       <div>
-        <strong>Privacy and data-use notice</strong>
-        <p>
-          MDARIX uses one essential sign-in cookie and keeps an audit record of actions in your organization&apos;s
-          workspace. Please do not enter patient-identifiable information. MDARIX is not certified for GDPR, HIPAA or
-          other regulations; review your organization&apos;s obligations before entering regulated data. Read the{" "}
-          <a href="/privacy" target="_blank" rel="noopener">
-            Privacy Policy
-          </a>
-          .
-        </p>
+        <strong>Privacy:</strong> one essential sign-in cookie; please enter no patient-identifiable information.{" "}
+        <details className="consent-more">
+          <summary>Read more</summary>
+          <p>
+            MDARIX keeps an audit record of actions in your organization&apos;s workspace. MDARIX is not certified for
+            GDPR, HIPAA or other regulations; review your organization&apos;s obligations before entering regulated
+            data. Read the{" "}
+            <a href="/privacy" target="_blank" rel="noopener">
+              Privacy Policy
+            </a>
+            .
+          </p>
+        </details>
       </div>
       <div className="consent-actions">
-        <button className="secondary-action" onClick={dismiss}>
+        <button className="secondary-action" onClick={onDismiss}>
           Dismiss
         </button>
-        <button className="primary-action" onClick={accept}>
+        <button className="primary-action" onClick={onAccept}>
           Acknowledge
         </button>
       </div>

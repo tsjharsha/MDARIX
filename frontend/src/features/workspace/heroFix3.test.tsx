@@ -4,6 +4,7 @@ import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { SettingsSection } from "./sections/Settings";
 import { TRIAL_AI_TAB } from "./sections/TrialAi";
 import { aiStatusBanner } from "./intelligence";
+import { ConsentNotice } from "../shared/ConsentBanner";
 
 // Hero review 2 (17 Nov 2026), front-end fix pass 3: the findings are named by their review IDs.
 
@@ -87,5 +88,14 @@ describe("F-A1: the trial AI-off line says why", () => {
     expect(user.title).toBe("AI is not switched on for your account");
     const none = aiStatusBanner({ enabled: false, reason_code: "PROVIDER_UNAVAILABLE", trial: true })!;
     expect(none.title).toBe("AI is off for free trials");
+  });
+});
+
+describe("F-H4: the privacy notice is one line", () => {
+  it("says the essentials on one line and keeps the rest in a Read more fold", () => {
+    const html = renderToStaticMarkup(<ConsentNotice onAccept={() => undefined} onDismiss={() => undefined} />);
+    expect(html).toContain("please enter no patient-identifiable information");
+    expect(html).toMatch(/<details class="consent-more"><summary>Read more<\/summary>.*not certified for/);
+    expect(html).toContain("Acknowledge");
   });
 });

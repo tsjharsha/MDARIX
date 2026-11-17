@@ -6397,7 +6397,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 16px 20px;
+  padding: 8px 16px;
   background: var(--ms-navy-deep);
   color: var(--ms-white);
   border: 1px solid var(--ms-muted);
@@ -6406,6 +6406,18 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .consent-banner strong {
   font-size: var(--ms-fs-14);
+}
+.consent-banner > div:first-child {
+  font-size: var(--ms-fs-14);
+}
+.consent-more {
+  display: inline;
+}
+.consent-more summary {
+  display: inline;
+  cursor: pointer;
+  color: var(--ms-mint);
+  text-decoration: underline;
 }
 .consent-banner p {
   margin: 5px 0 0;
