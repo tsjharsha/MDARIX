@@ -41,6 +41,7 @@ from auth.durable import (
 from auth.emailer import send_password_reset_email
 from auth.security_notices import queue_security_notice
 from auth.service import (
+    NO_PASSWORD,
     PASSWORD_MESSAGES,
     _hash,
     _verify,
@@ -157,8 +158,10 @@ def _check_new_password(password: str, email: str | None) -> None:
 
 
 def _password_reuse(db, row, new_password: str) -> bool:
-    """Return true when the proposed password matches the current or last five passwords."""
-    if row.password_hash and _verify(new_password, row.password_hash):
+    """Return true when the proposed password matches the current or last five passwords. An invited account's
+    NO_PASSWORD matches nothing, so it costs no hash here (P7: activation is one hash, not two; the person already holds
+    the one-time link, so there is no timing to equalise)."""
+    if row.password_hash and row.password_hash != NO_PASSWORD and _verify(new_password, row.password_hash):
         return True
     history = (
         db.query(PasswordHistory)

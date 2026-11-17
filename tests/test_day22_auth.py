@@ -96,3 +96,24 @@ def test_a_hash_at_the_old_cost_still_verifies_and_is_rehashed_at_sign_in(monkey
     assert _verify("Old cost 1234567", old)
     assert not _verify("Old cost 7654321", old)
     assert needs_rehash(old)
+
+
+def test_activating_an_invited_account_costs_one_hash_not_two(monkeypatch):
+    """P7: the reuse check does not burn a hash on an invited account's NO_PASSWORD (it matches nothing); sign-in's
+    burn for unknown or password-less accounts is unchanged (burn_verification_time)."""
+    from types import SimpleNamespace
+
+    from backend.app import auth_router
+
+    class _NoHistory:
+        def __getattr__(self, name):
+            return lambda *args, **kwargs: [] if name == "all" else self
+
+    checked = []
+    monkeypatch.setattr(auth_router, "_verify", lambda password, stored: checked.append(stored) or False)
+    invited = SimpleNamespace(password_hash=service.NO_PASSWORD, tenant_id=None, id=None)
+    assert auth_router._password_reuse(_NoHistory(), invited, "A new password 2026") is False
+    assert checked == []
+    active = SimpleNamespace(password_hash="scrypt$15$8$3$00$00", tenant_id=None, id=None)
+    auth_router._password_reuse(_NoHistory(), active, "A new password 2026")
+    assert checked == ["scrypt$15$8$3$00$00"]
