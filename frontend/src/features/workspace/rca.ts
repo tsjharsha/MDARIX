@@ -292,6 +292,8 @@ export type EventVersion = {
   lot?: { identifier?: string | null } | null;
   version?: { version_identifier: string; released_at?: string | null } | null;
   version_label: string;
+  /** Where the version comes from: the complaint, else its lot (PV-1); null when neither names one. */
+  version_source?: "COMPLAINT" | "LOT" | null;
   candidate_versions: { version_identifier: string }[];
   components: { identifier: string; name: string; revision?: string | null }[];
   flags: { code: string; label: string }[];

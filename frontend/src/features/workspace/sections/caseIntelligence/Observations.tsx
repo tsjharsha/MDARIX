@@ -6,7 +6,7 @@ import { titleCase } from "../../../admin/console/dashboardModel";
 import { Drawer, Table, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { StatementKind } from "../../../shared/StatementKind";
-import { AiReviewActions } from "../../../shared/AiReview";
+import { AiReviewActions, RecordedChip } from "../../../shared/AiReview";
 import { STATEMENT_KIND, statementOriginLabel } from "../../../shared/epistemic";
 import { useCan, usePanelFlag } from "../../workspaceContext";
 import {
@@ -106,6 +106,7 @@ export function ObservationsView({
                   originLabel={row.origin_label}
                 />
                 <span>{safeText(row.statement) ?? "—"}</span>
+                <RecordedChip recorded={row.recorded} />
                 {row.ai_label ? (
                   <AiReviewActions
                     outputId={row.id}

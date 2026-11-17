@@ -287,8 +287,9 @@ describe("screens", () => {
       <OverviewView investigationId="inv-1" caseLabel="INV-1" onView={() => undefined} methods />,
     );
     expect(html).toContain("HYP-1");
-    expect(html).toContain("Version unknown");
-    expect(html).toContain("Released by then: Rev A");
+    // W1: never filled in; the candidates are listed.
+    expect(html).toContain("Version not known (unverified)");
+    expect(html).toContain("Candidates released by then: Rev A");
     expect(html).toContain("Version released after the event: check");
   });
 
