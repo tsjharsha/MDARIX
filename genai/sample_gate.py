@@ -16,8 +16,10 @@ call record is written. Paid organizations skip this gate (their data goes only 
 
 The catalogue is every text the sample loader writes: the string constants of ``backend/app/trial/sample*.py``. A
 record's text fields match when each is empty or a part of one of those texts (a part of synthetic text is still
-synthetic; anything typed in is not). Text built at load time from parts is not in the catalogue, so such a record is
-refused: the gate fails closed.
+synthetic; anything typed in is not). Text the loader builds at load time from parts (its f-strings, such as a bulk
+complaint's "Customer reported {symptom} on {revision}, lot {lot}.") matches when it has the f-string's exact shape and
+every filled-in part is itself sample text or a server-style identifier (review G2): a person who keeps the sentence
+but types real text into a part is still refused. Anything else is refused: the gate fails closed.
 
 Every text column is checked (String, Text and the strings inside JSONB), deny by default, not a list of names: the
 prompts send columns such as ``investigations.investigation_question`` and a complaint's status, type, problem code,
@@ -45,6 +47,8 @@ SKIPPED_COLUMNS = frozenset({"business_id", "source_system", "source_identifier"
 # shortcut: a single upper-case word typed into a sample record passes; narrative and contact details need spaces or
 # lower case. Tighten to per-column enums if a prompt ever sends a free single-word field.
 _CODE = re.compile(r"[A-Z][A-Z0-9_]{0,39}")
+# An identifier the loader writes into a sentence (SAMPLE-ORBIT-300-LOT-003, 012, 2026-11-17): no spaces, no lower case.
+_IDENTIFIER = re.compile(r"[A-Z0-9][A-Z0-9_.:+-]{0,59}")
 # The loader marks sample titles with this suffix (the rest of the title is catalogue text).
 SAMPLE_SUFFIX = "(Sample)"
 _SPACE = re.compile(r"\s+")
@@ -74,6 +78,39 @@ def catalogue() -> str:
     return "\x00" + "\x00".join(sorted(found)) + "\x00"
 
 
+@functools.lru_cache(maxsize=1)
+def templates() -> tuple[re.Pattern, ...]:
+    """The sample modules' f-strings as patterns: their literal text exact (whitespace-normalized), each ``{...}`` one
+    filled-in part."""
+    found: set[str] = set()
+    for path in sorted(SAMPLE_MODULES.glob("sample*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.JoinedStr):
+                continue
+            parts = [
+                re.escape(_SPACE.sub(" ", part.value)) if isinstance(part, ast.Constant) else "(.+?)"
+                for part in node.values
+            ]
+            # A bare "{x}" or "{a}{b}" says nothing about the shape; its parts are checked as plain text anyway.
+            if any(isinstance(part, ast.Constant) and part.value.strip() for part in node.values):
+                found.add("".join(parts).strip())
+    return tuple(re.compile(pattern, re.DOTALL) for pattern in sorted(found))
+
+
+def _sample_part(text: str) -> bool:
+    text = text.strip()
+    return not text or bool(_IDENTIFIER.fullmatch(text)) or text in catalogue()
+
+
+def _built_from_parts(text: str) -> bool:
+    """True when ``text`` has the shape of one of the loader's f-strings and every part filled in is sample text."""
+    for pattern in templates():
+        found = pattern.fullmatch(text)
+        if found and all(_sample_part(part) for part in found.groups()):
+            return True
+    return False
+
+
 def matches_catalogue(value) -> bool:
     """True when every text in ``value`` (a string, or the strings anywhere inside a JSON value) is sample text."""
     if isinstance(value, dict):
@@ -85,7 +122,7 @@ def matches_catalogue(value) -> bool:
     text = _normal(value)
     if text.endswith(SAMPLE_SUFFIX):
         text = text[: -len(SAMPLE_SUFFIX)].strip()
-    return not text or bool(_CODE.fullmatch(text)) or text in catalogue()
+    return not text or bool(_CODE.fullmatch(text)) or text in catalogue() or _built_from_parts(text)
 
 
 def _skipped(name: str) -> bool:

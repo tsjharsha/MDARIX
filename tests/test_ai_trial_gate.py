@@ -581,3 +581,45 @@ def test_unedited_sample_evidence_investigations_and_changes_pass_the_gate(trial
             )
             is None
         )
+
+
+def _all_sample_ids(tenant_id, table: str) -> list:
+    model = sample_gate._model_for(table)
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        return [
+            row_id
+            for (row_id,) in db.query(model.id).filter(
+                model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE
+            )
+        ]
+
+
+@pytest.mark.parametrize("table", ["complaints", "investigations", "evidence", "changes"])
+def test_every_unedited_sample_record_passes_the_gate(trial, table):
+    """Review G2: every sample record, including the bulk complaints whose description the loader builds from parts
+    ("Customer reported {symptom} on {revision}, lot {lot}."), passes; 28 of 44 complaints were refused before."""
+    ids = _all_sample_ids(trial["tenant_id"], table)
+    if table == "complaints":
+        assert len(ids) >= 44, "the sample story has at least 44 complaints"
+    assert ids
+    refused = {}
+    for record_id in ids:
+        found = sample_gate.problem(
+            str(trial["tenant_id"]), records=[{"table": table, "id": str(record_id)}], evidence=[], user_text=None
+        )
+        if found:
+            refused[str(record_id)] = found
+    assert refused == {}
+
+
+def test_a_built_sentence_with_real_text_typed_into_a_part_is_refused():
+    """The f-string's shape alone is not enough: each part filled in must be sample text or an identifier."""
+    built = (
+        "Customer reported pressure alarm during infusion on Rev B, lot SAMPLE-ORBIT-300-LOT-003. "
+        "Device returned for evaluation; no patient injury reported."
+    )
+    assert sample_gate.matches_catalogue(built)
+    assert not sample_gate.matches_catalogue(built.replace("pressure alarm during infusion", "Asha Rao, 98450 12345"))
+    assert not sample_gate.matches_catalogue(built.replace("SAMPLE-ORBIT-300-LOT-003", "lot of a real patient"))
+    assert not sample_gate.matches_catalogue(built + " Patient called back at home.")
