@@ -117,3 +117,26 @@ def test_the_signed_records_list_opens_on_the_latest_signatures(trial):  # F-E2,
     assert all(item["record_label"] and item["object_id"] for item in items)
     for item in items:  # a decision is verified now; other kinds have no check here and say so with null
         assert item["fingerprint_ok"] is (True if item["object_type"] == "Decision" else None)
+
+
+def test_signed_records_read_mfa_verified_from_the_signing_event_of_any_kind(trial):  # review D1/C1
+    """A signing event of any kind that records mfa_verified is shown on the list (the sample seed writes them)."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    items = trial["client"].get("/api/v1/governance/signed-records").json()["items"]
+    other = next(item for item in items if item["object_type"] != "Decision")
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        db.add(
+            make_audit_event(
+                tenant_id=trial["tenant_id"],
+                actor_ref="test",
+                action="TEST_RECORD_SIGNED",
+                entity_type=other["object_type"],
+                entity_id=uuid.UUID(other["object_id"]),
+                details={"signature_id": other["signature_id"], "mfa_verified": False, "sample": True},
+            )
+        )
+        db.commit()
+    items = trial["client"].get("/api/v1/governance/signed-records").json()["items"]
+    assert next(item for item in items if item["signature_id"] == other["signature_id"])["mfa_verified"] is False

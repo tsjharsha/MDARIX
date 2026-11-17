@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -983,7 +983,7 @@ def signed_records(
         else {}
     )
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
-    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    mfa_by_signature = _mfa_by_signature(db, t.id, rows)
     training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     items = []
     for r in rows:
@@ -1012,14 +1012,17 @@ def signed_records(
     return {"items": items}
 
 
-def _mfa_by_signature(db: Session, tenant_id, signature_ids) -> dict[str, bool]:
-    """``{signature id: mfa_verified}`` from the signing audit events that record it."""
-    ids = {str(value) for value in signature_ids}
+def _mfa_by_signature(db: Session, tenant_id, rows) -> dict[str, bool]:
+    """``{signature id: mfa_verified}`` from the signing audit event of any kind that records it (decisions, case
+    decisions, and every other signing path or seed that writes ``signature_id`` with ``mfa_verified``). The search
+    starts a day before the oldest signature, so it reads the tenant's recent audit events only."""
+    ids = {str(r.id) for r in rows}
     if not ids:
         return {}
+    since = min(r.signed_at for r in rows) - timedelta(days=1)
     events = db.query(AuditEvent.details).filter(
         AuditEvent.tenant_id == tenant_id,
-        AuditEvent.action.in_(("SIGNED_APPROVAL_CREATED", "SIGNED_REJECTION_CREATED", "CASE_DECISION_SIGNED")),
+        AuditEvent.created_at >= since,
         AuditEvent.details["signature_id"].astext.in_(ids),
     )
     return {
@@ -1081,7 +1084,7 @@ def signature_verification(
 
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
     signed_brief = _signed_brief_label(data, item)
-    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    mfa_by_signature = _mfa_by_signature(db, t.id, rows)
     training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     result = []
     for r in rows:
