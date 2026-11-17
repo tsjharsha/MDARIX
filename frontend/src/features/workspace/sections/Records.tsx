@@ -4,6 +4,7 @@ import {
   AlarmClock,
   BadgeCheck,
   CalendarClock,
+  CircleHelp,
   ClipboardList,
   FileSearch,
   PenLine,
@@ -27,10 +28,12 @@ import {
 import { MVP_RECORDS_TABS, recordsAuditView, type MvpRecordsTab } from "../../../app/featureSet";
 import { ReportsPanel } from "../../reports/ReportsPanel";
 import { DidItWorkView } from "./DidItWork";
+import { SyntheticFollowUpView } from "./SyntheticFollowUp";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
 import {
   BOARD_SHOWS,
   DIRECTION,
+  SIGNED_RESULTS,
   EFFECTIVENESS_BASIS,
   EFFECTIVENESS_LIMITS,
   EMPTY_SIGN,
@@ -560,7 +563,7 @@ export function CapaCard({ item, onOpen }: { item: CapaItem; onOpen: () => void 
             <ToneIcon tone="critical" size={14} /> Closed without an effectiveness check
           </p>
         )}
-        {item.planned_on && item.state !== "EFFECTIVE" && item.state !== "NOT_EFFECTIVE" && (
+        {item.planned_on && !SIGNED_RESULTS.includes(item.state) && (
           <p className="uw-cr-meta">
             <strong>{dueText(item)}</strong> · {formatDay(item.planned_on)}
             {item.plan_source === "SOURCE_SYSTEM" ? " · date from your quality system: confirm the plan" : ""}
@@ -713,6 +716,7 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
         </h3>
         <RecurrenceView recurrence={detail.recurrence} />
       </section>
+      {detail.synthetic_follow_up && <SyntheticFollowUpView followUp={detail.synthetic_follow_up} />}
       {detail.capa.investigation && (
         <DidItWorkView
           investigationId={detail.capa.investigation.id}
@@ -865,6 +869,15 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
               />
               <XCircle size={15} aria-hidden="true" /> Not effective: plan a further action
             </label>
+            <label className="ca-check">
+              <input
+                type="radio"
+                name="result"
+                checked={sign.result === "INCONCLUSIVE"}
+                onChange={() => setSign({ ...sign, result: "INCONCLUSIVE" })}
+              />
+              <CircleHelp size={15} aria-hidden="true" /> Inconclusive: the evidence does not settle it yet
+            </label>
           </fieldset>
           <label className="ca-field">
             What you found
@@ -899,8 +912,11 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
           </div>
           {sign.result && sign.summary && signIssue && <p className="uw-hint">{signIssue}</p>}
           <p className="ac-muted">
-            Your signature covers the criteria, the result, your summary and the recurrence shown above, and is in the
-            audit trail.
+            Your signature covers the criteria, the result, your summary and the recurrence shown above
+            {detail.synthetic_follow_up
+              ? `, with the ${detail.synthetic_follow_up.label.toLowerCase()} labelled as such`
+              : ""}
+            , and is in the audit trail.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !!signIssue}>

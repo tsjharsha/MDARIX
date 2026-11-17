@@ -35,7 +35,7 @@ export type SummaryCapa = {
   check: SummaryCheck | null;
 };
 export type Worked = {
-  state: "EFFECTIVE" | "NOT_EFFECTIVE" | "TOO_EARLY" | "NOT_PLANNED";
+  state: "EFFECTIVE" | "NOT_EFFECTIVE" | "INCONCLUSIVE" | "TOO_EARLY" | "NOT_PLANNED";
   text: string;
   on: string | null;
 };
@@ -190,4 +190,10 @@ export const listText = (items: Array<string | null | undefined> | undefined) =>
 };
 
 export const workedTone = (state: Worked["state"] | undefined) =>
-  state === "EFFECTIVE" ? "good" : state === "NOT_EFFECTIVE" ? "critical" : "neutral";
+  state === "EFFECTIVE"
+    ? "good"
+    : state === "NOT_EFFECTIVE"
+      ? "critical"
+      : state === "INCONCLUSIVE"
+        ? "warning"
+        : "neutral";

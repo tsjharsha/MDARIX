@@ -20,12 +20,15 @@ export const EFFECTIVENESS_LIMITS = {
   dueSoonDays: 14,
 };
 
-export type EffectivenessState = "OVERDUE" | "DUE_SOON" | "NOT_PLANNED" | "NOT_EFFECTIVE" | "SCHEDULED" | "EFFECTIVE";
+export type EffectivenessState =
+  "OVERDUE" | "DUE_SOON" | "NOT_PLANNED" | "NOT_EFFECTIVE" | "INCONCLUSIVE" | "SCHEDULED" | "EFFECTIVE";
+/** The results a person signs (W1d: INCONCLUSIVE too). */
+export const SIGNED_RESULTS: readonly string[] = ["EFFECTIVE", "NOT_EFFECTIVE", "INCONCLUSIVE"];
 
 export type CheckRound = {
   id: string;
   round: number;
-  status: "PLANNED" | "EFFECTIVE" | "NOT_EFFECTIVE";
+  status: "PLANNED" | "EFFECTIVE" | "NOT_EFFECTIVE" | "INCONCLUSIVE";
   criteria: string;
   planned_on: string;
   measured_from: string;
@@ -79,6 +82,37 @@ export type Recurrence = {
   note?: string;
 };
 
+/** W1d (D04): one month of a before/after series. */
+export type FollowUpMonth = { month: number; days: number; complaints: number };
+export type FollowUpSide = {
+  source: string;
+  months: FollowUpMonth[];
+  complaints: number;
+  unit_months: number;
+  per_1000_unit_months: number | null;
+};
+/** W1d (D04): the sample CAPA's synthetic follow-up, labelled; never real history. */
+export type SyntheticFollowUp = {
+  label: string;
+  synthetic: true;
+  notice: string;
+  action: string;
+  evidence_ref: string;
+  follow_up_days: number;
+  before: FollowUpSide & { lots: string[]; units: number };
+  after: FollowUpSide & {
+    lots: Array<{
+      lot: string;
+      built_day_after_fix: number;
+      units: number;
+      sensors_inspected: number;
+      sensors_out_of_range: number;
+      complaints: number;
+    }>;
+  };
+  limits: string[];
+};
+
 export type CapaDetail = CapaItem & {
   excluded: boolean;
   rounds: CheckRound[];
@@ -86,6 +120,7 @@ export type CapaDetail = CapaItem & {
   suggestion: { criteria: string; planned_on: string; measured_from: string };
   can_plan: boolean;
   can_sign: boolean;
+  synthetic_follow_up?: SyntheticFollowUp | null;
 };
 
 export type BoardSummary = {
@@ -97,6 +132,7 @@ export type BoardSummary = {
   scheduled: number;
   effective: number;
   not_effective: number;
+  inconclusive?: number;
   date_from_source: number;
 };
 
@@ -130,6 +166,7 @@ export const STATE: Record<EffectivenessState, { label: string; tone: Tone }> = 
   DUE_SOON: { label: "Check due soon", tone: "warning" },
   NOT_PLANNED: { label: "No check planned", tone: "serious" },
   NOT_EFFECTIVE: { label: "Not effective", tone: "critical" },
+  INCONCLUSIVE: { label: "Inconclusive", tone: "warning" },
   SCHEDULED: { label: "Scheduled", tone: "neutral" },
   EFFECTIVE: { label: "Effective", tone: "good" },
 };
@@ -265,11 +302,16 @@ export function planBody(form: PlanForm, detail: Pick<CapaDetail, "check">) {
   };
 }
 
-export type SignForm = { result: "EFFECTIVE" | "NOT_EFFECTIVE" | ""; summary: string; password: string; code: string };
+export type SignForm = {
+  result: "EFFECTIVE" | "NOT_EFFECTIVE" | "INCONCLUSIVE" | "";
+  summary: string;
+  password: string;
+  code: string;
+};
 export const EMPTY_SIGN: SignForm = { result: "", summary: "", password: "", code: "" };
 
 export function signProblem(form: SignForm): string | null {
-  if (!form.result) return "Choose whether the action was effective";
+  if (!form.result) return "Choose the result: effective, not effective or inconclusive";
   const summary = collapsed(form.summary);
   if (summary.length < EFFECTIVENESS_LIMITS.summaryMin)
     return `Say in at least ${EFFECTIVENESS_LIMITS.summaryMin} characters what you found`;
