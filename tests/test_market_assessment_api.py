@@ -482,12 +482,12 @@ def test_a_trial_holds_the_sample_answers_and_removing_the_sample_removes_them_a
     assert chapter["title"] == "Assess a serious complaint per market" and chapter["acted"]["count"] == 1
     with SessionLocal() as db:
         bind_tenant(db, tenant_id)
-        # The sample author's acknowledgements: the EU question set and the scale, and (0.10.53) the disposition rules
-        # and the coding criteria of the routine example.
+        # The sample author's acknowledgements: the EU and Canada question sets and the scale, and (0.10.53) the
+        # disposition rules and the coding criteria of the routine example.
         sample_records = db.query(SignerTrainingRecord).filter(
             SignerTrainingRecord.tenant_id == tenant_id, SignerTrainingRecord.source_system == "MDARIX_SAMPLE"
         )
-        assert sample_records.count() == 4
+        assert sample_records.count() == 5
     removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
     assert removed.status_code == 200, removed.text
     with SessionLocal() as db:

@@ -1646,8 +1646,10 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
     base = f"/api/v1/investigations/{case_id}/intelligence"
     hypotheses = user.get(f"{base}/hypotheses").json()
     items = hypotheses["items"] if isinstance(hypotheses, dict) else hypotheses
-    statuses = sorted(item["human_status"] for item in items)
+    statuses = sorted(item["human_status"] for item in items if item["origin"] == "HUMAN")
     assert statuses == ["PARTIALLY_SUPPORTED", "WEAKLY_SUPPORTED"], items
+    # The pre-recorded AI proposal (trial/sample_ai.py) waits for a person's judgement.
+    assert [item["human_status"] for item in items if item["origin"] == "AI"] == [None]
     assert all("(Sample)" in item["statement"] for item in items)
     unknowns = user.get(f"{base}/unknowns").json()
     open_items = [item for item in (unknowns["items"] if isinstance(unknowns, dict) else unknowns)]
