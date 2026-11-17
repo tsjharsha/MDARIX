@@ -274,7 +274,7 @@ describe("the investigation's one progress line (stage 8)", () => {
       { section: "Decisions & actions", state: "OPEN", done: 0, total: 3 },
       { section: "History", state: "OPEN", done: 0, total: 1 },
     ]);
-    expect(nextCaseStep(steps)).toEqual({ key: "gaps", label: "gaps", section: "Evidence", part: "intelligence" });
+    expect(nextCaseStep(steps)).toEqual({ key: "gaps", label: "gaps", section: "Evidence", part: "unknowns" });
   });
   it("is done, with no next step, once the decision is signed", () => {
     const steps = Object.keys(STEP_PLACE).map((key) => step(key, "DONE"));

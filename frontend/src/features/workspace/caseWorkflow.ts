@@ -460,12 +460,26 @@ export const STEP_PLACE: Readonly<Record<string, { section: CaseSection; part: s
   scope: { section: "Summary", part: "scope" },
   evidence: { section: "Evidence", part: "evidence" },
   analysis: { section: "Evidence", part: "analysis" },
-  hypotheses: { section: "Evidence", part: "intelligence" },
-  gaps: { section: "Evidence", part: "intelligence" },
+  hypotheses: { section: "Evidence", part: "causes" },
+  gaps: { section: "Evidence", part: "unknowns" },
   risk_regulatory: { section: "Decisions & actions", part: "reviews" },
   brief: { section: "Decisions & actions", part: "brief" },
   human_review: { section: "Decisions & actions", part: "decision" },
 };
+
+/**
+ * W1b: the six questions an investigation answers, in the order the case screen leads the reader through them, each
+ * with the section and part that answers it. The advanced tools (challenges, failure chains, observations, the RCA
+ * methods, the trust details) sit folded below these.
+ */
+export const INVESTIGATION_QUESTIONS: ReadonlyArray<{ question: string; section: CaseSection; part: string }> = [
+  { question: "What happened?", section: "Summary", part: "scope" },
+  { question: "What evidence do we have?", section: "Evidence", part: "glance" },
+  { question: "What could have caused it?", section: "Evidence", part: "causes" },
+  { question: "What do we still not know?", section: "Evidence", part: "unknowns" },
+  { question: "What should we decide?", section: "Decisions & actions", part: "brief" },
+  { question: "What action should we take?", section: "Decisions & actions", part: "decision" },
+];
 
 // A step that is finished, or that the organization cannot record yet, is not work anyone owes.
 const SETTLED: readonly StepStatus[] = ["DONE", "NOT_AVAILABLE"];
