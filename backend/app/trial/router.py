@@ -102,11 +102,57 @@ class ApproveRequest(BaseModel):
 
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
 def approve_trial_request(
-    request_id: uuid.UUID, request: Request, payload: ApproveRequest | None = None, db: Session = Depends(get_db)
+    request_id: uuid.UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    payload: ApproveRequest | None = None,
+    background: bool = False,
+    db: Session = Depends(get_db),
 ):
+    """Approve a trial request: the organization, its owner, the sample story and the invitation, all or nothing.
+
+    ``background=true`` (review P6): the answer comes at once (202, ``APPROVING``) and the approval runs right after
+    it, in its own session, exactly as the click would run it; the request list shows APPROVED when it is done, and a
+    failure leaves the request waiting for review with nothing saved (the reason is logged). Without it, the answer
+    waits for the whole approval (several seconds: the sample story is about a thousand rows)."""
     admin = _require_platform_admin(request, db)
+    sample_only = bool(payload and payload.sample_only)
+    if background:
+        row = db.query(OnboardingRequest).filter(OnboardingRequest.id == request_id).first()
+        if row is None:
+            raise HTTPException(404, detail={"code": "TRIAL_REQUEST_NOT_FOUND", "message": "Trial request not found"})
+        if row.status != "PENDING_REVIEW":
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "TRIAL_REQUEST_ALREADY_REVIEWED",
+                    "message": f"This request is already {row.status.lower()}",
+                },
+            )
+        background_tasks.add_task(_approve_after_response, request_id, admin.id, sample_only)
+        return JSONResponse(
+            status_code=202, content={"id": str(request_id), "status": "APPROVING", "sample_only": sample_only}
+        )
     # The approval also detects the sample's signals (service.approve_request).
-    return approve_request(db, request_id, admin, sample_only=bool(payload and payload.sample_only))
+    return approve_request(db, request_id, admin, sample_only=sample_only)
+
+
+def _approve_after_response(request_id: uuid.UUID, admin_id, sample_only: bool) -> None:
+    """The approval of ``approve_trial_request(background=true)``, in its own session; never raises."""
+    import logging
+
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_system
+
+    with SessionLocal() as db:
+        try:
+            bind_system(db, "trial approval after the response")
+            admin = db.get(AuthUser, admin_id)
+            approve_request(db, request_id, admin, sample_only=sample_only)
+        except Exception as exc:  # nothing was saved: the request still waits for review
+            db.rollback()
+            detail = exc.detail if isinstance(exc, HTTPException) else type(exc).__name__
+            logging.getLogger(__name__).warning("Trial approval %s did not complete: %s", request_id, detail)
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/decline")
