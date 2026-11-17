@@ -129,6 +129,7 @@ def _capas(db: Session, case) -> list[dict]:
                         "planned_on": _iso(check.planned_on),
                         "signed_at": _iso(check.signed_at),
                         "result_summary": check.result_summary,
+                        "criteria": check.criteria,
                     }
                     if check is not None
                     else None
@@ -353,5 +354,7 @@ def for_case(control_db: Session, db: Session, case) -> dict:
                 "question": case.investigation_question,
             },
             "decision": None,
+            # W1c: the product's risk file, so the Investigation Brief shows the risk links before the decision.
+            "risks": _risks(db, case),
         }
     return summary(control_db, db, case, decision)
