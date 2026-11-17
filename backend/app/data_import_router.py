@@ -460,14 +460,95 @@ def import_runs(
     data: Session = Depends(get_data_plane_db),
 ):
     """The latest import runs, newest first, each with its data-quality report (R17). The sample's run is left out
-    once the sample data, and its rows, are removed."""
+    once the sample data, and its rows, are removed; the sample's simulated source runs (W5) are under ``/sources``."""
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    events = _runs_query(db, tenant_id).order_by(AuditEvent.created_at.desc()).limit(20).all()
+    events = (
+        _runs_query(db, tenant_id)
+        .filter(~AuditEvent.details.has_key("simulated_system"))
+        .order_by(AuditEvent.created_at.desc())
+        .limit(20)
+        .all()
+    )
     samples = [event.details["import_ref"] for event in events if event.details.get("sample")]
     kept = import_lineage.present(data, tenant_id, samples)
     events = [event for event in events if not event.details.get("sample") or event.details["import_ref"] in kept]
     names = _actor_names(db, tenant_id, events)
     return {"runs": [_run_view(event, names) for event in events]}
+
+
+@router.get("/sources", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def import_sources(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """W5 (free trial only): where the sample's records came from, by system (PLM, ERP, eQMS; generic names, simulated,
+    not a live connection): each run with its headers mapped and not used, its checks, the rows written and set aside
+    and its lineage rows, reconciled when the report balances and every written row has its lineage."""
+    from sqlalchemy import func
+
+    from backend.app.db.models.ingestion import ImportLineage
+    from backend.app.signer_training.router import is_trial
+    from backend.app.trial import sample_imports, sample_lot_impact, sample_sources
+
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    if not is_trial(db, tenant_id):
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
+    events = (
+        _runs_query(db, tenant_id)
+        .filter(AuditEvent.details["sample"].astext == "true")
+        .order_by(AuditEvent.created_at)
+        .all()
+    )
+    refs = [event.details["import_ref"] for event in events]
+    lineage = dict(
+        data.query(ImportLineage.import_ref, func.count(ImportLineage.id))
+        .filter(ImportLineage.tenant_id == tenant_id, ImportLineage.import_ref.in_([uuid.UUID(r) for r in refs]))
+        .group_by(ImportLineage.import_ref)
+        .all()
+        if refs
+        else []
+    )
+    lineage = {str(key): int(count) for key, count in lineage.items()}
+    # The sample's runs whose rows are still there (sample removal takes them).
+    events = [event for event in events if event.details["import_ref"] in lineage]
+    names = _actor_names(db, tenant_id, events)
+    columns = {
+        sample_imports.SAMPLE_FILE: (sample_imports.SAMPLE_COLUMNS, []),
+        sample_lot_impact.SAMPLE_FILE: (sample_lot_impact.SAMPLE_COLUMNS, []),
+        **{name: (run["columns"], run["not_used"]) for name, run in sample_sources.RUN_BY_FILE.items()},
+    }
+    systems = {key: {"key": key, **value, "runs": []} for key, value in sample_sources.SYSTEMS.items()}
+    simulated = [event for event in events if event.details.get("simulated_system")]
+    for event in events:
+        details = event.details
+        system = details.get("simulated_system") or sample_sources.SYSTEM_OF.get(details.get("entity"))
+        if system not in systems:
+            continue
+        mapped, not_used = columns.get(details.get("file_name"), ([], []))
+        help_text = imports.column_help(details["entity"])
+        report = details["quality_report"]
+        rows = lineage[details["import_ref"]]
+        systems[system]["runs"].append(
+            {
+                **_run_view(event, names),
+                "simulated": bool(details.get("simulated_system")),
+                "columns": [{**item, "help": help_text.get(item["column"])} for item in mapped],
+                "not_used": not_used,
+                "lineage_rows": rows,
+                "reconciled": bool(report.get("balanced")) and rows == report.get("rows_accepted"),
+            }
+        )
+    first = events[0].created_at if events else None
+    return {
+        "label": sample_sources.LABEL,
+        # None: no simulated run yet (a trial started before W5 gets them when its sample is refreshed); True: they
+        # came with a later refresh; False: with the trial's sample.
+        "added_after_start": (None if not simulated else (simulated[0].created_at - first).total_seconds() > 3600),
+        "systems": list(systems.values()),
+    }
 
 
 @router.get("/runs/{import_ref}", dependencies=[Depends(require_permission(RECORDS_WRITE))])

@@ -53,6 +53,8 @@ GENEALOGY = {
 NEW_LOTS = {6: 30, 7: 30, 8: 30}
 LOT_005_UNITS, LOT_005_BEFORE = 60, 150
 SAMPLE_FILE = "Sample distribution export.csv"
+# The export's headers read under the template's columns (the mapping version is made from them).
+SAMPLE_COLUMNS = [{"header": "Ship To Name", "column": "consignee"}, {"header": "Ship Date", "column": "ship_date"}]
 SAMPLE_ACTOR = STORY_WINDOWS_BY
 CEDAR = ("Cedar Plains Medical Center (Sample)", "US", "Hospital", "SMP-C-1001")
 BLUEGATE = ("Bluegate Medical Supply (Sample)", "US", "Distributor", "SMP-C-1002")
@@ -221,8 +223,7 @@ def stage_sample_lot_impact(db: Session, tenant_id, now: datetime) -> dict:
     rows = _ship(db, tenant_id, lots, SHIPMENTS, now)
     db.flush()
     import_ref = uuid.uuid4()
-    columns = [{"header": "Ship To Name", "column": "consignee"}, {"header": "Ship Date", "column": "ship_date"}]
-    version = import_lineage.mapping_version("distribution", columns, "ISO")
+    version = import_lineage.mapping_version("distribution", SAMPLE_COLUMNS, "ISO")
     lines = list(enumerate(rows, 2))
     import_lineage.write(
         db, tenant_id, import_ref, "distribution", TEMPLATES["distribution"]["required"], lines, version, SAMPLE_SOURCE
