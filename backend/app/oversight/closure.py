@@ -193,7 +193,25 @@ def facts(
     enabled: list[str] | None = None,
 ) -> dict:
     """Everything the checklist, the stage line and the decision record read, in one place (``tasks``: the open
-    tasks by complaint, ``enabled``: the organization's markets, when already read for a whole list)."""
+    tasks by complaint, ``enabled``: the organization's markets, when already read for a whole list).
+
+    Read once per request for one complaint (the story's progress and the event page it embeds both ask): kept until
+    the session's next write (backend/app/db/request_memo.py). Callers read the result and never change it."""
+    if tasks is None and triage is None and enabled is None:
+        from backend.app.db.request_memo import once
+
+        return once(db, ("closure.facts", str(tenant_id), str(complaint.id)), lambda: _facts(db, tenant_id, complaint))
+    return _facts(db, tenant_id, complaint, tasks, triage, enabled)
+
+
+def _facts(
+    db: Session,
+    tenant_id,
+    complaint,
+    tasks: dict[str, list] | None = None,
+    triage: set[str] | None = None,
+    enabled: list[str] | None = None,
+) -> dict:
     from backend.app.communications.service import open_requests
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
     from backend.app.db.models.complaint_disposition import ComplaintDisposition

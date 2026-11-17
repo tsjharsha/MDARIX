@@ -68,8 +68,9 @@ def _ensure_trial_open(db: Session, tenant_id) -> None:
         )
 
 
-def ensure_tenant_access(db: Session, user) -> None:
-    """Refuse access when the user's organization or their membership in it has been suspended or revoked."""
+def ensure_tenant_access(db: Session, user):
+    """Refuse access when the user's organization or their membership in it has been suspended or revoked. Returns
+    the person's ACTIVE membership (None for a legacy account with no membership row)."""
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     # A free trial past its end reads as ended (the trial-ended page), even when an older release's hourly job
     # suspended its organization at the end (J25).
@@ -96,8 +97,9 @@ def ensure_tenant_access(db: Session, user) -> None:
     memberships = db.query(TenantMembership).filter(
         TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id
     )
-    if memberships.filter(TenantMembership.status == "ACTIVE").first() is not None:
-        return
+    active = memberships.filter(TenantMembership.status == "ACTIVE").first()
+    if active is not None:
+        return active
     if memberships.filter(TenantMembership.status.in_(sorted(BLOCKED_MEMBERSHIP_STATUSES))).first() is not None:
         raise HTTPException(
             403, detail={"code": "MEMBERSHIP_SUSPENDED", "message": "Your access to this organization is suspended"}
@@ -233,10 +235,11 @@ def get_request_context(
     if not is_background_request(request):
         durable.last_seen_at = now
         renew_session_if_due(durable, now, response, token)
-    set_database_tenant_context(db, str(durable.tenant_id))
+    # Read before the commit, which expires the row (it would be read again for these two values).
+    user_id, tenant_id = str(durable.user_id), str(durable.tenant_id)
+    set_database_tenant_context(db, tenant_id)
     if hasattr(db, "commit"):
         db.commit()
-    user_id, tenant_id = str(durable.user_id), str(durable.tenant_id)
     user = (
         db.query(AuthUser)
         .filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE")
@@ -248,7 +251,7 @@ def get_request_context(
         # A session this deployment does not serve (another organization's in a CELL, a customer's on the PLATFORM,
         # platform staff in a CELL) is no session here, whatever database it was created in.
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
-    ensure_tenant_access(db, user)
+    membership = ensure_tenant_access(db, user)
     from backend.app import mfa
 
     if not mfa.is_enrolled(user) and mfa.required_for(user, db):
@@ -266,15 +269,6 @@ def get_request_context(
 
     # Model calls made while handling this request apply this organization's AI switch and budget.
     set_request_tenant(tenant_id, user_id)
-    membership = (
-        db.query(TenantMembership)
-        .filter(
-            TenantMembership.user_id == user.id,
-            TenantMembership.tenant_id == user.tenant_id,
-            TenantMembership.status == "ACTIVE",
-        )
-        .first()
-    )
     return AuthenticatedRequestContext(
         user_id,
         token,
