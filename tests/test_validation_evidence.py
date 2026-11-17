@@ -193,3 +193,20 @@ def test_the_run_table_migration_goes_down_and_up_again(migration_database):
         up = _alembic(env, "upgrade", "head")
     assert up.returncode == 0, up.stderr[-2000:]
     assert present() and _fingerprint(engine) == at_head
+
+
+@pytest.mark.unit
+def test_the_class_a_scenarios_are_worked_out_once_per_screen_not_per_test(monkeypatch):
+    """A full-suite run has thousands of tests with file-level markers: recomputing the class-A list for each made the
+    screen take seconds to minutes."""
+    from validation import pack
+
+    calls = []
+    original = pack.class_a_scenarios
+    monkeypatch.setattr(pack, "class_a_scenarios", lambda sources: calls.append(1) or original(sources))
+    tests = [
+        {"id": f"tests.test_x::test_{i}", "result": "pass", "seconds": 0, "scenarios": [], "file_scenarios": ["RG-05"]}
+        for i in range(200)
+    ]
+    evidence_view.evidence(evidence_view.repo_sources(), {"commit": COMMIT, "meta": {}, "tests": tests})
+    assert len(calls) <= 3
