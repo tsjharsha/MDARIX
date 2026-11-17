@@ -21,6 +21,7 @@ REJECTED_STATUSES = ("CONTRADICTED", "RETIRED")
 NO_CHECK = "No effectiveness check is planned yet."
 TOO_EARLY = "Too early: the effectiveness check is planned for {on}. Only a signed check says an action worked."
 NO_ACTION = "No CAPA or effectiveness check is recorded on this investigation yet."
+RESULT_WORDS = {"EFFECTIVE": "effective", "NOT_EFFECTIVE": "not effective", "INCONCLUSIVE": "inconclusive"}
 
 
 def _iso(value) -> str | None:
@@ -130,6 +131,8 @@ def _capas(db: Session, case) -> list[dict]:
                         "signed_at": _iso(check.signed_at),
                         "result_summary": check.result_summary,
                         "criteria": check.criteria,
+                        # W1d (D04): judged on the sample's synthetic follow-up, never on real history.
+                        "synthetic": "synthetic_follow_up" in (check.evidence or {}),
                     }
                     if check is not None
                     else None
@@ -159,10 +162,11 @@ def worked(capas: list[dict]) -> dict:
     signed = [(capa, check) for capa, check in checks if check["signed_at"] and check["status"] != "PLANNED"]
     if signed:
         capa, check = max(signed, key=lambda pair: pair[1]["signed_at"])
-        effective = check["status"] == "EFFECTIVE"
+        word = RESULT_WORDS.get(check["status"], "not effective")
+        basis = " Judged on the synthetic follow-up (sample), not on real history." if check.get("synthetic") else ""
         return {
-            "state": "EFFECTIVE" if effective else "NOT_EFFECTIVE",
-            "text": f"{capa['ref']}: signed {'effective' if effective else 'not effective'} (round {check['round']}).",
+            "state": check["status"] if check["status"] in RESULT_WORDS else "NOT_EFFECTIVE",
+            "text": f"{capa['ref']}: signed {word} (round {check['round']}).{basis}",
             "on": check["signed_at"][:10],
         }
     planned = sorted((check["planned_on"], capa) for capa, check in checks if check["planned_on"])

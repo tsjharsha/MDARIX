@@ -9,7 +9,8 @@ SAMPLE-INV-001, "Why did pressure-alarm complaints rise after OrbitCare 300 Rev 
    row; or an AI hypothesis a person judged). Seeding never ticks it: the sample's proposals are unreviewed;
 5. brief: a person accepted the sample author's brief for decision (APPROVED_FOR_DECISION);
 6. decision: a signed BRIEF decision on the case (its audit event says whether an authenticator code was checked);
-7. action: an effectiveness check is planned on a CAPA of the case (SAMPLE-CAPA-02 by default).
+7. action: an effectiveness check is planned on a CAPA of the case (SAMPLE-CAPA-02 by default). The tick stays on
+   the planned check (W1 spec); the card then reads planned -> synthetic follow-up (W1d) -> signed result.
 
 Ticks are read from saved records, as one_story.py reads its ten steps, in order (``one_story.in_order``); the marks
 (steps 1 to 3) are kept with the ten-step story's marks, under the run "flagship" and the investigation's id, so a
@@ -227,6 +228,10 @@ def run_progress(data: Session, control_db: Session, tenant_id, request) -> dict
         (row for row in capas if row.id in planned), capas[0] if capas else None
     )
     signed_check = next((row for row in checks if capa is not None and row.capa_id == capa.id and row.signed_at), None)
+    # W1d (D04): planned -> synthetic follow-up -> signed. The follow-up shows once the check is planned.
+    from backend.app.trial import sample_follow_up
+
+    follow_up = bool(capa is not None and capa.id in planned and sample_follow_up.has_record(data, tenant_id))
     branch = (
         data.query(Complaint.id)
         .filter(
@@ -275,6 +280,7 @@ def run_progress(data: Session, control_db: Session, tenant_id, request) -> dict
                 "title": capa.title,
                 "check_planned": capa.id in planned,
                 "check_status": signed_check.status if signed_check is not None else None,
+                "follow_up": follow_up,
             }
             if capa is not None
             else None
