@@ -208,18 +208,16 @@ export function ValidationEvidence({ canRecord = false }: { canRecord?: boolean 
             onOpen={() => setFilter("Gaps")}
           />
           <StatTile
-            label="Last result"
-            value={data?.run ? `${counts?.passed ?? 0} passed` : NO_RUN}
-            detail={
-              data?.run ? `${counts?.failed ?? 0} failed · ${counts?.not_run ?? 0} not in the run` : "No results yet"
-            }
+            label="Passed"
+            value={data?.run ? (counts?.passed ?? 0) : "None"}
+            detail={data?.run ? `${counts?.failed ?? 0} failed · ${counts?.not_run ?? 0} not in the run` : NO_RUN}
             icon={<FlaskConical size={18} />}
             tone={!data?.run ? "neutral" : counts?.failed ? "critical" : "good"}
           />
           <StatTile
-            label="OQ protocol"
-            value={data?.protocol.signed ? "Signed" : "Not yet signed"}
-            detail={`Expected results confirmed: ${data?.protocol.expected_confirmed ?? 0} of ${data?.protocol.expected_results ?? 0}`}
+            label="OQ protocol signed"
+            value={data?.protocol.signed ? "Yes" : "No"}
+            detail={`${data?.protocol.signed ? "Signed" : "Not yet signed"} · expected results confirmed: ${data?.protocol.expected_confirmed ?? 0} of ${data?.protocol.expected_results ?? 0}`}
             icon={<FileCheck2 size={18} />}
             tone={data?.protocol.signed ? "good" : "warning"}
           />

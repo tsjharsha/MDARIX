@@ -74,9 +74,12 @@ def validation_pack(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/platform-admin/validation-runs", status_code=201)
-def record_validation_run(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Record one pytest JUnit XML (with the requirement markers) as the newest test run."""
+def record_validation_run(request: Request, file: UploadFile | None = File(None), db: Session = Depends(get_db)):
+    """Record one pytest JUnit XML (with the requirement markers) as the newest test run. The file is optional in the
+    signature so the role check answers first: an anonymous call never learns the body's shape."""
     admin = _require_platform_admin(request, db)
+    if file is None:
+        raise HTTPException(422, detail={"code": "NOT_A_TEST_REPORT", "message": "Choose a JUnit XML file."})
     raw = file.file.read(evidence_view.MAX_JUNIT_BYTES + 1)
     try:
         parsed = evidence_view.parse_junit(raw)
