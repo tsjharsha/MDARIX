@@ -912,6 +912,24 @@ def _signature_valid(data: Session, r: SignedApprovalRecord, item: Decision) -> 
     return fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED"
 
 
+# What each kind of signed record is, in words, for the signed-records list.
+SIGNED_RECORD_LABELS = {
+    "Decision": "Decision",
+    "FirstContactCheck": "First-contact check",
+    "IntakeEvent": "Intake event",
+    "TriageRecord": "Triage",
+    "ComplaintMarketAssessment": "Market assessment",
+    "ReportSnapshot": "Authority report",
+    "ReportObligation": "Attached authority report",
+    "ComplaintDisposition": "Disposition",
+    "EventClosure": "Event closure",
+    "DecisionGuideVersion": "Decision guide",
+    "CapaEffectivenessCheck": "CAPA effectiveness check",
+    "LotImpactList": "Lot impact list",
+    "QmsDocumentVersion": "QMS document",
+}
+
+
 @router.get("/signed-records")
 def signed_records(
     limit: int = 20,
@@ -919,37 +937,46 @@ def signed_records(
     data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The organization's latest signed decisions, newest first, each verified now: who signed (by name), what the
-    signature means, when, whether an authenticator code was checked, the signer's training, and whether the record
-    still matches what was signed (WHIF review F-E2, F-E6: verification opens on these)."""
+    """The organization's latest signatures of every kind, newest first: what was signed (``object_type`` and
+    ``record_label``), who signed (by name), what the signature means, when, whether an authenticator code was checked,
+    the signer's training, and whether the record still matches what was signed (WHIF review F-E2, F-E6: verification
+    opens on these). ``fingerprint_ok`` is checked now for decisions; it is null for the kinds that have no check here
+    (their own screens verify them)."""
     from backend.app.workflow.people import names_by_id
 
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
     rows = (
         db.query(SignedApprovalRecord)
-        .filter_by(tenant_id=t.id, object_type="Decision")
-        .order_by(SignedApprovalRecord.signed_at.desc())
+        .filter_by(tenant_id=t.id)
+        .order_by(SignedApprovalRecord.signed_at.desc(), SignedApprovalRecord.id)
         .limit(min(100, max(1, limit)))
         .all()
     )
-    decisions = {
-        item.id: item
-        for item in data.query(Decision).filter(
-            Decision.tenant_id == t.id, Decision.id.in_({r.object_id for r in rows})
-        )
-    }
+    decision_ids = {r.object_id for r in rows if r.object_type == "Decision"}
+    decisions = (
+        {
+            item.id: item
+            for item in data.query(Decision).filter(Decision.tenant_id == t.id, Decision.id.in_(decision_ids))
+        }
+        if decision_ids
+        else {}
+    )
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
     mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
     training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     items = []
     for r in rows:
-        item = decisions.get(r.object_id)
+        is_decision = r.object_type == "Decision"
+        item = decisions.get(r.object_id) if is_decision else None
         items.append(
             {
                 "signature_id": str(r.id),
                 "business_id": r.business_id,
-                "decision_id": str(r.object_id),
+                "object_type": r.object_type,
+                "object_id": str(r.object_id),
+                "record_label": SIGNED_RECORD_LABELS.get(r.object_type, r.object_type),
+                "decision_id": str(r.object_id) if is_decision else None,
                 "decision_business_id": item.business_id if item is not None else None,
                 "decision": r.decision,
                 "signer_name": signers.get(str(r.signer_user_id)),
@@ -958,8 +985,8 @@ def signed_records(
                 "signed_at": r.signed_at,
                 "mfa_verified": mfa_by_signature.get(str(r.id)),
                 "training": (training.get(str(r.signer_user_id)) or {}).get("documents", []),
-                # The decision is gone (another plane, deleted): nothing to match, so not OK.
-                "fingerprint_ok": bool(item is not None and _signature_valid(data, r, item)),
+                # A decision that is gone (another plane, deleted) has nothing to match, so it is not OK.
+                "fingerprint_ok": bool(item is not None and _signature_valid(data, r, item)) if is_decision else None,
             }
         )
     return {"items": items}

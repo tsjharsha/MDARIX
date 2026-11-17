@@ -112,5 +112,8 @@ def test_the_signed_records_list_opens_on_the_latest_signatures(trial):  # F-E2,
     for item in items:
         assert {"signer_name", "meaning", "signed_at", "mfa_verified", "training", "fingerprint_ok"} <= set(item)
         assert all({"code", "version", "current"} <= set(doc) for doc in item["training"])
-    if items:  # the sample's signed decisions verify against what was signed
-        assert all(item["fingerprint_ok"] is True for item in items)
+    # The sample story signs records of several kinds (review C1, T1: the list was empty when it kept decisions only).
+    assert len({item["object_type"] for item in items}) >= 3, items
+    assert all(item["record_label"] and item["object_id"] for item in items)
+    for item in items:  # a decision is verified now; other kinds have no check here and say so with null
+        assert item["fingerprint_ok"] is (True if item["object_type"] == "Decision" else None)
