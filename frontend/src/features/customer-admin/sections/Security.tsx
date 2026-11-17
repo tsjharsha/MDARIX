@@ -132,8 +132,9 @@ export type AiSettings = {
   trial_chain_on?: boolean;
   /** Each AI feature with its intended use and risk, and whether it is on for the organization. */
   features?: AiFeature[];
-  /** Whether the signed-in person may change the switch (absent on an older server: then the answer itself says so). */
+  /** Whether the switch can be moved now, and why not (a free trial before its AI services are set; newer servers). */
   can_change?: boolean;
+  can_change_reason?: string | null;
 };
 
 export const AI_SETTINGS_PATH = "/api/v1/admin/ai-settings";
@@ -153,7 +154,7 @@ export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
   const trial = Boolean(data?.free_trial);
   const provider = trial ? TRIAL_SERVICES : data?.provider_name;
   // A trial whose AI services MDARIX has not set up yet cannot switch AI on (the server answers 409).
-  const waitsForServices = trial && !on && data?.trial_chain_on === false;
+  const waitsForServices = trial && !on && (data?.trial_chain_on === false || data?.can_change === false);
   const share =
     data && data.monthly_token_budget ? Math.min(100, (data.tokens_used / data.monthly_token_budget) * 100) : 0;
   const change = () =>

@@ -61,8 +61,9 @@ describe("F1: the trial owner switches AI on in Settings", () => {
     resources.data[AI_SETTINGS] = trialSettings;
     expect(render(api(["signal.triage"], true), <SettingsSection />)).toContain(TRIAL_AI_TAB);
     expect(render(api(["signal.triage"], false), <SettingsSection />)).not.toContain(TRIAL_AI_TAB);
+    // can_change false (the trial services are not set yet): the tab stays, its switch is off (next test).
     resources.data[AI_SETTINGS] = { ...trialSettings, can_change: false };
-    expect(render(api(["signal.triage"], true), <SettingsSection />)).not.toContain(TRIAL_AI_TAB);
+    expect(render(api(["signal.triage"], true), <SettingsSection />)).toContain(TRIAL_AI_TAB);
   });
 
   it("shows the switch without the pilot gate, the provider or the model id", () => {
@@ -75,7 +76,7 @@ describe("F1: the trial owner switches AI on in Settings", () => {
   });
 
   it("keeps the switch off while the trial's AI services are not set up", () => {
-    resources.data[AI_SETTINGS] = { ...trialSettings, trial_chain_on: false };
+    resources.data[AI_SETTINGS] = { ...trialSettings, trial_chain_on: true, can_change: false };
     const html = render(api(["signal.triage"], true), <SettingsSection tab={TRIAL_AI_TAB} />);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Turn AI on/);
     expect(html).toContain("still setting up the trial&#x27;s AI services");
