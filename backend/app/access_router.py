@@ -26,6 +26,7 @@ from backend.app.access import (
     platform_trials,
     session,
     tenant_settings,
+    validation_evidence,
 )
 
 router = APIRouter()
@@ -48,5 +49,6 @@ for _module in (
     platform_reference,
     platform_reference_data,
     catalog,
+    validation_evidence,
 ):
     router.include_router(_module.router)

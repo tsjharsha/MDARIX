@@ -134,6 +134,9 @@ TRIAL_OWNER_ADMIN_ROUTES = {
     # The trial's own audit trail and its chain check (WHIF review F-E1): a trial has no customer administrator.
     "/api/v1/admin/audit-history",
     "/api/v1/admin/audit-chain",
+    # Validation evidence and its release validation pack (E2): what a trial's owner shows a customer's validation lead.
+    "/api/v1/admin/validation-evidence",
+    "/api/v1/admin/validation-evidence/pack",
 }
 
 _WORK = {RECORDS_WRITE, AI_RUN, DATA_EXPORT}

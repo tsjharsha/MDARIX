@@ -1,0 +1,81 @@
+/* Validation evidence (E2): flat operational screen (G-2), readable at 1280x720. */
+.ve-lead {
+  margin: 0 0 12px;
+  max-width: 72ch;
+}
+.ve-framing {
+  margin: -4px 0 12px;
+  max-width: 110ch;
+  font-size: var(--ms-fs-12);
+}
+.ve-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+.ve-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ac-line);
+}
+.ve-run {
+  display: grid;
+  gap: 2px;
+}
+.ve-actions,
+.ve-record,
+.ve-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ve-filters {
+  margin: 8px 0;
+}
+.ve-note {
+  margin: 4px 0;
+}
+.ve-small {
+  margin: 0 0 4px;
+  font-size: var(--ms-fs-12);
+}
+.ve-error {
+  color: var(--ac-critical);
+}
+.ve-req {
+  display: grid;
+  gap: 2px;
+  white-space: nowrap;
+}
+.ve-text {
+  display: block;
+  max-width: 52ch;
+}
+.ve-tests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.ve-tests code {
+  font-size: var(--ms-fs-12);
+  overflow-wrap: anywhere;
+}
+.ve-gap {
+  font-weight: 600;
+}
+@media (max-width: 900px) {
+  .ve-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .ve-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -75,7 +75,13 @@ export const dataIntegrationStep = (section: string) => {
   return { number: index + 1, total: DATA_INTEGRATION_SECTIONS.length, stage: stage?.stage ?? "" };
 };
 export const AI_SECTIONS = ["Overview", "Governance", "Evaluations", "AI runs", "Agents & guardrails"] as const;
-export const SECURITY_SECTIONS = ["Overview", "Audit trail", "Support access", "Retention"] as const;
+export const SECURITY_SECTIONS = [
+  "Overview",
+  "Audit trail",
+  "Support access",
+  "Retention",
+  "Validation evidence",
+] as const;
 export const OPERATIONS_SECTIONS = [
   "System health",
   "Queues & jobs",
@@ -127,6 +133,8 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
     "Audit trail": "Every recorded change across tenants: who did what, when and why.",
     "Support access": "Time-limited access that lets our support team look into a customer's tenant.",
     Retention: "How long audit records are kept, and the earliest date any may be deleted.",
+    "Validation evidence":
+      "Each requirement, the tests that cover it and the last recorded run; record a run and download the validation pack.",
   },
   Operations: {
     "System health": "Whether the platform's services are up and the background worker is running.",

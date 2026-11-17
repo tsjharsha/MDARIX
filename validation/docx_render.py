@@ -78,9 +78,10 @@ def render_docx(markdown: str, *, title: str, document_date: str) -> bytes:
             width = max(len(row) for row in rows)
             table = document.add_table(rows=len(rows), cols=width)
             table.style = "Table Grid"
-            for r, row in enumerate(rows):
-                for c in range(width):
-                    cell = table.cell(r, c)
+            # One cell list per row: table.cell(r, c) walks the whole table on every call, so a 180-row table took a
+            # minute to render (E2: the pack is downloaded from the validation evidence screen).
+            for r, (row, cells) in enumerate(zip(rows, (table_row.cells for table_row in table.rows))):
+                for c, cell in enumerate(cells[:width]):
                     cell.text = ""
                     _runs(cell.paragraphs[0], row[c] if c < len(row) else "")
                     if r == 0:

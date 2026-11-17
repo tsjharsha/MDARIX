@@ -18,6 +18,8 @@ source_simulator/*
 # Migration md11 reads the source catalog.
 !source_simulator/source_catalog.json
 docs
+# The validation evidence screen reads the requirement mapping and builds the validation pack (E2).
+!docs/validation
 artifacts
 .mdarix-object-storage
 .mdarix-embedding-cache

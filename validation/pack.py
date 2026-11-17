@@ -371,7 +371,18 @@ def _proves(sources: Sources, test: dict, sid: str) -> bool:
     class-A requirement cites (owner decision O24)."""
     if sid in test["scenarios"]:
         return True
-    return sid in test.get("file_scenarios", ()) and sid not in class_a_scenarios(sources)
+    return sid in test.get("file_scenarios", ()) and sid not in _class_a_set(sources)
+
+
+def _class_a_set(sources: Sources) -> set[str]:
+    """class_a_scenarios as a set, kept while the requirements and register are the same objects: recomputing it for
+    every test and scenario made the RTM of a full-suite run take minutes (E2 screen)."""
+    key = (id(sources.requirements), len(sources.requirements), id(sources.scenarios), len(sources.scenarios))
+    cached = sources.__dict__.get("_class_a_cache")
+    if cached is None or cached[0] != key:
+        cached = (key, set(class_a_scenarios(sources)))
+        sources.__dict__["_class_a_cache"] = cached
+    return cached[1]
 
 
 def is_future(sources: Sources, sid: str) -> bool:
