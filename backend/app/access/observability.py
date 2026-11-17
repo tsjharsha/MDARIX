@@ -5,7 +5,7 @@ import json
 import zipfile
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -68,10 +68,19 @@ def real_ai_runs():
 
 @router.get("/admin/audit-history")
 def audit_history(
-    request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)
+    request: Request,
+    action: str | None = None,
+    entity_type: str | None = None,
+    paged: bool = False,
+    limit: int = Query(200, ge=1, le=500),
+    before: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
 ):
+    """The organization's audit events, newest first: a list of the latest 200 (as before), or with ``paged=true``
+    (review A2) ``{"items", "next_cursor"}``: ``limit`` events before the ``before`` cursor (an event's place in the
+    hash chain), and the cursor of the next page (null on the last one)."""
     from backend.app.access.authz import admin_or_trial_owner
-    from backend.app.access.platform_trials import _names
+    from backend.app.workflow.people import names_by_id
 
     admin = admin_or_trial_owner(request, db)  # a free trial's owner reads the trial's own trail (WHIF F-E1)
     query = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
@@ -79,13 +88,20 @@ def audit_history(
         query = query.filter(AuditEvent.action == action)
     if entity_type:
         query = query.filter(AuditEvent.entity_type == entity_type)
-    rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
+    if paged:
+        if before is not None:
+            query = query.filter(AuditEvent.chain_seq < before)
+        rows = query.order_by(AuditEvent.chain_seq.desc()).limit(limit).all()
+    else:
+        rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
     # Actions by MDARIX staff stay visible to the customer, attributed to the platform rather than to a person.
     actor_business_ids = business_id_map(db, AuthUser, (row.actor_ref for row in rows))
     # Staff accounts live in the platform's organization, which this organization's session cannot read.
     platform_actors = set() if _is_platform_admin(admin) else set(staff_accounts(row.actor_ref for row in rows))
-    names = _names(db, {row.actor_ref for row in rows if str(row.actor_ref) not in platform_actors})
-    return [
+    names = names_by_id(
+        db, admin.tenant_id, {row.actor_ref for row in rows if str(row.actor_ref) not in platform_actors}
+    )
+    items = [
         {
             "id": str(row.id),
             "tenant_id": str(row.tenant_id),
@@ -110,6 +126,10 @@ def audit_history(
         }
         for row in rows
     ]
+    if not paged:
+        return items
+    more = len(rows) == limit and rows[-1].chain_seq is not None
+    return {"items": items, "next_cursor": rows[-1].chain_seq if more else None}
 
 
 # Every exported audit event carries its place in the organization's hash chain (migration md18), so whoever

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
+from auth.emailer import delivery_off
 from backend.app.runtime_env import PRODUCTION, STAGING, environment, is_production_like
 from security import keyring
 
@@ -150,6 +151,8 @@ def problems(*, offline: bool = False) -> list[str]:
     if not _get("MDARIX_CLAMD_HOST") and not _get("MDARIX_MALWARE_SCANNER_COMMAND"):
         add("Uploaded files must be virus-scanned: set MDARIX_CLAMD_HOST (ClamAV) or MDARIX_MALWARE_SCANNER_COMMAND")
 
+    if delivery_off():
+        add("E-mail delivery is off (MDARIX_EMAIL_DELIVERY=off or a mdarix_whif_ demo database): not allowed here")
     for name in ("MDARIX_SMTP_HOST", "MDARIX_SMTP_USERNAME", "MDARIX_SMTP_PASSWORD"):
         if not _get(name):
             add(f"{name} must be set: without email no one can be invited or reset a password")

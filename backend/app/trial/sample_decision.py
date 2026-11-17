@@ -17,7 +17,6 @@ pass the submission gate, nothing is kept. Idempotent; flushes but never commits
 from __future__ import annotations
 
 import logging
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -174,7 +173,7 @@ def _author_email(tenant_id: uuid.UUID) -> str:
 def sample_author(db: Session, tenant_id: uuid.UUID, now: datetime):
     """The trial's sample author: an account that cannot sign in and holds no seat (created once)."""
     from backend.app.db.models.foundation import AuthUser
-    from backend.app.trial.service import _hash
+    from auth.service import NO_PASSWORD
 
     email = _author_email(tenant_id)
     user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.username == email).first()
@@ -186,8 +185,8 @@ def sample_author(db: Session, tenant_id: uuid.UUID, now: datetime):
         username=email,
         display_name=SAMPLE_AUTHOR_NAME,
         company="MDARIX sample data",
-        # A password nobody knows; DISABLED refuses sign-in, activation and reset in any case.
-        password_hash=_hash(secrets.token_urlsafe(32)),
+        # No password matches it; DISABLED refuses sign-in, activation and reset in any case.
+        password_hash=NO_PASSWORD,
         role=SAMPLE_AUTHOR_ROLE,
         status="DISABLED",
         email_verified=False,

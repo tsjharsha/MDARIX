@@ -30,8 +30,10 @@ from backend.app.trial.sample_source import is_sample
 from backend.app.downloads import attachment
 from backend.app import links
 import base64
+from collections import OrderedDict
 import binascii
 import hashlib
+import json
 import re
 import logging
 import uuid
@@ -3675,6 +3677,13 @@ def request_for_information(
 # --------------------------------------------------------------------------------------------- exports
 
 
+# Rendered files of approved snapshots (review P2): an approved snapshot never changes, so its PDF or DOCX is rendered
+# once per process. Keyed by everything else the file shows (organization name, trial label, form).
+# shortcut: per process and bounded; move to object storage if the PDFs ever run on several API instances.
+_RENDERED: OrderedDict = OrderedDict()
+_RENDERED_MAX = 64
+
+
 @router.get("/{obligation_id}/worksheet.{kind}", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def export(
     obligation_id: uuid.UUID,
@@ -3714,7 +3723,6 @@ def export(
         and not (form in INDIA_FILES and india_pdf)
     ):
         raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US, India or Canada report's PDF")
-    view = detail(db, control_db, ctx, obligation)
     frozen = None
     if snapshot is not None:
         frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
@@ -3724,6 +3732,28 @@ def export(
             _approved_only(frozen)
     elif obligation.state == rules.CANCELLED:
         raise _error(409, "REPORT_CANCELLED", "This report was cancelled: there is no draft to preview")
+    cache_key = None
+    if frozen is not None and frozen.state == "APPROVED":
+        from genai.governance import is_free_trial
+
+        cache_key = (
+            str(tenant_id),
+            str(obligation.id),
+            str(frozen.id),
+            # What is stored with the snapshot: a changed (tampered) stored file is a new key, so it is checked and
+            # refused as before, never served from the cache.
+            hashlib.sha256(json.dumps(frozen.fields or {}, sort_keys=True, default=str).encode()).hexdigest(),
+            kind,
+            form,
+            _organization_name(control_db, tenant_id),
+            bool(is_free_trial(control_db, tenant_id)),
+        )
+    if cache_key in _RENDERED:
+        _RENDERED.move_to_end(cache_key)
+        body, stem = _RENDERED[cache_key]
+        _audit_download(db, ctx, tenant_id, obligation, kind, frozen, form)
+        return Response(content=body, media_type=MEDIA[kind], headers={"Content-Disposition": attachment(stem)})
+    view = detail(db, control_db, ctx, obligation)
     if frozen is not None:
         record = control_db.get(SignedApprovalRecord, frozen.signed_record_id) if frozen.signed_record_id else None
         view = _frozen_view(view, frozen, _signature_view(control_db, tenant_id, record) if record else None)
@@ -3753,6 +3783,23 @@ def export(
             body = mir_pdf.render(found[0], view, organization, note=found[1])
     if body is None:
         body = render.render(view, kind, organization=organization)
+    _audit_download(db, ctx, tenant_id, obligation, kind, frozen, form)
+    stem = f"mdarix-{obligation.form_code.lower().replace('_', '-')}-{view['complaint']['ref']}"
+    stem += f"-snapshot-{frozen.version}" if frozen else "-draft"
+    stem += {"official": "-official-form", "adrms": "-adrms-entry-sheet"}.get(form or "", "")
+    if cache_key is not None:
+        _RENDERED[cache_key] = (body, f"{stem}.{kind}")
+        while len(_RENDERED) > _RENDERED_MAX:
+            _RENDERED.popitem(last=False)
+    return Response(
+        content=body,
+        media_type=MEDIA[kind],
+        headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
+    )
+
+
+def _audit_download(db, ctx, tenant_id, obligation, kind: str, frozen, form) -> None:
+    """Every download is audited, a file served from the rendered cache too."""
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -3765,14 +3812,6 @@ def export(
         )
     )
     db.commit()
-    stem = f"mdarix-{obligation.form_code.lower().replace('_', '-')}-{view['complaint']['ref']}"
-    stem += f"-snapshot-{frozen.version}" if frozen else "-draft"
-    stem += {"official": "-official-form", "adrms": "-adrms-entry-sheet"}.get(form or "", "")
-    return Response(
-        content=body,
-        media_type=MEDIA[kind],
-        headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
-    )
 
 
 def _mir_for_pdf(db, control_db, obligation: ReportObligation, frozen, view: dict) -> tuple[bytes, str] | None:

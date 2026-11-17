@@ -451,13 +451,61 @@ async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"detail": body}, headers={"X-Request-ID": request_id})
 
 
+# Plain English for the validation errors people meet (review C4), by pydantic error type; others keep their text.
+_PLAIN_ERRORS = {
+    "missing": "is required",
+    "uuid_parsing": "must be a valid ID",
+    "uuid_type": "must be a valid ID",
+    "int_parsing": "must be a whole number",
+    "int_type": "must be a whole number",
+    "float_parsing": "must be a number",
+    "bool_parsing": "must be true or false",
+    "date_parsing": "must be a date (YYYY-MM-DD)",
+    "date_from_datetime_parsing": "must be a date (YYYY-MM-DD)",
+    "datetime_parsing": "must be a date and time (YYYY-MM-DDTHH:MM:SSZ)",
+    "datetime_from_date_parsing": "must be a date and time (YYYY-MM-DDTHH:MM:SSZ)",
+    "string_too_long": "is too long (at most {max_length} characters)",
+    "string_too_short": "is too short (at least {min_length} characters)",
+    "string_pattern_mismatch": "is not in the expected format",
+    "greater_than_equal": "must be at least {ge}",
+    "less_than_equal": "must be at most {le}",
+    "enum": "must be one of: {expected}",
+    "literal_error": "must be one of: {expected}",
+    "json_invalid": "is not valid JSON",
+    "extra_forbidden": "is not a field this request accepts",
+}
+
+
+def _plain(error: dict) -> str:
+    """``<field>: <what is wrong>`` in plain English, the field named by its last name in ``loc``."""
+    names = [str(part) for part in error.get("loc", ()) if part not in ("body", "query", "path", "header", "cookie")]
+    field = names[-1] if names else "The request"
+    template = _PLAIN_ERRORS.get(error.get("type", ""))
+    try:
+        text = template.format(**(error.get("ctx") or {})) if template else error.get("msg", "is not valid")
+    except (KeyError, IndexError):
+        text = error.get("msg", "is not valid")
+    return f"{field}: {text}"
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error_without_input(request: Request, exc: RequestValidationError) -> JSONResponse:
     """FastAPI's 422 answer (``{"detail": [{"type", "loc", "msg", ...}]}``, which the app reads field by field),
     without each error's ``input``: what was submitted is never sent back, so a password or an oversized body does not
-    come back in the answer."""
-    errors = [{key: value for key, value in error.items() if key != "input"} for error in exc.errors()]
-    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+    come back in the answer. Like the app's own errors it also carries ``code`` (INVALID_INPUT) and a plain-English
+    ``message``; each error has its own ``message`` too (review C4)."""
+    errors = [
+        {**{key: value for key, value in error.items() if key != "input"}, "message": _plain(error)}
+        for error in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": jsonable_encoder(errors),
+            "code": "INVALID_INPUT",
+            "message": "; ".join(error["message"] for error in errors[:3]),
+        },
+    )
 
 
 # First, so its fixed path /api/v1/investigations/mine/summary is matched before any /{investigation_id} route.

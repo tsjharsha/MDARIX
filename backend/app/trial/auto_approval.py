@@ -353,7 +353,7 @@ def _approver(db: Session, create: bool = True, personal: bool = False):
     has already promised the approval)."""
     from backend.app.db.models.foundation import AuthUser
     from backend.app.support_access import ensure_platform_tenant
-    from backend.app.trial.service import _hash
+    from auth.service import _hash
 
     username, name = (
         (PERSONAL_APPROVER_USERNAME, PERSONAL_APPROVER_NAME) if personal else (APPROVER_USERNAME, APPROVER_NAME)

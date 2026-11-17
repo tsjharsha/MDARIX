@@ -495,3 +495,89 @@ def test_the_ai_status_of_a_trial_follows_the_chain_the_organization_and_the_per
     inactive = trial["client"].get("/api/v1/ai/status").json()
     assert inactive["enabled"] is False and inactive["reason_code"] == "USER_AI_INACTIVE"
     assert inactive["message"].startswith("AI is not enabled for your account")
+
+
+# ----------------------------------------------------------- every text column the prompts send (review S1)
+
+TYPED = "Ann Roy, 12 Hill Road, Pune 411001, phone 98200 00000"
+
+
+def _sample_row(tenant_id, table):
+    model = sample_gate._model_for(table)
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        row = (
+            db.query(model)
+            .filter(model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE)
+            .order_by(model.id)
+            .all()
+        )
+        return next(
+            item.id
+            for item in row
+            if sample_gate._record_problem(db, tenant_id, {"table": table, "id": item.id}) is None
+        )
+
+
+@pytest.mark.parametrize(
+    "table, column",
+    [
+        # Sent by the complaint explanation, the signal summary and the IMDRF code suggestions.
+        ("complaints", "description"),
+        ("complaints", "status"),
+        ("complaints", "complaint_type"),
+        ("complaints", "problem_code"),
+        ("complaints", "severity"),
+        ("complaints", "country"),
+        ("complaints", "other_lots"),
+        # Sent by case analysis and drafting.
+        ("investigations", "investigation_question"),
+        ("changes", "description"),
+        # Sent by Ask and case analysis: the title and type of the record, the text of its search chunks.
+        ("evidence", "title"),
+        ("evidence", "evidence_type"),
+        ("evidence", "content"),
+        ("evidence_chunks", "text_content"),
+    ],
+)
+def test_real_text_typed_into_any_sent_column_of_a_sample_record_is_refused(trial, table, column):
+    from backend.app.db.models.evidence_intelligence import EvidenceChunk
+
+    record_table = "evidence" if table == "evidence_chunks" else table
+    record_id = _sample_row(trial["tenant_id"], record_table)
+    model = EvidenceChunk if table == "evidence_chunks" else sample_gate._model_for(table)
+    length = getattr(model.__table__.columns[column].type, "length", None) or len(TYPED)
+    typed = [TYPED] if column == "other_lots" else TYPED[:length]
+    key = model.evidence_id if table == "evidence_chunks" else model.id
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        before = {row.id: getattr(row, column) for row in db.query(model).filter(key == record_id)}
+        assert before, f"the sample has a {table} row to edit"
+        db.query(model).filter(key == record_id).update({column: typed}, synchronize_session=False)
+        db.commit()
+    try:
+        found = sample_gate.problem(
+            str(trial["tenant_id"]),
+            records=[{"table": record_table, "id": str(record_id)}],
+            evidence=[],
+            user_text=None,
+        )
+        assert found and f"{table}.{column}" in found
+    finally:
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            for row_id, value in before.items():
+                db.query(model).filter(model.id == row_id).update({column: value}, synchronize_session=False)
+            db.commit()
+
+
+def test_unedited_sample_evidence_investigations_and_changes_pass_the_gate(trial):
+    """The (Sample) title suffix, server-set codes such as MEDIUM and the chunk text of sample evidence all pass."""
+    for table in ("evidence", "investigations", "changes"):
+        record_id = _sample_row(trial["tenant_id"], table)
+        assert (
+            sample_gate.problem(
+                str(trial["tenant_id"]), records=[{"table": table, "id": str(record_id)}], evidence=[], user_text=None
+            )
+            is None
+        )

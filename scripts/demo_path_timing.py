@@ -1,10 +1,10 @@
 """Time the WHIF demo path's API calls against a running local backend, and flag server errors and slow calls.
 
-Run only against a local backend on a *_test database (the script refuses anything else), for example:
+The script starts its own local backend on a mdarix_whif_* demo database or a *_test database (it refuses
+anything else), with e-mail delivery and alerts forced off (NO_SEND), for example:
 
-    $env:POSTGRES_DB = "mdarix_demo_test"
-    python -m uvicorn backend.app.main:app --port 8017          # in one window
-    python scripts/demo_path_timing.py --base-url http://127.0.0.1:8017 --rounds 20 --out timing.md
+    $env:POSTGRES_DB = "mdarix_whif_demo"
+    python scripts/demo_path_timing.py --port 8017 --rounds 20 --out timing.md
 
 It signs a new trial up, approves it as a Platform Administrator (a session minted for an existing PLATFORM_ADMIN test
 account), signs in as the trial owner and walks the nine story steps: each read is repeated --rounds times, each write
@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import math
 import os
+from datetime import datetime, timedelta, timezone
+import subprocess
 import sys
 import time
 import uuid
@@ -116,6 +118,33 @@ def activation_token(approval: dict, email: str) -> str:
         return issue_invitation(db, user.id, user.tenant_id)
 
 
+def iso(hours: int = 0) -> str:
+    return (datetime.now(timezone.utc) + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def day(days: int) -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=days)).date().isoformat()
+
+
+def enroll_authenticator(w: Walk, owner: httpx.Client) -> str:
+    """Set up the trial owner's authenticator through the API, as a person does, so the walk can sign."""
+    from auth import totp
+
+    started = w.call(owner, "POST", "/api/v1/auth/mfa/enroll")
+    assert started.status_code == 200, started.text
+    secret = started.json()["secret"]
+    done = w.call(owner, "POST", "/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
+    assert done.status_code == 200, done.text
+    return secret
+
+
+def next_code(secret: str) -> str:
+    """The code of the next 30-second step: accepted once the current one was used (each code works once)."""
+    from auth import totp
+
+    return totp.code_at(secret, totp._step() + 1)
+
+
 def walk(w: Walk) -> None:
     public, admin, owner = httpx.Client(timeout=60), httpx.Client(timeout=60), httpx.Client(timeout=60)
     admin.cookies.set("mdarix_session", platform_admin_session())
@@ -137,6 +166,7 @@ def walk(w: Walk) -> None:
     signed_in = w.call(owner, "POST", "/api/v1/auth/signin", json={"email": email, "password": PASSWORD})
     assert signed_in.status_code == 200, signed_in.text
     tenant = approval["tenant_id"]
+    secret = enroll_authenticator(w, owner)
 
     w.step = "2 trial orgs"
     org = f"/api/v1/platform-admin/trial-organizations/{tenant}"
@@ -174,9 +204,15 @@ def walk(w: Walk) -> None:
         "POST",
         f"/api/v1/intake/{event['id']}/check/sign",
         "/intake/{id}/check/sign",
-        json={"classification": "COMPLAINT", "seen_version": event["version"], "password": PASSWORD},
+        json={
+            "classification": "COMPLAINT",
+            "seen_version": event["version"],
+            "password": PASSWORD,
+            "mfa_code": next_code(secret),
+        },
     )
-    complaint = signed.json().get("complaint_id") if signed.status_code == 200 else None
+    assert signed.status_code == 200, signed.text
+    complaint = signed.json().get("complaint_id")
     me = w.read(owner, "/api/v1/triage").json()["people"][0]["id"]
     if complaint:
         w.call(
@@ -218,7 +254,8 @@ def walk(w: Walk) -> None:
         owner,
         f"{inv}/workspace",
         "/investigations/{id}/workspace?as_of",
-        params={"temporal_mode": "known", "as_of": "2026-10-01T00:00:00Z", "retrieval_top_k": 8},
+        # Relative to the sample's day 0 (today): what was known an hour ago.
+        params={"temporal_mode": "known", "as_of": iso(hours=-1), "retrieval_top_k": 8},
     )
     for tail in ("readiness", "decisions", "evidence-inventory", "rca/fishbone", "intelligence/hypotheses"):
         w.read(owner, f"{inv}/{tail}", f"/investigations/{{id}}/{tail}")
@@ -252,7 +289,9 @@ def walk(w: Walk) -> None:
     w.step = "8 trust"
     w.read(owner, "/api/v1/admin/audit-history")
     w.read(owner, f"{inv}/trust/timeline", "/investigations/{id}/trust/timeline")
-    w.read(owner, "/api/v1/reviews/audit-trail", params={"from": "2026-10-05", "to": "2026-10-11"})
+    w.read(owner, "/api/v1/reviews/audit-trail", params={"from": day(-7), "to": day(0)})
+    w.read(owner, "/api/v1/governance/signed-records")
+    w.read(owner, "/api/v1/admin/audit-chain")
 
     w.step = "9 admin AI"
     w.read(admin, "/api/v1/platform-admin/ai/models")
@@ -260,24 +299,75 @@ def walk(w: Walk) -> None:
     w.read(admin, f"{org}/ai-metrics", "/trial-organizations/{id}/ai-metrics")
 
 
+# Settings the backend and this script run with, whatever the developer's dotenv file holds: no e-mail, no alert
+# webhook or alert e-mail. python-dotenv never replaces a variable that is present, so an empty value keeps it out.
+NO_SEND = {
+    "MDARIX_EMAIL_DELIVERY": "off",
+    "MDARIX_SMTP_HOST": "",
+    "MDARIX_SMTP_USERNAME": "",
+    "MDARIX_SMTP_PASSWORD": "",
+    "MDARIX_ALERT_WEBHOOK": "",
+    "MDARIX_ALERT_FALLBACK_WEBHOOK": "",
+    "MDARIX_ALERT_EMAIL": "",
+}
+
+
+def checked_database(database: str) -> str:
+    """A WHIF demo database (mdarix_whif_*) or a *_test database other than the shared ones; anything else refused."""
+    if database.startswith("mdarix_whif_"):
+        from scripts.demo_database import guard
+
+        return guard(database)
+    if not database.endswith("_test") or database in ("mdarix_r1_test",):
+        raise SystemExit(
+            f"Refusing: POSTGRES_DB must name a mdarix_whif_* or *_test database other than mdarix_r1_test, "
+            f"not {database!r}"
+        )
+    return database
+
+
+def backend_env(database: str) -> dict[str, str]:
+    return {**os.environ, **NO_SEND, "POSTGRES_DB": database, "PYTHONPATH": str(ROOT)}
+
+
+def start_backend(database: str, port: int) -> subprocess.Popen:
+    """Start the local backend this walk times, with NO_SEND forced on, and wait for /health."""
+    server = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--port", str(port), "--no-access-log"],
+        cwd=ROOT,
+        env=backend_env(database),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        if server.poll() is not None:
+            raise SystemExit(f"The backend stopped at start (exit code {server.returncode})")
+        try:
+            if httpx.get(f"http://127.0.0.1:{port}/health", timeout=2).status_code == 200:
+                return server
+        except httpx.HTTPError:
+            pass
+        time.sleep(1)
+    server.terminate()
+    raise SystemExit("The backend did not answer /health within 120 s")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--base-url", default="http://127.0.0.1:8017")
+    parser.add_argument("--port", type=int, default=8017, help="local port for the backend this script starts")
     parser.add_argument("--rounds", type=int, default=20, help="repeats of each read (default 20)")
     parser.add_argument("--out", help="also write the results table to this Markdown file")
     args = parser.parse_args()
-    database = os.environ.get("POSTGRES_DB", "")
-    if not database.endswith("_test") or database in ("mdarix_r1_test",):
-        raise SystemExit(
-            f"Refusing: POSTGRES_DB must name a *_test database other than mdarix_r1_test, not {database!r}"
-        )
-    host = urlparse(args.base_url).hostname
-    if host not in ("127.0.0.1", "localhost"):
-        raise SystemExit("Refusing: the demo path timing runs against a local backend only")
-    w = Walk(args.base_url, args.rounds)
+    database = checked_database(os.environ.get("POSTGRES_DB", ""))
+    os.environ.update(NO_SEND)  # this process reads the database too; it must not send either
+    server = start_backend(database, args.port)
+    w = Walk(f"http://127.0.0.1:{args.port}", args.rounds)
     try:
         walk(w)
     finally:
+        server.terminate()
+        server.wait(timeout=30)
         table, ok = w.table()
         print(table)
         if args.out:

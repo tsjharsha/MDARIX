@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 
 _TENANT_KEY = "mdarix_tenant_id"
 _SYSTEM_KEY = "mdarix_system_reason"
+# The settings the current transaction already holds (dropped when it ends and on any rollback, a savepoint's too).
+_APPLIED_KEY = "mdarix_scope_applied"
 _APPLY = text("SELECT set_config('app.tenant_id', :tenant, true), set_config('app.rls_bypass', :bypass, true)")
 
 
@@ -48,7 +50,9 @@ def _values(session: Session) -> dict:
 def _apply_now(session: Session) -> None:
     # A transaction already in progress keeps its settings until it ends, so update it immediately too.
     if hasattr(session, "in_transaction") and session.in_transaction():
-        session.execute(_APPLY, _values(session))
+        values = _values(session)
+        session.execute(_APPLY, values)
+        session.info[_APPLIED_KEY] = values
 
 
 def bind_tenant(session: Session, tenant_id) -> None:
@@ -77,9 +81,26 @@ def scope_of(session: Session) -> dict:
 
 
 @event.listens_for(Session, "after_begin")
-def _apply_scope_on_begin(session: Session, _transaction, connection) -> None:
+def _apply_scope_on_begin(session: Session, transaction, connection) -> None:
     if session.info.get(_TENANT_KEY) or session.info.get(_SYSTEM_KEY):
-        connection.execute(_APPLY, _values(session))
+        values = _values(session)
+        # A SAVEPOINT runs inside a transaction that already holds these settings (they last until it ends): applying
+        # them again cost one statement per savepoint. After any rollback they are applied again, as before.
+        if getattr(transaction, "nested", False) and session.info.get(_APPLIED_KEY) == values:
+            return
+        connection.execute(_APPLY, values)
+        session.info[_APPLIED_KEY] = values
+
+
+@event.listens_for(Session, "after_soft_rollback")
+def _forget_applied_on_rollback(session: Session, _previous) -> None:
+    session.info.pop(_APPLIED_KEY, None)
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _forget_applied_at_end(session: Session, transaction) -> None:
+    if not transaction.nested:
+        session.info.pop(_APPLIED_KEY, None)
 
 
 class _SessionConnectionSource:

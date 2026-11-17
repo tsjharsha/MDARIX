@@ -112,5 +112,57 @@ def test_the_signed_records_list_opens_on_the_latest_signatures(trial):  # F-E2,
     for item in items:
         assert {"signer_name", "meaning", "signed_at", "mfa_verified", "training", "fingerprint_ok"} <= set(item)
         assert all({"code", "version", "current"} <= set(doc) for doc in item["training"])
-    if items:  # the sample's signed decisions verify against what was signed
-        assert all(item["fingerprint_ok"] is True for item in items)
+    # The sample story signs records of several kinds (review C1, T1: the list was empty when it kept decisions only).
+    assert len({item["object_type"] for item in items}) >= 3, items
+    assert all(item["record_label"] and item["object_id"] for item in items)
+    for item in items:  # a decision is verified now; other kinds have no check here and say so with null
+        assert item["fingerprint_ok"] is (True if item["object_type"] == "Decision" else None)
+
+
+def test_signed_records_read_mfa_verified_from_the_signing_event_of_any_kind(trial):  # review D1/C1
+    """A signing event of any kind that records mfa_verified is shown on the list (the sample seed writes them)."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    items = trial["client"].get("/api/v1/governance/signed-records").json()["items"]
+    other = next(item for item in items if item["object_type"] != "Decision")
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        db.add(
+            make_audit_event(
+                tenant_id=trial["tenant_id"],
+                actor_ref="test",
+                action="TEST_RECORD_SIGNED",
+                entity_type=other["object_type"],
+                entity_id=uuid.UUID(other["object_id"]),
+                details={"signature_id": other["signature_id"], "mfa_verified": False, "sample": True},
+            )
+        )
+        db.commit()
+    items = trial["client"].get("/api/v1/governance/signed-records").json()["items"]
+    assert next(item for item in items if item["signature_id"] == other["signature_id"])["mfa_verified"] is False
+
+
+def test_the_sample_accounts_store_no_password_hash(trial):  # review P1: no scrypt for accounts that never sign in
+    from auth.service import NO_PASSWORD, _verify
+
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        sample = db.query(AuthUser).filter(AuthUser.tenant_id == trial["tenant_id"], AuthUser.status == "DISABLED")
+        hashes = {row.password_hash for row in sample}
+    assert hashes == {NO_PASSWORD}
+    assert _verify(NO_PASSWORD, NO_PASSWORD) is False and _verify("", NO_PASSWORD) is False
+
+
+def test_the_audit_history_pages_with_a_cursor(trial):  # review A2
+    client = trial["client"]
+    first = client.get("/api/v1/admin/audit-history", params={"paged": "true", "limit": 2})
+    assert first.status_code == 200, first.text
+    page = first.json()
+    assert len(page["items"]) == 2 and page["next_cursor"]
+    second = client.get(
+        "/api/v1/admin/audit-history", params={"paged": "true", "limit": 2, "before": page["next_cursor"]}
+    ).json()
+    assert not {item["id"] for item in page["items"]} & {item["id"] for item in second["items"]}
+    whole = client.get("/api/v1/admin/audit-history").json()
+    assert isinstance(whole, list)  # without paged=true the answer is the list it always was
+    assert len(whole) >= 4

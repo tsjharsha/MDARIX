@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from auth.durable import INVITATION_SECONDS, issue_invitation
 from auth.emailer import EmailDeliveryError, send_trial_invitation
-from auth.service import _hash
+from auth.service import NO_PASSWORD
 from backend.app.customer_lifecycle import build_customer_tenant
 from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
 from backend.app.db.models.customer_lifecycle import TenantDataPlane, TenantEnvironment
@@ -78,13 +78,20 @@ def _error(status: int, code: str, message: str) -> HTTPException:
 
 
 def trial_subscription(db: Session, tenant_id) -> SubscriptionLifecycle | None:
-    """The tenant's Free Trial subscription, or None when the tenant is not on the Free Trial plan."""
-    return (
-        db.query(SubscriptionLifecycle)
-        .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
-        .filter(SubscriptionLifecycle.tenant_id == tenant_id, PlanDefinition.code == FREE_TRIAL_PLAN)
-        .order_by(SubscriptionLifecycle.created_at.desc())
-        .first()
+    """The tenant's Free Trial subscription, or None when the tenant is not on the Free Trial plan. Read once per
+    request (every authenticated request checks it, and trial pages ask again): kept until the session's next write."""
+    from backend.app.db.request_memo import once
+
+    return once(
+        db,
+        ("trial_subscription", str(tenant_id)),
+        lambda: (
+            db.query(SubscriptionLifecycle)
+            .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+            .filter(SubscriptionLifecycle.tenant_id == tenant_id, PlanDefinition.code == FREE_TRIAL_PLAN)
+            .order_by(SubscriptionLifecycle.created_at.desc())
+            .first()
+        ),
     )
 
 
@@ -102,15 +109,11 @@ def trial_tenant_ids(db: Session) -> set:
 def trial_has_ended(db: Session, tenant_id, now: datetime | None = None) -> bool:
     """True when the tenant is on the Free Trial plan and its end date (and any grace period) has passed.
 
-    Runs on every authenticated request, so it is one indexed query; a converted tenant's subscription no longer
-    points at the Free Trial plan and is never treated as ended here.
+    Runs on every authenticated request, so it is one indexed query, shared with ``trial_subscription`` for the rest
+    of the request; a converted tenant's subscription no longer points at the Free Trial plan and is never treated as
+    ended here.
     """
-    free_trial = select(PlanDefinition.id).where(PlanDefinition.code == FREE_TRIAL_PLAN).scalar_subquery()
-    row = (
-        db.query(SubscriptionLifecycle)
-        .filter(SubscriptionLifecycle.tenant_id == tenant_id, SubscriptionLifecycle.plan_id.in_(free_trial))
-        .first()
-    )
+    row = trial_subscription(db, tenant_id)
     expires_at = getattr(row, "expires_at", None)
     if not isinstance(expires_at, datetime):
         return False
@@ -631,7 +634,7 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser, *, samp
             username=email,
             display_name=row.display_name,
             company=row.organization,
-            password_hash=_hash(secrets.token_urlsafe(24)),
+            password_hash=NO_PASSWORD,  # until the invitation is accepted: no password matches it (review P1)
             role=TRIAL_USER_ROLE,
             status="INVITED",
             email_verified=False,

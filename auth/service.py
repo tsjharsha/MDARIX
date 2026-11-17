@@ -89,8 +89,17 @@ def _parse(stored: str) -> tuple[int, int, int, bytes, bytes]:
     return _LEGACY_LOG2_N, 8, 1, bytes.fromhex(salt), bytes.fromhex(digest)
 
 
+# Stored for an account that can never sign in (the sample's authors and approvers): no password matches it, and
+# writing it costs no scrypt hash (about a second each at the production cost; review P1).
+NO_PASSWORD = "!no-password"
+
+
 def _verify(password: str, stored: str) -> bool:
-    """True when ``password`` matches ``stored``; raises ValueError for a value that is not a password hash."""
+    """True when ``password`` matches ``stored``; raises ValueError for a value that is not a password hash.
+    ``NO_PASSWORD`` never matches, after the time of a real check (so it tells nothing apart)."""
+    if stored == NO_PASSWORD:
+        burn_verification_time(password)
+        return False
     log2_n, r, p, salt, digest = _parse(stored)
     return hmac.compare_digest(_scrypt(password, salt, log2_n, r, p), digest)
 

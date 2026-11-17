@@ -599,10 +599,16 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
     checks = []
     # The trend check and the risk file check read the same trend board: once (0.10.43).
     with shared_trend_boards():
-        found_checks = [
-            (step, safely(db, step.__name__, lambda session, step=step: step(session, tenant_id, today)))
-            for step in CHECKS
-        ]
+        try:
+            # Every check in one SAVEPOINT: three statements of overhead instead of three per check.
+            with db.begin_nested():
+                found_checks = [(step, step(db, tenant_id, today)) for step in CHECKS]
+        except Exception:
+            # One check failed: each again in its own SAVEPOINT, so the failing one never fails the others.
+            found_checks = [
+                (step, safely(db, step.__name__, lambda session, step=step: step(session, tenant_id, today)))
+                for step in CHECKS
+            ]
     for step, found in found_checks:
         if found is None:
             code = step.__name__.upper()
@@ -618,7 +624,9 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
                 "items": [],
             }
         checks.append(found)
-    counts: dict = {}
+    # Whether each kind of record exists, in one statement (it was one count per kind).
+    kinds = (Complaint, Capa, Product)
+    counts: dict = dict(zip(kinds, db.query(*(exists().where(m.tenant_id == tenant_id) for m in kinds)).one()))
     checks = [_no_records_yet(db, tenant_id, check, counts) for check in checks]
     states = [check["state"] for check in checks]
     return {

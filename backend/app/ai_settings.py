@@ -61,6 +61,9 @@ class CustomerAiSettings(BaseModel):
     features: dict[str, bool] | None = None
     password: str | None = Field(default=None, max_length=256)
     mfa_code: str | None = Field(default=None, max_length=16)
+    # The settings' ``lock_version`` as read (review D3): when given, a change by someone else since then is refused
+    # (409 STALE_RECORD) instead of being overwritten.
+    lock_version: int | None = None
 
 
 class PlatformAiSettings(BaseModel):
@@ -108,6 +111,7 @@ def _settings(db: Session, tenant_id) -> dict:
     allowed_here = platform_features()
     return {
         **governance.usage(db, tenant_id),
+        "lock_version": tenant.lock_version if tenant is not None else None,
         # A free trial keeps AI off until the owner sets the trial chain; then sample data only.
         "free_trial": governance.is_free_trial(db, tenant_id),
         "trial_chain_on": bool(trial_chain_names()),
@@ -285,6 +289,14 @@ def update_customer_ai_settings(
     tenant = db.get(Tenant, admin.tenant_id)
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
+    if payload.lock_version is not None and int(payload.lock_version) != int(tenant.lock_version or 0):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "STALE_RECORD",
+                "message": "Someone changed the AI settings since you opened them; refresh and try again",
+            },
+        )
     switching_on = payload.ai_processing_allowed and not tenant.ai_processing_allowed
     trial = _refuse_for_free_trial(db, tenant.id, switching_on, payload.trial_acknowledgement)
     _require_acknowledgement(switching_on, payload.acknowledgement)
@@ -300,6 +312,7 @@ def update_customer_ai_settings(
     before = {"ai_processing_allowed": tenant.ai_processing_allowed}
     tenant.ai_processing_allowed = payload.ai_processing_allowed
     tenant.updated_at = datetime.now(timezone.utc)
+    tenant.lock_version = int(tenant.lock_version or 0) + 1
     old_values, new_values = change_diff(before, {"ai_processing_allowed": tenant.ai_processing_allowed})
     db.add(
         make_audit_event(

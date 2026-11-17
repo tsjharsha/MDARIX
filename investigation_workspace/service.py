@@ -247,7 +247,29 @@ class InvestigationWorkspaceService:
         as_of: datetime | None,
     ) -> list[dict[str, Any]]:
         rows = self._investigation_evidence_query(db, tenant_id, investigation.id, temporal_mode, as_of).all()
-        return [self._evidence_item(db, tenant_id, investigation, evidence) for evidence in rows]
+        if not rows:
+            return []
+        # The chunks, observations and entity links of every evidence record in three statements, not three each.
+        ids = [evidence.id for evidence in rows]
+        related: dict[str, dict] = {"chunks": {}, "observations": {}, "links": {}}
+        for key, model, order in (
+            ("chunks", EvidenceChunk, (EvidenceChunk.sequence_number,)),
+            ("observations", EvidenceObservation, (EvidenceObservation.created_at,)),
+            ("links", EvidenceEntityLink, ()),
+        ):
+            query = db.query(model).filter(model.tenant_id == tenant_id, model.evidence_id.in_(ids))
+            for row in query.order_by(model.evidence_id, *order):
+                related[key].setdefault(row.evidence_id, []).append(row)
+        return [
+            self._evidence_item(
+                investigation,
+                evidence,
+                related["chunks"].get(evidence.id, []),
+                related["observations"].get(evidence.id, []),
+                related["links"].get(evidence.id, []),
+            )
+            for evidence in rows
+        ]
 
     def _investigation_evidence_query(
         self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, temporal_mode: str, as_of: datetime | None
@@ -273,25 +295,8 @@ class InvestigationWorkspaceService:
         return q.order_by(Evidence.source_timestamp.nulls_last(), Evidence.evidence_identifier)
 
     def _evidence_item(
-        self, db: Session, tenant_id: uuid.UUID, investigation: Investigation, evidence: Evidence
+        self, investigation: Investigation, evidence: Evidence, chunks: list, observations: list, links: list
     ) -> dict[str, Any]:
-        chunks = (
-            db.query(EvidenceChunk)
-            .filter(EvidenceChunk.tenant_id == tenant_id, EvidenceChunk.evidence_id == evidence.id)
-            .order_by(EvidenceChunk.sequence_number)
-            .all()
-        )
-        observations = (
-            db.query(EvidenceObservation)
-            .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence.id)
-            .order_by(EvidenceObservation.created_at)
-            .all()
-        )
-        links = (
-            db.query(EvidenceEntityLink)
-            .filter(EvidenceEntityLink.tenant_id == tenant_id, EvidenceEntityLink.evidence_id == evidence.id)
-            .all()
-        )
         link_payload = [
             {
                 "entity_type": link.entity_type,

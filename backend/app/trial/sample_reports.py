@@ -188,11 +188,10 @@ def has_sample_reports(db: Session, tenant_id) -> bool:
 def sample_approver(db: Session, tenant_id: uuid.UUID, now: datetime):
     """The second sample account, which approves the sample's snapshots: it cannot sign in and holds no seat (its
     username starts as the sample author's does, so every list that leaves out the sample author leaves it out)."""
-    import secrets
 
     from backend.app.db.models.foundation import AuthUser
     from backend.app.trial.sample_decision import SAMPLE_AUTHOR_ROLE
-    from backend.app.trial.service import _hash
+    from auth.service import NO_PASSWORD
 
     email = f"sample-author+approver-{tenant_id.hex[:12]}@sample.invalid"
     user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.username == email).first()
@@ -204,7 +203,7 @@ def sample_approver(db: Session, tenant_id: uuid.UUID, now: datetime):
         username=email,
         display_name=APPROVER_NAME,
         company="MDARIX sample data",
-        password_hash=_hash(secrets.token_urlsafe(32)),
+        password_hash=NO_PASSWORD,
         role=SAMPLE_AUTHOR_ROLE,
         status="DISABLED",
         email_verified=False,

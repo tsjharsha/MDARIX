@@ -38,7 +38,27 @@ class EmailDeliveryError(RuntimeError):
     """Controlled SMTP failure that never includes credentials or raw protocol data."""
 
 
+DELIVERY_SWITCH = "MDARIX_EMAIL_DELIVERY"
+DEMO_DATABASE_PREFIX = "mdarix_whif_"
+
+
+def delivery_off() -> bool:
+    """True when this process must never hand an e-mail to SMTP, whatever the developer's dotenv file holds.
+
+    ``MDARIX_EMAIL_DELIVERY=off`` (local scripts, timing runs, the demo stack), or a WHIF demo database: a server or
+    script on ``mdarix_whif_*`` never e-mails anyone. Test databases (``*_test``) are left to tests/conftest.py, which
+    blanks the SMTP settings and lets the delivery tests patch smtplib. Production refuses the switch at start
+    (backend/app/config_check.py).
+    """
+    if os.getenv(DELIVERY_SWITCH, "").strip().lower() == "off":
+        return True
+    database = os.getenv("POSTGRES_DB", "")
+    return database.startswith(DEMO_DATABASE_PREFIX) and not database.endswith("_test")
+
+
 def smtp_configuration_status() -> dict[str, object]:
+    if delivery_off():
+        return {"configured": False, "delivery_off": True, "present": {}, "port_present": False}
     required = {
         "host": os.getenv("MDARIX_SMTP_HOST"),
         "username": os.getenv("MDARIX_SMTP_USERNAME"),
@@ -158,7 +178,9 @@ def _send(recipient: str, message: Message, *, reply_to: str | None = None) -> s
 def _send_email(
     recipient: str, subject: str, body: str, html_body: str | None = None, *, reply_to: str | None = None
 ) -> str:
-    """Send one email through the configured SMTP provider; NOT_CONFIGURED when there is none."""
+    """Send one email through the configured SMTP provider; NOT_CONFIGURED when there is none or delivery is off."""
+    if delivery_off():
+        return "NOT_CONFIGURED"
     host = os.getenv("MDARIX_SMTP_HOST")
     username = os.getenv("MDARIX_SMTP_USERNAME")
     password = os.getenv("MDARIX_SMTP_PASSWORD")

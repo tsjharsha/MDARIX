@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -438,7 +438,7 @@ def session_actor(db, ctx: AuthenticatedRequestContext):
 
 def verify_signing_credentials(
     db, ctx: AuthenticatedRequestContext, *, password: str | None, mfa_code: str | None, record_refusal
-) -> AuthUser | None:
+) -> bool:
     """Re-authenticate the signed-in person before an electronic signature or a controlled approval.
 
     The one check behind every signature-grade action (decision signing here, regulatory document approval in
@@ -447,8 +447,13 @@ def verify_signing_credentials(
     "sign" throttle (5 lock signing for 15 minutes); sign-in has its own lock, so signing cannot be used to guess
     passwords around it. Each refusal first rolls back ``db`` (whatever the request staged before the check is never
     committed with the refusal; the tenant scope is applied again when the next transaction begins), then calls
-    ``record_refusal(action)`` (the caller's audit event), is committed, and raises 403. Returns the signer (None for
-    a legacy in-process session that has no account).
+    ``record_refusal(action)`` (the caller's audit event), is committed, and raises 403. Returns True when an
+    authenticator code was checked and accepted for this signature, False when none was asked (signatures do not
+    require MFA): the signing audit event stores this as ``mfa_verified``.
+
+    A code that is real but already used (typically the one just typed at sign-in) is refused with
+    SIGNATURE_CODE_ALREADY_USED and does not count toward the lock: replay stays impossible (each code works once),
+    and a guess that is not a real code still counts.
 
     The codes are about this signature only (SIGNATURE_CODE_INVALID, SIGNATURE_MFA_NOT_SET_UP), never MFA_REQUIRED:
     that one means the sign-in still owes its second factor, and the browser leaves the page for it, losing what the
@@ -483,6 +488,18 @@ def verify_signing_credentials(
                     "message": "Set up an authenticator app (My Account > Security) before signing decisions",
                 },
             )
+        if mfa_code and mfa.code_already_used(signer, mfa_code):
+            # Replay stays refused, but it is not a wrong guess: no lock on stage after typing the sign-in code again.
+            db.rollback()
+            record_refusal("SIGNATURE_MFA_CODE_REUSED")
+            db.commit()
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "SIGNATURE_CODE_ALREADY_USED",
+                    "message": "This code was just used. Wait for the next code from your authenticator app.",
+                },
+            )
         if not mfa_code or not mfa.check_code(signer, mfa_code, allow_recovery=False):
             db.rollback()
             record_refusal("SIGNATURE_MFA_FAILED")
@@ -499,9 +516,12 @@ def verify_signing_credentials(
                     ),
                 },
             )
+        code_checked = True
+    else:
+        code_checked = False
     if signer is not None:
         mfa.record_success(db, signer, scope="sign")
-    return signer
+    return code_checked
 
 
 def _notify(helper: str, db, **details) -> bool:
@@ -649,7 +669,7 @@ def sign(
         raise HTTPException(403, detail={"code": code, "message": message})
     if not payload.remarks.strip():
         raise HTTPException(400, detail={"code": "REMARKS_REQUIRED", "message": "Remarks are required"})
-    verify_signing_credentials(
+    mfa_verified = verify_signing_credentials(
         db,
         ctx,
         password=payload.password,
@@ -733,8 +753,8 @@ def sign(
         actor["user_id"],
         "SIGNED_APPROVAL_CREATED" if payload.decision == "APPROVE" else "SIGNED_REJECTION_CREATED",
         item.id,
-        # A current authenticator code was checked for this signature (verify_signing_credentials) when required.
-        {"signature_id": str(record.id), "fingerprint": fingerprint, "mfa_verified": _signing_mfa_required()},
+        # Whether a current authenticator code was checked for this signature (verify_signing_credentials).
+        {"signature_id": str(record.id), "fingerprint": fingerprint, "mfa_verified": mfa_verified},
         request=request,
         reason=payload.remarks,
     )
@@ -912,6 +932,24 @@ def _signature_valid(data: Session, r: SignedApprovalRecord, item: Decision) -> 
     return fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED"
 
 
+# What each kind of signed record is, in words, for the signed-records list.
+SIGNED_RECORD_LABELS = {
+    "Decision": "Decision",
+    "FirstContactCheck": "First-contact check",
+    "IntakeEvent": "Intake event",
+    "TriageRecord": "Triage",
+    "ComplaintMarketAssessment": "Market assessment",
+    "ReportSnapshot": "Authority report",
+    "ReportObligation": "Attached authority report",
+    "ComplaintDisposition": "Disposition",
+    "EventClosure": "Event closure",
+    "DecisionGuideVersion": "Decision guide",
+    "CapaEffectivenessCheck": "CAPA effectiveness check",
+    "LotImpactList": "Lot impact list",
+    "QmsDocumentVersion": "QMS document",
+}
+
+
 @router.get("/signed-records")
 def signed_records(
     limit: int = 20,
@@ -919,37 +957,46 @@ def signed_records(
     data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The organization's latest signed decisions, newest first, each verified now: who signed (by name), what the
-    signature means, when, whether an authenticator code was checked, the signer's training, and whether the record
-    still matches what was signed (WHIF review F-E2, F-E6: verification opens on these)."""
+    """The organization's latest signatures of every kind, newest first: what was signed (``object_type`` and
+    ``record_label``), who signed (by name), what the signature means, when, whether an authenticator code was checked,
+    the signer's training, and whether the record still matches what was signed (WHIF review F-E2, F-E6: verification
+    opens on these). ``fingerprint_ok`` is checked now for decisions; it is null for the kinds that have no check here
+    (their own screens verify them)."""
     from backend.app.workflow.people import names_by_id
 
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
     rows = (
         db.query(SignedApprovalRecord)
-        .filter_by(tenant_id=t.id, object_type="Decision")
-        .order_by(SignedApprovalRecord.signed_at.desc())
+        .filter_by(tenant_id=t.id)
+        .order_by(SignedApprovalRecord.signed_at.desc(), SignedApprovalRecord.id)
         .limit(min(100, max(1, limit)))
         .all()
     )
-    decisions = {
-        item.id: item
-        for item in data.query(Decision).filter(
-            Decision.tenant_id == t.id, Decision.id.in_({r.object_id for r in rows})
-        )
-    }
+    decision_ids = {r.object_id for r in rows if r.object_type == "Decision"}
+    decisions = (
+        {
+            item.id: item
+            for item in data.query(Decision).filter(Decision.tenant_id == t.id, Decision.id.in_(decision_ids))
+        }
+        if decision_ids
+        else {}
+    )
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
-    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    mfa_by_signature = _mfa_by_signature(db, t.id, rows)
     training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     items = []
     for r in rows:
-        item = decisions.get(r.object_id)
+        is_decision = r.object_type == "Decision"
+        item = decisions.get(r.object_id) if is_decision else None
         items.append(
             {
                 "signature_id": str(r.id),
                 "business_id": r.business_id,
-                "decision_id": str(r.object_id),
+                "object_type": r.object_type,
+                "object_id": str(r.object_id),
+                "record_label": SIGNED_RECORD_LABELS.get(r.object_type, r.object_type),
+                "decision_id": str(r.object_id) if is_decision else None,
                 "decision_business_id": item.business_id if item is not None else None,
                 "decision": r.decision,
                 "signer_name": signers.get(str(r.signer_user_id)),
@@ -958,27 +1005,24 @@ def signed_records(
                 "signed_at": r.signed_at,
                 "mfa_verified": mfa_by_signature.get(str(r.id)),
                 "training": (training.get(str(r.signer_user_id)) or {}).get("documents", []),
-                # The decision is gone (another plane, deleted): nothing to match, so not OK.
-                "fingerprint_ok": bool(item is not None and _signature_valid(data, r, item)),
+                # A decision that is gone (another plane, deleted) has nothing to match, so it is not OK.
+                "fingerprint_ok": bool(item is not None and _signature_valid(data, r, item)) if is_decision else None,
             }
         )
     return {"items": items}
 
 
-def _signing_mfa_required() -> bool:
-    from backend.app import mfa
-
-    return bool(mfa.signatures_require_mfa())
-
-
-def _mfa_by_signature(db: Session, tenant_id, signature_ids) -> dict[str, bool]:
-    """``{signature id: mfa_verified}`` from the signing audit events that record it."""
-    ids = {str(value) for value in signature_ids}
+def _mfa_by_signature(db: Session, tenant_id, rows) -> dict[str, bool]:
+    """``{signature id: mfa_verified}`` from the signing audit event of any kind that records it (decisions, case
+    decisions, and every other signing path or seed that writes ``signature_id`` with ``mfa_verified``). The search
+    starts a day before the oldest signature, so it reads the tenant's recent audit events only."""
+    ids = {str(r.id) for r in rows}
     if not ids:
         return {}
+    since = min(r.signed_at for r in rows) - timedelta(days=1)
     events = db.query(AuditEvent.details).filter(
         AuditEvent.tenant_id == tenant_id,
-        AuditEvent.action.in_(("SIGNED_APPROVAL_CREATED", "SIGNED_REJECTION_CREATED", "CASE_DECISION_SIGNED")),
+        AuditEvent.created_at >= since,
         AuditEvent.details["signature_id"].astext.in_(ids),
     )
     return {
@@ -1040,7 +1084,7 @@ def signature_verification(
 
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
     signed_brief = _signed_brief_label(data, item)
-    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    mfa_by_signature = _mfa_by_signature(db, t.id, rows)
     training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     result = []
     for r in rows:

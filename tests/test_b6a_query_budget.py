@@ -19,12 +19,19 @@ pytestmark = pytest.mark.db
 # The trial story and the reports list (WHIF hero pass, 17 Nov): 122 and 71 at 1,000 imported
 # complaints; the story read 135 before its chapter counts were batched into one statement. The reports list reads
 # each started report's worksheet (about 12 queries a report; the trial sample has 4): flat with size, pinned here.
+# Backend review fix pass (17 Nov): one savepoint for the readiness board, the scope not applied again per savepoint,
+# the request context and trial subscription read once, the checklist facts kept per request, the case graph and the
+# workspace evidence read per kind. Measured: story 82, short story 88, RV-11 86, RV-09 95, reports 65,
+# workspace 55 (it was 118); one story 103 with imports (it was 140 ceiling); each ceiling is the measure plus about 10%.
 BUDGET = {
-    "/api/v1/oversight/events/SAMPLE-RV-11": 115,
-    "/api/v1/trial/one-story": 140,
-    "/api/v1/trial/story": 125,
-    "/api/v1/reports": 75,
+    "/api/v1/oversight/events/SAMPLE-RV-11": 95,
+    "/api/v1/oversight/events/SAMPLE-RV-09": 105,
+    "/api/v1/trial/one-story": 113,
+    "/api/v1/trial/story": 90,
+    "/api/v1/trial/short-story": 97,
+    "/api/v1/reports": 72,
 }
+WORKSPACE_BUDGET = 80  # 72 with 1,000 imported complaints (more graph node kinds)
 
 
 def _queries(client, path: str) -> int:
@@ -56,8 +63,11 @@ def test_the_pages_stay_in_budget_and_flat_with_organization_size():  # B6-15
         _import(user, 1000)  # the first 100 again (unchanged) and 900 more
         at_1000 = {path: _queries(user, path) for path in BUDGET}
         assert at_1000 == at_100, (at_100, at_1000)
-        for path, limit in BUDGET.items():
-            assert at_1000[path] <= limit, (path, at_1000[path], limit)
+        assert all(at_1000[path] <= limit for path, limit in BUDGET.items()), at_1000
+        case = user.get("/api/v1/workspace/context/resolve", params={"investigation": "SAMPLE-INV-001"}).json()
+        workspace = f"/api/v1/investigations/{case['investigation_id']}/workspace?temporal_mode=known&retrieval_top_k=8"
+        _queries(user, workspace)
+        assert _queries(user, workspace) <= WORKSPACE_BUDGET
     finally:
         with SessionLocal() as db:
             purge_trial(db, tenant_id, "test:b6a-query-budget-cleanup")

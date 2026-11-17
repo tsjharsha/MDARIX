@@ -18,6 +18,12 @@ The catalogue is every text the sample loader writes: the string constants of ``
 record's text fields match when each is empty or a part of one of those texts (a part of synthetic text is still
 synthetic; anything typed in is not). Text built at load time from parts is not in the catalogue, so such a record is
 refused: the gate fails closed.
+
+Every text column is checked (String, Text and the strings inside JSONB), deny by default, not a list of names: the
+prompts send columns such as ``investigations.investigation_question`` and a complaint's status, type, problem code,
+severity and country (review S1). For an evidence record the text of its search chunks is checked too, since Ask and
+case analysis send the chunk text. Only identifier and actor columns are skipped (``_skipped``): they hold keys the
+server writes, never typed narrative.
 """
 
 from __future__ import annotations
@@ -33,29 +39,14 @@ logger = logging.getLogger("mdarix.genai")
 
 TRIAL_FREE_TEXT_MAX = 300
 SAMPLE_MODULES = Path(__file__).resolve().parent.parent / "backend" / "app" / "trial"
-# Text columns a person can edit and an AI request may carry. Identifiers, codes and states are not narrative.
-NARRATIVE_COLUMNS = frozenset(
-    {
-        "description",
-        "narrative",
-        "summary",
-        "text",
-        "content",
-        "title",
-        "body",
-        "notes",
-        "name",
-        "statement",
-        "excerpt",
-        "chunk_text",
-        "raw_text",
-        "subject",
-        "event_description",
-        "problem_description",
-        "reporter_narrative",
-        "verbatim",
-    }
-)
+# Keys and markers the server writes, never narrative: they are not compared with the catalogue.
+SKIPPED_COLUMNS = frozenset({"business_id", "source_system", "source_identifier", "tenant_id"})
+# A state or code the server sets (MEDIUM, CLOSED, NOT_REPORTABLE): one upper-case token, no spaces.
+# shortcut: a single upper-case word typed into a sample record passes; narrative and contact details need spaces or
+# lower case. Tighten to per-column enums if a prompt ever sends a free single-word field.
+_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,39}")
+# The loader marks sample titles with this suffix (the rest of the title is catalogue text).
+SAMPLE_SUFFIX = "(Sample)"
 _SPACE = re.compile(r"\s+")
 
 
@@ -84,12 +75,33 @@ def catalogue() -> str:
 
 
 def matches_catalogue(value) -> bool:
-    if value is None:
-        return True
+    """True when every text in ``value`` (a string, or the strings anywhere inside a JSON value) is sample text."""
+    if isinstance(value, dict):
+        return all(matches_catalogue(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return all(matches_catalogue(item) for item in value)
     if not isinstance(value, str):
         return True
     text = _normal(value)
-    return not text or text in catalogue()
+    if text.endswith(SAMPLE_SUFFIX):
+        text = text[: -len(SAMPLE_SUFFIX)].strip()
+    return not text or bool(_CODE.fullmatch(text)) or text in catalogue()
+
+
+def _skipped(name: str) -> bool:
+    """Identifier and actor columns (keys and account references the server writes)."""
+    return name in SKIPPED_COLUMNS or name.endswith(("_identifier", "_ref", "_id", "_owner"))
+
+
+def _text_columns(model):
+    from sqlalchemy import String, Text
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    return [
+        column
+        for column in model.__table__.columns
+        if isinstance(column.type, (String, Text, JSONB)) and not _skipped(column.name)
+    ]
 
 
 def _model_for(table: str):
@@ -120,9 +132,17 @@ def _record_problem(db, tenant_id: uuid.UUID, entry: dict) -> str | None:
         return "a record is not this organization's"
     if row.source_system != SAMPLE_SOURCE:
         return "a record is not sample data"
-    for column in columns:
-        if column.name in NARRATIVE_COLUMNS and not matches_catalogue(getattr(row, column.key, None)):
+    for column in _text_columns(model):
+        if not matches_catalogue(getattr(row, column.key, None)):
             return f"a sample record was edited ({entry.get('table')}.{column.name})"
+    if model.__tablename__ == "evidence":
+        from backend.app.db.models.evidence_intelligence import EvidenceChunk
+
+        chunks = db.query(EvidenceChunk.text_content).filter(
+            EvidenceChunk.tenant_id == tenant_id, EvidenceChunk.evidence_id == record_id
+        )
+        if not all(matches_catalogue(text) for (text,) in chunks):
+            return "a sample record was edited (evidence_chunks.text_content)"
     return None
 
 

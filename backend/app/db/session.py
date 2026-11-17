@@ -1,5 +1,7 @@
+import functools
 import os
 
+import pg8000.legacy
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
@@ -8,6 +10,29 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.db.tls import connect_args
 
 load_dotenv()
+
+_scan_paramstyle = pg8000.legacy.convert_paramstyle
+
+
+@functools.lru_cache(maxsize=4096)
+def _format_statement(query: str) -> str:
+    return _scan_paramstyle("format", query, ())[0]
+
+
+def convert_paramstyle(style, query, args):
+    """pg8000's placeholder rewrite (%s to $1...), kept per statement text.
+
+    pg8000 scans every statement character by character in Python on every execution: about 4 ms for a 2.5 KB ORM
+    SELECT, more than the database round trips of a demo read. SQLAlchemy uses the "format" style, where the rewritten
+    text depends on the statement text only and the values pass through unchanged, so the rewrite is kept by text
+    (bounded: statements with a different number of IN values are different texts).
+    """
+    if style == "format":
+        return _format_statement(query), args
+    return _scan_paramstyle(style, query, args)
+
+
+pg8000.legacy.convert_paramstyle = convert_paramstyle
 
 
 def database_url(username: str | None = None, password: str | None = None) -> URL:
