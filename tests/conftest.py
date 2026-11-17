@@ -377,6 +377,50 @@ def golden_dataset():
         NormalizationService().normalize_all()
 
 
+@pytest.fixture(scope="session")
+def migration_database():
+    """A fresh database at head beside the test database, for the Alembic round-trip tests.
+
+    Downgrades refuse, rightly, while AI call records or root-cause data exist (tr32aiready, trrcatools); the shared
+    test database collects such rows from every other test, so the round trips run where only they write. Dropped at
+    the end. Yields ``(engine, env)``: ``env`` points Alembic at it."""
+    import sys
+
+    from sqlalchemy import create_engine, text
+
+    from backend.app.db.session import database_url
+    from backend.app.db.tls import connect_args
+
+    base = os.environ["POSTGRES_DB"]
+    assert base.endswith("_test"), base
+    name = base.removesuffix("_test") + "_migrations_test"
+    admin = create_engine(database_url().set(database="postgres"), isolation_level="AUTOCOMMIT", future=True)
+
+    def recreate(create: bool) -> None:
+        with admin.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+            if create:
+                connection.execute(text(f'CREATE DATABASE "{name}"'))
+
+    recreate(True)
+    env = {**os.environ, "POSTGRES_DB": name, "MDARIX_DB_HARDENING_APPLY": "1"}
+    up = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert up.returncode == 0, up.stderr[-2000:]
+    engine = create_engine(database_url().set(database=name), future=True, connect_args=connect_args())
+    try:
+        yield engine, env
+    finally:
+        engine.dispose()
+        recreate(False)
+        admin.dispose()
+
+
 def access_api_source() -> str:
     """Source text of the access/admin/platform API (backend/app/access/*.py) for static contract tests."""
     from pathlib import Path

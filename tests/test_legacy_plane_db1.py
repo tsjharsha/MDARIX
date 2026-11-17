@@ -1,19 +1,16 @@
 """DB-1 on a legacy dedicated database (owner decision 6): scripts/add_workflow_tables_to_legacy_planes.py runs
 tr21, tr22 + tr23, tr24 and tr24a, leaves the schema exactly as the migrations do, and only lists without --apply.
 
-The schema test runs Alembic against the test database (``POSTGRES_DB``), so it must not run beside another test run
-on the same database.
+The schema test runs Alembic against a fresh database of its own (the ``migration_database`` fixture in conftest.py).
 """
 
 import importlib.util
-import os
-import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from backend.app.db.session import engine
-from tests.test_db1_migration_roundtrip import _fingerprint
+from tests.test_db1_migration_roundtrip import _alembic as _run
+from tests.test_db1_migration_roundtrip import _fingerprint, _ok
 
 ROOT = Path(__file__).resolve().parents[1]
 DB1_STEPS = ["tr21", "tr22+tr23", "tr24", "tr24a"]
@@ -29,19 +26,17 @@ def _script():
     return module
 
 
-def _alembic(*args: str) -> None:
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", *args], cwd=ROOT, env=dict(os.environ), capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr[-2000:]
+def test_the_legacy_steps_give_the_same_schema_as_the_db1_migrations(migration_database):
+    engine, env = migration_database
 
+    def _alembic(*args: str) -> None:
+        _ok(_run(env, *args))
 
-def test_the_legacy_steps_give_the_same_schema_as_the_db1_migrations():
     script = _script()
     url = engine.url.render_as_string(hide_password=False)
     _alembic("downgrade", "tr24aproductreferences")
     try:
-        after_migrations = _fingerprint()
+        after_migrations = _fingerprint(engine)
         _alembic("downgrade", "tr19casesescalation")
         _legacy, todo, problems = script.state(url)
         assert problems == []
@@ -49,7 +44,7 @@ def test_the_legacy_steps_give_the_same_schema_as_the_db1_migrations():
         assert [step.name for step in todo][: len(DB1_STEPS)] == DB1_STEPS == [step.name for step in db1]
         script.apply(url, db1)
         assert not {step.name for step in script.state(url)[1]} & set(DB1_STEPS)  # a second run has nothing to do
-        assert _fingerprint() == after_migrations
+        assert _fingerprint(engine) == after_migrations
         _alembic("stamp", "tr24aproductreferences")
     finally:
         _alembic("upgrade", "head")

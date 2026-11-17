@@ -1,17 +1,14 @@
 """DB-1's migrations (tr21-tr24a) go down to tr19casesescalation and back up to head, leaving the same schema.
 
-Runs Alembic against the test database (``POSTGRES_DB``), so it takes a few seconds and must not run beside another
-test run on the same database.
+Runs Alembic against a fresh database of its own (the ``migration_database`` fixture in conftest.py): rows other tests
+leave in the shared test database would make the later migrations' downgrade guards refuse.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 from sqlalchemy import text
-
-from backend.app.db.session import engine
 
 ROOT = Path(__file__).resolve().parents[1]
 BEFORE_DB1 = "tr19casesescalation"
@@ -35,26 +32,28 @@ FROM information_schema.role_table_grants WHERE grantee = 'mdarix_runtime' AND t
 """
 
 
-def _alembic(*args: str) -> None:
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", *args], cwd=ROOT, env=dict(os.environ), capture_output=True, text=True
-    )
+def _alembic(env: dict, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, "-m", "alembic", *args], cwd=ROOT, env=env, capture_output=True, text=True)
+
+
+def _ok(result: subprocess.CompletedProcess) -> None:
     assert result.returncode == 0, result.stderr[-2000:]
 
 
-def _fingerprint() -> set[tuple[str, str]]:
+def _fingerprint(engine) -> set[tuple[str, str]]:
     with engine.connect() as connection:
         return {tuple(row) for row in connection.execute(text(FINGERPRINT))}
 
 
-def test_db1_migrations_go_down_and_up_again_to_the_same_schema():
-    at_head = _fingerprint()
+def test_db1_migrations_go_down_and_up_again_to_the_same_schema(migration_database):
+    engine, env = migration_database
+    at_head = _fingerprint(engine)
     try:
-        _alembic("downgrade", BEFORE_DB1)
-        before = _fingerprint()
+        _ok(_alembic(env, "downgrade", BEFORE_DB1))
+        before = _fingerprint(engine)
     finally:
-        _alembic("upgrade", "head")
-    assert _fingerprint() == at_head
+        _ok(_alembic(env, "upgrade", "head"))
+    assert _fingerprint(engine) == at_head
     # The downgrade really removed DB-1: the composite references and the plane policies are gone.
     names = " ".join(item for _, item in before)
     assert "fk_complaints_source_record_id_tenant" not in names
