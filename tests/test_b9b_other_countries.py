@@ -352,7 +352,8 @@ def test_an_open_country_keeps_the_complaint_open_on_the_watch_on_its_own_line(o
     report = _report(regulatory, complaint, "JP")
     # The list says the report's own status, never a worksheet's "ready for approval" (OC-D3).
     assert report["stage"] is None and report["stage_label"] == "To be submitted"
-    late = (date.today() - timedelta(days=1)).isoformat()
+    # The server's day is the UTC day; a local date.today() is a day ahead of it before 05:30 IST.
+    late = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     regulatory.put(f"{REPORTS}/{report['id']}/attached-due-date", json={"due_on": late, "reason": REASON})
     line = watched()
     assert line["state"] == "OVERDUE"

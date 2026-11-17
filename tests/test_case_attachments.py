@@ -66,7 +66,7 @@ def test_a_clean_file_is_stored_listed_opened_and_audited(trials):
 
 
 def test_an_infected_or_wrong_file_is_never_stored(trials):
-    user, tenant_id = trials[0]["user"], trials[0]["tenant_id"]
+    user = trials[0]["user"]
     case = _case(user)
     infected = _upload(user, case, "run.txt", b"#!/bin/sh\nrm -rf /")
     assert infected.status_code == 422 and infected.json()["detail"]["code"] == "MALWARE_SCAN_REJECTED"

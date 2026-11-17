@@ -733,7 +733,8 @@ def sign(
         actor["user_id"],
         "SIGNED_APPROVAL_CREATED" if payload.decision == "APPROVE" else "SIGNED_REJECTION_CREATED",
         item.id,
-        {"signature_id": str(record.id), "fingerprint": fingerprint},
+        # A current authenticator code was checked for this signature (verify_signing_credentials) when required.
+        {"signature_id": str(record.id), "fingerprint": fingerprint, "mfa_verified": _signing_mfa_required()},
         request=request,
         reason=payload.remarks,
     )
@@ -891,6 +892,128 @@ def signature_history(
     ]
 
 
+def _signature_valid(data: Session, r: SignedApprovalRecord, item: Decision) -> bool:
+    """Whether the signature still matches the signed material (fingerprint and signature hash) and is SIGNED."""
+    if r.decision_type == CASE_DECISION_TYPE:
+        # A decision signed on a Decision Brief (backend/app/human_decision): its material also binds the brief
+        # version, the evidence set, the context snapshot, the conditions and the follow-ups.
+        from backend.app.human_decision.service import signature_valid
+
+        return signature_valid(data, r, item)
+    material = {
+        "decision_id": str(item.id),
+        "version": r.object_version,
+        "type": r.decision_type,
+        "decision": r.decision,
+        "remarks": r.remarks,
+    }
+    fingerprint = hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
+    expected = hashlib.sha256((fingerprint + r.signer_user_id + r.object_version).encode()).hexdigest()
+    return fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED"
+
+
+@router.get("/signed-records")
+def signed_records(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The organization's latest signed decisions, newest first, each verified now: who signed (by name), what the
+    signature means, when, whether an authenticator code was checked, the signer's training, and whether the record
+    still matches what was signed (WHIF review F-E2, F-E6: verification opens on these)."""
+    from backend.app.workflow.people import names_by_id
+
+    actor = session_actor(db, ctx)
+    t = tenant(db, actor)
+    rows = (
+        db.query(SignedApprovalRecord)
+        .filter_by(tenant_id=t.id, object_type="Decision")
+        .order_by(SignedApprovalRecord.signed_at.desc())
+        .limit(min(100, max(1, limit)))
+        .all()
+    )
+    decisions = {
+        item.id: item
+        for item in data.query(Decision).filter(
+            Decision.tenant_id == t.id, Decision.id.in_({r.object_id for r in rows})
+        )
+    }
+    signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
+    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
+    items = []
+    for r in rows:
+        item = decisions.get(r.object_id)
+        items.append(
+            {
+                "signature_id": str(r.id),
+                "business_id": r.business_id,
+                "decision_id": str(r.object_id),
+                "decision_business_id": item.business_id if item is not None else None,
+                "decision": r.decision,
+                "signer_name": signers.get(str(r.signer_user_id)),
+                "signer_role": r.signer_role,
+                "meaning": r.signature_meaning,
+                "signed_at": r.signed_at,
+                "mfa_verified": mfa_by_signature.get(str(r.id)),
+                "training": (training.get(str(r.signer_user_id)) or {}).get("documents", []),
+                # The decision is gone (another plane, deleted): nothing to match, so not OK.
+                "fingerprint_ok": bool(item is not None and _signature_valid(data, r, item)),
+            }
+        )
+    return {"items": items}
+
+
+def _signing_mfa_required() -> bool:
+    from backend.app import mfa
+
+    return bool(mfa.signatures_require_mfa())
+
+
+def _mfa_by_signature(db: Session, tenant_id, signature_ids) -> dict[str, bool]:
+    """``{signature id: mfa_verified}`` from the signing audit events that record it."""
+    ids = {str(value) for value in signature_ids}
+    if not ids:
+        return {}
+    events = db.query(AuditEvent.details).filter(
+        AuditEvent.tenant_id == tenant_id,
+        AuditEvent.action.in_(("SIGNED_APPROVAL_CREATED", "SIGNED_REJECTION_CREATED", "CASE_DECISION_SIGNED")),
+        AuditEvent.details["signature_id"].astext.in_(ids),
+    )
+    return {
+        details["signature_id"]: bool(details["mfa_verified"])
+        for (details,) in events
+        if details and "mfa_verified" in details
+    }
+
+
+def _signer_training(data: Session, tenant_id, signers) -> dict[str, dict]:
+    """``{signer: {"state": CURRENT | NOT_CURRENT, "documents": [...]}}`` on the disposition documents."""
+    from backend.app.signer_training import service as training
+
+    wanted = training.for_disposition()
+    found = {}
+    for signer in signers:
+        documents = training.status(data, tenant_id, signer, wanted)
+        state = "CURRENT" if all(item["state"] == "CURRENT" for item in documents) else "NOT_CURRENT"
+        found[str(signer)] = {
+            "state": state,
+            "documents": [
+                {
+                    "code": item["code"],
+                    "title": item["title"],
+                    "version": item["version"],
+                    "current": item["state"] == "CURRENT",
+                    "state": item["state"],
+                    "trained_at": item["trained_at"],
+                }
+                for item in documents
+            ],
+        }
+    return found
+
+
 @router.get("/decisions/{decision_id}/signature-verification")
 def signature_verification(
     decision_id: uuid.UUID,
@@ -917,25 +1040,11 @@ def signature_verification(
 
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
     signed_brief = _signed_brief_label(data, item)
+    mfa_by_signature = _mfa_by_signature(db, t.id, [r.id for r in rows])
+    training = _signer_training(data, t.id, {r.signer_user_id for r in rows})
     result = []
     for r in rows:
-        if r.decision_type == CASE_DECISION_TYPE:
-            # A decision signed on a Decision Brief (backend/app/human_decision): its material also binds the brief
-            # version, the evidence set, the context snapshot, the conditions and the follow-ups.
-            from backend.app.human_decision.service import signature_valid
-
-            valid = signature_valid(data, r, item)
-        else:
-            material = {
-                "decision_id": str(item.id),
-                "version": r.object_version,
-                "type": r.decision_type,
-                "decision": r.decision,
-                "remarks": r.remarks,
-            }
-            fingerprint = hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
-            expected = hashlib.sha256((fingerprint + r.signer_user_id + r.object_version).encode()).hexdigest()
-            valid = fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED"
+        valid = _signature_valid(data, r, item)
         result.append(
             {
                 "signature_id": str(r.id),
@@ -945,6 +1054,10 @@ def signature_verification(
                 "signer_user_id": r.signer_user_id,
                 "signer_name": signers.get(str(r.signer_user_id)),
                 "signer_role": r.signer_role,
+                # True/False as recorded when it was signed; None for a signature from before this was recorded.
+                "mfa_verified": mfa_by_signature.get(str(r.id)),
+                # The signer's training on the documents a decision relies on, as it stands now.
+                "signer_training": training.get(str(r.signer_user_id)),
                 "object_version": r.object_version,
                 # The signed version in words, for people: "Decision Brief DBV000012 version 2" for a decision on a
                 # brief (its object_version is the brief's content hash); None for a legacy approval, whose version is

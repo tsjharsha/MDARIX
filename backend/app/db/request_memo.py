@@ -14,10 +14,19 @@ _KEY = "mdarix.request_memo"
 
 
 @event.listens_for(Session, "after_flush")
-@event.listens_for(Session, "after_commit")
 @event.listens_for(Session, "after_rollback")
+@event.listens_for(Session, "after_soft_rollback")  # a savepoint rolled back too
 def _forget(session, *_) -> None:
     session.info.pop(_KEY, None)
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _forget_at_commit(session, transaction) -> None:
+    """The request's transaction ended (commit or rollback). A savepoint released by ``begin_nested()`` is not the end
+    of one: it wrote nothing (a write flushes first, which drops the memo), so the memo stays; ``after_commit`` fires
+    for savepoints too, which made a page that reads each section in a savepoint read its settings again each time."""
+    if not transaction.nested:
+        session.info.pop(_KEY, None)
 
 
 def once(session, key: tuple, read):

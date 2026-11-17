@@ -272,6 +272,13 @@ def test_signing_a_decision_records_everything_and_verifies(org):
     ]
     # The report names the signer, for the signer too (DEV-024), and for a colleague who reads it.
     assert verification["signatures"][0]["signer_name"] == "Approver Brief"
+    # Whether an authenticator code was checked for this signature, as recorded at signing, and the signer's training.
+    from backend.app.governance_router import _signing_mfa_required
+
+    assert verification["signatures"][0]["mfa_verified"] is _signing_mfa_required()
+    training = verification["signatures"][0]["signer_training"]
+    assert training["state"] in ("CURRENT", "NOT_CURRENT")
+    assert {item["code"] for item in training["documents"]} == {"DISPOSITION_RULES", "CODING_CRITERIA"}
     # The signed version in words (0.10.43): the brief version, not its content hash.
     assert verification["signatures"][0]["object_version"] == brief["content_hash"]
     assert verification["signatures"][0]["version_label"] == f"Decision Brief {brief['business_id']} version 1"

@@ -351,19 +351,22 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
     _require_platform_admin(request, db)
     days = min(365, max(1, days))
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    window = db.query(AIExecution).filter(AIExecution.execution_timestamp >= since)
+    from backend.app.access.observability import real_ai_runs
+
+    real = real_ai_runs()  # a trial sample's pre-recorded answers are not runs (WHIF F-X2)
+    window = db.query(AIExecution).filter(AIExecution.execution_timestamp >= since, real)
     total = window.count()
     failed = window.filter(AIExecution.error_state.is_not(None)).count()
     latencies = sorted(
         value
         for (value,) in db.query(AIExecution.latency_ms).filter(
-            AIExecution.execution_timestamp >= since, AIExecution.latency_ms.is_not(None)
+            AIExecution.execution_timestamp >= since, AIExecution.latency_ms.is_not(None), real
         )
     )
     p95 = latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))] if latencies else None
     by_tenant_rows = (
         db.query(AIExecution.tenant_id, func.count(AIExecution.id))
-        .filter(AIExecution.execution_timestamp >= since)
+        .filter(AIExecution.execution_timestamp >= since, real)
         .group_by(AIExecution.tenant_id)
         .order_by(func.count(AIExecution.id).desc())
         .limit(10)
@@ -372,7 +375,7 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
     by_model = [
         {"provider": row[0], "model": row[1], "count": row[2]}
         for row in db.query(AIExecution.provider, AIExecution.model_name, func.count(AIExecution.id))
-        .filter(AIExecution.execution_timestamp >= since)
+        .filter(AIExecution.execution_timestamp >= since, real)
         .group_by(AIExecution.provider, AIExecution.model_name)
         .order_by(func.count(AIExecution.id).desc())
         .all()
@@ -380,13 +383,13 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
     by_validation: dict = {}
     for status, count in (
         db.query(func.upper(AIExecution.validation_status), func.count(AIExecution.id))
-        .filter(AIExecution.execution_timestamp >= since)
+        .filter(AIExecution.execution_timestamp >= since, real)
         .group_by(func.upper(AIExecution.validation_status))
         .all()
     ):
         key = status or "NOT_RECORDED"
         by_validation[key] = by_validation.get(key, 0) + count
-    latest = db.query(AIExecution).order_by(AIExecution.execution_timestamp.desc()).limit(50).all()
+    latest = db.query(AIExecution).filter(real).order_by(AIExecution.execution_timestamp.desc()).limit(50).all()
     names = _tenant_names(db, [row[0] for row in by_tenant_rows] + [row.tenant_id for row in latest])
     return {
         "window_days": days,
@@ -969,6 +972,8 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
     """Platform-wide daily activity for the dashboard (AI runs, integration runs, audit events, new tenants) and
     the shape of the customer base (tenants by plan and data region, licences ending by month)."""
     _require_platform_admin(request, db)
+    from backend.app.access.observability import real_ai_runs
+
     days, today, since = window(days)
 
     def per_day(column, *conditions, key=None) -> list[tuple]:
@@ -977,7 +982,9 @@ def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get
     # Group on plain column expressions (no bound values, which Postgres would not match in GROUP BY), then label.
     ai_rows = [
         (day, "completed" if ok else "failed", count)
-        for day, ok, count in per_day(AIExecution.execution_timestamp, key=AIExecution.error_state.is_(None))
+        for day, ok, count in per_day(
+            AIExecution.execution_timestamp, real_ai_runs(), key=AIExecution.error_state.is_(None)
+        )
     ]
 
     run_rows = [

@@ -287,7 +287,7 @@ def test_the_trial_list_and_detail_show_dates_people_sample_and_actions():
     assert detail["sample"]["sample_counts"]["products"] == 3
     assert detail["actions"]["extend"]["allowed"] and detail["actions"]["end"]["allowed"]
     assert not detail["actions"]["delete_data"]["allowed"] and detail["actions"]["delete_data"]["reason"]
-    assert detail["ai"]["enabled"] is False and "AI is off for free trials" in detail["ai"]["line"]
+    assert detail["ai"]["enabled"] is False and detail["ai"]["line"] == "AI is off for this trial (trial terms)."
     assert detail["next_step"]
     removed = owner.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
     assert removed.status_code == 200, removed.text

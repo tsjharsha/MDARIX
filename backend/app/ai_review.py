@@ -222,7 +222,7 @@ def review_output(
         )
     )
     session.commit()
-    return _view(review)
+    return _view(review, _reviewers(control_db, tenant_id, [review]))
 
 
 @router.get("/ai-outputs/{output_id}/reviews", dependencies=[Depends(require_permission(AI_RUN))])
@@ -244,10 +244,18 @@ def output_reviews(
         .order_by(AiOutputReview.created_at.desc())
         .all()
     )
-    return {"items": [_view(row) for row in rows], "state": rows[0].decision if rows else "NOT_REVIEWED"}
+    reviewers = _reviewers(control_db, tenant_id, rows)
+    return {"items": [_view(row, reviewers) for row in rows], "state": rows[0].decision if rows else "NOT_REVIEWED"}
 
 
-def _view(row: AiOutputReview) -> dict:
+def _reviewers(control_db: Session, tenant_id: uuid.UUID, rows) -> dict[str, str]:
+    from backend.app.workflow.people import names_by_id
+
+    return names_by_id(control_db, tenant_id, {row.reviewer for row in rows})
+
+
+def _view(row: AiOutputReview, reviewers: dict[str, str]) -> dict:
+    reviewed_at = row.created_at.isoformat() if row.created_at else None
     return {
         "id": str(row.id),
         "subject_type": row.subject_type,
@@ -256,5 +264,8 @@ def _view(row: AiOutputReview) -> dict:
         "edited_text": row.edited_text,
         "reason": row.reason,
         "reviewer": row.reviewer,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
+        # Who decided and when, for the "Accepted by ... on ..." line (A4).
+        "reviewer_name": reviewers.get(str(row.reviewer)),
+        "reviewed_at": reviewed_at,
+        "created_at": reviewed_at,
     }

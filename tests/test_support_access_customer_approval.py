@@ -185,6 +185,9 @@ def test_without_audit_access_staff_see_what_staff_did_and_never_the_customer_s_
     actions = {item["action"] for item in shown["items"]}
     assert "SUPPORT_ACCESS_REQUESTED" in actions and "SUPPORT_ACCESS_APPROVED" in actions  # staff accountability
     assert "SUPPORT_ACCESS_DENIED" not in actions and shown["complete"] is False
+    # Each row names the person who acted (the trial history shows names, not account ids).
+    requested = next(item for item in shown["items"] if item["action"] == "SUPPORT_ACCESS_REQUESTED")
+    assert requested["actor_name"] and requested["actor_name"] != requested["actor_ref"]
     console = recipient.get(
         "/api/v1/platform-admin/console/audit", params={"tenant_id": tenant, "page_size": 200}
     ).json()

@@ -129,8 +129,13 @@ def test_f2_step_3_is_the_consequence_question_and_the_summary_reads_its_state(s
     _ok(
         user.post(
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
-            json={"severity": "NEGLIGIBLE",
-                "potential_severity": "MINOR", "event_owner": me, "triage_owner": me, "immediate_action": "Out of use."},
+            json={
+                "severity": "NEGLIGIBLE",
+                "potential_severity": "MINOR",
+                "event_owner": me,
+                "triage_owner": me,
+                "immediate_action": "Out of use.",
+            },
         )
     )
     event = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))

@@ -293,7 +293,7 @@ and its conclusion could be signed with no country and with its clock counted fr
 |---|---|---|
 | AU-1 | Saving or signing needs regulatory review or approve; a viewer is refused (403) | tests/test_market_assessment_api.py::test_a_serious_us_complaint_is_assessed_trained_signed_versioned_and_filed |
 | AU-2 | The current password, and the authenticator code when signatures require it | tests/test_market_assessment_api.py::test_signing_needs_the_authenticator_code_when_signatures_require_it |
-| AU-3 | In a free trial, the practice training on the current question set and scale first | tests/test_market_assessment_api.py::test_the_practice_training_rule_binds_a_trial_organization_only |
+| AU-3 | Training on the current question set and scale first, in every organization (practice wording in a free trial; RSK-011) | tests/test_market_assessment_api.py::test_the_training_rule_binds_every_organization_not_only_a_trial |
 | AU-4 | An administrator never signs a decision | tests/test_custom_role_escalation.py::test_an_administrator_is_refused_a_signature |
 | AU-5 | A report is approved by neither its preparer nor the conclusion's signer | tests/test_authority_reports_api.py::test_the_preparer_and_the_conclusion_signer_cannot_approve_and_a_colleague_can |
 | AU-6 | A missing country or awareness date blocks signing (FACT_NEEDED) | tests/test_release_0_10_81.py::test_f3_f4_f9_a_missing_country_or_awareness_date_is_asked_for_and_blocks_signing |

@@ -980,6 +980,8 @@ def sign_decision(
                 "follow_ups": rules.follow_up_types(follow_up_actions),
                 "supersedes_decision_id": str(current.id) if current is not None else None,
                 "signer_role": role,
+                # A current authenticator code was checked for this signature when signatures require one.
+                "mfa_verified": _governance()._signing_mfa_required(),
             },
             created_at=now,
         )

@@ -16,7 +16,15 @@ from tests.test_free_trial import _approved_trial_client
 pytestmark = pytest.mark.db
 
 # Queries per call, measured in B6a run 3 at 5,000 imported complaints (106 and 129), plus about 10%.
-BUDGET = {"/api/v1/oversight/events/SAMPLE-RV-11": 115, "/api/v1/trial/one-story": 140}
+# The trial story and the reports list (WHIF hero pass, 17 Nov): 122 and 71 at 1,000 imported
+# complaints; the story read 135 before its chapter counts were batched into one statement. The reports list reads
+# each started report's worksheet (about 12 queries a report; the trial sample has 4): flat with size, pinned here.
+BUDGET = {
+    "/api/v1/oversight/events/SAMPLE-RV-11": 115,
+    "/api/v1/trial/one-story": 140,
+    "/api/v1/trial/story": 125,
+    "/api/v1/reports": 75,
+}
 
 
 def _queries(client, path: str) -> int:
@@ -65,6 +73,9 @@ def test_a_setting_kept_for_the_request_is_read_again_after_a_write():  # B6a ru
     with SessionLocal() as db:
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1  # kept: not read again
+        with db.begin_nested():  # a section read in a savepoint, released: nothing written, still kept
+            db.execute(text("SELECT 1"))
+        assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1
         db.commit()  # a write (commit, flush or rollback) drops what was kept
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 2
         db.execute(text("SELECT 1"))  # a transaction in progress, so the rollback is a real one
