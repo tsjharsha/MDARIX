@@ -231,12 +231,15 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
         context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
     if is_mir_chain(obligation):
         context.update(_mir_carried(db, obligation))  # B8 step 3: values and the NCA's number carried, not copied
-    if obligation.form_code == forms.EU_MIR.code and is_sample(obligation.source_system) and not context["parties"]:
+    product = context.get("product")
+    sample = is_sample(obligation.source_system) or (product is not None and is_sample(product.source_system))
+    if obligation.form_code in (forms.EU_MIR.code, forms.GB_MIR.code) and sample and not context["parties"]:
         from backend.app.trial.sample_reports import sample_eu_parties
 
         # B8 step 12: the sample's EU report reads the sample's EU parties, held in memory only (B3 A9), until the
-        # trial user enters their own (Settings › Products): theirs always win.
-        context["parties"] = sample_eu_parties(obligation.tenant_id)
+        # trial user enters their own (Settings › Products): theirs always win. Review G-09: a GB report too, and any
+        # report on a sample product (a complaint escalated from a sample call is the trial user's own record).
+        context["parties"] = sample_eu_parties(obligation.tenant_id, "GB" if obligation.market == "GB" else "EU")
     if is_follow_up(obligation):
         parent = db.get(ReportObligation, obligation.parent_id)
         chain = _follow_ups(db, obligation.tenant_id, parent.id)

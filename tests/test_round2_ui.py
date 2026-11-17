@@ -51,3 +51,17 @@ def test_the_organization_trail_hides_system_events_unless_asked(trial):  # G-03
     assert str(ids["PRODUCT360_TEMPORAL_RETRIEVAL"]) not in shown
     every = {row["id"] for row in client.get("/api/v1/admin/audit-history?include_system=true").json()}
     assert {str(value) for value in ids.values()} <= every
+
+
+def test_a_gb_mir_on_a_sample_product_opens_with_its_submitter_block(trial):  # G-09
+    from tests.test_b8_gb_end_to_end import REPORTS, _in, _ok, _report
+    from tests.test_release_c3_0_10_75 import _flagship
+
+    user = trial["client"]
+    complaint = _flagship(user)
+    _in(trial["tenant_id"], complaint, "Great Britain")
+    detail = _ok(user.get(f"{REPORTS}/{_report(user, complaint, 'GB')}"))
+    fields = {item["id"]: item for section in detail["sections"] for item in section["fields"]}
+    assert "Orbit Medical Devices (Sample)" in str(fields["1_3_2A"]["value"])
+    assert "Sample UK Responsible Person (Sample)" in str(fields["1_3_3"]["value"])
+    assert fields["1_2B"]["value"] and fields["1_2C"]["value"]
