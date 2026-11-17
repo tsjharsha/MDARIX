@@ -271,11 +271,18 @@ def test_trial_chain_names_must_be_vetted_and_never_paid(monkeypatch):
     assert "nonsense" in problems
 
 
-def test_the_shipped_register_vets_no_upstream_yet():
+def test_the_shipped_register_vets_only_the_owner_confirmed_upstreams():
+    # Owner, 17 Nov 2026: Groq, Cloudflare Workers AI and OpenRouter (training opt-out set) passed the terms check.
     register = vetted.load()
-    assert vetted.chain_problem("groq", register) is not None
-    with pytest.raises(vetted.UpstreamNotVetted):
-        vetted.identify("freellmapi", headers={"x-routed-via": "groq/llama"}, raw={})
+    checked = date(2026, 11, 18)
+    for name in ("groq", "cloudflare", "cloudflare-ai", "openrouter"):
+        row = next(item for item in register["providers"] if item["provider"] == name)
+        assert vetted.upstream_problem(row, register, today=checked) is None, name
+    assert vetted.chain_problem("groq", register, today=checked) is None
+    assert vetted.identify("freellmapi", headers={"x-routed-via": "cloudflare/llama"}, raw={}).provider == "cloudflare"
+    for unvetted in ("gemini/flash", "nvidia/llama", "cohere/command"):
+        with pytest.raises(vetted.UpstreamNotVetted):
+            vetted.identify("freellmapi", headers={"x-routed-via": unvetted}, raw={})
 
 
 def test_an_old_terms_check_warns_at_six_months_and_refuses_at_twelve():
