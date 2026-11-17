@@ -1,4 +1,13 @@
-import { BASIS_DISCLAIMER, SIGNATURE_BASIS, basisOf } from "./standards";
+import { BASIS_DISCLAIMER, SIGNATURE_BASIS, STARTER_LABEL, basisOf } from "./standards";
+
+/** The starter mark: once per page that shows MDARIX's default rules, never a chip per question or item (G-17). */
+export function StarterNote() {
+  return (
+    <p className="ac-note uw-starter-note" role="note">
+      {STARTER_LABEL}
+    </p>
+  );
+}
 
 /**
  * A finding's or a window's regulatory basis as small chips, each with its title on hover (the catalog in

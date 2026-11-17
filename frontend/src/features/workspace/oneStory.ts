@@ -4,6 +4,7 @@ import { errorText, onSaved, send, useResource } from "../customer-admin/shared"
 import { reportPlace } from "./authorityReports";
 import { treePlace } from "./sections/DecisionTrees";
 import { IMPORTED_SOURCE } from "./complaintList";
+import { monthlyRates, monthlyText } from "./signalAi";
 
 /**
  * One story, from the first contact to the submission (0.10.82, D1; Part 1 in 0.10.93, B2 spec 4.8): ten steps on one
@@ -297,17 +298,21 @@ export function flagshipPlace(run: FlagshipRun, index: number): FlagshipPlace {
     : { section: "Records", tab: "Effectiveness checks" };
 }
 
-/** G-06: the flagship signal in the trend check's own number (the figure Home and Trends show), never a figure of
- * its own; without a trend row for the product, the sentence has no number. */
+/** G-06: the flagship signal in the trend check's own numbers (the figures Home shows), as complaints a month before
+ * and after (owner, 17 Nov 2026), from the product's strongest rising row; without a trend row, no number. */
 export function signalWhy(
-  items: ReadonlyArray<{ product: { id: string }; ratio: number | null }> | undefined,
+  items:
+    ReadonlyArray<{ product: { id: string }; ratio: number | null } & Parameters<typeof monthlyRates>[0]> | undefined,
   productId: string | null | undefined,
 ): string {
-  const ratios = (items ?? [])
-    .filter((row) => row.product.id === productId && typeof row.ratio === "number")
-    .map((row) => row.ratio as number);
-  const lead = ratios.length
-    ? `Pressure-alarm complaints on one pump are at ${Math.max(...ratios).toFixed(1)}× the earlier average after Rev B.`
+  const rows = (items ?? []).filter((row) => row.product.id === productId && typeof row.ratio === "number");
+  const top = rows.reduce<(typeof rows)[number] | null>(
+    (best, row) => (!best || (row.ratio as number) > (best.ratio as number) ? row : best),
+    null,
+  );
+  const rates = top ? monthlyRates(top) : null;
+  const lead = rates
+    ? `Pressure-alarm complaints on one pump went from ${monthlyText(rates).replace(" → ", " to ")} a month after Rev B.`
     : "Pressure-alarm complaints on one pump are rising after Rev B.";
   return `${lead} A rise like this starts an investigation.`;
 }

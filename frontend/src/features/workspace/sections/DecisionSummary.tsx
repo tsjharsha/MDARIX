@@ -10,6 +10,7 @@ import {
   decisionSummaryPath,
   headline,
   listText,
+  lockedAiLines,
   mfaText,
   reviewText,
   workedTone,
@@ -109,6 +110,12 @@ export function DecisionRecordParts({ data }: { data: DecisionSummary }) {
               person.
             </p>
           ))}
+          <strong>As locked at signing</strong>
+          <ul className="uw-intel-list" aria-label="AI used, as locked at signing">
+            {lockedAiLines(ai?.locked).map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
         </dd>
       </div>
       <div>

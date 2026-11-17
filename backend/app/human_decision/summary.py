@@ -129,6 +129,7 @@ def _capas(db: Session, case) -> list[dict]:
                         "planned_on": _iso(check.planned_on),
                         "signed_at": _iso(check.signed_at),
                         "result_summary": check.result_summary,
+                        "criteria": check.criteria,
                     }
                     if check is not None
                     else None
@@ -305,6 +306,8 @@ def summary(control_db: Session, db: Session, case, decision) -> dict:
             "statement": ai.get("statement"),
             "in_brief": list(signed["ai_execution_refs"]),
             "proposals": _ai_proposals(db, case),
+            # U7: as locked into the signed snapshot (None: signed before it was recorded).
+            "locked": snapshot.get("ai_used"),
         },
         "hypotheses": {
             # What the signer ticked as the root cause, as bound into the signed snapshot.
@@ -353,5 +356,7 @@ def for_case(control_db: Session, db: Session, case) -> dict:
                 "question": case.investigation_question,
             },
             "decision": None,
+            # W1c: the product's risk file, so the Investigation Brief shows the risk links before the decision.
+            "risks": _risks(db, case),
         }
     return summary(control_db, db, case, decision)

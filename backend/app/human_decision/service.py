@@ -694,6 +694,8 @@ def record_view(control_db: Session, db: Session, decision: Decision) -> dict:
                 "scope_version": snapshot_data.get("scope_version"),
                 # The accepted root cause as the signer ticked it (bound into the signature); absent before RCA.
                 "root_cause": snapshot_data.get("root_cause"),
+                # U7: absent from decisions signed before it was recorded (None: not recorded at signing).
+                "ai_used": snapshot_data.get("ai_used"),
             }
             if snapshot is not None
             else None

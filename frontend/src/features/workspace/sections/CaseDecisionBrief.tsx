@@ -8,6 +8,7 @@ import { roleNote } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
 import { useCanRunAi, useChallenge, usePanelFlag, useWorkspace } from "../workspaceContext";
 import { BriefChallengeSections } from "./caseIntelligence/Challenge";
+import { InvestigationBriefPage } from "./InvestigationBriefPage";
 import {
   ACTION_MAX,
   BRIEF_REVIEW_ACTIONS,
@@ -189,6 +190,8 @@ export function CaseDecisionBriefPanel({
           onOpenDecision={onOpenDecision}
         />
       )}
+      {/* W1c: the brief as one page to read, print or project; the working parts follow it. */}
+      {current && <InvestigationBriefPage investigationId={investigationId} caseLabel={caseLabel} version={current} />}
       {state?.communications && (state.communications.open > 0 || state.communications.unresolved > 0) && (
         <p className={`uw-hint tone-${state.communications.overdue ? "critical" : "warning"}`} role="note">
           Requests to external contacts on this investigation's complaints: {state.communications.open} open,{" "}

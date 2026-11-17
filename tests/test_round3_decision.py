@@ -45,6 +45,8 @@ def test_before_signing_there_is_no_decision_and_nothing_is_invented(trial):
     body = _summary(trial["user"], trial["case_id"])
     assert body["decision"] is None
     assert body["investigation"]["ref"] == "SAMPLE-INV-001" and "Rev B" in body["investigation"]["question"]
+    # W1c: the product's risk file is read before the decision, for the Investigation Brief's risk part.
+    assert "SAMPLE-RSK-01" in [risk["ref"] for risk in body["risks"]]
 
 
 def test_g06_the_orbitcare_rise_reads_the_trend_checks_one_number_everywhere(trial):
@@ -177,6 +179,9 @@ def test_a_planned_check_sets_the_review_date_and_it_is_too_early(trial):
     )
     body = _summary(user, case_id)
     assert body["decision"]["review_on"] == planned
+    # W1c: the check's criteria, as planned, for the Investigation Brief's effectiveness part.
+    check = next(item["check"] for item in body["capas"] if item["id"] == capa["id"])
+    assert check["criteria"].startswith("No pressure-alarm complaint from lots made after")
     assert body["worked"] == {
         "state": "TOO_EARLY",
         "text": f"Too early: the effectiveness check is planned for {planned}. Only a signed check says an action worked.",

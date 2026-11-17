@@ -23,6 +23,8 @@ export type SummaryCheck = {
   planned_on: string | null;
   signed_at: string | null;
   result_summary: string | null;
+  /** What the check measures, as planned (W1c). */
+  criteria?: string | null;
 };
 export type SummaryCapa = {
   id: string;
@@ -72,6 +74,8 @@ export type DecisionSummary = {
     statement: string | null;
     in_brief: string[];
     proposals: Array<{ ref: string | null; label: string | null; recorded: boolean; reviews: Record<string, number> }>;
+    /** U7: the AI results as locked into the signed snapshot; null for a decision signed before it was kept. */
+    locked?: LockedAi[] | null;
   };
   hypotheses?: {
     accepted: SummaryHypothesis[];
@@ -91,9 +95,56 @@ export type DecisionSummary = {
   capas?: SummaryCapa[];
   next?: SummaryNext[];
   worked?: Worked;
+  /** Before a decision is signed: the product's risk file (W1c; once signed it is in `affects.risks`). */
+  risks?: Array<{ ref: string; description: string; status: string | null }>;
 };
 
 export const NOT_RECORDED = "Not recorded";
+
+export type LockedAi = {
+  ref: string | null;
+  what: string | null;
+  provider: string | null;
+  model: string | null;
+  model_version: string | null;
+  prompt_version: string | null;
+  at: string | null;
+  sources: string[];
+  recorded: boolean;
+  in_signed_brief: boolean;
+  verdicts: Array<{ about: string; state: string; reason: string | null; reviewer: string | null; at: string | null }>;
+};
+
+const VERDICT_WORDS: Record<string, string> = {
+  ACCEPTED: "Accepted",
+  EDITED: "Edited",
+  REJECTED: "Rejected",
+  NOT_REVIEWED: "Not reviewed",
+};
+export const NOT_LOCKED = "Not recorded at signing: this decision was signed before MDARIX kept the AI record with it.";
+
+/** U7: each AI output as it stood when the decision was signed (model, prompt version, sources), then each reviewer
+ * verdict with its reason. Pure; "Not recorded" wherever the record has nothing. */
+export function lockedAiLines(locked: LockedAi[] | null | undefined): string[] {
+  if (!locked) return [NOT_LOCKED];
+  if (!locked.length) return ["No AI output on this investigation when the decision was signed."];
+  return locked.flatMap((item) => [
+    [
+      `${item.ref ?? NOT_RECORDED}: ${item.what ?? "AI output"}`,
+      `${item.provider ?? NOT_RECORDED} · ${item.model ?? NOT_RECORDED}${item.model_version ? ` (${item.model_version})` : ""}`,
+      `prompt ${item.prompt_version ?? NOT_RECORDED}`,
+      `sources: ${item.sources.length ? item.sources.join(", ") : NOT_RECORDED}`,
+      ...(item.recorded ? ["recorded with the sample, no model was called"] : []),
+      ...(item.in_signed_brief ? ["in the signed brief"] : []),
+    ].join(" · "),
+    ...item.verdicts.map(
+      (verdict) =>
+        `${VERDICT_WORDS[verdict.state] ?? verdict.state}${verdict.reviewer ? ` by ${verdict.reviewer}` : ""}${
+          verdict.reason ? `: ${verdict.reason}` : ""
+        } (${verdict.about})`,
+    ),
+  ]);
+}
 
 export const decisionSummaryPath = (investigationId: string) =>
   `/api/v1/investigations/${encodeURIComponent(investigationId)}/decision/summary`;

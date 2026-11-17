@@ -20,7 +20,7 @@ import {
 } from "../reportability";
 import { countOf } from "./common";
 import { InlineError } from "./boardParts";
-import { BasisChips, BasisNote } from "../../shared/Basis";
+import { BasisChips, BasisNote, StarterNote } from "../../shared/Basis";
 
 /**
  * Complaints › Reporting windows: the windows the reportability watch counts against, entered from the organization's
@@ -77,9 +77,10 @@ export function RolesBody({ settings, onSaved }: { settings: ReportabilitySettin
       <h3>Your role in each market</h3>
       <p className="ac-muted">
         Manufacturer unless you set it. An importer or a US user facility reports under its own rules (for the US: 21
-        CFR 803.40 and 803.30, starter, for your consultant to confirm). A change applies to drafts at their next save;
-        signed conclusions keep the rules they were signed under.
+        CFR 803.40 and 803.30). A change applies to drafts at their next save; signed conclusions keep the rules they
+        were signed under.
       </p>
+      <StarterNote />
       <dl className="ca-facts">
         {Object.keys(offered).map((code) => (
           <div key={code}>

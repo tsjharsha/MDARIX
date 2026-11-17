@@ -42,10 +42,11 @@ const render = (tab: string) =>
   );
 
 describe("the Evidence step (F-A3, F-R1)", () => {
-  it("puts the method tabs first and folds the evidence table under them", () => {
+  it("folds the evidence table under question 2 and the method tabs under the advanced tools (W1b)", () => {
     const html = render("Evidence");
-    expect(html.indexOf('data-part="method-tabs"')).toBeLessThan(html.indexOf('data-part="evidence-table"'));
-    expect(html).toMatch(/<details class="uw-more uw-case-part" id="case-part-evidence">/);
+    expect(html.indexOf('data-part="evidence-table"')).toBeLessThan(html.indexOf('data-part="method-tabs"'));
+    expect(html).toContain('<details class="uw-more" id="case-part-evidence"');
+    expect(html).toMatch(/<details class="uw-more uw-case-part" id="case-part-advanced">/);
   });
 
   it("leads with Ask when Ask was asked for, once", () => {

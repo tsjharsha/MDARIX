@@ -8,9 +8,22 @@ import { SAMPLE_SOURCE } from "./complaintList";
 export const HUB_TABS = ["Product 360", "Supplier 360"] as const;
 export type HubTab = (typeof HUB_TABS)[number];
 
-/** One product's sections; the Records tab holds the full lists. */
-export const PRODUCT_VIEWS = ["Overview", "Configuration", "Lots", "Changes", "Records", "Version story"] as const;
+/** One product's sections; the Records tab holds the full lists. Connected and Sources are a free trial's (W5). */
+export const PRODUCT_VIEWS = [
+  "Overview",
+  "Connected",
+  "Configuration",
+  "Lots",
+  "Changes",
+  "Records",
+  "Version story",
+  "Sources (simulated)",
+] as const;
 export type ProductView = (typeof PRODUCT_VIEWS)[number];
+/** The sections a pilot does not have yet (W5, D1: the twin's reads answer 404 outside a free trial). */
+export const TRIAL_VIEWS: readonly ProductView[] = ["Connected", "Sources (simulated)"];
+export const productViews = (trial: boolean): readonly ProductView[] =>
+  trial ? PRODUCT_VIEWS : PRODUCT_VIEWS.filter((view) => !TRIAL_VIEWS.includes(view));
 
 /** One supplier's sections. Lots is offered in a free trial only (supplier_router.LOTS_TRIAL_ONLY). */
 export const SUPPLIER_VIEWS = [
@@ -44,6 +57,11 @@ export type HubPlace = {
   view: string | null;
   list: RecordKind | null;
   compare: string | null;
+  /** W5: the change whose impact is open (its id), a previewed change ("<component id>" or "<component id>:<supplier
+   * id>") and a field-action scope ("COMPONENT_LOT:<component id or identifier>:<lot>"). */
+  change: string | null;
+  preview: string | null;
+  scope: string | null;
 };
 
 export function hubPlace(tab: string | undefined | null): HubPlace {
@@ -59,13 +77,26 @@ export function hubPlace(tab: string | undefined | null): HubPlace {
     view: get("view"),
     list: RECORD_KINDS.some(([kind]) => kind === list) ? (list as RecordKind) : null,
     compare: get("compare"),
+    change: get("change"),
+    preview: get("preview"),
+    scope: get("scope"),
   };
 }
 
 /** The tab (with what it carries) for a place; empty values are left out. */
 export function hubTab(place: Partial<HubPlace> & { tab: HubTab }): string {
   const params = new URLSearchParams();
-  for (const key of ["product", "version", "supplier", "view", "list", "compare"] as const) {
+  for (const key of [
+    "product",
+    "version",
+    "supplier",
+    "view",
+    "list",
+    "compare",
+    "change",
+    "preview",
+    "scope",
+  ] as const) {
     const value = place[key];
     if (value) params.set(key, value);
   }

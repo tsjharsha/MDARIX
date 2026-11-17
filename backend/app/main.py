@@ -46,6 +46,7 @@ from backend.app.product360.schemas import (
 )
 from backend.app.product360.service import Product360Error, Product360Service
 from backend.app.product360.supplier_router import router as supplier360_router
+from backend.app.product360.twin_router import router as twin_router
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.retrieval.router import router as retrieval_router
 from backend.app.regulatory_router import router as regulatory_router
@@ -57,6 +58,7 @@ from backend.app.demo_requests import router as demo_requests_router
 from backend.app.trial.feedback import router as trial_feedback_router
 from backend.app.site_info import router as site_info_router
 from backend.app.paging import Page
+from backend.app.ai_governance import router as ai_governance_router
 from backend.app.ai_review import router as ai_review_router
 from backend.app.ai_settings import router as ai_settings_router
 from backend.app.audit_chain_api import router as audit_chain_router
@@ -538,6 +540,7 @@ app.include_router(trial_feedback_router)
 app.include_router(site_info_router)
 app.include_router(ai_settings_router)
 app.include_router(ai_review_router)
+app.include_router(ai_governance_router)
 app.include_router(audit_chain_router)
 app.include_router(tenant_export_router)
 app.include_router(data_import_router)
@@ -598,6 +601,7 @@ app.include_router(cell_admin_router)  # Platform administration of packages and
 app.include_router(support_access_router)  # The customer approves, denies and revokes support access
 app.include_router(support_workspace_router)  # MDARIX reads what the customer granted, read-only (support access)
 app.include_router(supplier360_router)  # W1: Supplier 360, read-only (product360/supplier_router.py)
+app.include_router(twin_router)  # W5: the Product Lifecycle Twin, trial only (product360/twin_router.py)
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

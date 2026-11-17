@@ -1,18 +1,7 @@
 import { SampleDates } from "../../../app/chips";
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Copy,
-  FileWarning,
-  Hourglass,
-  Link2,
-  PhoneCall,
-  Siren,
-  Unlink,
-  Wrench,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Copy, Hourglass, Link2, PhoneCall, Siren, Unlink, Wrench } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { requestJson } from "../../../app/apiClient";
@@ -21,7 +10,8 @@ import { WorkspaceContext, useCan, useLateEntry, useRoutinePath, useTabParam, us
 import { ApiError } from "../../../app/apiClient";
 import { DuplicateHits, LateEntryField, RecordRef, duplicatesPath, looksLate, type DuplicateHit } from "./BackEntry";
 import { DecideAndSign } from "./common";
-import { WhyAsked } from "../../shared/Basis";
+import { StarterNote, WhyAsked } from "../../shared/Basis";
+import { isStarterVersion } from "../../shared/standards";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
 import { Hero, InlineError } from "./boardParts";
 import { EscalateButton } from "./Triage";
@@ -132,12 +122,7 @@ export function FirstContact({
         }}
       />
       <CasesList onOpen={setOpen} reloadKey={reloadKey} />
-      {guide.data && (
-        // The guide's version code stays in the tooltip: no internal code on screen (hero review 2).
-        <p className="uw-ma-starter" role="note" title={`Guide ${guide.data.version}`}>
-          <FileWarning size={15} aria-hidden="true" /> The nine questions: {guide.data.starter_mark}
-        </p>
-      )}
+      {isStarterVersion(guide.data?.version) && <StarterNote />}
       {part === "all" && <Duplicates onChanged={reload} />}
       {logging && guide.data && (
         <LogDrawer

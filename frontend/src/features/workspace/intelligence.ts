@@ -1173,6 +1173,13 @@ export function evidenceStates(input: {
     lots?: Row[] | null;
     evidence?: Row[] | null;
   } | null;
+  /** W5: the case's lot impact read, once loaded: its component lot's genealogy is a known fact. */
+  lotImpact?: {
+    list?: {
+      factor: { kind: string; lot: string | null };
+      totals: { lots: number; with_complaints: number };
+    } | null;
+  } | null;
 }): EvidenceStates {
   const hypotheses = input.hypotheses ?? [];
   const known = new Map<string, GlanceItem>();
@@ -1236,5 +1243,13 @@ export function evidenceStates(input: {
     if (ref) add(row.source_timestamp ?? row.created_at, safeText(row.title) ?? ref, ref);
   }
   timeline.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+  const genealogy = input.lotImpact?.list;
+  if (genealogy?.factor.kind === "COMPONENT_LOT" && genealogy.factor.lot) {
+    const { lots, with_complaints: withComplaints } = genealogy.totals;
+    known.set("Lot impact", {
+      label: `Lot genealogy: ${genealogy.factor.lot} is in ${lots} ${lots === 1 ? "lot" : "lots"}; ${withComplaints} ${withComplaints === 1 ? "has" : "have"} complaints`,
+      sources: ["Lot impact"],
+    });
+  }
   return { known: [...known.values()], unknown, contradicted, missing, timeline };
 }

@@ -9,6 +9,7 @@ import { WorkspaceContext, useB9India, useCan, useNavigation, useTabParam } from
 import { communicationsTab } from "../communications";
 import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
+import { StarterNote } from "../../shared/Basis";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
@@ -181,7 +182,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
             }
           />
         )}
-        {list.data && <p className="ac-muted">{list.data.starter_mark}</p>}
+        {list.data && <StarterNote />}
       </Panel>
       {open && !fresh && (
         <ReportDrawer
@@ -310,9 +311,8 @@ export function ReportDrawer({
             </ul>
           </section>
         )}
-        <p className="ac-muted">
-          {detail.starter_mark} Field order: {detail.form.source_document}.
-        </p>
+        <p className="ac-muted">Field order: {detail.form.source_document}.</p>
+        <StarterNote />
         <ComplaintNextStep
           complaintId={detail.complaint.id}
           here="Reports"

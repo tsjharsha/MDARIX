@@ -6,7 +6,8 @@ import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, Table, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { formatDay } from "../../../../app/dates";
-import { WorkspaceContext, useCan, useRcaMethods } from "../../workspaceContext";
+import { WorkspaceContext, useCan, useIsTrial, useRcaMethods } from "../../workspaceContext";
+import { lotImpactBase, type LotImpactView } from "../../lotImpact";
 import { ResolutionTrend } from "../Dispositions";
 import {
   evidenceStates,
@@ -70,6 +71,8 @@ export function OverviewView({
   const whys = useResource<any>(methods ? rcaPath(investigationId, "five-whys") : null);
   const chains = useResource<FailureChains>(intelligencePath(investigationId, "failure-chains"));
   const versions = useResource<{ items: EventVersion[] }>(rcaPath(investigationId, "event-versions"));
+  // W5 (flagship step 3): the case's lot impact read (a free trial's), for the lot genealogy row once it has loaded.
+  const lotImpact = useResource<LotImpactView>(useIsTrial() ? lotImpactBase(investigationId) : null);
   // The case's product (the context bar's Product 360): its changes, releases, lots and evidence dates.
   const view = useContext(WorkspaceContext)?.work.view;
   const glance = evidenceStates({
@@ -85,6 +88,7 @@ export function OverviewView({
           evidence: view.evidence,
         }
       : null,
+    lotImpact: lotImpact.data,
   });
   const lines = overviewLines({
     hypotheses: listOf(hypotheses.data?.items),

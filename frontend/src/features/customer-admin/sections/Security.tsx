@@ -21,8 +21,16 @@ import { plural, readable } from "../labels";
 import { awaitingCount, type SupportGrant } from "../supportAccessModel";
 import { SupportAccess } from "./SupportAccess";
 import { AiReleaseGate, gateBlocksSwitchOn, type ReleaseGate } from "./AiReleaseGate";
+import { AiGovernance } from "./AiGovernance";
 
-const TABS = ["Posture", "Support access", "AI processing", "Single sign-on", "Security events"] as const;
+const TABS = [
+  "Posture",
+  "Support access",
+  "AI processing",
+  "AI governance",
+  "Single sign-on",
+  "Security events",
+] as const;
 type Tab = (typeof TABS)[number];
 
 // How a single sign-on setup reads while MDARIX checks it ("Pending verification" alone says nothing about who acts).
@@ -61,6 +69,9 @@ export function SecuritySection({ tab }: { tab?: string }) {
         {active === "Posture" && <Posture />}
         {active === "Support access" && <SupportAccess />}
         {active === "AI processing" && <AiProcessing />}
+        {active === "AI governance" && (
+          <AiGovernance change={{ label: "Change in AI processing", onOpen: () => setActive("AI processing") }} />
+        )}
         {active === "Single sign-on" && <SingleSignOn />}
         {active === "Security events" && <SecurityEvents />}
       </Tabs>

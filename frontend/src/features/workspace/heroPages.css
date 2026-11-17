@@ -2029,3 +2029,10 @@
   display: grid;
   gap: 4px;
 }
+
+/* Owner, 17 Nov 2026: the rise as complaints a month, before → after; the unit reads small under it. */
+.uw-hybrid .ac-main .uw-home-trend .uw-home-ratio small {
+  display: block;
+  font-size: 0.4em;
+  font-weight: 400;
+}

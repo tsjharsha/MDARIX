@@ -24,11 +24,12 @@ import { AttemptsSetting } from "./Communications";
 import { IMPORT_PATH, type ImportSetup } from "./ImportData";
 import { WhoCanChange } from "./Views";
 import { PRODUCT_EDITORS, ProductIdentityPanel, ResponsibleParties } from "./ImportReports";
-import { TRIAL_AI_TAB, TrialAiSettings, useTrialAiOwner } from "./TrialAi";
+import { TRIAL_AI_GOVERNANCE_TAB, TRIAL_AI_TAB, TrialAiSettings, useTrialAiOwner } from "./TrialAi";
+import { AiGovernance } from "../../customer-admin/sections/AiGovernance";
 
 export const SETTINGS_TABS = NEW_PLACES.Settings.tabs;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
-type OfferedTab = SettingsTab | typeof TRIAL_AI_TAB;
+type OfferedTab = SettingsTab | typeof TRIAL_AI_TAB | typeof TRIAL_AI_GOVERNANCE_TAB;
 
 /** Who may change each setting: the permission the server checks (each screen keeps its own check as well). */
 export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermission[]> = {
@@ -57,16 +58,22 @@ export function SettingsSection({ tab }: { tab?: string }) {
     ...SETTINGS_TABS.filter(
       (item) => !(sampleOnly && item === "Import templates") && !(!routine && item === "Alerts and files"),
     ),
-    ...(trialAiOwner ? [TRIAL_AI_TAB] : []),
+    ...(trialAiOwner ? [TRIAL_AI_TAB, TRIAL_AI_GOVERNANCE_TAB] : []),
   ];
   const [chosen, setActive] = useReportedTab<OfferedTab>(() =>
     // The AI tab is offered once the settings answer; a link to it waits for that instead of falling back.
-    offeredTab(tab, [...tabs, TRIAL_AI_TAB], "Complaint review rules"),
+    offeredTab(tab, [...tabs, TRIAL_AI_TAB, TRIAL_AI_GOVERNANCE_TAB], "Complaint review rules"),
   );
   const active = tabs.includes(chosen) ? chosen : tabs[0];
   return (
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Settings">
-      {active === TRIAL_AI_TAB ? <TrialAiSettings /> : <SettingOwner tab={active} />}
+      {active === TRIAL_AI_TAB ? (
+        <TrialAiSettings />
+      ) : active === TRIAL_AI_GOVERNANCE_TAB ? (
+        <AiGovernance change={{ label: `Change in ${TRIAL_AI_TAB}`, onOpen: () => setActive(TRIAL_AI_TAB) }} />
+      ) : (
+        <SettingOwner tab={active} />
+      )}
       {active === "Complaint review rules" && <ReviewSettingsPanel />}
       {active === "Reporting windows" && <ReportingWindows />}
       {active === "Reportability guides" && <DecisionGuides />}

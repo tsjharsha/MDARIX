@@ -4,13 +4,12 @@ import { Empty, Panel } from "../../admin/console/charts";
 import { Tabs, useResource, type Resource } from "../../customer-admin/shared";
 import { DeviceIcon, MonitorBand, StatusPill, deviceKind } from "../../shared/hero/HeroVisuals";
 import { formatDay } from "../../../app/dates";
-import { chooseCase, useClosedLoop, useWorkspace } from "../workspaceContext";
+import { chooseCase, useClosedLoop, useIsTrial, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
 import { useVisited } from "../oneStory";
 import { ChartOrTable } from "./WowCharts";
 import {
   HUB_TABS,
-  PRODUCT_VIEWS,
   RECORD_KINDS,
   chosenView,
   compareConfigurations,
@@ -21,6 +20,7 @@ import {
   markersByMonth,
   monthLabel,
   productTab,
+  productViews,
   rateText,
   supplierTab,
   type HubPlace,
@@ -29,6 +29,7 @@ import {
   type RecordKind,
 } from "../productHub";
 import { SuppliersTab } from "./SupplierHub";
+import { ChangeImpactPanel, ConnectedView, FieldScopePanel, PreviewPicker, SourcesView } from "./ProductTwin";
 import "../productHub.css";
 
 // The server's rows (backend/app/product360): plain records, each with its origin.
@@ -332,7 +333,10 @@ function ProductPage({
   const links = useResource<Row>(
     view ? `/api/v1/products/${product}/links${version ? `?version=${encodeURIComponent(version)}` : ""}` : null,
   );
-  const active = chosenView(PRODUCT_VIEWS, place.view);
+  // W5: Connected and Sources (simulated) are a free trial's, as are a change's impact and a field-action scope.
+  const trial = useIsTrial();
+  const views = productViews(trial);
+  const active = chosenView(views, place.view);
   const at = (next: Partial<HubPlace>, how: "push" | "replace" = "push") =>
     go(hubTab({ ...place, version, ...next, tab: "Product 360" }), how);
   if (!view)
@@ -398,15 +402,27 @@ function ProductPage({
         </MonitorBand>
       </div>
       <Tabs
-        tabs={PRODUCT_VIEWS}
+        tabs={views}
         active={active}
-        onChange={(next) => at({ view: next === "Overview" ? null : next, list: null }, "replace")}
+        onChange={(next) =>
+          at(
+            { view: next === "Overview" ? null : next, list: null, change: null, preview: null, scope: null },
+            "replace",
+          )
+        }
         label={`${info.name} sections`}
       >
         {active === "Overview" && <Overview view={view} links={links} version={version} at={at} />}
+        {active === "Connected" && <ConnectedView product={place.product ?? ""} version={version} at={at} />}
         {active === "Configuration" && <Configuration view={view} place={place} go={go} />}
-        {active === "Lots" && <Lots view={view} version={version} />}
-        {active === "Changes" && <Changes changes={view.changes ?? []} />}
+        {active === "Lots" &&
+          (trial && place.scope ? (
+            <FieldScopePanel scope={place.scope} at={at} />
+          ) : (
+            <Lots view={view} version={version} />
+          ))}
+        {active === "Changes" &&
+          (trial ? <ChangesWithImpact view={view} place={place} at={at} /> : <Changes changes={view.changes ?? []} />)}
         {active === "Records" && (
           <Records
             product={product}
@@ -422,6 +438,7 @@ function ProductPage({
           ) : (
             <p className="ac-muted">No versions recorded, so there is no version story.</p>
           ))}
+        {active === "Sources (simulated)" && <SourcesView productId={String(info.id)} version={version} at={at} />}
       </Tabs>
     </>
   );
@@ -751,8 +768,37 @@ function Lots({ view, version }: { view: Row; version: string | null }) {
   );
 }
 
-/** The product's own changes, with the complaints before and after each took effect (spec 3.3, IV-14). */
-export function Changes({ changes }: { changes: Row[] }) {
+/** W5 (U2): the changes with "See impact" on each, a preview of a change by component, and the impact panel. */
+function ChangesWithImpact({
+  view,
+  place,
+  at,
+}: {
+  view: Row;
+  place: HubPlace;
+  at: (next: Partial<HubPlace>, how?: "push" | "replace") => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  return (
+    <>
+      {(place.change || place.preview) && <ChangeImpactPanel product={place.product ?? ""} place={place} at={at} />}
+      <Changes
+        changes={view.changes ?? []}
+        onImpact={(change) => at({ change: String(change.id), preview: null, scope: null })}
+      />
+      <div className="ca-action-row">
+        <button type="button" className="ac-secondary" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+          Preview a change
+        </button>
+      </div>
+      {picking && <PreviewPicker configuration={view.configuration} at={at} />}
+    </>
+  );
+}
+
+/** The product's own changes, with the complaints before and after each took effect (spec 3.3, IV-14); in a free
+ * trial each opens its impact (W5). */
+export function Changes({ changes, onImpact }: { changes: Row[]; onImpact?: (change: Row) => void }) {
   return (
     <section className="uw-ph-section" aria-label="Changes">
       <p className="ac-muted">MDARIX lists what was recorded; it does not infer a cause.</p>
@@ -778,6 +824,11 @@ export function Changes({ changes }: { changes: Row[] }) {
               </td>
               <td>
                 Before it took effect {change.complaints_before ?? 0} · after {change.complaints_after ?? 0}
+                {onImpact && (
+                  <button type="button" className="ac-link" onClick={() => onImpact(change)}>
+                    See impact
+                  </button>
+                )}
               </td>
             </tr>
           ))}

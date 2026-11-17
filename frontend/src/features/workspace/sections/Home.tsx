@@ -26,7 +26,7 @@ import { useResource, type Resource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { OVERSIGHT, eventPath, type EventView, type Oversight, type OversightItem } from "../oversight";
 import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
-import { comparisonLine, risingSentence, trendPath, type TrendBoard } from "../signalAi";
+import { comparisonLine, monthlyRates, monthlyText, risingSentence, trendPath, type TrendBoard } from "../signalAi";
 import {
   DUE_WEEK_PATH,
   DUE_WEEK_VIEW,
@@ -221,14 +221,14 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                       <span className="uw-home-trend-pic" aria-hidden="true">
                         <DeviceIcon kind={deviceKind(row.product.name)} size={36} decorative />
                       </span>
-                      <h2 className="uw-home-trend-title">{risingSentence(row)}</h2>
+                      <h2 className="uw-home-trend-title">{risingSentence(row, { ratio: false })}</h2>
                     </div>
                     <TrendBars row={row} bare />
                     <p className="ac-muted">{comparisonLine(row)}</p>
-                    {typeof row.ratio === "number" && (
-                      // The rise as one big figure, the sentence above says it in words (the hero design's card).
-                      <span className="uw-home-ratio" aria-hidden="true">
-                        {row.ratio.toFixed(1)}×
+                    {monthlyRates(row) && (
+                      // The rise as complaints a month, before → after, from the trend's own counts (owner, 17 Nov).
+                      <span className="uw-home-ratio">
+                        {monthlyText(monthlyRates(row)!)} <small>complaints a month</small>
                       </span>
                     )}
                   </li>

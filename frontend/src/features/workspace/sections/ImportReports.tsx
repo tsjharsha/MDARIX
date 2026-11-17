@@ -8,6 +8,7 @@ import { countOf, formatCount } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { EscalateButton } from "./Triage";
 import { ProblemCodeOf } from "./ProblemCode";
+import { StarterNote } from "../../shared/Basis";
 
 /*
  * What an Excel or CSV import did (0.10.56, the MVP's R14, R16 and R17 on the trial's import path): each run's
@@ -1038,7 +1039,7 @@ function RegistrationForm({
           </select>
         </label>
       )}
-      <p className="ac-muted">Risk classes: starter list, for your consultant to confirm.</p>
+      <StarterNote />
       <div className="ca-action-row">
         <button type="submit" className="ac-primary" disabled={busy || !form.registration_number.trim()}>
           Add

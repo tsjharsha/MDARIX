@@ -6,6 +6,8 @@ import { useIsTrial, useWorkspace } from "../workspaceContext";
 
 /** The Settings tab where the person who started a free trial switches AI on for the sample data (F1, decision T5). */
 export const TRIAL_AI_TAB = "AI on the sample data";
+/** E1: the trial's AI governance, for the same person (the server answers only them). */
+export const TRIAL_AI_GOVERNANCE_TAB = "AI governance";
 
 /**
  * Whether the signed-in person may switch the trial's AI: the server answers the AI settings only to the person who

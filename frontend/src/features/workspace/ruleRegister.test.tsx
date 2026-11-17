@@ -6,6 +6,7 @@ import { RuleRegister, RulesUsedPanel } from "./sections/RuleRegister";
 import { WindowsBody } from "./sections/ReportingWindows";
 import { inForceText, registerPath, rulesUsedLines, type RuleList, type RulesUsed } from "./ruleRegister";
 import { legalOf, type Clock, type ReportabilitySettings } from "./reportability";
+import { STARTER_LABEL } from "../shared/standards";
 
 // B4 steps 9, 10 (screen) and 13: Decision trees › Rules (read-only, every member), the "Rules used" panel (at the
 // event, today, decided), both hidden while the session says rule_register is off; FG-1's warning and legal deadline.
@@ -83,7 +84,8 @@ describe("Decision trees › Rules", () => {
     resources.data["/api/v1/rule-register"] = LIST;
     const html = render(api(true), <RuleRegister />);
     expect(html).toContain("46 rules · 5 markets · 6 held as data");
-    expect(html).toContain("starter, for your consultant to confirm.");
+    expect(html.split(STARTER_LABEL).length - 1).toBe(1);
+    expect(html).not.toContain("consultant");
     expect(html).toContain("US medical device reporting");
     expect(html).toContain("<code>US-floor-1</code>");
     expect(html).toContain("21 CFR 803.50(a)");

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { WhyAsked } from "../../shared/Basis";
+import { StarterNote, WhyAsked } from "../../shared/Basis";
 import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
@@ -203,10 +203,13 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
           />
         )}
         {list.data && (
-          <p className="uw-ma-starter" role="note">
-            <FileWarning size={15} aria-hidden="true" /> Provisional deadlines use the shortest category the facts do
-            not yet exclude, per market. {list.data.starter_mark}
-          </p>
+          <>
+            <p className="uw-ma-starter" role="note">
+              <FileWarning size={15} aria-hidden="true" /> Provisional deadlines use the shortest category the facts do
+              not yet exclude, per market.
+            </p>
+            <StarterNote />
+          </>
         )}
       </Panel>
       {open && list.data && (

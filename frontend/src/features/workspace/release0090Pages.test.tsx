@@ -1,7 +1,7 @@
 // 0.10.90, the owner-approved hero design on the pages: deadline rings, the list at a glance, the deadline ruler, the
 // trend's lot split and each page's emblem. Presentation only: the words stay the page's own.
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClockPill, DeadlineRuler, OwnerCell, StageCell, listGlance, ringOf, rulerDays, stageIndex } from "./heroBits";
 import { lotParts } from "./sections/TrendCheck";
 import { ListGlance } from "./sections/ComplaintList";
@@ -90,7 +90,12 @@ describe("the deadline ruler", () => {
     expect(ruler.now).toBeLessThan(0.4);
   });
 
+  afterEach(() => vi.useRealTimers());
+
   it("groups the deadlines per day and state, says them in words, and marks the overdue stretch", () => {
+    // A fixed clock: the three deadlines 50-52 hours ahead fall on one day whatever the time of day the test runs.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-17T00:00:00Z"));
     const html = renderToStaticMarkup(<DeadlineRuler items={[due(-30), due(50), due(51), due(52)]} />);
     expect(html).toMatch(/role="img" aria-label="Deadlines on a timeline: 1 overdue since [A-Z][a-z]{2} \d+, 3 due /);
     expect(html.match(/class="hx-ruler-mk is-/g)).toHaveLength(2);

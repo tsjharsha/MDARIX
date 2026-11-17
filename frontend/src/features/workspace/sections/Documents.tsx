@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DecideAndSign } from "./common";
-import { Download, FileCheck2, FileText, FileWarning, PenLine } from "lucide-react";
+import { Download, FileCheck2, FileText, PenLine } from "lucide-react";
+import { StarterNote } from "../../shared/Basis";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
@@ -235,9 +236,8 @@ function VersionHeader({ version }: { version: DocumentVersion }) {
         cut-off {formatDate(version.cut_off)}
       </p>
       <p className="uw-doc-clauses">{version.clauses.map(clauseText).join("; ")}</p>
-      <p className="uw-ma-starter" role="note">
-        <FileWarning size={15} aria-hidden="true" /> {version.starter_mark}
-      </p>
+      {/* Every template's wording is MDARIX's starter until confirmed (qms_documents/templates.py). */}
+      <StarterNote />
     </header>
   );
 }

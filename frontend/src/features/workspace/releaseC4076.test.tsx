@@ -7,6 +7,7 @@ import { ReportsSection } from "./sections/ReportsTab";
 import { DecisionTreesSection, TREE_NAMES, type Trees } from "./sections/DecisionTrees";
 import { taskDestination } from "./tasks";
 import { MARKET_SHORT } from "./marketAssessment";
+import { STARTER_LABEL } from "../shared/standards";
 
 // 0.10.76, Release C part C4: the EU MIR, GB MIR and Health Canada forms (starters, for your consultant to confirm) on
 // the new navigation, Canada's tree, and a link to one report opening that report.
@@ -67,7 +68,8 @@ describe("the new forms are the new navigation's", () => {
     };
     const html = render(<ReportsSection />);
     expect(html).toContain("EU Manufacturer Incident Report (MIR)</span>");
-    expect(html).toContain("Starter, for your consultant to confirm");
+    // G-17: no chip per form; the forms card says the starter mark once.
+    expect(html.split(STARTER_LABEL).length - 1).toBe(1);
     expect(html).toContain("In MDARIX today");
     expect(html).not.toContain("record where and when you reported");
   });
@@ -84,7 +86,7 @@ describe("Canada's tree and a market outside the reporting windows", () => {
           version: 1,
           status: "STARTER",
           status_label: "Starter",
-          version_label: "MDARIX starter · version 1, for your consultant to confirm",
+          version_label: "MDARIX starter · version 1",
           enabled: false,
           tests: { passed: 6, total: 6, current: true },
           questions: [

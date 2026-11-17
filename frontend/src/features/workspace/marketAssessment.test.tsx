@@ -27,6 +27,7 @@ import {
 } from "./marketAssessment";
 import marketAssessmentSource from "./sections/MarketAssessment.tsx?raw";
 import { formatDay } from "../../app/dates";
+import { STARTER_LABEL } from "../shared/standards";
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {
@@ -294,7 +295,9 @@ describe("the assessment screen", () => {
     expect(html).toContain("1.</strong> Did a death occur?");
     expect(html).not.toContain("US1.");
     expect(html).toContain("21 CFR 803.50(a)(2)");
-    expect(html.split("Starter, for your consultant to confirm</span>").length - 1).toBe(QUESTIONS.length + 1);
+    // G-17: no starter chip on a question or the scale; the assessment page's footnote says it once.
+    expect(html).not.toContain(STARTER_LABEL);
+    expect(html).not.toContain("consultant");
     expect(html).toContain("Recurrence is presumed");
     expect(html).toContain("US serious injury threshold");
     expect(html).toContain("<strong>critical</strong>, at or above the US serious injury threshold");
@@ -505,7 +508,7 @@ describe("the assessment screen", () => {
       />,
     );
     expect(india).toContain(WHY_ASSESSED);
-    expect(india).toContain("Starter, for your consultant to confirm.");
+    expect(india).not.toContain(STARTER_LABEL);
     const own = render(
       <MarketPanel item={item({ preselected: true })} detail={detail(item({ preselected: true }))} onSaved={vi.fn()} />,
     );

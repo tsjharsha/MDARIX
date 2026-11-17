@@ -28,7 +28,6 @@ import {
 } from "../marketAssessment";
 import { useCanReport } from "./Reports";
 import { InlineError } from "./boardParts";
-import { STARTER_LABEL } from "../../shared/standards";
 
 // B9b (OC spec, approved 9 Nov 2026): a country outside the five built-in markets. The person picks the country on the
 // Decision trees page, answers the generic starter questions and signs; Reportable creates the "Other Regulatory
@@ -87,7 +86,7 @@ export function OtherCountryPicker({
       </p>
       {list.data && (
         <p className="dt-hint" role="note">
-          {list.data.generic_note} <span className="dt-tag is-starter">{STARTER_LABEL}</span>
+          {list.data.generic_note}
         </p>
       )}
       {list.state === "error" && <InlineError text={errorText(list.error, "The countries could not be read.")} />}

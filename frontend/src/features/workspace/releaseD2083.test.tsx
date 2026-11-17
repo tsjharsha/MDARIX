@@ -447,7 +447,7 @@ describe("D2.5: the form for the incident's country", () => {
     expect(html).toContain(
       "<b>May also apply</b><span>CDSCO&#x27;s MvPI guidance: check it for events outside India.</span>",
     );
-    expect(html).toContain("Starter, for your consultant to confirm · no second report is created");
+    expect(html).toContain('<span class="dt-tag">No second report is created</span>');
   });
 
   it("opens the report once signed, and says no report when not reportable", () => {
@@ -803,13 +803,18 @@ describe("D2.8: approval in plain words", () => {
   });
 });
 
-describe("D2.9: the starter mark only on starter content, in one wording", () => {
-  it("marks MDARIX's starter version and never the organization's approved one", () => {
-    expect(STARTER_LABEL).toBe("Starter, for your consultant to confirm");
+describe("D2.9 and G-17: the starter mark only on starter content, once per page as a footnote", () => {
+  it("marks MDARIX's starter version once, never per question or form, and never the organization's approved one", () => {
+    expect(STARTER_LABEL).toBe("Default rules: confirm with your regulatory lead");
     expect(isStarterVersion("US-starter-1")).toBe(true);
     expect(isStarterVersion("US-v2")).toBe(false);
-    expect(questionMark({ starter: true, extra: false })).toBe(STARTER_LABEL);
-    expect(show(usItem())).toContain(`<span class="dt-tag is-starter"> ${STARTER_LABEL}</span>`);
+    expect(questionMark({ starter: true, extra: false })).toBeNull();
+    expect(questionMark({ starter: false, extra: false })).toBe("Your wording");
+    const starter = show(usItem());
+    expect(starter.split(STARTER_LABEL).length - 1).toBe(1);
+    expect(starter).toContain(`<p class="ac-note uw-starter-note" role="note">${STARTER_LABEL}</p>`);
+    expect(starter).not.toContain("is-starter");
+    expect(starter).not.toContain("consultant");
     const approved = usItem();
     approved.question_set = { ...approved.question_set, version: "US-v2" };
     expect(show(approved)).not.toContain(STARTER_LABEL);
@@ -835,7 +840,7 @@ describe("0.10.84: the tree while answering, compact enough for Sign on the firs
     });
     const trees = {
       ...TREES,
-      markets: [{ ...TREES.markets[0], version_label: "MDARIX starter · version 1, for your consultant to confirm" }],
+      markets: [{ ...TREES.markets[0], version_label: "MDARIX starter · version 1" }],
     };
     resources.data = {
       "/api/v1/decision-trees": trees,
@@ -844,7 +849,10 @@ describe("0.10.84: the tree while answering, compact enough for Sign on the firs
     const html = render(<DecisionTreesSection />);
     const row = html.slice(html.indexOf('class="dt-markets"'), html.indexOf('class="dt-rec"'));
     expect(row).toContain('class="dt-modes"');
-    expect(html.split("for your consultant to confirm").length - 1).toBe(1);
+    // G-17: the whole page says the starter mark once, as its footnote, and no item carries a chip.
+    expect(html.split(STARTER_LABEL).length - 1).toBe(1);
+    expect(html).not.toContain("is-starter");
+    expect(html).not.toContain("uw-ma-starter-chip");
     const rail = html.slice(html.indexOf('class="dt-rail"'));
     expect(rail).toContain("12 of 12 worked complaints pass");
     expect(rail).not.toContain("MDARIX starter · version 1");

@@ -15,6 +15,7 @@ import {
   type DecisionSummary,
 } from "./decisionSummary";
 import { signalWhy, summaryPlace, type FlagshipRun } from "./oneStory";
+import { monthlyRates } from "./signalAi";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { SAMPLE_SOURCE } from "./complaintList";
 
@@ -237,15 +238,20 @@ describe("Decision and impact summary", () => {
 });
 
 describe("G-06 and the flagship's way to the summary", () => {
-  it("says the rise in the trend check's own number, and no number without a trend row", () => {
+  it("says the rise as the trend check's own monthly rates, before and after, and no number without a trend row", () => {
     const rows = [
-      { product: { id: "p-orbit" }, ratio: 9.31 },
-      { product: { id: "p-orbit" }, ratio: 1.2 },
-      { product: { id: "other" }, ratio: 20 },
+      // 14 complaints in 75 days against 1.5 expected: 0.6 → 5.6 a month (9.3×).
+      { product: { id: "p-orbit" }, ratio: 9.3, recent: 14, expected: 1.5, recent_days: 75 },
+      { product: { id: "p-orbit" }, ratio: 1.2, recent: 3, expected: 2.5, recent_days: 30 },
+      { product: { id: "other" }, ratio: 20, recent: 20, expected: 1, recent_days: 30 },
     ];
+    const rates = monthlyRates(rows[0])!;
+    expect(rates.after / rates.before).toBeCloseTo(14 / 1.5);
     expect(signalWhy(rows, "p-orbit")).toBe(
-      "Pressure-alarm complaints on one pump are at 9.3× the earlier average after Rev B. A rise like this starts an investigation.",
+      `Pressure-alarm complaints on one pump went from ${rates.before.toFixed(1)} to ${rates.after.toFixed(1)} a month after Rev B. A rise like this starts an investigation.`,
     );
+    expect(signalWhy(rows, "p-orbit")).toContain("0.6 to 5.6 a month");
+    expect(signalWhy(rows, "p-orbit")).not.toContain("×");
     expect(signalWhy([], "p-orbit")).not.toMatch(/\d|sevenfold/);
   });
 

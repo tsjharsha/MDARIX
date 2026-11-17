@@ -22,7 +22,8 @@ import {
 import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
 import { BedsideScene, SignedSeal } from "../../shared/hero/HeroArt";
 import { errorText, send, useResource } from "../../customer-admin/shared";
-import { useRoutinePath, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useIsTrial, useRoutinePath, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { connectedTab, sampleScopeTab } from "../productTwin";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
 import { chanceText, runPath, trendCountText, trendPath, trendResultLabel, type TrendItem } from "../signalAi";
@@ -833,6 +834,9 @@ export const SUMMARY_LINE = "See the decision and its impact on one screen";
 export const FLAGSHIP_BRIEF_LINE =
   "Written by the sample author before the AI proposal; your accepted proposal is on the case.";
 export const RISK_LINE = "Risk file: reassess SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor";
+// W5: the twin's links from the flagship (no new step): step 2 to the connected view, step 7 to the sensor lot's scope.
+export const connectedLine = (version: string | null) => `See everything connected to ${version ?? "the product"}`;
+export const SCOPE_LINE = "Field-action scope from NS-SL-2417";
 
 /** What only some steps say: the AI's state, the brief's author, the signature, the action's three lines. */
 function FlagshipExtra({
@@ -841,12 +845,15 @@ function FlagshipExtra({
   aiReady,
   onRisk,
   onSummary,
+  onProduct,
 }: {
   run: FlagshipRun;
   index: number;
   aiReady: boolean | null;
   onRisk: () => void;
   onSummary: () => void;
+  /** W5 (trial): open a Product 360 address (the connected view, the field-action scope). */
+  onProduct?: (tab: string) => void;
 }) {
   const note = run.steps[index].note;
   // E3 + W6: once the decision is signed, its summary is one click away from steps 6 and 7.
@@ -855,6 +862,22 @@ function FlagshipExtra({
       {SUMMARY_LINE}
     </button>
   ) : null;
+  const product = run.product.ref ?? "SAMPLE-ORBIT-300";
+  if (index === 1 && onProduct)
+    return (
+      <div className="uw-os-differ">
+        <p>{LOT_005_LINE}</p>
+        <p>
+          <button
+            type="button"
+            className="ac-link"
+            onClick={() => onProduct(connectedTab(product, run.product.version))}
+          >
+            {connectedLine(run.product.version)}
+          </button>
+        </p>
+      </div>
+    );
   if (index === 0 || index === 1) return <p className="uw-os-differ">{LOT_005_LINE}</p>;
   if (index === 3)
     return (
@@ -893,6 +916,17 @@ function FlagshipExtra({
             {RISK_LINE}
           </button>
         </li>
+        {onProduct && (
+          <li>
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => onProduct(sampleScopeTab(product, run.product.version))}
+            >
+              {SCOPE_LINE}
+            </button>
+          </li>
+        )}
         {summary && <li>{summary}</li>}
       </ul>
     );
@@ -916,6 +950,7 @@ export function FlagshipView({
   more?: ReactNode;
 }) {
   const { open, session, startStory, chooseDataSource, work } = useWorkspace();
+  const isTrial = useIsTrial();
   const aiReady = useAiReady();
   const [picked, setPicked] = useState<number | null>(null);
   const [problem] = useState(takeMarkProblem);
@@ -1088,6 +1123,7 @@ export function FlagshipView({
           aiReady={aiReady}
           onRisk={() => go("Records", "Risk file input")}
           onSummary={openSummary}
+          onProduct={isTrial ? (tab) => go("Product 360", tab) : undefined}
         />
         {(selected === 2 || selected === 6) && run.branch && (
           <p className="uw-wt-hint">

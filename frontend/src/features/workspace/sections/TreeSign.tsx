@@ -22,7 +22,6 @@ import {
 import { signChecklist, type CheckItem, type QuestionGroup, type TreeForm } from "../treeAnswer";
 import type { TreeMarket, TreePath } from "../decisionTrees";
 import { InlineError } from "./boardParts";
-import { STARTER_LABEL } from "../../shared/standards";
 
 export type HarmState = { level: string; reason: string; disagreement: string };
 
@@ -415,7 +414,6 @@ export function FormCard({
         <>
           <p className="dt-form-name">
             <b>{formName(tree.form.title)}</b>
-            {tree.form.starter && <span className="dt-tag is-starter">{STARTER_LABEL}</span>}
           </p>
           {report ? (
             <button
@@ -441,7 +439,7 @@ export function FormCard({
               {others.map((other) => (
                 <span key={other.market}>{other.foreign}</span>
               ))}
-              <span className="dt-tag is-starter">{STARTER_LABEL} · no second report is created</span>
+              <span className="dt-tag">No second report is created</span>
             </div>
           )}
         </>
