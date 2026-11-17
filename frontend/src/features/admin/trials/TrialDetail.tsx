@@ -135,8 +135,9 @@ export function TrialDetailView({
     <>
       <header className="ac-page-head to-hero">
         <div>
-          <p className="ac-eyebrow">
-            {detail.tenant_business_id ?? "Trial"} · {detail.plan ?? "Converted"}
+          {/* The MDARIX ID stays in the tooltip: the presenter reads the plan, not a code (F-T7). */}
+          <p className="ac-eyebrow" title={detail.tenant_business_id ?? undefined}>
+            {detail.plan ?? "Converted"}
             {sample.sample_only ? " · Sample only" : ""}
           </p>
           <h1 ref={title} tabIndex={-1}>
@@ -335,10 +336,15 @@ const EVENT_LABELS: Record<string, string> = {
   TRIAL_SAMPLE_RESTARTED: "Sample data restarted",
   SUBSCRIPTION_CHANGED: "Plan changed",
   TRIAL_OWNER_PROMOTED: "Owner became Customer Administrator",
+  TRIAL_USER_AI_ACCESS_CHANGED: "AI switched for a person",
+  TRIAL_AI_ACCESS_BULK_CHANGED: "AI switched for everyone",
+  AI_PROCESSING_SETTING_CHANGED: "AI for the organization changed",
+  AI_FEATURE_SETTING_CHANGED: "An AI feature changed",
 };
 
-/** A sample count's kind in plain words ("complaints" -> "Complaints", "capa_records" -> "Capa records"). */
-export const sampleKindLabel = (kind: string) => (kind.charAt(0).toUpperCase() + kind.slice(1)).replace(/_/g, " ");
+/** A sample count's kind in plain words ("complaints" -> "Complaints", "capas" -> "CAPAs"). */
+export const sampleKindLabel = (kind: string) =>
+  (kind.charAt(0).toUpperCase() + kind.slice(1)).replace(/_/g, " ").replace(/\bcapa(s?)\b/i, "CAPA$1");
 
 /** An audit action in plain words ("TRIAL_EXTENDED" -> "Trial extended"). */
 export const eventLabel = (action: string) =>

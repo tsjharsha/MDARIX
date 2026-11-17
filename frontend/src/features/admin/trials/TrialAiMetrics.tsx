@@ -16,6 +16,9 @@ export type ChainLink = {
   name: string;
   state: "READY" | "RESTING" | "NOT_USABLE";
   resting_until: string | null;
+  /** Why the link cannot be used, in words, and when it was last checked (newer servers). */
+  reason?: string | null;
+  checked_at?: string | null;
 };
 export type SwitchEvent = {
   action: string;
@@ -133,6 +136,13 @@ export function TrialAiMetrics({ tenantId }: { tenantId: string }) {
                       </span>
                       <ToneBadge tone={CHAIN_WORDS[link.state][1]} label={CHAIN_WORDS[link.state][0]} />
                       {link.resting_until && <small className="ac-muted">until {formatDate(link.resting_until)}</small>}
+                      {(link.reason || link.checked_at) && (
+                        <small className="ac-muted">
+                          {[link.reason, link.checked_at ? `checked ${formatDateTime(link.checked_at)}` : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </small>
+                      )}
                     </li>
                   ))}
                 </ol>

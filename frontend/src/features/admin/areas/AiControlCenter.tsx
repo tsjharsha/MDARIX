@@ -88,13 +88,14 @@ function Overview() {
   }));
   return (
     <div className="ac-grid">
-      <ReleaseGateStatus />
+      {/* Hero review 2 (F-X1): lead with how AI is used; the pilot gate is folded at the end, and no provider, model
+          id, setting name or command is shown (they stay in the runbook). */}
       <section className="ac-stats ar-stats-4" aria-label="AI in the last 30 days">
         <StatTile
-          label="Model"
-          value={model ? model.model : null}
+          label="Model in use"
+          value={model ? (model.configured ? "Configured" : "Not connected") : null}
           detail={
-            model ? `${displayCode(model.provider)} · ${model.configured ? "connected" : "not connected"}` : "Loading"
+            model ? (model.configured ? "Answers checked before they are shown" : "Rule-based answers") : "Loading"
           }
           icon={<Bot size={18} />}
           tone={model ? (model.configured ? "good" : "warning") : undefined}
@@ -131,14 +132,6 @@ function Overview() {
       <Panel eyebrow="Configuration" title="Model in use" source={models}>
         {model ? (
           <dl className="cc-details">
-            <div>
-              <dt>Provider</dt>
-              <dd>{displayCode(model.provider)}</dd>
-            </div>
-            <div>
-              <dt>Model</dt>
-              <dd>{model.model}</dd>
-            </div>
             <div>
               <dt>Connection</dt>
               <dd>{model.configured ? "Connected" : "Not connected (rule-based fallback is used)"}</dd>
@@ -181,9 +174,11 @@ function Overview() {
             detail: "No backup AI provider is set up. Ask your technical team to add one.",
           }}
           columns={[
-            { key: "order", label: "Order", numeric: true, render: (row) => row.order ?? "—" },
-            { key: "provider", label: "Provider", render: (row) => <strong>{displayCode(row.provider)}</strong> },
-            { key: "model", label: "Model", render: (row) => row.model },
+            {
+              key: "provider",
+              label: "Backup",
+              render: (row) => <strong>{row.order ? `Backup provider ${row.order}` : "Backup provider"}</strong>,
+            },
             {
               key: "state",
               label: "State",
@@ -209,6 +204,7 @@ function Overview() {
           ]}
         />
       </Panel>
+      <ReleaseGateStatus />
     </div>
   );
 }
@@ -249,17 +245,6 @@ function Executions() {
             render: (row) => <TenantCell row={row} />,
           },
           {
-            key: "model",
-            fields: ["model", "provider"],
-            label: "Model",
-            render: (row) => (
-              <span className="cc-stack">
-                <strong>{row.model}</strong>
-                <small>{displayCode(row.provider)}</small>
-              </span>
-            ),
-          },
-          {
             key: "check",
             fields: ["validation_status"],
             label: "Answer check",
@@ -294,10 +279,18 @@ function Executions() {
   );
 }
 
-/** The AI release gate's four bars, with what to do for each open one (MDARIX staff operate the server). */
-function ReleaseGateStatus() {
+/** The AI release gate's four bars, folded: it is about pilots, and what to do for each bar is in the runbook. */
+export function ReleaseGateStatus() {
   const gate = useResource<ReleaseGate>("/api/v1/ai/release-gate");
-  return <AiReleaseGate gate={gate.data} showActions />;
+  if (!gate.data) return null;
+  return (
+    <details className="ar-gate-fold">
+      <summary>
+        Before AI goes to a pilot · {gate.data.met} of {gate.data.total} checks done
+      </summary>
+      <AiReleaseGate gate={gate.data} />
+    </details>
+  );
 }
 
 type Agent = { code: string; label: string; allowed: string[]; forbidden: string[] };

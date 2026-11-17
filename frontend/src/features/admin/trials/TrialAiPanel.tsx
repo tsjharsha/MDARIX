@@ -15,7 +15,28 @@ import { TrialAiMetrics } from "./TrialAiMetrics";
 
 export const AI_ACCESS_REASON_MIN = 10;
 
-export type TrialAiPerson = { user_id: string; display_name: string | null; active: boolean };
+export type TrialAiPerson = {
+  user_id: string;
+  display_name: string | null;
+  active: boolean;
+  /** The sample story's built-in author and approver, not people (sent by newer servers). */
+  system_user?: boolean;
+  /** Whether AI really answers for this person: their switch, the organization and the trial services (newer servers). */
+  effective?: boolean;
+};
+
+// shortcut: an older server sends no system_user, so the sample story's accounts are known by name; drop once it does.
+const isSystemUser = (person: TrialAiPerson) =>
+  person.system_user ?? /^MDARIX sample /i.test(person.display_name ?? "");
+
+/** The real people of the trial (the sample story's own accounts are left out). */
+export const realPeople = (people: TrialAiPerson[]) => people.filter((person) => !isSystemUser(person));
+
+/** Whether AI really answers for the person: the server's word, else the three gates together. */
+export const effectiveAi = (
+  person: TrialAiPerson,
+  list: Pick<TrialAiAccessList, "organization_on" | "trial_chain_on">,
+) => person.effective ?? (person.active && list.organization_on && list.trial_chain_on);
 export type TrialAiAccessList = { organization_on: boolean; trial_chain_on: boolean; items: TrialAiPerson[] };
 
 const trialPath = (tenantId: string) => `/api/v1/platform-admin/trial-organizations/${encodeURIComponent(tenantId)}`;
@@ -45,7 +66,8 @@ type Gate = { label: string; value: string; on: boolean };
 
 /** The three gates a person's AI passes, shown whether they are on or off (trial services, organization, people). */
 export function aiGates(list: TrialAiAccessList): Gate[] {
-  const active = list.items.filter((person) => person.active).length;
+  const people = realPeople(list.items);
+  const active = people.filter((person) => effectiveAi(person, list)).length;
   return [
     { label: "Trial AI services", value: list.trial_chain_on ? "Ready" : "Not set up", on: list.trial_chain_on },
     {
@@ -53,7 +75,7 @@ export function aiGates(list: TrialAiAccessList): Gate[] {
       value: list.organization_on ? "Switched on" : "Not switched on",
       on: list.organization_on,
     },
-    { label: "People", value: `${active} of ${list.items.length} with AI`, on: active > 0 },
+    { label: "People", value: `${active} of ${people.length} with AI`, on: active > 0 },
   ];
 }
 
@@ -67,7 +89,9 @@ export function TrialAiPanel({
   onChanged: () => void;
 }) {
   const list = useResource<TrialAiAccessList>(aiAccessPath(detail.tenant_id));
-  const people = list.data?.items ?? [];
+  const people = realPeople(list.data?.items ?? []);
+  // Each saved change reads the metrics again, so the switch audit shows it at once (F-T4).
+  const [changes, setChanges] = useState(0);
   const [pending, setPending] = useState<Pending | null>(null);
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -95,6 +119,7 @@ export function TrialAiPanel({
       await send(request.path, "PUT", request.body);
       close();
       list.reload();
+      setChanges((value) => value + 1);
       onChanged();
     } catch (error) {
       setProblem(errorText(error, "The AI switch could not be changed."));
@@ -105,8 +130,8 @@ export function TrialAiPanel({
   const word = (target: boolean) => (target ? "Active" : "Inactive");
   return (
     <>
-      {/* The server's own line about AI for this trial, shown even while the people are read. */}
-      {detail.ai?.line && (
+      {/* The server's own line about AI for this trial, only until the panel below says it with the live gates. */}
+      {detail.ai?.line && !list.data && (
         <p className="to-ai" role="note">
           <Sparkles size={14} aria-hidden="true" /> {detail.ai.line}
         </p>
@@ -157,7 +182,7 @@ export function TrialAiPanel({
               <button
                 type="button"
                 id={switchId(person.user_id)}
-                className="to-switch"
+                className={`to-switch${list.data && !effectiveAi(person, list.data) ? " is-waiting" : ""}`}
                 role="switch"
                 aria-checked={person.active}
                 aria-label={`AI for ${person.display_name || "this person"}`}
@@ -165,7 +190,11 @@ export function TrialAiPanel({
               >
                 <span aria-hidden="true" />
               </button>
-              <small className="to-switch-word">{word(person.active)}</small>
+              <small className="to-switch-word">
+                {person.active && list.data && !effectiveAi(person, list.data)
+                  ? "Active · waits for the organization"
+                  : word(person.active)}
+              </small>
             </li>
           ))}
         </ul>
@@ -203,7 +232,7 @@ export function TrialAiPanel({
         )}
       </Panel>
       <div id="trial-ai-metrics">
-        <TrialAiMetrics tenantId={detail.tenant_id} />
+        <TrialAiMetrics key={changes} tenantId={detail.tenant_id} />
       </div>
     </>
   );

@@ -119,6 +119,10 @@
   background: var(--ms-surface);
   transition: transform 120ms;
 }
+/* On, but AI does not answer yet (the organization or the trial services are off): neutral, not green. */
+.to-switch.is-waiting[aria-checked="true"] {
+  background: var(--ms-muted);
+}
 .to-switch[aria-checked="true"] > span {
   transform: translateX(16px);
 }

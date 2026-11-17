@@ -133,8 +133,9 @@ export function FirstContact({
       />
       <CasesList onOpen={setOpen} reloadKey={reloadKey} />
       {guide.data && (
-        <p className="uw-ma-starter" role="note">
-          <FileWarning size={15} aria-hidden="true" /> Guide {guide.data.version}. {guide.data.starter_mark}
+        // The guide's version code stays in the tooltip: no internal code on screen (hero review 2).
+        <p className="uw-ma-starter" role="note" title={`Guide ${guide.data.version}`}>
+          <FileWarning size={15} aria-hidden="true" /> The ten questions: {guide.data.starter_mark}
         </p>
       )}
       {part === "all" && <Duplicates onChanged={reload} />}
