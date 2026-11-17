@@ -119,6 +119,18 @@ def test_a_failed_event_waits_the_configured_delay_and_records_the_error(two_eve
     assert row.last_error.startswith("RuntimeError:") and "abc" not in row.last_error and "[REDACTED]" in row.last_error
 
 
+@pytest.fixture(autouse=True)
+def _no_background_timeouts_left():
+    """``main()`` gives every engine of the process the background timeouts (a ``connect`` listener on Engine); undo
+    it, or later tests' engines run ``SET statement_timeout`` too (SQLite ones fail on it)."""
+    from sqlalchemy.engine import Engine
+
+    from backend.app.db import job_timeouts
+
+    yield
+    job_timeouts.stop_background_timeouts(Engine)
+
+
 def _script():
     spec = importlib.util.spec_from_file_location(
         "run_outbox_worker", Path(__file__).resolve().parents[1] / "scripts" / "run_outbox_worker.py"
