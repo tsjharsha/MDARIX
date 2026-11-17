@@ -392,6 +392,7 @@ describe("the flagship bar", () => {
     expect(html).toContain("Next: Product reality");
     expect(html).toContain("Back to Getting started");
     expect(render(<FlagshipBar section="Getting started" />)).toBe("");
+    expect(render(<FlagshipBar section="Trends" />)).toContain("Lot 005 was built with the next sensor lot");
     const branch = render(<FlagshipBar section="Decision trees" branch />);
     expect(branch).toContain("Optional branch");
     expect(branch).not.toContain("Next:");

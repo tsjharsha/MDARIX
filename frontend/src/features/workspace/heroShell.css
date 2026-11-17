@@ -404,8 +404,8 @@
     display: none;
   }
 }
-/* A projector at 1280x720 (review G-08): the labels beside icons go, the search keeps its width, the avatar stays in. */
-@media (max-width: 1366px) {
+/* Up to a 1536-wide screen (review G-08, a 1280x720 projector): labels beside icons go, the search keeps its width. */
+@media (max-width: 1536px) {
   .uw-hybrid .uw-top .uw-persona-hint,
   .uw-hybrid .uw-top .uw-persona-eye,
   .uw-hybrid .uw-top .uw-top-label,

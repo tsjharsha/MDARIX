@@ -96,6 +96,10 @@ export type OneStory = {
 
 export const STORY_STEPS = 10;
 export const FLAGSHIP_STEPS = 7;
+/** Why the trend's lot 005 is not in the case (W1 open item 2): it was built with the next sensor lot. */
+export const LOT_005_LINE =
+  "The trend also shows lot 005: a no-fault-found return and a free-flow report. Lot 005 was built with the next " +
+  "sensor lot (NS-SL-2533), so the investigation keeps to lots 003 and 004, which share sensor lot NS-SL-2417.";
 /** The steps ticked when someone opens the step's screen from the story: it counts for the whole team (0.10.84, M6);
  * per run (W1: the flagship's first three). */
 const TEN_STEP_MARKS: Record<number, string> = { 5: "form", 8: "records", 9: "trends" };
