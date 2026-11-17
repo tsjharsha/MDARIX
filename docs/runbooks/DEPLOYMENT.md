@@ -204,6 +204,16 @@ follow this (a rename, a type change, a destructive data fix) is called out in t
 backup and a planned window. CI runs every new migration down and up again (`alembic downgrade -1`), but a downgrade
 is a last resort on production data.
 
+**Migrations that hold write locks (free-trial line, WHIF push 2).** `tr23compositetenantfks` adds and validates 41
+composite references and nine product/version references in one transaction: each validation reads its table once,
+and writes to those tables (complaints, investigations, evidence, decisions and the other organization tables) wait
+until the migration commits. Measured on 17 Nov 2026 on the 2,000-row test database: about 1 s for tr23 alone
+(`alembic upgrade tr23compositetenantfks` 3.5 s, of which 2.4 s is Alembic starting). The time grows with the rows
+of those tables; production's size was not measured (production checks are paused). Take the backup first, stop the
+API and background services for the migration (`docker compose ... stop api background`, then `up -d --wait`), and
+allow a few minutes in the window. Reads keep working; nothing is lost if it is interrupted (the transaction rolls
+back).
+
 **The readiness gate (0.10.88).** `/health/live` only says the process answers. After `up -d --wait`, ask the new
 API container whether the release can serve, and roll back when it cannot:
 
