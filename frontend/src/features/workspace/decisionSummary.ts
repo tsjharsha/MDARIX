@@ -176,7 +176,7 @@ export function firstSentence(text: string | null | undefined): string | null {
   return end > 0 ? value.slice(0, end) : value;
 }
 
-/** "Accepted the conclusion: the NovaSense pressure sensors … are the most likely cause". */
+/** "Accepted the conclusion: the evidence shows a time and lot association …" (the conclusion's first sentence). */
 export function headline(decision: NonNullable<DecisionSummary["decision"]>): string {
   const lead = firstSentence(decision.conclusion);
   const outcome = decision.outcome_label ?? NOT_RECORDED;

@@ -43,11 +43,14 @@ NARRATIVE = {
     "problem_statement": (
         f"Pressure-alarm complaints on OrbitCare 300 Rev B are at {SIGNAL_TEXT}, mostly from lots 003 and 004."
     ),
+    # W1d (D03): an association, never a proven cause. New seeds and restarts only; a sealed brief is never edited.
     "proposed_conclusion": (
-        "The NovaSense pressure sensors fitted from Rev B, accepted with incoming inspection cut from 32 to 13 units "
-        "per lot, are the most likely cause: sampled sensors in lots 003 and 004 read 4-6% high at the upper pressure "
-        "range, and the earlier supplier's lots show none. Contain the affected lots, restore 32-unit incoming "
-        "inspection, and confirm with a bench test of returned pumps."
+        "The evidence shows a time and lot association after the supplier and inspection changes: the rise sits in "
+        "lots 003 and 004, the first with NovaSense pressure sensors accepted under incoming inspection cut from 32 to "
+        "13 units per lot; sampled sensors in those lots read 4-6% high at the upper pressure range, and the earlier "
+        "supplier's lots show none. The cause is not yet confirmed: a bench test of returned pumps is still open. "
+        "Contain the affected lots, start a CAPA to restore 32-unit incoming inspection, and verify the supplier and "
+        "inspection controls with an effectiveness check."
     ),
     "recommended_actions": [
         "Contain OrbitCare 300 lots 003 and 004",

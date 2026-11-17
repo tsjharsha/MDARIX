@@ -24,7 +24,7 @@ from tests.test_w1_flagship import _flag, _intel, _ok, _purge
 
 pytestmark = pytest.mark.db
 
-RATIONALE = "The NovaSense sensors accepted under reduced inspection explain the pressure alarms."
+RATIONALE = "The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed."
 
 
 def _summary(user, case_id: str, status: int = 200):

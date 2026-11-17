@@ -44,7 +44,7 @@ const render = (node: ReactNode) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={api()}>{node}</WorkspaceContext.Provider>);
 
 const QUESTION = "Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?";
-const RATIONALE = "The NovaSense sensors accepted under reduced inspection explain the pressure alarms.";
+const RATIONALE = "The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed.";
 const SIGNED: DecisionSummary = {
   investigation: { id: "inv-1", ref: "SAMPLE-INV-001", question: QUESTION },
   decision: {

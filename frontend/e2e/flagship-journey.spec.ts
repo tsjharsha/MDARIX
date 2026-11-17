@@ -166,7 +166,7 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     if (await acknowledge.count()) await acknowledge.check();
     await decide
       .getByLabel("Your rationale (in your own words)")
-      .fill("The NovaSense sensors accepted under reduced inspection explain the pressure alarms.");
+      .fill("The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed.");
     await decide
       .getByRole("group", { name: "Root-cause attribution" })
       .getByRole("radio", { name: "Device-related" })
