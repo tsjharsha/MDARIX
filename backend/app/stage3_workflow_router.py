@@ -361,6 +361,7 @@ def create_interaction(
         import json
 
         from genai.ask import compact_context
+        from genai.grounding import context_records
 
         budget = provider.max_input * 4 - len(prompt) - 400
         model_context = grounded
@@ -370,8 +371,8 @@ def create_interaction(
             prompt,
             model_context,
             feature="ask",
-            # The records whose text is sent; a case's own context is not listed, so a trial is refused for it.
-            records=None if payload.investigation_id else search.get("records"),
+            # The records whose text is sent: the search's, and a case's own context (review G3).
+            records=(context_records(grounded) if payload.investigation_id else []) + list(search.get("records") or []),
             user_text=payload.prompt,
             max_output_tokens=ASK_MAX_OUTPUT_TOKENS,
         )

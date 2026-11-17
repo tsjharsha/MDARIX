@@ -98,6 +98,23 @@ def _filter(value: Any) -> Any:
     return value[:1000] if isinstance(value, str) else value
 
 
+def context_records(context: dict[str, Any]) -> list[dict[str, Any]]:
+    """The records whose text a case context (``build_authorized_context``) carries, for the free-trial sample check
+    (``genai/sample_gate.py``, review G3): the investigation, its changes and every evidence record (whose title and
+    chunk text are sent). The rest of the context is identifiers, states and dates (``ALLOWED_KEYS``)."""
+    records: list[dict[str, Any]] = []
+    investigation_id = (context.get("investigation") or {}).get("id")
+    if investigation_id:
+        records.append({"table": "investigations", "id": str(investigation_id)})
+    for change in (context.get("product_context") or {}).get("changes") or []:
+        if isinstance(change, dict) and change.get("id"):
+            records.append({"table": "changes", "id": str(change["id"])})
+    for item in context.get("evidence_context") or []:
+        if isinstance(item, dict) and item.get("id"):
+            records.append({"table": "evidence", "id": str(item["id"]), "evidence_id": item.get("evidence_identifier")})
+    return records
+
+
 def source_provenance(context: dict[str, Any]) -> list[dict[str, Any]]:
     """Return citation metadata without copying evidence text into API metadata."""
     return [
@@ -258,6 +275,8 @@ def advisory(
             feature=feature,
             system=ADVISORY_SYSTEM,
             evidence=evidence,
+            records=context_records(grounded_context),
+            user_text=question,
         )
     except GenAIUnavailable as exc:
         refusal = exc.refusal()

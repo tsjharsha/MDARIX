@@ -587,12 +587,10 @@ def _all_sample_ids(tenant_id, table: str) -> list:
     model = sample_gate._model_for(table)
     with SessionLocal() as db:
         bind_system(db, "test")
-        return [
-            row_id
-            for (row_id,) in db.query(model.id).filter(
-                model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE
-            )
-        ]
+        query = db.query(model.id).filter(model.tenant_id == tenant_id, model.source_system == SAMPLE_SOURCE)
+        if table == "complaints":  # not the edited copies other tests here make (_copy)
+            query = query.filter(~model.complaint_identifier.like("COPY-%"))
+        return [row_id for (row_id,) in query]
 
 
 @pytest.mark.parametrize("table", ["complaints", "investigations", "evidence", "changes"])
@@ -601,7 +599,7 @@ def test_every_unedited_sample_record_passes_the_gate(trial, table):
     ("Customer reported {symptom} on {revision}, lot {lot}."), passes; 28 of 44 complaints were refused before."""
     ids = _all_sample_ids(trial["tenant_id"], table)
     if table == "complaints":
-        assert len(ids) >= 44, "the sample story has at least 44 complaints"
+        assert len(ids) == 44, "the sample story has 44 complaints"
     assert ids
     refused = {}
     for record_id in ids:
@@ -623,3 +621,52 @@ def test_a_built_sentence_with_real_text_typed_into_a_part_is_refused():
     assert not sample_gate.matches_catalogue(built.replace("pressure alarm during infusion", "Asha Rao, 98450 12345"))
     assert not sample_gate.matches_catalogue(built.replace("SAMPLE-ORBIT-300-LOT-003", "lot of a real patient"))
     assert not sample_gate.matches_catalogue(built + " Patient called back at home.")
+
+
+@pytest.fixture
+def case_features_on(monkeypatch, trial, chain_on):
+    """Ask and case analysis switched on for the trial (on top of chain_on)."""
+    monkeypatch.setenv("MDARIX_AI_FEATURES", "summaries,ask,case_analysis")
+    _set_tenant(trial["tenant_id"], ai_processing_allowed=True, ai_features={"ask": True, "case_analysis": True})
+    return chain_on
+
+
+def _sample_case(tenant_id):
+    from backend.app.db.models.foundation import Investigation
+
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        return (
+            db.query(Investigation.id)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .scalar()
+        )
+
+
+def test_ask_inside_the_sample_case_reaches_the_trial_chain(trial, case_features_on):
+    """Review G3: Ask in a case listed no records, so a trial was always refused ("AI available on paid plans")."""
+    response = trial["client"].post(
+        "/api/v1/stage3/interactions",
+        json={
+            "prompt": "What changed before the pressure alarms rose?",
+            "investigation_id": str(_sample_case(trial["tenant_id"])),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert case_features_on == [FREELLMAPI], response.json()
+
+
+def test_the_case_advisory_lists_the_case_records_and_reaches_the_trial_chain(trial, case_features_on):
+    from genai.grounding import advisory, build_authorized_context, context_records
+
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        grounded = build_authorized_context(
+            db, tenant_id=trial["tenant_id"], investigation_id=_sample_case(trial["tenant_id"])
+        )
+    tables = {item["table"] for item in context_records(grounded)}
+    assert {"investigations", "evidence"} <= tables
+    with governance.tenant_scope(trial["tenant_id"], trial["user_id"]):
+        result = advisory(workflow="INVESTIGATION_SYNTHESIS", deterministic_result={}, grounded_context=grounded)
+    assert result.get("code") != "GENAI_TRIAL_SAMPLE_ONLY", result
+    assert case_features_on == [FREELLMAPI]
