@@ -6,7 +6,7 @@ summary is returned for human review.
 """
 
 from __future__ import annotations
-import json, os, re, time
+import json, os, re, threading, time
 from dataclasses import dataclass, replace
 from urllib import error as urlerror, request
 import logging
@@ -45,9 +45,12 @@ OPENAI_COMPATIBLE = {
 # The free-trial chain (MDARIX_AI_TRIAL_CHAIN, empty by default = off): the providers a Free Trial organization's
 # sample-data requests may go to, in order. A paid organization never uses it (genai/vetted.py has the register).
 TRIAL_CHAIN_SETTING = "MDARIX_AI_TRIAL_CHAIN"
-TRIAL_TIMEOUTS = {"freellmapi": 30}
-TRIAL_DEFAULT_TIMEOUT = 20
-TRIAL_DEADLINE_SECONDS = 60.0
+# A trial request is a person's click on the sample (review G4): each provider gets a short wait and the whole chain
+# at most TRIAL_DEADLINE_SECONDS; a provider that failed rests (REST_SECONDS) and is skipped until then, so the next
+# click does not wait for it again. When every provider rests or fails, the answer is GENAI_AI_BUSY at once.
+TRIAL_TIMEOUTS = {"freellmapi": 15}
+TRIAL_DEFAULT_TIMEOUT = 10
+TRIAL_DEADLINE_SECONDS = 20.0
 # Seconds a trial-chain provider rests after each kind of failure (genai/provider.py _classify).
 REST_SECONDS = {"UNAVAILABLE": 60.0, "RATE_LIMITED": 900.0, "KEY_REFUSED": 3600.0, "UPSTREAM_NOT_VETTED": 3600.0}
 ORGANISATION_TRIAL = "TRIAL"
@@ -162,6 +165,11 @@ REFUSAL_MESSAGES = {
     # A free trial's person whose own AI flag a Platform Administrator set INACTIVE.
     "GENAI_USER_AI_INACTIVE": "AI is not enabled for your account, so MDARIX answered from its rules.",
     # Free trials use AI on the sample data only (owner decision AI-D14a): never on the trial's own records.
+    # Every trial-chain provider failed or is resting after a failure: answered at once, not after a long wait.
+    "GENAI_AI_BUSY": (
+        "AI is busy right now, so MDARIX answered from its rules; where the sample has a recorded AI answer it is "
+        "still shown, marked as recorded. Please try again in a minute."
+    ),
     "GENAI_TRIAL_SAMPLE_ONLY": (
         "AI available on paid plans. In the free trial, AI works on the sample data only, so MDARIX answered "
         "from its rules."
@@ -495,12 +503,16 @@ class GenAIProvider:
         if not chain:
             governance.count_refusal(access.tenant_id)
             raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED: no usable provider in the trial chain")
+        # Resting providers are skipped, not tried last (review G4): one that just failed would only fail again.
         resting_until = _resting_until()
-        resting = [provider for provider in chain if resting_until.get(provider.provider_name, 0) > time.time()]
-        ordered = [provider for provider in chain if provider not in resting] + resting
+        ordered = [provider for provider in chain if resting_until.get(provider.provider_name, 0) <= time.time()]
+        if not ordered:
+            governance.count_refusal(access.tenant_id)
+            raise GenAIUnavailable("GENAI_AI_BUSY: every trial provider is resting after a failure")
         deadline = time.monotonic() + TRIAL_DEADLINE_SECONDS
         attempts: list[dict] = []
-        for position, provider in enumerate(ordered, start=1):
+        for provider in ordered:
+            position = chain.index(provider) + 1
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 attempts.append({"provider": provider.provider_name, "outcome": "DEADLINE"})
@@ -528,7 +540,7 @@ class GenAIProvider:
             )
             return _finish(access, call, result)
         _record_failure(access, call, attempts, ORGANISATION_TRIAL, "trial")
-        raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: trial chain ({len(attempts)} tried)")
+        raise GenAIUnavailable(f"GENAI_AI_BUSY: trial chain ({len(attempts)} tried)")
 
     def _payload(
         self,
@@ -820,22 +832,41 @@ class _Failover(Exception):
         return cls("UNAVAILABLE", status)
 
 
+# When this process last alerted about a trial provider being down (UNAVAILABLE), by provider name.
+_DOWN_ALERTED_AT: dict[str, float] = {}
+DOWN_ALERT_SECONDS = 3600.0
+
+
 def _after_failure(name: str, kind: str) -> None:
-    """Rest a failed trial provider for its kind of failure; tell the operators about a key or upstream problem."""
+    """Rest a failed trial provider for its kind of failure; tell the operators about a key or upstream problem, and
+    (at most once an hour per process) about a provider that is down (review G10: a down gateway was silent)."""
     seconds = REST_SECONDS.get(kind)
     if seconds:
         _rest(name, seconds, kind)
     if kind in ("KEY_REFUSED", "UPSTREAM_NOT_VETTED"):
-        try:
-            from backend.app.alerts import send_alert
+        advice = "Check its key, or the upstreams configured in it against the vetted-provider register."
+    elif kind == "UNAVAILABLE" and time.time() - _DOWN_ALERTED_AT.get(name, 0.0) >= DOWN_ALERT_SECONDS:
+        # shortcut: once an hour per process (each worker may alert once); share it across processes if that is noisy.
+        _DOWN_ALERTED_AT[name] = time.time()
+        advice = "It did not answer: check that the gateway runs on the server and the forwarders are healthy."
+    else:
+        return
+    body = f"Trial AI provider {name} failed with {kind}; it rests for {int(seconds or 0)} seconds. {advice}"
+    _alert_beside_the_request(body)
 
-            send_alert(
-                "Trial AI provider problem",
-                f"Trial AI provider {name} failed with {kind}; it rests for {int(seconds or 0)} seconds. "
-                "Check its key, or the upstreams configured in it against the vetted-provider register.",
-            )
-        except Exception:
-            logger.exception("Trial AI provider alert could not be sent")
+
+def _alert_beside_the_request(body: str) -> None:
+    """Sent in its own thread: a person's click does not wait for the alert channel (webhook up to 10 s)."""
+    threading.Thread(target=_send_provider_alert, args=(body,), daemon=True).start()
+
+
+def _send_provider_alert(body: str) -> None:
+    try:
+        from backend.app.alerts import send_alert
+
+        send_alert("Trial AI provider problem", body)
+    except Exception:
+        logger.exception("Trial AI provider alert could not be sent")
 
 
 def _finish(access, call: _Call, result: GenAIResult) -> GenAIResult:

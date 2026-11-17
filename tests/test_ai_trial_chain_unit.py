@@ -30,6 +30,9 @@ from tests.fake_ai_gateway import register as _register
 def chain(monkeypatch):
     """The trial chain FreeLLMAPI -> OmniRoute -> Groq, all configured with test keys; every request recorded."""
     provider_module._COOLDOWN_UNTIL.clear()
+    provider_module._DOWN_ALERTED_AT.clear()
+    # The operator alert runs in its own thread in the app; here it runs inline so a test can see it.
+    monkeypatch.setattr(provider_module, "_alert_beside_the_request", provider_module._send_provider_alert)
     monkeypatch.setenv("MDARIX_GENAI_SHARED_REST", "false")
     monkeypatch.setenv("MDARIX_AI_FEATURES", "ask,summaries,case_analysis")
     monkeypatch.setenv("MDARIX_AI_TRIAL_CHAIN", "freellmapi,omniroute,groq")
@@ -202,8 +205,45 @@ def test_omniroute_names_its_upstream_in_headers_not_in_the_body_model(monkeypat
 def test_every_provider_failing_gives_the_rules_answer(chain):
     with pytest.raises(GenAIUnavailable) as refused:
         _ask()
-    assert refused.value.code == "GENAI_UNAVAILABLE"
+    assert refused.value.code == "GENAI_AI_BUSY"
+    assert "AI is busy" in refused.value.user_message and "try again" in refused.value.user_message
     assert chain["state"]["sent"] == [FREELLMAPI, OMNIROUTE, GROQ]
+
+
+def test_resting_providers_are_skipped_and_the_next_click_answers_at_once(chain, monkeypatch):
+    """Review G4: resting providers were only moved to the end, so every click waited for each of them again."""
+    with pytest.raises(GenAIUnavailable):
+        _ask()
+    chain["state"]["sent"].clear()
+    started = provider_module.time.monotonic()
+    with pytest.raises(GenAIUnavailable) as refused:
+        _ask()
+    assert refused.value.code == "GENAI_AI_BUSY"
+    assert chain["state"]["sent"] == [], "a resting provider is not tried"
+    assert provider_module.time.monotonic() - started < 1.0
+    # One that rested and then answers is tried again, keeping its place in the chain.
+    provider_module._COOLDOWN_UNTIL.pop("omniroute")
+    chain["state"]["replies"][OMNIROUTE] = _Reply(_answer(), OMNI_CEREBRAS)
+    result = _ask()
+    assert chain["state"]["sent"] == [OMNIROUTE] and result.chain_position == 2
+
+
+def test_a_click_waits_at_most_twenty_seconds_for_the_whole_chain():
+    assert provider_module.TRIAL_DEADLINE_SECONDS <= 20
+    assert max(provider_module.TRIAL_TIMEOUTS.values()) <= 15 and provider_module.TRIAL_DEFAULT_TIMEOUT <= 10
+
+
+def test_a_down_provider_alerts_the_operators_once_an_hour(chain, monkeypatch):
+    """Review G10: a gateway that is down (UNAVAILABLE) was silent; now it alerts, at most hourly per provider."""
+    alerts = []
+    monkeypatch.setattr("backend.app.alerts.send_alert", lambda title, body: alerts.append(body))
+    with pytest.raises(GenAIUnavailable):
+        _ask()
+    assert len(alerts) == 3 and all("failed with UNAVAILABLE" in body for body in alerts)
+    provider_module._COOLDOWN_UNTIL.clear()
+    with pytest.raises(GenAIUnavailable):
+        _ask()
+    assert len(alerts) == 3, "not again within the hour"
 
 
 def test_the_total_deadline_ends_the_chain(chain, monkeypatch):
