@@ -31,7 +31,13 @@ type Flagship = {
   finished: boolean;
   product: { label: string; version: string | null };
   investigation: { id: string; ref: string };
-  capa: { id: string; ref: string; check_planned: boolean } | null;
+  capa: {
+    id: string;
+    ref: string;
+    check_planned: boolean;
+    check_status: string | null;
+    follow_up?: boolean;
+  } | null;
   branch: { complaint_id: string; ref: string } | null;
   mfa_verified: boolean | null;
 };
@@ -166,7 +172,9 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     if (await acknowledge.count()) await acknowledge.check();
     await decide
       .getByLabel("Your rationale (in your own words)")
-      .fill("The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed.");
+      .fill(
+        "The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed.",
+      );
     await decide
       .getByRole("group", { name: "Root-cause attribution" })
       .getByRole("radio", { name: "Device-related" })
@@ -195,6 +203,29 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     await expect(main(page)).toHaveText(/Do the same with your data/);
     await expect(page.getByText(/it worked/i)).toHaveCount(0);
     await shot(page, "fs-7-done");
+
+    // W1d (D04): planned -> synthetic follow-up -> signed. The person opens the check, reads the follow-up labelled
+    // synthetic, and signs the result they choose (here inconclusive) with password and authenticator code. Until
+    // then "Did it work?" stays too early; the step 7 tick stays on the planned check.
+    expect((await flagship(page)).capa?.follow_up).toBe(true);
+    await card(page)
+      .getByRole("button", { name: "Optional: review the synthetic follow-up and sign the effectiveness result" })
+      .click();
+    await settle(page);
+    const follow = page.getByRole("region", { name: "Synthetic follow-up (sample)" });
+    await expect(follow).toBeVisible({ timeout: 60_000 });
+    await expect(follow).toContainText("Synthetic, not real history");
+    await page.getByRole("radio", { name: /Inconclusive/ }).check();
+    await page.getByLabel("What you found").fill("One complaint in 750 unit-months on a short synthetic follow-up.");
+    await page.getByLabel("Your password").fill(owner.password);
+    await page.getByLabel("Authenticator code").fill(await freshCode(page, owner));
+    await page.getByRole("button", { name: "Sign the result" }).click();
+    await expect.poll(async () => (await flagship(page)).capa?.check_status, { timeout: 60_000 }).toBe("INCONCLUSIVE");
+    await page.goto("/app/getting-started");
+    await card(page).getByRole("button", { name: "Step 7: Action and impact" }).click();
+    await expect(card(page)).toContainText("Did it work? Signed: inconclusive");
+    await expect(page.getByText(/it worked/i)).toHaveCount(0);
+    await shot(page, "fs-7-signed");
 
     // The person's time: the step budgets fit 7 to 12 minutes; the machine's own run is recorded for the trace.
     const human = HUMAN_SECONDS.reduce((sum, value) => sum + value, 0);
