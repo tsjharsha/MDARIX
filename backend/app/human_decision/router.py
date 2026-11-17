@@ -704,7 +704,7 @@ def sign_decision(
         refuse(403, *rules.AUTHOR_DENIED)
     now = states.now_utc()
     planned = _resolve_follow_ups(control_db, case, payload, now)
-    governance.verify_signing_credentials(
+    mfa_verified = governance.verify_signing_credentials(
         control_db,
         ctx,
         password=payload.password,
@@ -980,8 +980,8 @@ def sign_decision(
                 "follow_ups": rules.follow_up_types(follow_up_actions),
                 "supersedes_decision_id": str(current.id) if current is not None else None,
                 "signer_role": role,
-                # A current authenticator code was checked for this signature when signatures require one.
-                "mfa_verified": _governance()._signing_mfa_required(),
+                # Whether a current authenticator code was checked for this signature.
+                "mfa_verified": mfa_verified,
             },
             created_at=now,
         )

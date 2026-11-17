@@ -175,6 +175,21 @@ def check_code(user, code: str, *, allow_recovery: bool) -> bool:
     return True
 
 
+def code_already_used(user, code: str) -> bool:
+    """True when ``code`` is a real authenticator code of this account that was already used (its step is at or before
+    the last accepted one), for example the code just typed at sign-in. It is still refused (each code works once);
+    the caller only words the refusal differently and does not count it as a wrong guess, since it proves the person
+    holds the authenticator."""
+    if not is_enrolled(user) or user.mfa_last_step is None:
+        return False
+    try:
+        secret = totp.decrypt_secret(user.mfa_secret_encrypted, str(user.id))
+    except totp.MfaUnavailable:
+        return False
+    step = totp.matching_step(secret, str(code or "").strip())
+    return step is not None and step <= user.mfa_last_step
+
+
 def reset(db, user, now: datetime) -> int:
     """Remove the user's authenticator and recovery codes (an administrator's recovery for a lost device).
 

@@ -438,7 +438,7 @@ def session_actor(db, ctx: AuthenticatedRequestContext):
 
 def verify_signing_credentials(
     db, ctx: AuthenticatedRequestContext, *, password: str | None, mfa_code: str | None, record_refusal
-) -> AuthUser | None:
+) -> bool:
     """Re-authenticate the signed-in person before an electronic signature or a controlled approval.
 
     The one check behind every signature-grade action (decision signing here, regulatory document approval in
@@ -447,8 +447,13 @@ def verify_signing_credentials(
     "sign" throttle (5 lock signing for 15 minutes); sign-in has its own lock, so signing cannot be used to guess
     passwords around it. Each refusal first rolls back ``db`` (whatever the request staged before the check is never
     committed with the refusal; the tenant scope is applied again when the next transaction begins), then calls
-    ``record_refusal(action)`` (the caller's audit event), is committed, and raises 403. Returns the signer (None for
-    a legacy in-process session that has no account).
+    ``record_refusal(action)`` (the caller's audit event), is committed, and raises 403. Returns True when an
+    authenticator code was checked and accepted for this signature, False when none was asked (signatures do not
+    require MFA): the signing audit event stores this as ``mfa_verified``.
+
+    A code that is real but already used (typically the one just typed at sign-in) is refused with
+    SIGNATURE_CODE_ALREADY_USED and does not count toward the lock: replay stays impossible (each code works once),
+    and a guess that is not a real code still counts.
 
     The codes are about this signature only (SIGNATURE_CODE_INVALID, SIGNATURE_MFA_NOT_SET_UP), never MFA_REQUIRED:
     that one means the sign-in still owes its second factor, and the browser leaves the page for it, losing what the
@@ -483,6 +488,18 @@ def verify_signing_credentials(
                     "message": "Set up an authenticator app (My Account > Security) before signing decisions",
                 },
             )
+        if mfa_code and mfa.code_already_used(signer, mfa_code):
+            # Replay stays refused, but it is not a wrong guess: no lock on stage after typing the sign-in code again.
+            db.rollback()
+            record_refusal("SIGNATURE_MFA_CODE_REUSED")
+            db.commit()
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "SIGNATURE_CODE_ALREADY_USED",
+                    "message": "This code was just used. Wait for the next code from your authenticator app.",
+                },
+            )
         if not mfa_code or not mfa.check_code(signer, mfa_code, allow_recovery=False):
             db.rollback()
             record_refusal("SIGNATURE_MFA_FAILED")
@@ -499,9 +516,12 @@ def verify_signing_credentials(
                     ),
                 },
             )
+        code_checked = True
+    else:
+        code_checked = False
     if signer is not None:
         mfa.record_success(db, signer, scope="sign")
-    return signer
+    return code_checked
 
 
 def _notify(helper: str, db, **details) -> bool:
@@ -649,7 +669,7 @@ def sign(
         raise HTTPException(403, detail={"code": code, "message": message})
     if not payload.remarks.strip():
         raise HTTPException(400, detail={"code": "REMARKS_REQUIRED", "message": "Remarks are required"})
-    verify_signing_credentials(
+    mfa_verified = verify_signing_credentials(
         db,
         ctx,
         password=payload.password,
@@ -733,8 +753,8 @@ def sign(
         actor["user_id"],
         "SIGNED_APPROVAL_CREATED" if payload.decision == "APPROVE" else "SIGNED_REJECTION_CREATED",
         item.id,
-        # A current authenticator code was checked for this signature (verify_signing_credentials) when required.
-        {"signature_id": str(record.id), "fingerprint": fingerprint, "mfa_verified": _signing_mfa_required()},
+        # Whether a current authenticator code was checked for this signature (verify_signing_credentials).
+        {"signature_id": str(record.id), "fingerprint": fingerprint, "mfa_verified": mfa_verified},
         request=request,
         reason=payload.remarks,
     )
@@ -990,12 +1010,6 @@ def signed_records(
             }
         )
     return {"items": items}
-
-
-def _signing_mfa_required() -> bool:
-    from backend.app import mfa
-
-    return bool(mfa.signatures_require_mfa())
 
 
 def _mfa_by_signature(db: Session, tenant_id, signature_ids) -> dict[str, bool]:

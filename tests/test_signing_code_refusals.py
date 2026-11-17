@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from backend.app import governance_router
+from backend.app import governance_router, mfa
 from backend.app.db.models.foundation import AuditEvent, AuthUser
 from backend.app.db.models.stage2 import LoginThrottle
 from backend.app.db.session import SessionLocal
@@ -117,13 +117,13 @@ def _verify(ctx, *, password=PASSWORD, code=None):
     with SessionLocal() as db:
         bind_system(db, "test: verify signing")
         try:
-            governance_router.verify_signing_credentials(
+            checked = governance_router.verify_signing_credentials(
                 db, ctx, password=password, mfa_code=code, record_refusal=refusals.append
             )
             db.commit()  # as the signing route does with its signature
         except HTTPException as refused:
             return refused.status_code, refused.detail, refusals
-    return 200, None, refusals
+    return 200, checked, refusals
 
 
 @pytest.mark.db
@@ -138,9 +138,37 @@ def test_a_wrong_blank_or_reused_code_is_a_signature_refusal(monkeypatch, signer
     assert status == 403 and detail["code"] == "SIGNATURE_CODE_INVALID"
     assert detail["message"] == "Enter the current code from your authenticator app."
     code = _next_code(secret)
+    assert _verify(ctx, code=code)[:2] == (200, True)  # D2: True means a code was checked, not the setting
+    status, detail, refusals = _verify(ctx, code=code)  # each code works once
+    assert status == 403 and detail["code"] == "SIGNATURE_CODE_ALREADY_USED"
+    assert detail["message"] == "This code was just used. Wait for the next code from your authenticator app."
+    assert refusals == ["SIGNATURE_MFA_CODE_REUSED"]
+
+
+@pytest.mark.db
+def test_typing_the_sign_in_code_again_never_locks_signing(monkeypatch, signer):
+    """Review C2: on stage the presenter re-types the code just used to sign in. It stays refused (no replay) but it is
+    not a wrong guess, so it never adds up to the 15-minute lock; real wrong guesses still count."""
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
+    ctx, secret = signer
+    code = _next_code(secret)
     assert _verify(ctx, code=code)[0] == 200
-    status, detail, _ = _verify(ctx, code=code)  # each code works once
-    assert status == 403 and detail["code"] == "SIGNATURE_CODE_INVALID"
+    for _ in range(mfa.MAX_FAILURES + 1):
+        assert _verify(ctx, code=code)[1]["code"] == "SIGNATURE_CODE_ALREADY_USED"
+    with SessionLocal() as db:
+        row = db.query(LoginThrottle).filter(LoginThrottle.identifier == f"sign:{ctx.user_id}").one_or_none()
+        assert row is None or (row.failure_count == 0 and row.locked_until is None)
+    assert _verify(ctx, code="000000")[1]["code"] == "SIGNATURE_CODE_INVALID"
+    with SessionLocal() as db:
+        assert (
+            db.query(LoginThrottle).filter(LoginThrottle.identifier == f"sign:{ctx.user_id}").one().failure_count == 1
+        )
+
+
+@pytest.mark.db
+def test_no_code_is_checked_when_signatures_do_not_require_one(monkeypatch, signer):
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
+    assert _verify(signer[0])[:2] == (200, False)
 
 
 @pytest.mark.db
