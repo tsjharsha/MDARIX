@@ -18,7 +18,8 @@ describe("platform administrator areas", () => {
     const counts = Object.entries(AREA_SECTIONS).map(([area, sections]) => [area, sections.length] as const);
     // 33, and Operations > Problem reports since 0.10.37 (FUN-07); Identity & Access > Onboarding moved to Trial
     // organizations > Requests (TO-1), an area of its own.
-    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(33);
+    // 34 with Security > Validation evidence (E2).
+    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(34);
     for (const [area, count] of counts) if (area !== DATA_AND_INTEGRATIONS) expect(count).toBeLessThanOrEqual(6);
   });
 

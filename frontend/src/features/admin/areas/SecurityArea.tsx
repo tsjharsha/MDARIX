@@ -20,6 +20,7 @@ import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatDay } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { PersonCell } from "./common";
+import { ValidationEvidence } from "../../validation/ValidationEvidence";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -50,6 +51,7 @@ export function SecurityArea({ section, onMessage }: { section: string; onMessag
   if (section === "Audit trail") return <AuditTrail />;
   if (section === "Support access") return <SupportAccess onMessage={onMessage} />;
   if (section === "Retention") return <Retention />;
+  if (section === "Validation evidence") return <ValidationEvidence canRecord />;
   return <Overview />;
 }
 

@@ -65,6 +65,7 @@ import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
 import { TrustSection } from "./Trust";
 import { EvidencePackCard, LatestSignatures } from "./TrustRecords";
+import { VALIDATION_EVIDENCE_PATH, ValidationEvidence } from "../../validation/ValidationEvidence";
 import { DocumentsPanel } from "./Documents";
 import { documentLink, parseDocumentLink } from "../documents";
 import { NEW_PLACES } from "../../../app/linkTable";
@@ -90,11 +91,14 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   const { session } = useWorkspace();
   const menu = (section: "Trust & Audit" | "Intelligence" | "Decisions") =>
     sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only);
+  // Validation evidence (E2) is offered to whom the server shows it: an administrator or the trial's owner.
+  const validation = useResource(VALIDATION_EVIDENCE_PATH).state === "ready";
   const tabs = NEW_RECORDS_TABS.filter(
     (item) =>
       (item !== "Audit trail" || menu("Trust & Audit")) &&
       (item !== "Documents" || menu("Intelligence")) &&
-      (item !== "Verify a signature" || menu("Decisions")),
+      (item !== "Verify a signature" || menu("Decisions")) &&
+      (item !== "Validation evidence" || validation),
   ) as NewRecordsTab[];
   const [target] = useState(() => parseRecordsTab(tab));
   const [auditView] = useState(() => recordsAuditView(tab));
@@ -136,6 +140,7 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
           </Embedded>
         </>
       )}
+      {active === "Validation evidence" && <ValidationEvidence />}
       {active === "Exports" && <Exports />}
     </Tabs>
   );
