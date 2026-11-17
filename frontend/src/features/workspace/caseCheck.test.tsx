@@ -125,7 +125,7 @@ describe("the Case check drawer (spec 4.4)", () => {
       "Add what they said later",
       "Correct a fact",
       "Provisional: US 30 days, due Wed 9 Dec 2026, 23:59 EST",
-      "The ten questions",
+      "The nine questions",
       "Suggestion",
       "a Yes on questions 1-3, and a repair is needed",
       "Your classification",
@@ -186,11 +186,15 @@ describe("the Case check drawer (spec 4.4)", () => {
     expect(html).not.toContain("This case becomes a complaint");
   });
 
-  it("after the escalation says the Case is a complaint and offers Next: Triage; a Service Desk agent cannot withdraw", () => {
-    const done = item({ status: "ESCALATED", draft: false, complaint_ref: "CASE-2026-000123", clock: null });
+  it("after the escalation says the Case is a complaint and offers Open the complaint; a Service Desk agent cannot withdraw", () => {
+    const done = item({ status: "ESCALATED", draft: false, complaint_ref: "CMP000045", clock: null });
     const html = render(<CheckBody item={done} guide={guide} onChanged={vi.fn()} />, ["case.log"]);
-    expect(html).toContain("CASE-2026-000123 is now a complaint");
-    expect(html).toContain("Next: Triage");
+    // G-04: a success message, one button to the complaint, and its number as a quiet line.
+    expect(html).toContain('role="status"');
+    expect(html).toContain("is now a complaint</h3>");
+    expect(html).toContain("Its complaint number is CMP000045.");
+    expect(html).toContain("Open the complaint");
+    expect(html).not.toContain("Next: Triage");
     expect(html).not.toContain("Withdraw: entered in error");
     expect(html).not.toContain("Waiting for internal team");
   });

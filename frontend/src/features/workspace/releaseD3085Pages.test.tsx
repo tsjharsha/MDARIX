@@ -335,7 +335,7 @@ describe("D3.10 Log a call opens in place, shorter, in the product's date format
     expect(html).toContain("The reporter&#x27;s words, as they said them");
     expect(html).toContain('<details class="ca-drawer-section uw-more" open=""><summary>What was said</summary>');
     expect(html).toContain("<summary>Customer</summary>");
-    expect(html).toContain("<summary>The ten questions: answer now, or at the Case check</summary>");
+    expect(html).toContain("<summary>The nine questions: answer now, or at the Case check</summary>");
     expect(html).toContain("Not in your products: type it");
     expect(wallClockText("2026-11-03T21:50")).toBe("Reads: 3 Nov 2026, 21:50");
   });
