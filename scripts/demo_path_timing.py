@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+from datetime import datetime, timedelta, timezone
 import subprocess
 import sys
 import time
@@ -117,6 +118,33 @@ def activation_token(approval: dict, email: str) -> str:
         return issue_invitation(db, user.id, user.tenant_id)
 
 
+def iso(hours: int = 0) -> str:
+    return (datetime.now(timezone.utc) + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def day(days: int) -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=days)).date().isoformat()
+
+
+def enroll_authenticator(w: Walk, owner: httpx.Client) -> str:
+    """Set up the trial owner's authenticator through the API, as a person does, so the walk can sign."""
+    from auth import totp
+
+    started = w.call(owner, "POST", "/api/v1/auth/mfa/enroll")
+    assert started.status_code == 200, started.text
+    secret = started.json()["secret"]
+    done = w.call(owner, "POST", "/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
+    assert done.status_code == 200, done.text
+    return secret
+
+
+def next_code(secret: str) -> str:
+    """The code of the next 30-second step: accepted once the current one was used (each code works once)."""
+    from auth import totp
+
+    return totp.code_at(secret, totp._step() + 1)
+
+
 def walk(w: Walk) -> None:
     public, admin, owner = httpx.Client(timeout=60), httpx.Client(timeout=60), httpx.Client(timeout=60)
     admin.cookies.set("mdarix_session", platform_admin_session())
@@ -138,6 +166,7 @@ def walk(w: Walk) -> None:
     signed_in = w.call(owner, "POST", "/api/v1/auth/signin", json={"email": email, "password": PASSWORD})
     assert signed_in.status_code == 200, signed_in.text
     tenant = approval["tenant_id"]
+    secret = enroll_authenticator(w, owner)
 
     w.step = "2 trial orgs"
     org = f"/api/v1/platform-admin/trial-organizations/{tenant}"
@@ -175,9 +204,15 @@ def walk(w: Walk) -> None:
         "POST",
         f"/api/v1/intake/{event['id']}/check/sign",
         "/intake/{id}/check/sign",
-        json={"classification": "COMPLAINT", "seen_version": event["version"], "password": PASSWORD},
+        json={
+            "classification": "COMPLAINT",
+            "seen_version": event["version"],
+            "password": PASSWORD,
+            "mfa_code": next_code(secret),
+        },
     )
-    complaint = signed.json().get("complaint_id") if signed.status_code == 200 else None
+    assert signed.status_code == 200, signed.text
+    complaint = signed.json().get("complaint_id")
     me = w.read(owner, "/api/v1/triage").json()["people"][0]["id"]
     if complaint:
         w.call(
@@ -219,7 +254,8 @@ def walk(w: Walk) -> None:
         owner,
         f"{inv}/workspace",
         "/investigations/{id}/workspace?as_of",
-        params={"temporal_mode": "known", "as_of": "2026-10-01T00:00:00Z", "retrieval_top_k": 8},
+        # Relative to the sample's day 0 (today): what was known an hour ago.
+        params={"temporal_mode": "known", "as_of": iso(hours=-1), "retrieval_top_k": 8},
     )
     for tail in ("readiness", "decisions", "evidence-inventory", "rca/fishbone", "intelligence/hypotheses"):
         w.read(owner, f"{inv}/{tail}", f"/investigations/{{id}}/{tail}")
@@ -253,7 +289,9 @@ def walk(w: Walk) -> None:
     w.step = "8 trust"
     w.read(owner, "/api/v1/admin/audit-history")
     w.read(owner, f"{inv}/trust/timeline", "/investigations/{id}/trust/timeline")
-    w.read(owner, "/api/v1/reviews/audit-trail", params={"from": "2026-10-05", "to": "2026-10-11"})
+    w.read(owner, "/api/v1/reviews/audit-trail", params={"from": day(-7), "to": day(0)})
+    w.read(owner, "/api/v1/governance/signed-records")
+    w.read(owner, "/api/v1/admin/audit-chain")
 
     w.step = "9 admin AI"
     w.read(admin, "/api/v1/platform-admin/ai/models")

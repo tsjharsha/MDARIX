@@ -54,3 +54,13 @@ def test_it_refuses_a_shared_or_non_demo_database(monkeypatch, database):
 @pytest.mark.parametrize("database", ["mdarix_whif_demo", "mdarix_demo_test"])
 def test_it_accepts_a_whif_demo_or_a_test_database(database):
     assert _script().checked_database(database) == database
+
+
+def test_the_walk_signs_with_the_next_code_and_seed_relative_dates():
+    from auth import totp
+
+    script = _script()
+    secret = totp.new_secret()
+    step = totp.matching_step(secret, script.next_code(secret), last_used_step=totp._step())
+    assert step == totp._step() + 1 or step == totp._step()  # accepted after the current code was used
+    assert script.day(0) == script.iso()[:10]
