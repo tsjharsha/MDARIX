@@ -287,6 +287,10 @@ describe("screens", () => {
       <OverviewView investigationId="inv-1" caseLabel="INV-1" onView={() => undefined} methods />,
     );
     expect(html).toContain("HYP-1");
+    // G-12: the right plural, and no zero counts.
+    expect(html).toContain("<strong>1</strong> hypothesis</li>");
+    expect(html).not.toContain("hypothesiss");
+    expect(html).not.toContain("verified facts");
     // W1: never filled in; the candidates are listed.
     expect(html).toContain("Version not known (unverified)");
     expect(html).toContain("Candidates released by then: Rev A");

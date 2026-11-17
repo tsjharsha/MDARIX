@@ -40,6 +40,14 @@ import {
 } from "../../rca";
 import { DrawerActions, DrawerError, Problem, ReasonField, useSend } from "./shared";
 
+const OVERVIEW_TAGS: ReadonlyArray<[string, string]> = [
+  ["Verified fact", "verified facts"],
+  ["Source assertion", "source assertions"],
+  ["Hypothesis", "hypotheses"],
+  ["Contradiction", "contradictions"],
+  ["Unknown", "unknowns"],
+  ["5 Whys", "5 Whys"],
+];
 const CONFIRMED_NOTE = "Each possible cause is a hypothesis. Only a signed decision confirms a cause.";
 
 // ---------------------------------------------------------------------------------------------------- overview
@@ -98,9 +106,10 @@ export function OverviewView({
           person signs a decision.
         </p>
         <ul className="rca-counts" aria-label="What the overview holds">
-          {["Verified fact", "Source assertion", "Hypothesis", "Contradiction", "Unknown", "5 Whys"].map((tag) => (
+          {/* Only what the case holds, each in its plural (review G-12: "3 hypothesiss", "0 verified facts"). */}
+          {OVERVIEW_TAGS.filter(([tag]) => count(tag) > 0).map(([tag, plural]) => (
             <li key={tag}>
-              <strong>{count(tag)}</strong> {tag === "5 Whys" ? tag : `${tag.toLowerCase()}s`}
+              <strong>{count(tag)}</strong> {count(tag) === 1 && tag !== "5 Whys" ? tag.toLowerCase() : plural}
             </li>
           ))}
         </ul>
