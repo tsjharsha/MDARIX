@@ -83,6 +83,10 @@ def test_an_unreviewed_model_result_is_not_used_and_an_accepted_one_is(monkeypat
         accepted = _review(client, row_id, decision="ACCEPTED")
         assert accepted.status_code == 200, accepted.text
         assert accepted.json()["decision"] == "ACCEPTED" and accepted.json()["reviewer"]
+        # A4: who decided and when, by name, on the decision and in its history.
+        assert accepted.json()["reviewer_name"] == "Legacy Test Auth" and accepted.json()["reviewed_at"]
+        listed = client.get(f"/api/v1/ai-outputs/{row_id}/reviews").json()["items"][0]
+        assert (listed["reviewer_name"], listed["reviewed_at"]) == ("Legacy Test Auth", accepted.json()["reviewed_at"])
         assert _latest_summary() == (str(row_id), "MODEL SUMMARY A")
         with SessionLocal() as db:
             bind_system(db, "test")
