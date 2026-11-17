@@ -146,8 +146,8 @@ def _require_acknowledgement(switching_on: bool, acknowledgement: bool) -> None:
 
 FREE_TRIAL_AI_REFUSAL = {
     "code": "AI_OFF_FOR_FREE_TRIALS",
-    "message": "AI stays off for free trials during the product validation phase, as the free trial agreement says. "
-    "It can be switched on once the organization continues on a paid plan.",
+    "message": "AI is not available for this free trial yet: MDARIX has not set up the free trial AI services. Once it "
+    "has, AI can be switched on here and works on the sample data only, as the free trial agreement says.",
 }
 
 
