@@ -203,9 +203,18 @@ export function CaseSections({
         )}
         {active === "Evidence" && (
           <>
-            <div className="uw-case-part" id={partId("evidence")}>
-              <CaseEvidencePanel key={id} investigationId={id} caseLabel={caseLabel} />
-            </div>
+            {/* Hero review 2: Ask leads when asked for (F-A3); the method tabs come first and the evidence table is
+                folded under them (F-R1), so the root-cause tools are on the first screen. */}
+            {part === "ask" && (
+              <div className="uw-case-part" id={partId("ask")}>
+                <Embedded>
+                  <AskMdarixPage
+                    investigationId={id}
+                    productVersionId={(work.view?.selected_version?.id as string | undefined) ?? undefined}
+                  />
+                </Embedded>
+              </div>
+            )}
             <div className="uw-case-part" id={partId("intelligence")}>
               <CaseIntelligencePanel
                 key={id}
@@ -216,12 +225,12 @@ export function CaseSections({
                 readOnly={readOnly}
               />
             </div>
-            <details
-              className="uw-more uw-case-part"
-              id={partId("analysis")}
-              open={part === "analysis" || part === "ask"}
-            >
-              <summary>The analysis workspace and Ask MDARIX</summary>
+            <details className="uw-more uw-case-part" id={partId("evidence")} open={part === "evidence"}>
+              <summary>The evidence records</summary>
+              <CaseEvidencePanel key={id} investigationId={id} caseLabel={caseLabel} />
+            </details>
+            <details className="uw-more uw-case-part" id={partId("analysis")} open={part === "analysis"}>
+              <summary>{part === "ask" ? "The analysis workspace" : "The analysis workspace and Ask MDARIX"}</summary>
               <Embedded>
                 <InvestigationWorkspacePanel
                   key={id}
@@ -236,12 +245,14 @@ export function CaseSections({
                   onOpenBrief={() => go("Decisions & actions", "brief")}
                 />
               </Embedded>
-              <Embedded>
-                <AskMdarixPage
-                  investigationId={id}
-                  productVersionId={(work.view?.selected_version?.id as string | undefined) ?? undefined}
-                />
-              </Embedded>
+              {part !== "ask" && (
+                <Embedded>
+                  <AskMdarixPage
+                    investigationId={id}
+                    productVersionId={(work.view?.selected_version?.id as string | undefined) ?? undefined}
+                  />
+                </Embedded>
+              )}
             </details>
           </>
         )}
