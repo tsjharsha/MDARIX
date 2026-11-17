@@ -262,6 +262,9 @@ describe("Reports: list views, six columns, cards on a phone", () => {
     expect(html).toContain("ms-cards");
     expect(html).toContain("Forms MDARIX prepares");
     expect(html).toContain("In MDARIX today");
+    // Hero review 2 (F-M3): every view with its count above the list, the open view pressed.
+    expect(html).toMatch(/<button type="button" class="selected" aria-pressed="true">Open reports · 1<\/button>/);
+    expect(html).toContain("Submitted this month · 0");
     // The list view in the address: /app/reports?view=my-approval opens "Waiting for my approval".
     const waiting = render(<ReportsSection />, api("?view=my-approval"));
     expect(waiting).toMatch(/<option value="Waiting for my approval" selected="">/);

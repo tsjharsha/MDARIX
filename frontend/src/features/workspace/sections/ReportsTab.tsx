@@ -175,6 +175,22 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
           </label>
         )}
       </div>
+      {/* Every view with its count, so a submitted report shows even while the list opens on the open ones (F-M3). */}
+      {list.data && (
+        <div className="ca-chips" role="group" aria-label="Reports by state">
+          {REPORT_VIEW_NAMES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={name === view ? "selected" : ""}
+              aria-pressed={name === view}
+              onClick={() => setCode(REPORT_VIEWS[name].code)}
+            >
+              {name} · {reportsInView(items, name).length}
+            </button>
+          ))}
+        </div>
+      )}
       <Panel title={listTitle(view, list.data ? rows.length : undefined)} source={list}>
         <Table
           caption={view}
