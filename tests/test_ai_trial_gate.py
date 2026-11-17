@@ -303,6 +303,10 @@ def test_the_platform_admin_sees_a_trials_ai_use_chain_and_switch_changes(trial,
         latest = body["switch_events"][0]
         assert latest["action"] == "TRIAL_USER_AI_ACCESS_CHANGED" and latest["reason"] == "Metrics test switch change"
         assert latest["new_values"] == {"ai_access": False} and latest["actor"]
+        # The person the switch changed, by name (the trial's AI panel: "<name>'s AI set Inactive").
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            assert latest["details"]["user_name"] == db.get(AuthUser, trial["user_id"]).display_name
         assert "Summarize" not in metrics.text, "metrics carry no prompt or record text"
     finally:
         _set_user(trial["user_id"], "ACTIVE")
@@ -372,8 +376,34 @@ def test_a_trial_admin_switches_ai_on_only_with_the_trial_acknowledgement(trial,
                 .first()
             )
             assert "sample data only" in event.details["trial_acknowledgement"]
+        # The Platform Administrator's Trial Organizations page follows the real state (TO-1, demo step 2).
+        admin, tenant = authenticated_client(), str(trial["tenant_id"])
+        with SessionLocal() as db:
+            bind_system(db, "test")
+            owner = db.get(AuthUser, trial["user_id"]).display_name
+        access = admin.get(f"{TRIALS}/{tenant}/users/ai-access").json()
+        assert access["organization_on"] is True and access["organization_on_by"] == owner
+        assert access["organization_on_at"] == event.created_at.isoformat()
+        detail = admin.get(f"{TRIALS}/{tenant}").json()["ai"]
+        assert detail["enabled"] is True and detail["people_active"] >= 1
+        assert detail["line"].startswith("AI is on for this trial") and "off" not in detail["line"]
+        row = next(item for item in admin.get(TRIALS, params={"q": tenant_key(tenant)}).json()["items"])
+        assert row["ai_on"] is True and row["ai_people_active"] >= 1
     finally:
         _set_tenant(trial["tenant_id"], ai_processing_allowed=False)
+    admin = authenticated_client()
+    off = admin.get(f"{TRIALS}/{trial['tenant_id']}/users/ai-access").json()
+    assert off["organization_on"] is False and off["organization_on_by"] is None and off["organization_on_at"] is None
+    detail = admin.get(f"{TRIALS}/{trial['tenant_id']}").json()["ai"]
+    assert detail == {"enabled": False, "people_active": 0, "line": "AI is off for this trial (trial terms)."}
+    row = admin.get(TRIALS, params={"q": tenant_key(str(trial["tenant_id"]))}).json()["items"][0]
+    assert row["ai_on"] is False and row["ai_people_active"] == 0
+
+
+def tenant_key(tenant_id: str) -> str:
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        return db.get(Tenant, uuid.UUID(tenant_id)).tenant_key
 
 
 def test_a_feature_is_turned_on_only_when_allowed_and_after_re_authentication(trial, monkeypatch):

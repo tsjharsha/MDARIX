@@ -42,7 +42,33 @@ CONVERT_KINDS = {"PILOT": "PILOT", "PAID": "CUSTOMER"}
 # The states the list filters by. ACTIVE, ENDING_SOON and ENDED come from the trials overview (story.py).
 LIST_STATES = ("ACTIVE", "ENDING_SOON", "ENDED", "ENDED_EARLY", "DATA_DELETED", "CONVERTED")
 GONE_STATUSES = ("ARCHIVED", "PURGING")
-AI_LINE = "AI is off for free trials (trial terms)."
+AI_OFF_LINE = "AI is off for this trial (trial terms)."
+
+
+def ai_by_tenant(db: Session, tenant_ids: list) -> dict:
+    """``{tenant id: {"on": organization switch, "people_active": active people with AI}}`` in one statement. A person
+    has AI only while the organization's switch is on too (AI-R 3.6.1), so ``people_active`` is 0 while it is off."""
+    found = {tenant_id: {"on": False, "people_active": 0} for tenant_id in tenant_ids}
+    if not tenant_ids:
+        return found
+    for tenant_id, on in db.query(Tenant.id, Tenant.ai_processing_allowed).filter(Tenant.id.in_(tenant_ids)):
+        found[tenant_id]["on"] = bool(on)
+    rows = (
+        db.query(AuthUser.tenant_id, func.count())
+        .filter(AuthUser.tenant_id.in_(tenant_ids), AuthUser.status == "ACTIVE", AuthUser.ai_access == "ACTIVE")
+        .group_by(AuthUser.tenant_id)
+    )
+    for tenant_id, count in rows:
+        if found[tenant_id]["on"]:
+            found[tenant_id]["people_active"] = int(count)
+    return found
+
+
+def ai_line(on: bool, people_active: int, people: int) -> str:
+    """The trial's AI in one sentence, from its real switches."""
+    if not on:
+        return AI_OFF_LINE
+    return f"AI is on for this trial: {people_active} of {people} people have AI, on sample data only."
 
 
 class TrialRefused(HTTPException):
@@ -339,7 +365,7 @@ def trial_list(db: Session, *, page=1, page_size=50, sort="", order="", state=""
 
 
 def _decorate(db: Session, items: list[dict], now: datetime) -> None:
-    """Add the extension used, the sample status and an early end to the overview's rows, in three statements."""
+    """Add the extension used, the sample status, the AI state and an early end to the overview's rows."""
     if not items:
         return
     ids = [uuid.UUID(item["tenant_id"]) for item in items]
@@ -353,6 +379,7 @@ def _decorate(db: Session, items: list[dict], now: datetime) -> None:
         subscriptions[row.tenant_id] = row
     tenants = db.query(Tenant).filter(Tenant.id.in_(ids)).all()
     samples = _sample_status(db, tenants)
+    ai = ai_by_tenant(db, ids)
     early = {
         row.trial_tenant_id
         for row in db.query(TrialExitRequest.trial_tenant_id).filter(
@@ -365,6 +392,7 @@ def _decorate(db: Session, items: list[dict], now: datetime) -> None:
             item["original_ends_at"] = original_end(subscription).isoformat()
             item["extension"] = {"used": extension_used(subscription), "max": EXTENSION_DAYS_MAX}
         item["sample"] = samples.get(tenant_id)
+        item["ai_on"], item["ai_people_active"] = ai[tenant_id]["on"], ai[tenant_id]["people_active"]
         item["ended_early"] = tenant_id in early
         if item["ended_early"] and item["state"] == "ENDED":
             item["state"] = "ENDED_EARLY"
@@ -501,6 +529,7 @@ def detail(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> di
     feedback = story._feedback_by_tenant(db, [tenant_id]).get(tenant_id)
     demo = story._demos_by_tenant(db, [tenant_id]).get(tenant_id)
     pending = _pending_exit(requests)
+    ai = ai_by_tenant(db, [tenant.id])[tenant.id]
     return {
         "tenant_id": str(tenant.id),
         "tenant_business_id": tenant.business_id,
@@ -528,7 +557,11 @@ def detail(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> di
         "conversion": _conversions(db, [tenant_id]).get(tenant_id) if converted else None,
         "next_step": _next_step(state, dates, reached, pending),
         "actions": actions_allowed(db, tenant, subscription, requests, state, now),
-        "ai": {"enabled": False, "line": AI_LINE},
+        "ai": {
+            "enabled": ai["on"],
+            "people_active": ai["people_active"],
+            "line": ai_line(ai["on"], ai["people_active"], seats),
+        },
     }
 
 

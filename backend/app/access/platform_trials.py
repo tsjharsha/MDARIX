@@ -261,9 +261,14 @@ def trial_users_ai_access(tenant_id: uuid.UUID, request: Request, db: Session = 
     admin = _require_platform_admin(request, db)
     tenant = _trial(db, tenant_id, admin, "AI_ACCESS_LIST")
     rows = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).order_by(AuthUser.display_name).all()
+    switched_on = _organization_switched_on(db, tenant) if tenant.ai_processing_allowed else None
+    by = _names(db, {switched_on.actor_ref}) if switched_on else {}
     return {
         # Both must agree (3.6.1): while the trial has not switched AI on, no user has AI.
         "organization_on": bool(tenant.ai_processing_allowed),
+        # Who switched it on, and when (the latest switch-on in the trial's audit trail); None while it is off.
+        "organization_on_by": by.get(str(switched_on.actor_ref), "MDARIX") if switched_on else None,
+        "organization_on_at": switched_on.created_at.isoformat() if switched_on and switched_on.created_at else None,
         "trial_chain_on": bool(trial_chain_names()),
         "items": [
             {
@@ -375,6 +380,8 @@ def trial_ai_metrics(tenant_id: uuid.UUID, request: Request, db: Session = Depen
         .all()
     )
     actors = _names(db, {event.actor_ref for event in events})
+    # The person a per-user switch changed, by name (entity_id is their account).
+    people = _names(db, {event.entity_id for event in events if event.action == "TRIAL_USER_AI_ACCESS_CHANGED"})
     return {
         "organization_on": bool(tenant.ai_processing_allowed),
         "usage": {
@@ -401,14 +408,34 @@ def trial_ai_metrics(tenant_id: uuid.UUID, request: Request, db: Session = Depen
                 "old_values": event.old_values,
                 "new_values": event.new_values,
                 "details": {
-                    key: value
-                    for key, value in (event.details or {}).items()
-                    if key in ("feature", "bulk", "count", "value", "source")
+                    **{
+                        key: value
+                        for key, value in (event.details or {}).items()
+                        if key in ("feature", "bulk", "count", "value", "source")
+                    },
+                    **(
+                        {"user_name": people.get(str(event.entity_id))}
+                        if event.action == "TRIAL_USER_AI_ACCESS_CHANGED"
+                        else {}
+                    ),
                 },
             }
             for event in events
         ],
     }
+
+
+def _organization_switched_on(db: Session, tenant: Tenant):
+    """The latest audit event that switched the organization's AI on."""
+    from backend.app.db.models.foundation import AuditEvent
+
+    events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.tenant_id == tenant.id, AuditEvent.action == "AI_PROCESSING_SETTING_CHANGED")
+        .order_by(AuditEvent.created_at.desc())
+        .limit(20)
+    )
+    return next((event for event in events if (event.new_values or {}).get("ai_processing_allowed") is True), None)
 
 
 def _names(db: Session, refs) -> dict[str, str]:
