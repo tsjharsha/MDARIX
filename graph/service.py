@@ -103,32 +103,52 @@ class RealityGraphService:
 
     def get_node(self, entity_type: str, entity_id: str, tenant_id: str | None = None) -> GraphNode:
         entity_type = self.clean_entity_type(entity_type)
-        try:
-            uuid.UUID(str(entity_id))
-        except ValueError:
-            # A malformed id names no node (404, as an unknown one), never a database error (500).
-            raise GraphError("NODE_NOT_FOUND", f"{entity_type} node not found") from None
-        tenant_id = tenant_id or self.tenant_id()
-        table, business_col, label_col = NODE_TYPES[entity_type]
+        return self.get_nodes([(entity_type, entity_id)], tenant_id or self.tenant_id())[(entity_type, str(entity_id))]
+
+    def get_nodes(self, keys, tenant_id: str) -> dict[tuple[str, str], GraphNode]:
+        """Every node of ``keys`` ([(entity type, id)]), one statement per entity type plus one for the source
+        counts (review P5: a case graph read two statements per node). NODE_NOT_FOUND when any is missing."""
+        wanted: dict[str, list[str]] = {}
+        for entity_type, entity_id in keys:
+            try:
+                uuid.UUID(str(entity_id))
+            except ValueError:
+                # A malformed id names no node (404, as an unknown one), never a database error (500).
+                raise GraphError("NODE_NOT_FOUND", f"{entity_type} node not found") from None
+            wanted.setdefault(entity_type, []).append(str(entity_id))
+        rows: dict[tuple[str, str], dict] = {}
         with self.connection() as conn:
-            row = (
-                conn.execute(
+            for entity_type, ids in wanted.items():
+                table, business_col, label_col = NODE_TYPES[entity_type]
+                found = conn.execute(
                     text(
-                        f"SELECT *, {business_col} AS business_identifier, {label_col} AS display_value FROM {table} WHERE tenant_id=:tenant_id AND id=:id"
+                        f"SELECT *, {business_col} AS business_identifier, {label_col} AS display_value FROM {table} "
+                        "WHERE tenant_id=:tenant_id AND id = ANY(CAST(:ids AS uuid[]))"
                     ),
-                    {"tenant_id": tenant_id, "id": entity_id},
+                    {"tenant_id": tenant_id, "ids": ids},
+                ).mappings()
+                rows.update({(entity_type, str(row["id"])): row for row in found})
+            counts = {
+                (row[0], str(row[1])): row[2]
+                for row in conn.execute(
+                    text(
+                        "SELECT canonical_entity_type, canonical_entity_id, count(*) FROM source_canonical_links "
+                        "WHERE tenant_id=:tenant_id AND canonical_entity_id = ANY(CAST(:ids AS uuid[])) "
+                        "GROUP BY canonical_entity_type, canonical_entity_id"
+                    ),
+                    {"tenant_id": tenant_id, "ids": [i for ids in wanted.values() for i in ids]},
                 )
-                .mappings()
-                .one_or_none()
-            )
-            if not row:
+            }
+        nodes = {}
+        for entity_type, entity_id in keys:
+            key = (entity_type, str(entity_id))
+            if key not in rows:
                 raise GraphError("NODE_NOT_FOUND", f"{entity_type} node not found")
-            source_count = conn.execute(
-                text(
-                    "SELECT count(*) FROM source_canonical_links WHERE tenant_id=:tenant_id AND canonical_entity_type=:entity_type AND canonical_entity_id=:id"
-                ),
-                {"tenant_id": tenant_id, "entity_type": entity_type, "id": entity_id},
-            ).scalar_one()
+            nodes[key] = self._node(entity_type, str(entity_id), tenant_id, rows[key], counts.get(key, 0))
+        return nodes
+
+    @staticmethod
+    def _node(entity_type: str, entity_id: str, tenant_id, row, source_count: int) -> GraphNode:
         return GraphNode(
             node_id=node_key(entity_type, entity_id),
             entity_type=entity_type,
@@ -179,8 +199,7 @@ class RealityGraphService:
         if target_entity_type:
             target_entity_type = self.clean_entity_type(target_entity_type)
         tenant_id = tenant_id or self.tenant_id()
-        start = node_key(entity_type, entity_id)
-        nodes = {start: self.get_node(entity_type, entity_id, tenant_id)}
+        found = [(entity_type, str(entity_id))]
         rels: dict[str, GraphRelationship] = {}
         queue = deque([(entity_type, entity_id, 0)])
         seen = {(entity_type, entity_id)}
@@ -210,10 +229,12 @@ class RealityGraphService:
                 if target_entity_type and adjacent[0] != target_entity_type:
                     continue
                 rels[rel.id] = rel
-                if adjacent not in seen and len(nodes) < MAX_NODES:
+                if adjacent not in seen and len(found) < MAX_NODES:
                     seen.add(adjacent)
-                    nodes[node_key(*adjacent)] = self.get_node(adjacent[0], adjacent[1], tenant_id)
+                    found.append((adjacent[0], str(adjacent[1])))
                     queue.append((adjacent[0], adjacent[1], current_depth + 1))
+        read = self.get_nodes(found, tenant_id)
+        nodes = {node_key(*key): read[key] for key in found}
         return self.response(nodes, rels, tenant_id, depth)
 
     def get_product_graph(self, product_id: str, depth: int = 2, tenant_id: str | None = None) -> GraphResponse:

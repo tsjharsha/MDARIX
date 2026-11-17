@@ -624,7 +624,9 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
                 "items": [],
             }
         checks.append(found)
-    counts: dict = {}
+    # Whether each kind of record exists, in one statement (it was one count per kind).
+    kinds = (Complaint, Capa, Product)
+    counts: dict = dict(zip(kinds, db.query(*(exists().where(m.tenant_id == tenant_id) for m in kinds)).one()))
     checks = [_no_records_yet(db, tenant_id, check, counts) for check in checks]
     states = [check["state"] for check in checks]
     return {
