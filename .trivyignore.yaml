@@ -140,3 +140,11 @@ vulnerabilities:
       not call GnuTLS: Python HTTPS uses OpenSSL and PostgreSQL connections use libpq/OpenSSL. Reassess when Debian
       publishes a fixed libgnutls30 package.
     expired_at: 2027-01-06
+  - id: CVE-2025-6020
+    statement: >-
+      Linux-PAM pam_namespace path traversal leading to local privilege escalation, in the libpam packages of the
+      Debian base image, with no Debian-fixed version. It needs a local login session that runs pam_namespace;
+      nobody logs in to MDARIX's containers, no PAM service is configured or started in them, and they run as the
+      non-root user with no-new-privileges and all capabilities dropped. Reviewed 17 Nov 2026 (owner sign-off);
+      remove once Debian ships a fixed libpam.
+    expired_at: 2027-01-06
