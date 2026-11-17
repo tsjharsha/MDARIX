@@ -30,6 +30,19 @@ import { chanceText, runPath, trendCountText, trendPath, trendResultLabel, type 
 import { useAiReady } from "../useAiStatus";
 import { RecordedChip } from "../../shared/AiReview";
 import { flagshipBarParts } from "./FlagshipBar";
+import { REGISTER_LINK, SAMPLE_REGISTER } from "./SampleRegister";
+
+/** W1d (D07): the six views of the sample investigation, named under Getting started's one main button. */
+export const SIX_VIEWS = [
+  "Product reality",
+  "Evidence",
+  "AI investigator",
+  "Investigation Brief",
+  "Decision and CAPA",
+  "Effectiveness and impact",
+] as const;
+/** W1d (D04): after step 7, the effectiveness check's synthetic follow-up waits for a person's signed result. */
+export const FOLLOW_UP_LINE = "Optional: review the synthetic follow-up and sign the effectiveness result";
 import {
   FLAGSHIP_STEPS,
   LOT_005_LINE,
@@ -39,6 +52,8 @@ import {
   summaryPlace,
   openFlagshipStep,
   casePlace,
+  didItWorkLine,
+  effectivenessStages,
   moreCasePlace,
   openStep,
   shownRun,
@@ -906,11 +921,18 @@ function FlagshipExtra({
     return (
       <ul className="uw-os-differ uw-flagship-lines">
         <li>{run.capa ? `CAPA ${run.capa.ref}: ${run.capa.title}` : "No CAPA recorded on the case yet"}</li>
-        <li>
-          {run.capa?.check_status
-            ? `Did it work? Signed: ${run.capa.check_status === "EFFECTIVE" ? "effective" : "not effective"}`
-            : "Did it work? Too early: only a signed effectiveness check says an action worked"}
-        </li>
+        <li>{didItWorkLine(run.capa)}</li>
+        {run.capa?.check_planned && (
+          <li>
+            <ol className="uw-flagship-stages" aria-label="Effectiveness check">
+              {effectivenessStages(run.capa).map((stage) => (
+                <li key={stage.label} className={stage.done ? "is-done" : undefined}>
+                  {stage.done && <Check size={12} aria-hidden="true" />} {stage.label}
+                </li>
+              ))}
+            </ol>
+          </li>
+        )}
         <li>
           <button type="button" className="ac-link" onClick={onRisk}>
             {RISK_LINE}
@@ -1012,7 +1034,20 @@ export function FlagshipView({
             </button>
           </div>
         )}
+        {/* W1d (D07): the six views the investigation walks through, a quiet strip, not buttons. */}
+        {fresh && (
+          <ul className="uw-gs-views" aria-label="What you will see">
+            {SIX_VIEWS.map((view) => (
+              <li key={view}>{view}</li>
+            ))}
+          </ul>
+        )}
         <p className="uw-gs-practice">{practiceLine(true)}</p>
+        <p className="uw-gs-register">
+          <button type="button" className="ac-link" onClick={() => go("Getting started", SAMPLE_REGISTER)}>
+            <ListChecks size={14} aria-hidden="true" /> {REGISTER_LINK}
+          </button>
+        </p>
         {!fresh && (
           <div className="uw-gs-prog" aria-hidden="true">
             <ProgressArc done={done} size={64} decorative />
@@ -1046,6 +1081,17 @@ export function FlagshipView({
             {SUMMARY_LINE}
           </button>
         </p>
+        {run.capa?.follow_up && !run.capa.check_status && (
+          <p className="uw-wt-hint">
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => openFlagshipStep(run, FLAGSHIP_STEPS - 1, go, work?.setInvestigationId)}
+            >
+              {FOLLOW_UP_LINE}
+            </button>
+          </p>
+        )}
         <div className="ca-action-row">
           {session?.sample_only ? (
             <button type="button" className="ac-primary uw-os-go" onClick={() => open("Next steps")}>

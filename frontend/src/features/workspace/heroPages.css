@@ -2036,3 +2036,12 @@
   font-size: 0.4em;
   font-weight: 400;
 }
+
+/* W1d (D07): the six-view strip and the register link inside the hero band. */
+.uw-hybrid .ac-main .uw-gs-band .uw-gs-views {
+  color: var(--ms-hero-muted);
+}
+.uw-hybrid .ac-main .uw-gs-band .uw-gs-head .uw-gs-register .ac-link {
+  color: var(--ms-hero-fg);
+  font-size: var(--ms-fs-12);
+}

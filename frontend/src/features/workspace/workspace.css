@@ -9491,3 +9491,78 @@ details.uw-team-change[open] {
     display: none;
   }
 }
+
+/* W1d (D07): the six views under Getting started's one main button, a quiet strip (no buttons). */
+.uw-gs-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.uw-gs-views li + li::before {
+  content: "·";
+  margin-right: 18px;
+  margin-left: -10px;
+  opacity: 0.6;
+}
+.uw-gs-head .uw-gs-register {
+  margin-top: 6px;
+}
+/* W1d (D04): step 7's planned -> follow-up -> signed line. */
+.uw-flagship-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ms-muted);
+}
+.uw-flagship-stages li.is-done {
+  color: var(--ms-ink-2);
+  font-weight: 600;
+}
+.uw-flagship-stages li + li::before {
+  content: "→";
+  margin-right: 10px;
+  color: var(--ms-muted);
+  font-weight: 400;
+}
+/* W1d (D04, D08): the synthetic follow-up on a check, and the sample evidence register. Flat (G-2). */
+.uw-ef-synthetic {
+  border-left: 3px solid var(--ms-warn-mark, var(--ms-line));
+  padding-left: var(--ms-space-4);
+}
+.uw-ef-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ms-space-3);
+  margin: 0;
+}
+.uw-ef-compare dt {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-ef-compare dd {
+  margin: 2px 0 0;
+  font-size: var(--ms-fs-16);
+  font-weight: 600;
+}
+.uw-reg .ac-panel {
+  font-size: var(--ms-fs-16);
+}
+.uw-reg-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2em;
+}
+.uw-reg-list small {
+  color: var(--ms-muted);
+}
