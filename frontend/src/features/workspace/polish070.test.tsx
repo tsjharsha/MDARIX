@@ -8,6 +8,7 @@ import { ProblemCode, problemCodeText } from "./sections/ProblemCode";
 import { attentionText } from "./sections/ComplaintPage";
 import { caseVersion, chosenInvestigation } from "./useWorkContext";
 import { CaseProgressLine } from "./sections/CaseHeader";
+import { caseSteps } from "./caseWorkflow";
 import { Panel } from "../admin/console/charts";
 
 // 0.10.70, "Polish before proof": the stage 8 leftovers.
@@ -136,6 +137,18 @@ describe("item 10: an investigation opened a moment ago never claims more than i
     const html = renderToStaticMarkup(<CaseProgressLine steps={[]} onSection={vi.fn()} />);
     expect(html).toContain("Reading where this investigation stands…");
     expect(html).not.toContain("Every step is done");
+  });
+  it("on the flagship story the Next step is secondary: the step's own action is the one main button", () => {
+    const steps = caseSteps({ steps: [{ key: "hypotheses", status: "IN_PROGRESS" }] } as never);
+    const line = (story: string | null) =>
+      renderToStaticMarkup(
+        <WorkspaceContext.Provider value={api(story)}>
+          <CaseProgressLine steps={steps} onSection={vi.fn()} />
+        </WorkspaceContext.Provider>,
+      );
+    expect(line(null)).toMatch(/class="ac-primary"[^>]*>Next: /);
+    expect(line("flagship")).toMatch(/class="ac-secondary"[^>]*>Next: /);
+    expect(line("flagship")).not.toContain("ac-primary");
   });
   it("a loading panel says it is reading: never an empty grey box", () => {
     const html = renderToStaticMarkup(
