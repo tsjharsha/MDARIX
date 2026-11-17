@@ -174,6 +174,9 @@ describe("Decision and impact summary", () => {
     expect(html).toContain("SAMPLE-RSK-01, SAMPLE-RSK-02");
     expect(html).toContain("Reassess SAMPLE-RSK-01");
     expect(html).toContain("Too early");
+    expect(html).toContain(
+      "The effectiveness check is planned for 15 Feb 2027. Only a signed check says an action worked.",
+    );
     expect(html).not.toMatch(/it worked|proven|eliminated/i);
     // The formal record: the question, the rationale, the AI proposal's reviews, the hypotheses, the dates.
     expect(html).toContain(QUESTION);

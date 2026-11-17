@@ -330,7 +330,7 @@ def summary(control_db: Session, db: Session, case, decision) -> dict:
             "versions": [
                 item.get("version_identifier") for item in scope.get("product_versions") or () if isinstance(item, dict)
             ],
-            "lots": [item.get("lot_number") for item in scope.get("lots") or () if isinstance(item, dict)],
+            "lots": sorted(item.get("lot_number") or "" for item in scope.get("lots") or () if isinstance(item, dict)),
             "markets": list(scope.get("markets") or ()),
             "complaints": scope.get("included_count"),
             "risks": _risks(db, case),

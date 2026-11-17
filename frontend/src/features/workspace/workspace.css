@@ -9308,6 +9308,7 @@ details.uw-team-change[open] {
   margin-bottom: var(--ms-space-4);
 }
 .uw-dsum-head h2 {
+  max-width: none;
   margin: 4px 0 6px;
   font-size: var(--ms-fs-24);
   line-height: 1.25;

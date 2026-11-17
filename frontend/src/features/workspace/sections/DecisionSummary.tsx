@@ -132,7 +132,7 @@ export function DecisionRecordParts({ data }: { data: DecisionSummary }) {
           {signature ? (
             <>
               {signature.name ?? NOT_RECORDED}
-              {signature.role_label ? ` (${signature.role_label})` : ""} ·{" "}
+              {signature.role_label ? `, ${signature.role_label}` : ""} ·{" "}
               {signature.signed_at ? formatDateTime(signature.signed_at, NOT_RECORDED) : NOT_RECORDED} ·{" "}
               {mfaText(signature.mfa_verified)} ·{" "}
               {signature.verification === "VALID"
@@ -291,7 +291,11 @@ export function DecisionSummaryView({
               }
             />
           </p>
-          <p>{worked?.text ?? NOT_RECORDED}</p>
+          <p>
+            {worked?.state === "TOO_EARLY" && worked.on
+              ? `The effectiveness check is planned for ${day(worked.on)}. Only a signed check says an action worked.`
+              : (worked?.text ?? NOT_RECORDED)}
+          </p>
         </article>
       </div>
       <details className="uw-more uw-dsum-more" open={recordOpen}>

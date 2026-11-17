@@ -154,7 +154,7 @@ def test_the_signed_record_shows_exactly_what_was_recorded(trial, monkeypatch):
     # What it affects: the brief's scope and the product's risk file.
     affects = body["affects"]
     assert affects["product"]["name"].startswith("OrbitCare 300") and affects["versions"] == ["Rev B"]
-    assert sorted(lot[-3:] for lot in affects["lots"]) == ["003", "004"]
+    assert [lot[-3:] for lot in affects["lots"]] == ["003", "004"]
     assert [risk["ref"] for risk in affects["risks"]] == ["SAMPLE-RSK-01", "SAMPLE-RSK-02"]
     # What happens next: the follow-up with its date, soonest first.
     assert body["next"][0]["what"] == "Reassess SAMPLE-RSK-01" and body["next"][0]["due"] == due.date().isoformat()
