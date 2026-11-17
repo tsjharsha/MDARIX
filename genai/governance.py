@@ -106,15 +106,19 @@ def _session(tenant_id: str):
     return db
 
 
-def usage(db, tenant_id, now: datetime | None = None) -> dict:
-    """This month's AI use for one organization, with its switch and budget (for administrators)."""
+def usage(db, tenant_id, now: datetime | None = None, *, trial: bool | None = None) -> dict:
+    """This month's AI use for one organization, with its switch and budget: the one figure that is enforced and shown
+    (a free trial's is ``trial_monthly_budget``, review G9). ``trial`` when the caller already knows the plan."""
     from backend.app.db.models.foundation import Tenant
     from backend.app.db.models.stage2 import AiUsageMonthly
 
     tenant = db.get(Tenant, uuid.UUID(str(tenant_id)))
     row = db.get(AiUsageMonthly, (uuid.UUID(str(tenant_id)), _month(now)))
     used = int(row.input_tokens + row.output_tokens) if row else 0
-    budget = monthly_budget(tenant.ai_monthly_token_budget if tenant else None)
+    own = tenant.ai_monthly_token_budget if tenant else None
+    if trial is None:
+        trial = _trial_or_paid(db, tenant_id)
+    budget = trial_monthly_budget(own) if trial else monthly_budget(own)
     return {
         "ai_processing_allowed": bool(tenant.ai_processing_allowed) if tenant else False,
         "monthly_token_budget": budget,
@@ -209,14 +213,10 @@ def check_allowed(estimated_tokens: int, *, feature: str | None = None, trial_ch
         from backend.app.db.models.foundation import Tenant
 
         trial = _trial_or_paid(db, tenant_id)
-        state = usage(db, tenant_id)
+        state = usage(db, tenant_id, trial=trial)
         tenant = db.get(Tenant, uuid.UUID(tenant_id))
         switches = dict((tenant.ai_features if tenant is not None else None) or {})
-        budget = (
-            trial_monthly_budget(tenant.ai_monthly_token_budget if tenant else None)
-            if trial
-            else state["monthly_token_budget"]
-        )
+        budget = state["monthly_token_budget"]
         if trial and not trial_chain_on:
             refusal = "GENAI_OFF_FOR_FREE_TRIAL"
         elif not state["ai_processing_allowed"]:

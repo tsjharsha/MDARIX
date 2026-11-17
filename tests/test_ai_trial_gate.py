@@ -670,3 +670,14 @@ def test_the_case_advisory_lists_the_case_records_and_reaches_the_trial_chain(tr
         result = advisory(workflow="INVESTIGATION_SYNTHESIS", deterministic_result={}, grounded_context=grounded)
     assert result.get("code") != "GENAI_TRIAL_SAMPLE_ONLY", result
     assert case_features_on == [FREELLMAPI]
+
+
+def test_the_trial_settings_screen_shows_the_allowance_that_is_enforced(trial):
+    """Review G9: the AI settings showed the paid default (2,000,000 tokens) while 200,000 was enforced."""
+    _set_tenant(trial["tenant_id"], ai_monthly_token_budget=None)
+    shown = trial["client"].get("/api/v1/admin/ai-settings")
+    assert shown.status_code == 200, shown.text
+    assert shown.json()["monthly_token_budget"] == governance.trial_monthly_budget(None) == 200_000
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        assert governance.usage(db, trial["tenant_id"])["monthly_token_budget"] == 200_000
