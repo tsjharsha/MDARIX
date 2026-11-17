@@ -52,6 +52,8 @@ NARRATIVE = {
         "Contain OrbitCare 300 lots 003 and 004",
         "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors",
         "Bench-test returned pumps from lots 003 and 004 at the upper pressure range",
+        # W1 (D8): new seeds and restarts only; a sealed brief is never edited.
+        "Reassess risk file entries SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor",
     ],
     "author_notes": (
         "Sample Decision Brief, written for the free trial: review it as the quality reviewer, then sign the decision."

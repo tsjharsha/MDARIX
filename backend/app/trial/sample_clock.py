@@ -142,9 +142,37 @@ def anchor_of(request) -> datetime | None:
     return None
 
 
+def _sample_ai_reviewed(data: Session, tenant_id) -> bool:
+    """W1: a person reviewed one of the sample's recorded AI proposals (the saved result or one of its observations)."""
+    from sqlalchemy import String, cast, or_, select
+
+    from backend.app.db.models.ai_records import AiOutputReview
+    from backend.app.db.models.evidence_intelligence import EvidenceObservation
+    from backend.app.db.models.foundation import AIExecution
+    from backend.app.trial.sample_ai import PROVIDER
+
+    sample = (AIExecution.tenant_id == tenant_id, AIExecution.provider == PROVIDER)
+    observations = select(cast(EvidenceObservation.id, String)).where(
+        EvidenceObservation.tenant_id == tenant_id,
+        EvidenceObservation.ai_execution_id.in_(select(AIExecution.id).where(*sample)),
+    )
+    return (
+        data.query(AiOutputReview.id)
+        .filter(
+            AiOutputReview.tenant_id == tenant_id,
+            or_(
+                AiOutputReview.subject_id.in_(select(cast(AIExecution.id, String)).where(*sample)),
+                AiOutputReview.subject_id.in_(observations),
+            ),
+        )
+        .first()
+        is not None
+    )
+
+
 def worked_on(data: Session, tenant_id) -> bool:
-    """Whether a person has acted on the sample (``story.acted_counts``, the organization's own uploads excluded, or
-    any work on calls)."""
+    """Whether a person has acted on the sample (``story.acted_counts``, the organization's own uploads excluded, a
+    review of the sample's recorded AI proposals, or any work on calls)."""
     from sqlalchemy import and_, or_
 
     from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, TriageRecord
@@ -152,6 +180,8 @@ def worked_on(data: Session, tenant_id) -> bool:
     from backend.app.trial.sample_data import SAMPLE_SOURCE
 
     if any(count for code, count in story.acted_counts(data, tenant_id).items() if code != "YOUR_DATA"):
+        return True
+    if _sample_ai_reviewed(data, tenant_id):
         return True
     # Work on calls (D11): a call, first-contact check or triage record of a person, or a sample one a person signed,
     # reviewed, escalated or completed (it keeps the sample's source; the sample author made and signed the others).
