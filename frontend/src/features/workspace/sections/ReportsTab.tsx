@@ -39,7 +39,7 @@ import {
   useCanReport,
 } from "./Reports";
 import { ListViewPicker } from "./Views";
-import { STARTER_LABEL } from "../../shared/standards";
+import { StarterNote } from "../../shared/Basis";
 import { AiCodeSuggestions, ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
 import { FollowUps } from "./FollowUps";
 import { MirFiles, MirNeeds } from "./MirFiles";
@@ -271,15 +271,11 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
                 </b>
                 <span>{form.title.replace(/ worksheet$/, "")}</span>
                 <span className="ac-muted">{versionWords(form.version)}</span>
-                {form.starter ? (
-                  <span className="ms-chip is-starter">{STARTER_LABEL}</span>
-                ) : (
-                  <ToneBadge tone="good" label="In MDARIX today" />
-                )}
+                {!form.starter && <ToneBadge tone="good" label="In MDARIX today" />}
               </div>
             ))}
           </div>
-          <p className="ac-muted">{list.data.starter_mark}</p>
+          {list.data.forms.some((form) => form.starter) && <StarterNote />}
         </section>
       )}
     </>
@@ -434,7 +430,6 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             ) : (
               detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>
             )}
-            {detail.form.starter && <span className="ms-chip is-starter">{STARTER_LABEL}</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
               <StateChip label={detail.state_label} />
             )}
@@ -527,13 +522,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                   </section>
                 ))}
               <SubmissionRecord detail={detail} />
-              <p className="ac-note">
-                {/* A starter form's chip says it is a starter (0.10.87). */}
-                {!detail.form.starter && detail.starter_mark ? `${detail.starter_mark} ` : ""}Field order:{" "}
-                {detail.form.source_document}.
-              </p>
+              <p className="ac-note">Field order: {detail.form.source_document}.</p>
             </div>
           </details>
+          {/* Every form's field map is MDARIX's default until confirmed: the mark once on the page (G-17). */}
+          <StarterNote />
         </div>
         <aside className="uw-rail" aria-label="What to do next">
           <section className="uw-card uw-card-pad uw-rail-next">

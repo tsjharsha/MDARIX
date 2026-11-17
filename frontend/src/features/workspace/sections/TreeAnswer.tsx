@@ -37,7 +37,8 @@ import { inData } from "../home";
 import { FormCard, SignCard } from "./TreeSign";
 import { OtherCountryPicker, OtherReportCard } from "./OtherCountries";
 import { RulesUsedPanel } from "./RuleRegister";
-import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
+import { isStarterVersion } from "../../shared/standards";
+import { StarterNote } from "../../shared/Basis";
 import "./decide.css";
 
 /** Whether the signed-in person's real role may answer and sign (regulatory review or approval), never the persona. */
@@ -318,10 +319,6 @@ export function MarketTree({
           <h2>{item.question_set.title}</h2>
           <span className="ac-muted">
             {tree?.version_label ?? item.question_set.version}
-            {/* The starter mark once: a version label that says it already gets no second chip (0.10.84). */}
-            {isStarterVersion(item.question_set.version) && !/consultant/i.test(tree?.version_label ?? "") && (
-              <span className="dt-tag is-starter"> {STARTER_LABEL}</span>
-            )}
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
           {other && (
@@ -424,6 +421,8 @@ export function MarketTree({
           />
         )}
         <RulesUsedPanel used={latest.rules_used} />
+        {/* The starter mark once on the page, never a chip per market, form or question (G-17). */}
+        {(isStarterVersion(item.question_set.version) || !!other || !!tree?.form?.starter) && <StarterNote />}
       </aside>
     </div>
   );

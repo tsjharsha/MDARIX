@@ -20,6 +20,7 @@ import { downloadFile } from "../../reports/download";
 import { useCan } from "../workspaceContext";
 import { Hero, InlineError } from "./boardParts";
 import { OwnText } from "./MarketAssessment";
+import { StarterNote } from "../../shared/Basis";
 import {
   GUIDES,
   NEW_EXTRA,
@@ -158,7 +159,7 @@ export function DecisionGuides() {
         ) : (
           <Empty title="No guide to show" detail="Each market's guide appears here." />
         )}
-        {list.data && <p className="ac-muted">{list.data.starter_mark}</p>}
+        {markets.some((item) => item.current.starter) && <StarterNote />}
       </Panel>
       {open && (
         <GuideDrawer
@@ -241,9 +242,8 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
         {view.state === "AWAITING_APPROVAL" && <MatrixCheck view={view} />}
         {view.editable && <Publish view={view} onChanged={setShown} canEdit={canEdit} />}
         <ApprovalRecord view={view} />
-        <p className="ac-muted">
-          {view.starter_mark} {view.scale_note}
-        </p>
+        <p className="ac-muted">{view.scale_note}</p>
+        {(view.starter || view.question_set.questions.some((question) => question.starter)) && <StarterNote />}
       </div>
     </Drawer>
   );
@@ -271,7 +271,7 @@ function QuestionTable({ view }: { view: GuideVersion }) {
                   <strong>{question.text}</strong>
                   {question.note && <p className="uw-hint">{question.note}</p>}
                   <OwnText question={question} />
-                  <span className="uw-ma-starter-chip">{questionMark(question)}</span>
+                  {questionMark(question) && <span className="uw-ma-starter-chip">{questionMark(question)}</span>}
                 </td>
                 <td>{question.clause || <span className="tone-critical">No clause</span>}</td>
                 <td>{question.basis.join(", ") || <span className="tone-critical">None</span>}</td>

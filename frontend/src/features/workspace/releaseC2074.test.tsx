@@ -23,6 +23,7 @@ import { SHORT_STORY_PATH, type ShortStory } from "./shortStory";
 import { Table } from "../customer-admin/shared";
 import { addressFor } from "./workspaceAddress";
 import { rv11 } from "../../test/rv11";
+import { STARTER_LABEL } from "../shared/standards";
 
 // 0.10.74, Release C part C2: list views and record pages (the approved design's viewComplaints, viewRecord,
 // viewInvestigations, viewRecords).
@@ -229,7 +230,9 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html.match(/class="ac-primary"/g)?.length).toBe(1);
     // Legal clocks: the work line's nearest deadline, as the list's urgency reads it.
     expect(rail).toContain("Due Tue 1 Dec 2026, 23:59 EST");
-    expect(rail).toContain("Starter rules, for your consultant to confirm.");
+    expect(rail).toContain(
+      `Each clock counts from awareness.</p><p class="ac-note uw-starter-note" role="note">${STARTER_LABEL}</p>`,
+    );
     // Who signs the next step, and the owner the list shows.
     expect(rail).toContain("Each market&#x27;s conclusion");
     expect(rail).toContain("Rahul Colleague");

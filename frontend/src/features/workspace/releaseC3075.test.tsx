@@ -19,6 +19,7 @@ import { treePlace } from "./sections/DecisionTrees";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { eventPath, type EventView } from "./oversight";
 import { PRACTICE_APPROVAL } from "./sections/PracticeApproval";
+import { STARTER_LABEL } from "../shared/standards";
 
 // 0.10.75, Release C part C3: the Decision trees and Reports tabs (the approved design's viewTrees, viewReports and
 // viewReport), and a complaint's page opening its decision path and its report.
@@ -297,13 +298,17 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html.split(NEVER_SUBMITS.replace(/'/g, "&#x27;")).length - 1).toBe(1);
   });
 
-  it("marks a starter form in the header with the one starter wording (0.10.84)", () => {
+  it("marks a starter form once, as the page's footnote, not as a header chip (G-17)", () => {
     const starter = report(0);
     resources.data[`${REPORTS}/r1`] = { ...starter, form: { ...starter.form, starter: true } };
     const html = render(<ReportsSection />, api("?report=r1"));
-    const chips = html.slice(html.indexOf('class="uw-cp-chips"'));
-    expect(chips).toContain('<span class="ms-chip is-starter">Starter, for your consultant to confirm</span>');
-    expect(html).not.toContain("Starter form, for your consultant to confirm");
+    const chips = html.slice(
+      html.indexOf('class="uw-cp-chips"'),
+      html.indexOf("</div>", html.indexOf('class="uw-cp-chips"')),
+    );
+    expect(chips).not.toContain(STARTER_LABEL);
+    expect(html.split(STARTER_LABEL).length - 1).toBe(1);
+    expect(html).not.toContain("consultant");
   });
 
   it("opens Send for approval once every mandatory field is filled", () => {

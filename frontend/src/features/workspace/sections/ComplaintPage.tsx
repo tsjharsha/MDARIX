@@ -26,7 +26,7 @@ import { DecisionRecord, OwnerPicker, ReadyForm } from "./Oversight";
 import { ProblemCode, useImdrfLinks } from "./ProblemCode";
 import { InlineError } from "./boardParts";
 import { type Lane } from "./WowCharts";
-import { WhyAsked } from "../../shared/Basis";
+import { StarterNote, WhyAsked } from "../../shared/Basis";
 import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
 import { ShortStoryPanel, useShortStory } from "./ShortStory";
@@ -811,7 +811,8 @@ function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventVie
         {!lanes.length && !without.length && !view.event.needs?.length && (
           <p className="ac-muted">No market to report to.</p>
         )}
-        <p className="ac-note">Each clock counts from awareness. Starter rules, for your consultant to confirm.</p>
+        <p className="ac-note">Each clock counts from awareness.</p>
+        <StarterNote />
       </details>
       <details className="uw-card uw-card-pad uw-rail-signs uw-cp-fold" open={!onPhone()}>
         <summary>

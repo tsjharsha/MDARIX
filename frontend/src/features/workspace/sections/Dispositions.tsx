@@ -1,9 +1,10 @@
 import { SampleDates } from "../../../app/chips";
 import { useState } from "react";
-import { WhyAsked } from "../../shared/Basis";
+import { StarterNote, WhyAsked } from "../../shared/Basis";
+import { isStarterVersion } from "../../shared/standards";
 import { DISPOSITION_WHY } from "../whyAsked";
 import { triggerLabel, versionWords } from "../../../app/labels";
-import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
+import { CheckCircle2, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { ImdrfCodes, RecordOrigin } from "./ImportReports";
@@ -682,9 +683,8 @@ export function DispositionPanel({
                 ))}
               </ol>
             </details>
-            <p className="uw-ma-starter" role="note">
-              <FileWarning size={15} aria-hidden="true" /> {screen.starter_mark}
-            </p>
+            {(isStarterVersion(screen.disposition_rules.version) ||
+              isStarterVersion(screen.coding_criteria.version)) && <StarterNote />}
 
             {canSign ? (
               <section className="ca-drawer-section uw-dp-sign">

@@ -19,7 +19,7 @@ import { collapsed } from "../complaintReview";
 import { InlineError } from "./boardParts";
 import { useCanDecide } from "./TreeAnswer";
 import { formName } from "./TreeSign";
-import { STARTER_LABEL } from "../../shared/standards";
+import { StarterNote } from "../../shared/Basis";
 
 /** One change between the version in use and the one prepared: what it is, and its text before and after. */
 export type GuideChange = { label: string; before: string; after: string };
@@ -481,12 +481,7 @@ function EditBody({
               {(inUse.test_results?.passed ?? 0) + (inUse.test_results?.failed ?? 0)} worked complaints pass
             </b>
           </p>
-          {form && (
-            <p className="ac-muted">
-              A reportable outcome creates the {formName(form.title)}
-              {form.starter ? ` (${STARTER_LABEL.toLowerCase()})` : ""}.
-            </p>
-          )}
+          {form && <p className="ac-muted">A reportable outcome creates the {formName(form.title)}.</p>}
           {!enabled && (
             <p className="ac-muted">Not in your reporting windows: add this market there to assess complaints.</p>
           )}
@@ -495,6 +490,9 @@ function EditBody({
             were given under.
           </p>
         </section>
+        {(shown.starter || shown.question_set.questions.some((question) => question.starter) || form?.starter) && (
+          <StarterNote />
+        )}
       </aside>
     </div>
   );

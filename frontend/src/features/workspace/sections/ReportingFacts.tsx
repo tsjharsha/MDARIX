@@ -2,7 +2,6 @@ import { useState } from "react";
 import { errorText, send } from "../../customer-admin/shared";
 import { InlineError } from "./boardParts";
 import { useCanReport } from "./Reports";
-import { STARTER_LABEL } from "../../shared/standards";
 
 /** A fact a reporting step needs and the complaint's record does not give (0.10.81, the server's facts.py). */
 export type FactNeed = {
@@ -65,9 +64,7 @@ export function ReportingFacts({
           <p>
             <b>{need.label} needed.</b> {need.message}
           </p>
-          <p className="ac-note">
-            Needed by {need.rule}. {STARTER_LABEL}.
-          </p>
+          <p className="ac-note">Needed by {need.rule}.</p>
           {canEnter && (
             <label>
               {need.label}{" "}

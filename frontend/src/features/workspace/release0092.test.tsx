@@ -213,12 +213,10 @@ describe("1.9: the new design's leftovers (A13-A16)", () => {
     expect(rule).toMatch(/^[^}]*var\(--ms-muted\) 50%/);
   });
 
-  it("gives every Starter label one look, in the warning tokens both themes check at 4.5:1 (A14)", () => {
-    expect(workspaceCss).toMatch(
-      /\.ms-chip\.is-starter,\n\.dt-tag\.is-starter \{\n {2}border: 1px solid var\(--ms-warn-line\);\n {2}background: var\(--ms-warn-bg\);\n {2}color: var\(--ms-warn\);/,
-    );
-    expect(reportsTab).not.toContain('<ToneBadge tone="neutral" label={STARTER_LABEL} />');
-    expect(reportsTab.match(/className="ms-chip is-starter">\{STARTER_LABEL\}/g)).toHaveLength(2);
+  it("has no Starter chip left: the starter mark is one footnote per page (G-17 replaces A14)", () => {
+    expect(workspaceCss).not.toContain(".is-starter");
+    expect(reportsTab).not.toContain("is-starter");
+    expect(reportsTab).not.toContain("STARTER_LABEL");
   });
 
   it("keeps a legal clock's lane calm while on track, amber only within seven days (A15)", () => {

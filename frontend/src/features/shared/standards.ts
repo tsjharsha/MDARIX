@@ -3,8 +3,12 @@
 // disclaimer once per page; references elsewhere (the sample story, the trial's citation themes) are built from it.
 import catalog from "./standards.json";
 
-/** The one wording of the starter mark, on starter content only (0.10.83, D2.9; usability U-11). */
-export const STARTER_LABEL = "Starter, for your consultant to confirm";
+/**
+ * The one wording of the starter mark, shown once per page as a footnote on starter content only (``StarterNote``;
+ * G-17, owner approval 17 Nov 2026). The server's ``starter_mark`` keeps the stored wording for exports and the rule
+ * register; screens show this one.
+ */
+export const STARTER_LABEL = "Default rules: confirm with your regulatory lead";
 
 /** A question set or guide version that is MDARIX's starter ("US-starter-1"), not the organization's approved one. */
 export const isStarterVersion = (code: string | null | undefined) => /starter/i.test(code ?? "");

@@ -3888,13 +3888,6 @@ div.uw-task-count:hover {
   background: var(--ac-page);
   font-weight: 600;
 }
-/* A starter text's label (consultant to confirm) looks the same on every page and in both themes (0.10.92, A14). */
-.ms-chip.is-starter,
-.dt-tag.is-starter {
-  border: 1px solid var(--ms-warn-line);
-  background: var(--ms-warn-bg);
-  color: var(--ms-warn);
-}
 .uw-ma-starter-chip {
   display: inline-block;
   margin-left: 6px;

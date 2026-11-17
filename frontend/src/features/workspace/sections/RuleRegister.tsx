@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BookOpenCheck } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, useResource } from "../../customer-admin/shared";
-import { BasisChips } from "../../shared/Basis";
+import { BasisChips, StarterNote } from "../../shared/Basis";
 import { Hero } from "./boardParts";
 import {
   STATE_LABELS,
@@ -47,7 +47,7 @@ export function RuleRegister() {
         }
         detail={
           summary
-            ? `All ${summary.starter_mark.charAt(0).toLowerCase()}${summary.starter_mark.slice(1)} A rule changes only by a new version with a date; a signed conclusion keeps the version it used.`
+            ? "A rule changes only by a new version with a date; a signed conclusion keeps the version it used."
             : "Reading the register…"
         }
       />
@@ -130,6 +130,8 @@ export function RuleRegister() {
             </table>
           </div>
         )}
+        {/* Every rule is MDARIX's starter (register.py checks each review note): the mark once (G-17). */}
+        {summary && <StarterNote />}
       </Panel>
       {open && <RuleDrawer code={open} onClose={() => setOpen(null)} />}
     </div>
@@ -148,7 +150,7 @@ function RuleDrawer({ code, onClose }: { code: string; onClose: () => void }) {
           <p>{rule.plain}</p>
           <p className="ac-muted">
             {rule.version_words} <code>{rule.code}</code> · {inForceText(rule)} · {STATE_LABELS[rule.state]} · held as{" "}
-            {rule.implementation_held.toLowerCase()} · {rule.starter_mark}
+            {rule.implementation_held.toLowerCase()}
           </p>
           {rule.logic && (
             <>
@@ -204,6 +206,7 @@ function RuleDrawer({ code, onClose }: { code: string; onClose: () => void }) {
               </li>
             ))}
           </ul>
+          <StarterNote />
         </div>
       )}
     </Drawer>

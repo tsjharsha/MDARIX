@@ -3,7 +3,7 @@ import { AlsoKnownAs, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { MARKET_QUESTION_WHY } from "../whyAsked";
 import { marketLabel, questionNumber, versionWords } from "../../../app/labels";
-import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
+import { BookOpenCheck, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { ReportingFacts } from "./ReportingFacts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -41,8 +41,8 @@ import {
 } from "../marketAssessment";
 import { InlineError } from "./boardParts";
 import { RulesUsedPanel } from "./RuleRegister";
-import { WhyAsked, BasisChips } from "../../shared/Basis";
-import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
+import { StarterNote, WhyAsked, BasisChips } from "../../shared/Basis";
+import { isStarterVersion } from "../../shared/standards";
 
 /** Whether the signed-in role may save and sign an assessment (regulatory review or approval: the server's rule). */
 function useCanAssess() {
@@ -198,12 +198,9 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
       </p>
       {detail.complaint.description && <q className="uw-cr-text">{detail.complaint.description}</q>}
       <AlsoKnownAs id={detail.complaint.business_id} shown={recordName(detail.complaint)} />
-      {/* Only on starter content: an approved guide of the organization is not marked (usability U-11). */}
-      {detail.markets.some((item) => isStarterVersion(item.question_set.version)) && (
-        <p className="uw-ma-starter" role="note">
-          <FileWarning size={15} aria-hidden="true" /> {detail.starter_mark}
-        </p>
-      )}
+      {/* Once per page, on starter content only: an approved guide of the organization is not marked (U-11, G-17). */}
+      {(isStarterVersion(detail.scale.version) ||
+        detail.markets.some((item) => isStarterVersion(item.question_set.version))) && <StarterNote />}
       {legacy && (
         <div className="uw-cr-decision">
           <ToneBadge tone="neutral" label={legacy.note} />
@@ -363,7 +360,6 @@ export function MarketPanel({
           <QuestionRow
             key={question.id}
             question={question}
-            version={item.question_set.version}
             entry={form.answers[question.id]}
             suggestion={item.suggestions?.[question.id]}
             disabled={!canDecide}
@@ -521,14 +517,12 @@ export function MarketPanel({
 
 function QuestionRow({
   question,
-  version,
   entry,
   suggestion,
   disabled,
   onChange,
 }: {
   question: Question;
-  version: string;
   entry: AnswerEntry | undefined;
   suggestion?: Suggestion_;
   disabled: boolean;
@@ -555,8 +549,6 @@ function QuestionRow({
           <span className="uw-basis-chip">{question.clause}</span> <BasisChips ids={question.basis} label="Basis" />
           {question.extra ? (
             <span className="uw-ma-starter-chip">Your extra question: optional, never changes the suggestion</span>
-          ) : question.starter && isStarterVersion(version) ? (
-            <span className="uw-ma-starter-chip">{STARTER_LABEL}</span>
           ) : question.starter ? null : (
             <span className="uw-ma-starter-chip">Your wording</span>
           )}
@@ -733,8 +725,7 @@ export function ScalePanel({
   return (
     <section className="ca-drawer-section uw-ma-scale" aria-label="Harm-severity scale">
       <h3>
-        <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}{" "}
-        <span className="uw-ma-starter-chip">{STARTER_LABEL}</span>
+        <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}
       </h3>
       <button
         type="button"
@@ -1110,11 +1101,7 @@ export const WHY_ASSESSED =
   "Assessed because your procedure asks every market where this device is sold to be assessed.";
 
 export function WhyAssessed() {
-  return (
-    <p className="uw-cr-meta uw-why-assessed">
-      {WHY_ASSESSED} <em>{STARTER_LABEL}.</em>
-    </p>
-  );
+  return <p className="uw-cr-meta uw-why-assessed">{WHY_ASSESSED}</p>;
 }
 
 /** Whether a receipt line is the conclusion of a market other than the event's own ("Market conclusion, India

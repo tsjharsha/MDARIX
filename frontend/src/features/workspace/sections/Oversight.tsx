@@ -4,6 +4,7 @@ import { DeadlineChip, SampleDates } from "../../../app/chips";
 import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { WhyAssessed, otherMarketLine } from "./MarketAssessment";
+import { StarterNote } from "../../shared/Basis";
 import { AlertTriangle, CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
@@ -688,6 +689,8 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
       ) : (
         <p className="ac-muted">No decision on this event is signed yet.</p>
       )}
+      {/* The "why assessed" line is MDARIX's default wording: its mark once, under the record (G-17). */}
+      {record.entries.some((entry) => otherMarketLine(entry.kind, view.event.market)) && <StarterNote />}
       <p className="uw-receipt-total">
         <span>
           {record.entries.length} signed {record.entries.length === 1 ? "decision" : "decisions"}
