@@ -201,46 +201,56 @@ export function EventVersions({ investigationId }: { investigationId: string }) 
   const items = listOf(data.data?.items) as EventVersion[];
   if (data.state === "ready" && !items.length)
     return <Empty title="No complaints in scope" detail="Add complaints to the scope to see their versions." />;
+  const kind = (item: EventVersion) =>
+    [versionWords(item).version, versionWords(item).source, item.flags.map((flag) => flag.code).join()].join("|");
+  const shown = items.filter((item, index) => items.findIndex((other) => kind(other) === kind(item)) === index);
+  const same = items.filter((item) => !shown.includes(item));
+  const row = (item: EventVersion) => (
+    <li key={item.complaint.id} className="rca-version">
+      <CalendarClock size={16} aria-hidden="true" />
+      <div>
+        <strong>{safeText(item.complaint.business_id) ?? safeText(item.complaint.identifier) ?? "Complaint"}</strong>
+        <small className="ac-muted">
+          {item.anchor_label}
+          {item.anchor_date ? `: ${formatDate(item.anchor_date)}` : ""}
+          {item.lot?.identifier ? ` · lot ${item.lot.identifier}` : ""}
+        </small>
+      </div>
+      <div>
+        {/* W1: from the complaint, from the lot, or not known: candidates are listed, never filled in. */}
+        <strong>{versionWords(item).version}</strong>
+        <small className="ac-muted">
+          {versionWords(item).source}
+          {versionWords(item).candidates.length
+            ? ` · Candidates released by then: ${versionWords(item).candidates.join(", ")}`
+            : ""}
+        </small>
+      </div>
+      <div className="rca-version-flags">
+        {item.flags.map((flag) => (
+          <ToneBadge key={flag.code} tone="warning" label={flag.label} />
+        ))}
+        {item.components.length > 0 && (
+          <small className="ac-muted">
+            {item.components.map((c) => `${c.name}${c.revision ? ` ${c.revision}` : ""}`).join(" · ")}
+          </small>
+        )}
+      </div>
+    </li>
+  );
   return (
     <>
       <p className="ac-note">{data.data?.note ?? "A date never chooses a version."}</p>
-      <ul className="rca-versions">
-        {items.map((item) => (
-          <li key={item.complaint.id} className="rca-version">
-            <CalendarClock size={16} aria-hidden="true" />
-            <div>
-              <strong>
-                {safeText(item.complaint.business_id) ?? safeText(item.complaint.identifier) ?? "Complaint"}
-              </strong>
-              <small className="ac-muted">
-                {item.anchor_label}
-                {item.anchor_date ? `: ${formatDate(item.anchor_date)}` : ""}
-                {item.lot?.identifier ? ` · lot ${item.lot.identifier}` : ""}
-              </small>
-            </div>
-            <div>
-              {/* W1: from the complaint, from the lot, or not known: candidates are listed, never filled in. */}
-              <strong>{versionWords(item).version}</strong>
-              <small className="ac-muted">
-                {versionWords(item).source}
-                {versionWords(item).candidates.length
-                  ? ` · Candidates released by then: ${versionWords(item).candidates.join(", ")}`
-                  : ""}
-              </small>
-            </div>
-            <div className="rca-version-flags">
-              {item.flags.map((flag) => (
-                <ToneBadge key={flag.code} tone="warning" label={flag.label} />
-              ))}
-              {item.components.length > 0 && (
-                <small className="ac-muted">
-                  {item.components.map((c) => `${c.name}${c.revision ? ` ${c.revision}` : ""}`).join(" · ")}
-                </small>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <ul className="rca-versions">{shown.map(row)}</ul>
+      {/* Review G-16: one row per distinct version and source; the identical rest folded, so a contrast shows. */}
+      {same.length > 0 && (
+        <details className="uw-story-more">
+          <summary>
+            {same.length} more {same.length === 1 ? "complaint" : "complaints"} with a version already shown
+          </summary>
+          <ul className="rca-versions">{same.map(row)}</ul>
+        </details>
+      )}
     </>
   );
 }
