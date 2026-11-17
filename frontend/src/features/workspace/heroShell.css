@@ -404,6 +404,26 @@
     display: none;
   }
 }
+/* A projector at 1280x720 (review G-08): the labels beside icons go, the search keeps its width, the avatar stays in. */
+@media (max-width: 1366px) {
+  .uw-hybrid .uw-top .uw-persona-hint,
+  .uw-hybrid .uw-top .uw-persona-eye,
+  .uw-hybrid .uw-top .uw-top-label,
+  .uw-hybrid .uw-top .help-menu .ac-hide-sm {
+    display: none;
+  }
+  .uw-hybrid .uw-top .uw-org {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 240px;
+  }
+  .uw-hybrid .uw-top .uw-search {
+    min-width: 180px;
+  }
+  .uw-hybrid .uw-top.ac-header > :not(.uw-org, .uw-search) {
+    flex-shrink: 0;
+  }
+}
 
 /* The page head the shell shows: the eyebrow, the page's question in the display face, its guide. */
 .uw-hybrid .ac-page-head h1 {

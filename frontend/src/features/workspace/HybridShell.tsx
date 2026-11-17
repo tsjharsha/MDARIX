@@ -442,8 +442,8 @@ export function DataChoice({ source, onChoose }: { source: string; onChoose: (so
 
 export function ImportOwnData({ onOpen }: { onOpen: () => void }) {
   return (
-    <button type="button" className="ac-secondary uw-top-import" onClick={onOpen}>
-      <Upload size={15} aria-hidden="true" /> Import your data
+    <button type="button" className="ac-secondary uw-top-import" title="Import your data" onClick={onOpen}>
+      <Upload size={15} aria-hidden="true" /> <span className="uw-top-label">Import your data</span>
     </button>
   );
 }
