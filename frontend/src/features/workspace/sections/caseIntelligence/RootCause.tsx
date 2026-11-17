@@ -5,6 +5,7 @@ import { ArrowDown, CalendarClock, ListTree, Plus, Network } from "lucide-react"
 import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, Table, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
+import { formatDay } from "../../../../app/dates";
 import { WorkspaceContext, useCan, useRcaMethods } from "../../workspaceContext";
 import { ResolutionTrend } from "../Dispositions";
 import {
@@ -175,7 +176,7 @@ export function AtAGlance({ caseLabel, states }: { caseLabel: string; states: Ev
           <ol className="rca-glance-timeline" aria-label="In time order">
             {states.timeline.map((event, index) => (
               <li key={`${event.source}-${index}`}>
-                <b className="uw-num">{formatDate(event.date)}</b> <span>{event.label}</span>{" "}
+                <b className="uw-num">{formatDay(event.date)}</b> <span>{event.label}</span>{" "}
                 <small className="ac-muted">{event.source}</small>
               </li>
             ))}

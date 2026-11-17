@@ -37,7 +37,8 @@ import "./workspace.css";
 import "./heroShell.css";
 import "./heroPages.css";
 import { ThemeMenu, useTheme } from "./theme";
-import { shownRun, useOneStory } from "./oneStory";
+import { FLAGSHIP_STEPS, STORY_STEPS, shownRun, useOneStory } from "./oneStory";
+import { IMPORTED_SOURCE } from "./complaintList";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
@@ -724,7 +725,13 @@ export function UserWorkspace({
         (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
     ).length,
   );
-  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
+  const oneStory = useOneStory(fresh && !!trial?.is_trial && ringRead).data;
+  // W1: the flagship investigation's seven steps while it leads Getting started (as OneStory.tsx chooses).
+  const flagship = oneStory?.flagship && !(dataSource === IMPORTED_SOURCE && oneStory.yours) ? oneStory.flagship : null;
+  const progress = flagship
+    ? flagship.steps.filter((step) => step.done).length
+    : storyProgress(shownRun(oneStory, dataSource));
+  const progressTotal = flagship ? FLAGSHIP_STEPS : STORY_STEPS;
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -830,6 +837,7 @@ export function UserWorkspace({
               open={open}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
               progress={progress}
+              progressTotal={progressTotal}
               alerts={alerts}
             />
           </>
@@ -1140,6 +1148,7 @@ export function UserWorkspace({
             open={open}
             personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
             progress={progress}
+            progressTotal={progressTotal}
             alerts={alerts}
           />
         )}

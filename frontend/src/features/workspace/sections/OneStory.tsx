@@ -1011,6 +1011,12 @@ export function FlagshipView({
           </p>
         )}
         <h3 id="uw-os-title">{copy.h}</h3>
+        {/* Hero pass: the one main button right under the heading, above the fold on a projector. */}
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary uw-os-go" disabled={busy} onClick={() => void start(selected)}>
+            {copy.b} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </div>
         <dl className="uw-os-lines">
           <div>
             <dt>Why</dt>
@@ -1033,11 +1039,6 @@ export function FlagshipView({
           <span className="ms-chip uw-os-state">Done earlier · ticked once the steps before it are done</span>
         ) : null}
         <FlagshipExtra run={run} index={selected} aiReady={aiReady} onRisk={() => go("Records", "Risk file input")} />
-        <div className="ca-action-row">
-          <button type="button" className="ac-primary uw-os-go" disabled={busy} onClick={() => void start(selected)}>
-            {copy.b} <ChevronRight size={15} aria-hidden="true" />
-          </button>
-        </div>
         {(selected === 2 || selected === 6) && run.branch && (
           <p className="uw-wt-hint">
             <button type="button" className="ac-link" onClick={branch}>

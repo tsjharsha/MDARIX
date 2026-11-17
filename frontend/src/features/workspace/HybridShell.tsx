@@ -725,6 +725,7 @@ export function NavRail({
   open,
   personaLabel,
   progress = null,
+  progressTotal = 10,
   alerts = new Set<string>(),
 }: {
   tabs: readonly string[];
@@ -733,6 +734,8 @@ export function NavRail({
   personaLabel?: string;
   /** Getting started's steps done of ten, when the story is read. */
   progress?: number | null;
+  /** Of how many: seven while the flagship investigation leads (W1). */
+  progressTotal?: number;
   /** The destinations with something new (railAlerts). */
   alerts?: ReadonlySet<string>;
 }) {
@@ -779,11 +782,15 @@ export function NavRail({
               <ListChecks size={22} />
             </span>
           ) : (
-            <ProgressArc done={progress} size={44} decorative />
+            <ProgressArc done={progress} total={progressTotal} size={44} decorative />
           )}
           <span className="uw-tab-label">
             <strong>Getting started</strong>
-            {progress !== null && <small>{progress} of 10 completed</small>}
+            {progress !== null && (
+              <small>
+                {progress} of {progressTotal} completed
+              </small>
+            )}
           </span>
         </button>
       )}
@@ -810,6 +817,7 @@ export function PhoneBar({
   open,
   personaLabel,
   progress = null,
+  progressTotal = 10,
   alerts = new Set<string>(),
 }: {
   tabs: readonly string[];
@@ -817,6 +825,7 @@ export function PhoneBar({
   open: (section: WorkspaceSection) => void;
   personaLabel?: string;
   progress?: number | null;
+  progressTotal?: number;
   alerts?: ReadonlySet<string>;
 }) {
   const [shown, setShown] = useState(false);
@@ -859,7 +868,7 @@ export function PhoneBar({
               {progress === null ? (
                 <ListChecks size={20} aria-hidden="true" />
               ) : (
-                <ProgressArc done={progress} size={22} tone="light" decorative />
+                <ProgressArc done={progress} total={progressTotal} size={22} tone="light" decorative />
               )}
               <span className="uw-tab-label">Getting started</span>
             </button>

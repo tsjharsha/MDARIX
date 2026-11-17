@@ -178,11 +178,11 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     expect((await flagship(page)).mfa_verified).toBe(true);
     await shot(page, "fs-6-decision");
 
-    // 7. Action and impact: plan the effectiveness check; "Did it work?" stays too early.
+    // 7. Action and impact: plan the effectiveness check (its form is open while no check exists); "Did it work?" stays
+    // too early.
     await page.goto("/app/getting-started");
     await expect(card(page)).toContainText("Did it work? Too early");
     await next(page, /Plan the effectiveness check/);
-    await page.getByRole("button", { name: "Plan the check" }).click();
     await page
       .getByLabel("What will show the action worked")
       .fill("No pressure-alarm complaint from lots made after 32-unit inspection is restored.");
