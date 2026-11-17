@@ -137,7 +137,8 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     });
     await expect(page.getByText("AI proposal, not reviewed").first()).toBeVisible();
     await ticked(page, 3);
-    await page.getByRole("button", { name: "Accept" }).first().click();
+    // W1b: the observations open in the folded advanced tools; the hypotheses above have Accept buttons of their own.
+    await page.locator("#case-part-advanced").getByRole("button", { name: "Accept" }).first().click();
     await ticked(page, 4);
     await shot(page, "fs-4-ai");
 

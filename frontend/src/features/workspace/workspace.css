@@ -9465,6 +9465,10 @@ details.uw-team-change[open] {
   font-size: var(--ms-fs-14);
   line-height: 1.45;
 }
+.uw-ibrief-part > p {
+  margin: 0;
+  padding-left: 1.1em;
+}
 .uw-ibrief-part.part-problem,
 .uw-ibrief-part.part-decision {
   grid-column: 1 / -1;

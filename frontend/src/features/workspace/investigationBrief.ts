@@ -53,14 +53,24 @@ export function briefPage(
       ]
     : [];
 
-  // Components and supplier: the factors the case's own lots share (lot genealogy), the one a person chose marked.
-  const saved = lotImpact?.saved?.factor;
-  const factors = (lotImpact?.options ?? [])
-    .filter((item) => item.kind !== "PRODUCT_VERSION" && item.case_lots > 0)
-    .map((item) => {
-      const chosen = saved && saved.kind === item.kind && saved.id === item.id && (saved.lot ?? null) === item.lot;
-      return `${item.kind_label}: ${item.label}${chosen ? " (chosen as the suspect factor)" : ""}`;
-    });
+  // Components and supplier (lot genealogy): the suspect factor a person chose, else the rule's suggestion said as
+  // such; then the other components and suppliers the case's own lots hold.
+  const suspect = lotImpact?.saved?.factor ?? lotImpact?.suggestion ?? null;
+  const same = (item: { kind: string; id: string; lot: string | null }) =>
+    !!suspect && suspect.kind === item.kind && suspect.id === item.id && (suspect.lot ?? null) === (item.lot ?? null);
+  const held = (lotImpact?.options ?? []).filter((item) => item.kind !== "PRODUCT_VERSION" && item.case_lots > 0);
+  const named = held.find(same);
+  const others = held.filter((item) => !same(item)).map((item) => `${item.kind_label} ${item.label}`);
+  const factors = [
+    ...(suspect && named
+      ? [
+          `Suspect ${named.kind_label.toLowerCase()}: ${named.label} (${
+            lotImpact?.saved ? "chosen by a person" : "suggested by rule, not confirmed"
+          })`,
+        ]
+      : []),
+    ...(others.length ? [`Also in the case's lots: ${others.join("; ")}`] : []),
+  ];
   const lots = rows(scope.lots).map(
     (item) => `Lot ${text(item.lot_number) ?? "—"} (${text(item.version_identifier) ?? VERSION_NOT_KNOWN})`,
   );
@@ -159,7 +169,7 @@ export function briefPage(
     {
       key: "affected",
       title: "Affected components, supplier and lots",
-      lines: factors.length || lots.length ? [...factors, ...(lots.length ? lots : ["Lots: " + NOT_RECORDED])] : [],
+      lines: factors.length || lots.length ? [...factors, ...(lots.length ? lots : [`Lots: ${NOT_RECORDED}`])] : [],
     },
     { key: "for", title: "Evidence for", lines: evidence(supporting) },
     { key: "against", title: "Evidence against", lines: evidence(contradicting) },

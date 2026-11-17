@@ -290,10 +290,20 @@ describe("W1c: the Investigation Brief on one page", () => {
     expect(parts.problem).toEqual(["Pressure-alarm complaints rose 9.3× after OrbitCare 300 Rev B."]);
     expect(parts.product).toEqual(["OrbitCare 300: Rev B", `1 complaint in scope: ${VERSION_NOT_KNOWN}`]);
     expect(parts.affected).toEqual([
-      "Component lot: NovaSense sensor NS-SL-2531 (chosen as the suspect factor)",
-      "Supplier: NovaSense",
+      "Suspect component lot: NovaSense sensor NS-SL-2531 (chosen by a person)",
+      "Also in the case's lots: Supplier NovaSense",
       "Lot LOT-003 (Rev B)",
       `Lot LOT-004 (${VERSION_NOT_KNOWN})`,
+    ]);
+    // Without a person's choice, the rule's suggestion is said to be one.
+    const suggested = { ...LOTS, saved: null, suggestion: { kind: "SUPPLIER", id: "s", lot: null } } as LotImpactView;
+    expect(
+      briefPage(VERSION, null, suggested)
+        .find((item) => item.key === "affected")
+        ?.lines.slice(0, 2),
+    ).toEqual([
+      "Suspect supplier: NovaSense (suggested by rule, not confirmed)",
+      "Also in the case's lots: Component lot NovaSense sensor NS-SL-2531",
     ]);
     expect(parts.for.join()).toContain("Trend 9.3×");
     expect(parts.against.join()).toContain("Bench test passed");
