@@ -161,8 +161,8 @@ only. No migration.
 ## [0.11.05] - not released yet (WHIF release: trial AI, flagship story, decision record, review fixes)
 
 Brings in the backend fix pass of the WHIF hero review, makes the screens match it, and fixes the release blockers of
-the independent backend/AI review (G1-G15). No new migration (one head, `tr32aiready`). The API, web and compose files
-change.
+the independent backend/AI review (G1-G15). Two new expand-only migrations (`tr33validationruns`,
+`tr33inconclusive`; one head, `tr33inconclusive`). The API, web and compose files change.
 
 - Production: the API and background containers reach the trial AI gateways (FreeLLMAPI, OmniRoute) at their own
   127.0.0.1 through loopback forwarders and a private bridge `ai-host` (10.99.211.0/29); the loopback-only rule is
@@ -195,6 +195,18 @@ change.
   report"), from the start (G-10, owner approval 17 Nov 2026); signed conclusions keep version 1.
 - One trial AI wording: "AI is not switched on for this trial" while the trial has no AI services or its switch is
   off, and "AI is busy" while its services are set up but none answers. Refusal codes are unchanged.
+- Product Lifecycle Twin (W5): Product 360 shows the connected view, change impact, field-action scope and the
+  sample's simulated PLM, ERP and eQMS sources, and the flagship links to it from steps 2, 3 and 7.
+- AI governance (E1): a read-only governance screen for administrators and trial owners, and the AI record is locked
+  when a decision is signed.
+- Validation evidence (E2, migration `tr33validationruns`): requirements, tests and the last recorded run in Records
+  and in the platform Security area, with a risk-based framing.
+- Investigation (W1b, W1c): the screen follows its six questions with advanced tools folded; the Investigation Brief
+  is one page to read, project and print; the OrbitCare signal shows complaints a month, before and after.
+- Starter content (G-17): the starter mark appears once per page as a small footnote, not as a chip on every item.
+- Trust closure (W1d, migration `tr33inconclusive`, awaiting owner approval): careful "association, cause not yet
+  confirmed" wording; a labelled synthetic effectiveness follow-up that a person signs, which may be "inconclusive";
+  a sample evidence register; a six-view strip on Getting started.
 
 ## [0.11.04] - not released yet
 
