@@ -1,8 +1,37 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-11-04 (0.10.88 final, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
+**Last verified:** 2026-11-17 (free-trial line `release/0.10` and WHIF push 2, local; sections below). Before that
+2026-11-04 (0.10.88 final, local). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
 Actions and the local Windows development stack (Docker Compose). Earlier results are kept below for comparison.
 Update this file only from real command output.
+
+## 2026-11-17 verified results (WHIF push 2, `release/whif-push2`, local, not pushed)
+
+The backend fix pass merged into the free-trial line, the screens following it, the backend/AI review gaps G1-G15,
+P7 and the owner-approved legal texts. Run on commit 81e92125 on `mdarix_p2_test`, recreated and prepared with
+`scripts/prepare_test_environment.py`. Command results, not a certification.
+
+| Check | Command | Result |
+|---|---|---|
+| Backend suite | `python -m pytest -q -p no:cacheprovider` | Exit 0: 5,585 passed, 20 skipped, 4 deselected (dataplane), 1 xfailed, 2 h 0 min 12 s |
+| After 81e92125 (one message reworded in 72409527) | `pytest tests/test_legal_compliance_0_10_33.py tests/test_site_info.py tests/test_ai_trial_gate.py` | 81 passed |
+| Python lint and format | `ruff check .`, `ruff format --check .` | Both exit 0 (1,910 files) |
+| Migrations | `alembic heads`, `alembic check` | One head `tr32aiready`; "No new upgrade operations detected" |
+| tr23 lock time | `alembic upgrade tr23compositetenantfks` from `tr22tenantfkcheck` on a fresh 2,000-row test database | 3.5 s, of which 2.4 s Alembic start-up |
+| Frontend | `npm run lint`, `npm run format:check`, `npm test`, `npm run build` | All exit 0; 1,914 tests in 259 files |
+| Secrets | `gitleaks git --log-opts=a357b4e7..HEAD` | 30 commits scanned, no leaks |
+| Demo path timing (quiet laptop) | `scripts/demo_path_timing.py --rounds 20` (e-mail off) | No 5xx; 51 of 53 calls within the SLO; over: synchronous approve 4,505 ms (the screen now approves in the background) and one event read p95 520 ms (352 ms on the run before) |
+
+## 2026-11-17 verified results (free-trial line `release/whif-trial`, before push 2)
+
+From the trial-line pre-push checks (tip a357b4e7, `mdarix_whiftrial_test`):
+
+| Check | Result |
+|---|---|
+| Backend suite | 5,499 passed, 1 failed, 20 skipped, 4 deselected, 1 xfailed (2 h 16 min); the failure (`test_b5_facts`, 3 hypotheses instead of 2) was a test not updated for the sample's AI proposal; fixed in a357b4e7 and that file re-run: 2 passed |
+| Upgrade from v0.10.92 (`tr18changereason`) | upgrade head OK, `alembic check` clean, downgrade to tr18 OK with identical row counts, re-upgrade OK |
+| Frontend | vitest 1,909 tests in 259 files passed; lint, format, build passed |
+| Secrets | gitleaks over the line and the working tree: no leaks |
 
 ## 2026-11-04 verified results (0.10.88 final, `fix/trial-0.10.88-journeys`, local, not pushed)
 
