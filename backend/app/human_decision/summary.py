@@ -306,6 +306,8 @@ def summary(control_db: Session, db: Session, case, decision) -> dict:
             "statement": ai.get("statement"),
             "in_brief": list(signed["ai_execution_refs"]),
             "proposals": _ai_proposals(db, case),
+            # U7: as locked into the signed snapshot (None: signed before it was recorded).
+            "locked": snapshot.get("ai_used"),
         },
         "hypotheses": {
             # What the signer ticked as the root cause, as bound into the signed snapshot.

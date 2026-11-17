@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 from backend.app.access.permissions import DECISION_SIGN, require_permission
 from backend.app.business_ids import as_uuid
 from backend.app.case_workflow import states
-from backend.app import signing_commit
+from backend.app import ai_governance, signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.decision_outcomes import DecisionFollowUp, ImpactAssessment
 from backend.app.db.models.foundation import Decision, Investigation, Product, SignedApprovalRecord
@@ -747,6 +747,8 @@ def sign_decision(
             "root_cause_attribution": {"code": attribution, "reason": attribution_reason},
             # RCA tools: the confirmed cause as the signer ticked it, bound the same way.
             "root_cause": {"category": cause_category, "reason": cause_reason, "hypotheses": accepted},
+            # U7: the AI results as they stand now (model, prompt version, sources, verdicts), bound the same way.
+            "ai_used": ai_governance.lock_for_signing(data, control_db, case, rules.ai_execution_refs(content)),
         }
     )
     snapshot_digest = rules.snapshot_hash(snapshot)
