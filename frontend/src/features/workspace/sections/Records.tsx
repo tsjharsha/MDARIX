@@ -64,6 +64,7 @@ import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
 import { TrustSection } from "./Trust";
+import { EvidencePackCard, LatestSignatures } from "./TrustRecords";
 import { DocumentsPanel } from "./Documents";
 import { documentLink, parseDocumentLink } from "../documents";
 import { NEW_PLACES } from "../../../app/linkTable";
@@ -126,11 +127,14 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
       {active === "CAPA records" && <Capas />}
       {active === "Effectiveness checks" && <EffectivenessBoard initialCapa={target.capa} />}
       {active === "Risk file input" && <RiskFileInput />}
-      {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} />}
+      {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} segmented />}
       {active === "Verify a signature" && (
-        <Embedded>
-          <SignatureVerificationWorkspace />
-        </Embedded>
+        <>
+          <LatestSignatures />
+          <Embedded>
+            <SignatureVerificationWorkspace />
+          </Embedded>
+        </>
       )}
       {active === "Exports" && <Exports />}
     </Tabs>
@@ -150,6 +154,7 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
       ) : (
         signed.data && <NoRecordYet />
       )}
+      <EvidencePackCard />
       <section className="uw-records-all" aria-labelledby="uw-records-all">
         <h2 id="uw-records-all">All records</h2>
         {all}
@@ -197,9 +202,8 @@ export function LatestSigned({ record, mine = true }: { record: SignedRecord; mi
       eyebrow={mine ? "Your latest record" : "Latest signed record"}
       title={reference ? `${record.what} · ${reference}` : record.what}
     >
-      {!mine && <p className="ac-muted">You have signed nothing yet: this is the newest record signed here.</p>}
       <p className="ac-muted">
-        {record.signed_by ?? "Signed"} ·{" "}
+        {record.signed_by ? `Signed by ${record.signed_by}` : "Signed"} ·{" "}
         {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
         {/* What a record is for is the page's guide (0.10.87). */}
         {record.meaning_label ? ` · ${record.meaning_label}` : ""}.<SampleDates sample={record.sample} />
@@ -424,7 +428,7 @@ export function RecordsSection({ tab }: { tab?: string }) {
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Record sections">
       {active === "Effectiveness checks" && <EffectivenessBoard initialCapa={target.capa} />}
       {active === "Risk file input" && <RiskFileInput />}
-      {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} />}
+      {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} segmented />}
       {active === "Reports" && (
         <>
           <DocumentsPanel initialCode={documentLink.code} initialScope={documentLink.scope} />
@@ -432,9 +436,12 @@ export function RecordsSection({ tab }: { tab?: string }) {
         </>
       )}
       {active === "Verify a signature" && (
-        <Embedded>
-          <SignatureVerificationWorkspace />
-        </Embedded>
+        <>
+          <LatestSignatures />
+          <Embedded>
+            <SignatureVerificationWorkspace />
+          </Embedded>
+        </>
       )}
     </Tabs>
   );

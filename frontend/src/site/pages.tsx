@@ -365,8 +365,9 @@ export function HomePage() {
               <a className="ms-btn ms-btn-ghost-light" href="/videos">
                 Watch the videos
               </a>
-              <a className="ms-btn ms-btn-ghost-light" href="/platform">
-                Explore the platform
+              {/* A text link after the buttons, so the hero never wraps an orphan button (F-W1). */}
+              <a className="ms-hero-link" href="/platform">
+                Explore the platform <ArrowRight size={14} aria-hidden="true" />
               </a>
             </div>
             <ul className="ms-hero-points">

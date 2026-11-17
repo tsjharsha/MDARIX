@@ -45,6 +45,9 @@ import {
 import { formatDateTime } from "../../../app/dates";
 import { safeText } from "../../../app/displayId";
 
+/** "1 customer", "2 customers" (F-X4). Exported for its test. */
+export const countOf = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
 type DashboardTrends = {
   days: number;
   ai_runs: DailyRow[];
@@ -375,7 +378,7 @@ export function AdminOverview({
                   ? "Reading live administrator sources."
                   : failingSources.length
                     ? `${failingSources.length} of ${Object.keys(SOURCES).length} data sources are unavailable; their panels say so.`
-                    : `${customerTotal} customers, ${model.active} active tenants and ${model.seats} people with access. Activity below covers the last ${days} days.`}
+                    : `${countOf(customerTotal, "customer")}, ${countOf(model.active, "active tenant")} and ${countOf(model.seats, "person", "people")} with access. Activity below covers the last ${days} days.`}
               </p>
             </div>
           </div>

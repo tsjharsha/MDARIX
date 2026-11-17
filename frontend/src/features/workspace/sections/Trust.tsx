@@ -16,7 +16,7 @@ import { DecisionRecordDrawer } from "./DecisionRecord";
 
 type Tab = TrustTab;
 
-export function TrustSection({ tab }: { tab?: string }) {
+export function TrustSection({ tab, segmented = false }: { tab?: string; segmented?: boolean }) {
   const { work, open } = useWorkspace();
   const [requested] = useState(() => parseTrustTab(tab));
   // A case opened from a decision, which the context bar may not hold (another product).
@@ -48,7 +48,7 @@ export function TrustSection({ tab }: { tab?: string }) {
   const caseTab = CASE_TRUST_TABS.includes(active);
   return (
     <>
-      <Tabs tabs={tabs} active={active} onChange={setChosen} label="Trust and audit sections">
+      <Tabs tabs={tabs} active={active} onChange={setChosen} label="Trust and audit sections" segmented={segmented}>
         {caseTab && opened && opened.id !== work.investigationId && (
           <p className="ac-note" role="status">
             {mvp

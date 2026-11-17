@@ -5,6 +5,12 @@ import { SettingsSection } from "./sections/Settings";
 import { TRIAL_AI_TAB } from "./sections/TrialAi";
 import { aiStatusBanner } from "./intelligence";
 import { ConsentNotice } from "../shared/ConsentBanner";
+import { AuditTab, SignaturesView } from "./sections/AuditTab";
+import { EvidencePackCard, LatestSignatures, trainingWords } from "./sections/TrustRecords";
+import { NEW_HEADS } from "./UserWorkspace";
+import { Tabs } from "../customer-admin/shared";
+import { SignupForm, TRIAL_AI_LINE } from "../auth/SignupForm";
+import { countOf } from "../admin/console/AdminOverview";
 
 // Hero review 2 (17 Nov 2026), front-end fix pass 3: the findings are named by their review IDs.
 
@@ -102,5 +108,92 @@ describe("F-H4: the privacy notice is one line", () => {
     expect(html).toContain("please enter no patient-identifiable information");
     expect(html).toMatch(/<details class="consent-more"><summary>Read more<\/summary>.*not certified for/);
     expect(html).toContain("Acknowledge");
+  });
+});
+
+describe("F-E1 to F-E6: records an inspector can trust", () => {
+  it("asks the inspector's question and shows sub-views as one segmented control", () => {
+    expect(NEW_HEADS.Records).toBe("Records an inspector can trust");
+    const html = renderToStaticMarkup(
+      <Tabs tabs={["A", "B"]} active="A" onChange={() => undefined} label="x" segmented />,
+    );
+    expect(html).toContain('class="ac-tabs is-segmented"');
+  });
+
+  it("shows the organization's audit trail to whoever the server lets read it, and nothing otherwise", () => {
+    delete resources.data["/api/v1/admin/audit-history"];
+    expect(render(api([]), <AuditTab />)).not.toContain("Everything done in your organization");
+    resources.data["/api/v1/admin/audit-history"] = [
+      {
+        id: "e1",
+        created_at: "2026-11-17T02:10:00Z",
+        action: "SIGNATURE_APPLIED",
+        action_label: "Decision signed",
+        actor_name: "Asha Rao (fictional)",
+        reason: "Reportable in the US",
+      },
+    ];
+    const html = render(api([]), <AuditTab />);
+    expect(html).toContain("Everything done in your organization");
+    expect(html).toContain("Decision signed");
+    expect(html).toContain("Asha Rao (fictional)");
+    expect(html).toContain("Check the audit trail is intact");
+  });
+
+  it("opens verification on the latest signed records, with signer, MFA and training", () => {
+    delete resources.data["/api/v1/governance/signed-records"];
+    expect(render(api([]), <LatestSignatures />)).toBe("");
+    resources.data["/api/v1/governance/signed-records"] = {
+      items: [
+        {
+          signature_id: "s1",
+          decision_business_id: "DEC000011",
+          decision: "REPORTABLE",
+          signer_name: "MDARIX sample author",
+          meaning: "Approved",
+          signed_at: "2026-11-17T02:10:00Z",
+          mfa_verified: true,
+          training: [{ code: "SOP-01", version: "2", current: true }],
+          fingerprint_ok: true,
+        },
+      ],
+    };
+    const html = render(api([]), <LatestSignatures />);
+    expect(html).toContain("1 signature");
+    expect(html).toContain("unchanged since signing · checked");
+    expect(html).toContain("MDARIX sample author");
+    expect(html).toContain("Authenticator code checked");
+    expect(html).toContain("Trained · 1 current document");
+    expect(trainingWords([{ code: "SOP-01", current: false }])).toBe("Training out of date: SOP-01");
+    const one = renderToStaticMarkup(
+      <SignaturesView
+        verification={{
+          state: "ready",
+          data: { verification_status: "VALID", signatures: [{ signature_id: "x", valid: true, mfa_verified: false }] },
+        }}
+      />,
+    );
+    expect(one).toContain("No authenticator code");
+  });
+
+  it("puts the evidence pack on Records for people who may export", () => {
+    expect(render(api([]), <EvidencePackCard />)).toBe("");
+    expect(render(api(["data.export"]), <EvidencePackCard />)).toContain("Evidence pack");
+  });
+});
+
+describe("F-W2, F-X4: first screens read in one glance", () => {
+  it("keeps the sign-up lead to the AI line, the rest in the fold", () => {
+    const html = renderToStaticMarkup(<SignupForm />);
+    expect(html).toContain(`<p class="auth-lead">${TRIAL_AI_LINE}</p>`);
+    expect(html).toContain("<li>50 people</li>");
+    expect(html.indexOf("5,000 uploaded rows are included")).toBeGreaterThan(html.indexOf("<summary>How it works"));
+  });
+
+  it("counts in the right number", () => {
+    expect(countOf(1, "customer")).toBe("1 customer");
+    expect(countOf(2, "active tenant")).toBe("2 active tenants");
+    expect(countOf(1, "person", "people")).toBe("1 person");
+    expect(countOf(3, "person", "people")).toBe("3 people");
   });
 });

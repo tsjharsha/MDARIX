@@ -180,7 +180,8 @@ describe("D3.4 Records opens on your latest record", () => {
     const html = render(<NewRecordsSection />);
     expect(html).toContain("Latest signed record");
     expect(html).not.toContain("Your latest record");
-    expect(html).toContain("You have signed nothing yet");
+    expect(html).not.toContain("You have signed nothing yet");
+    expect(html).toContain("Signed by Sample Author");
     expect(html).toContain("Sample Author");
     expect(html).toContain("SAMPLE-RV-09");
     expect(html).not.toContain("No signed record yet");

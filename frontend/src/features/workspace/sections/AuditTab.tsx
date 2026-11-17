@@ -8,12 +8,23 @@ import { StatusBadge } from "./common";
 import { roleLabel } from "../../../app/roles";
 import { SignatureBasis } from "../../shared/Basis";
 import { formatDateTime } from "../../../app/dates";
+import { OrganizationAuditTrail, signerProofColumns } from "./TrustRecords";
 
 /**
  * The record a user may see: decisions in the selected investigation and the signatures on them.
  * The organization-wide audit trail (IP addresses, before/after values) stays with administrators.
  */
 export function AuditTab() {
+  return (
+    <>
+      {/* The organization's own trail first, for whoever the server lets read it (F-E1). */}
+      <OrganizationAuditTrail />
+      <CaseDecisions />
+    </>
+  );
+}
+
+function CaseDecisions() {
   const { work } = useWorkspace();
   const decisions = useResource<any>(
     work.investigationId ? `/api/v1/investigations/${work.investigationId}/decisions` : null,
@@ -146,6 +157,7 @@ export function SignaturesView({ verification }: { verification: PanelSource & {
             ),
           },
           { key: "when", label: "Signed", render: (row) => formatDateTime(row.signed_at) },
+          ...signerProofColumns,
         ]}
       />
       {listOf(verification.data?.signatures).length > 0 && <SignatureBasis />}

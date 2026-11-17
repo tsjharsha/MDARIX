@@ -1144,6 +1144,26 @@ th.num .table-sort {
   color: var(--ms-surface);
   font-weight: 600;
 }
+/* Sub-views inside a tab: one segmented control, not a second row of tabs (Records › Audit trail). */
+.ac-tabs.is-segmented {
+  display: inline-flex;
+  gap: 0;
+  padding: 3px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ac-track);
+}
+.ac-tabs.is-segmented button {
+  border: 0;
+  border-radius: var(--ms-radius-md);
+  background: transparent;
+  font-size: var(--ms-fs-14);
+}
+.ac-tabs.is-segmented button.selected {
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
 /* A sequence of steps (Data & Integrations): each tab carries its step number, each stage starts with its name. */
 .ac-tabs {
   align-items: center;

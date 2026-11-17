@@ -359,7 +359,7 @@ export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
   Reports: "Which authority reports are due?",
   Investigations: "Why is it happening?",
   Trends: "Is a product problem rising?",
-  Records: "What did you finish last?",
+  Records: "Records an inspector can trust",
   Team: "Who works on your trial?",
   "Import your data": "Bring your own complaints in",
   // 0.10.85, D3.6: every new-navigation page asks its question.

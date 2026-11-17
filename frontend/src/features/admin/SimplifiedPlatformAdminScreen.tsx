@@ -23,6 +23,7 @@ import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
 import { TrialOrganizations, trialFromAddress, type TrialSection } from "./trials/TrialOrganizations";
 import { trialAiPanel } from "./trials/TrialAiPanel";
+import { roleLabel } from "../../app/roles";
 import "./console/admin-console.css";
 
 type Props = {
@@ -162,7 +163,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
         <div className="ac-user">
           <span>
             <strong>{securityContext?.display_name ?? "Administrator"}</strong>
-            <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
+            <small>{roleLabel(securityContext?.active_role) || "Platform administrator"}</small>
           </span>
           <SwitchOrganization />
           <HelpMenu />

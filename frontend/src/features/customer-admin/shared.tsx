@@ -829,6 +829,7 @@ export function Tabs<T extends string>({
   label,
   counts,
   children,
+  segmented = false,
 }: {
   tabs: readonly T[];
   active: T;
@@ -838,6 +839,8 @@ export function Tabs<T extends string>({
   counts?: Partial<Record<string, number | null>>;
   /** The selected tab's content, rendered as its tabpanel. */
   children?: ReactNode;
+  /** Sub-views inside a tab: a segmented control, so a page never shows two rows of tabs (F-E3). */
+  segmented?: boolean;
 }) {
   const base = `tabs-${slug(label)}`;
   const tabId = (tab: T) => `${base}-${slug(tab)}`;
@@ -857,7 +860,13 @@ export function Tabs<T extends string>({
   }, [active]);
   return (
     <>
-      <div className="ac-tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKeyDown}>
+      <div
+        className={segmented ? "ac-tabs is-segmented" : "ac-tabs"}
+        role="tablist"
+        aria-label={label}
+        ref={list}
+        onKeyDown={onKeyDown}
+      >
         {tabs.map((tab) => (
           <button
             type="button"

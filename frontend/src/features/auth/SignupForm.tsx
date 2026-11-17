@@ -316,15 +316,13 @@ export function SignupForm() {
       <span className="eyebrow">Request access</span>
       <h1>Start your free trial</h1>
       <ul className="su-facts" aria-label="The trial at a glance">
+        {/* Short labels, so the four chips stay on one row (F-W2). */}
         <li>30 days</li>
-        <li>up to 50 people</li>
+        <li>50 people</li>
         <li>sample data from day one</li>
         <li>no card</li>
       </ul>
-      <p className="auth-lead">
-        5,000 uploaded rows included. {TRIAL_AI_LINE} You set your own password from the invitation email;{" "}
-        {PASSWORD_PROMISE}
-      </p>
+      <p className="auth-lead">{TRIAL_AI_LINE}</p>
       <div className="su-mfa-note" role="note">
         <Smartphone size={20} aria-hidden="true" />
         <div>
@@ -337,6 +335,9 @@ export function SignupForm() {
               When you first sign in, you add MDARIX to an authenticator app on your phone (Microsoft Authenticator,
               Google Authenticator, 1Password or similar) and save your recovery codes. Each colleague you invite needs
               one too.
+            </p>
+            <p>
+              5,000 uploaded rows are included. You set your own password from the invitation email; {PASSWORD_PROMISE}
             </p>
           </details>
         </div>
