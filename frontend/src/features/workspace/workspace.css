@@ -9496,7 +9496,7 @@ details.uw-team-change[open] {
 .uw-gs-views {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: 6px 22px;
   margin: 12px 0 0;
   padding: 0;
   list-style: none;
@@ -9505,34 +9505,20 @@ details.uw-team-change[open] {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.uw-gs-views li + li::before {
-  content: "·";
-  margin-right: 18px;
-  margin-left: -10px;
-  opacity: 0.6;
-}
 .uw-gs-head .uw-gs-register {
   margin-top: 6px;
 }
 /* W1d (D04): step 7's planned -> follow-up -> signed line. */
 .uw-flagship-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
   color: var(--ms-muted);
 }
-.uw-flagship-stages li.is-done {
+.uw-flagship-stages svg {
+  display: inline;
+  vertical-align: -1px;
+}
+.uw-flagship-stages .is-done {
   color: var(--ms-ink-2);
   font-weight: 600;
-}
-.uw-flagship-stages li + li::before {
-  content: "→";
-  margin-right: 10px;
-  color: var(--ms-muted);
-  font-weight: 400;
 }
 /* W1d (D04, D08): the synthetic follow-up on a check, and the sample evidence register. Flat (G-2). */
 .uw-ef-synthetic {

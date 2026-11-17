@@ -924,13 +924,14 @@ function FlagshipExtra({
         <li>{didItWorkLine(run.capa)}</li>
         {run.capa?.check_planned && (
           <li>
-            <ol className="uw-flagship-stages" aria-label="Effectiveness check">
-              {effectivenessStages(run.capa).map((stage) => (
-                <li key={stage.label} className={stage.done ? "is-done" : undefined}>
+            <span className="uw-flagship-stages" role="group" aria-label="Effectiveness check">
+              {effectivenessStages(run.capa).map((stage, index) => (
+                <span key={stage.label} className={stage.done ? "is-done" : undefined}>
+                  {index > 0 && <span aria-hidden="true"> → </span>}
                   {stage.done && <Check size={12} aria-hidden="true" />} {stage.label}
-                </li>
+                </span>
               ))}
-            </ol>
+            </span>
           </li>
         )}
         <li>

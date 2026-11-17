@@ -27,15 +27,15 @@ export function SyntheticFollowUpView({ followUp }: { followUp: SyntheticFollowU
       </p>
       <FlatTable
         caption="Lots built after the fix (synthetic)"
-        head={["Lot (synthetic)", "Built", "Units", "Inspection", "Complaints"]}
+        head={["Lot (synthetic)", "Built, day after fix", "Units", "Sensors out of range", "Complaints"]}
       >
         {after.lots.map((lot) => (
           <tr key={lot.lot}>
             <th scope="row">{lot.lot}</th>
-            <td>Day {lot.built_day_after_fix} after the fix</td>
+            <td>{lot.built_day_after_fix}</td>
             <td>{lot.units}</td>
             <td>
-              {lot.sensors_out_of_range} of {lot.sensors_inspected} sensors out of range
+              {lot.sensors_out_of_range} of {lot.sensors_inspected}
             </td>
             <td>{lot.complaints}</td>
           </tr>
