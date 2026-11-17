@@ -23,7 +23,17 @@ import {
 import { forAndAgainst } from "../decisionBrief";
 import { parseDecisionTab } from "../decisionTabs";
 import { parseReviewsTab } from "../reviews";
-import { isIntelligenceView, type IntelligenceView } from "../intelligence";
+import {
+  hypothesesPath,
+  intelligencePath,
+  isIntelligenceView,
+  originGroup,
+  type HypothesisList,
+  type IntelligenceView,
+  type Observation,
+} from "../intelligence";
+import { AI_UNREVIEWED_LABEL } from "../../shared/AiReview";
+import { Sparkles } from "lucide-react";
 import { CaseHeader, ownerText } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
 import { LotImpactPanel } from "./LotImpact";
@@ -50,6 +60,52 @@ const QUIET_PARTS = [
 
 /** A part of a section, for a link or the next step to scroll to (`part=brief`). */
 const partId = (part: string) => `case-part-${part}`;
+
+/**
+ * The AI proposals waiting for a person, at the top of the Evidence step (hero review 2, F-A2): the observations still
+ * labelled "AI proposal, not reviewed" and the AI hypotheses nobody has judged, each opening its view. Nothing when
+ * none waits. Exported for its test.
+ */
+export function AiProposalsCard({
+  investigationId,
+  onOpen,
+}: {
+  investigationId: string;
+  onOpen: (view: IntelligenceView) => void;
+}) {
+  const observations = useResource<{ items?: Observation[] | null }>(intelligencePath(investigationId, "observations"));
+  const hypotheses = useResource<HypothesisList>(hypothesesPath(investigationId));
+  const waitingObservations = (observations.data?.items ?? []).filter((item) => item.ai_label === AI_UNREVIEWED_LABEL);
+  const waitingHypotheses = (hypotheses.data?.items ?? []).filter(
+    (item) => originGroup(item.origin) === "AI" && (!item.human_status || /^proposed$/i.test(item.human_status)),
+  );
+  const total = waitingObservations.length + waitingHypotheses.length;
+  if (!total) return null;
+  return (
+    <section className="uw-card uw-card-pad uw-ai-proposals" aria-label="AI proposals">
+      <h2>
+        <Sparkles size={18} aria-hidden="true" /> AI proposals · {total} waiting for your review
+      </h2>
+      <p className="ac-muted">Each is a proposal until a person accepts, edits or rejects it.</p>
+      <div className="ca-action-row">
+        {waitingObservations.length > 0 && (
+          <button type="button" className="ac-primary" onClick={() => onOpen("Observations")}>
+            Review {waitingObservations.length} {waitingObservations.length === 1 ? "observation" : "observations"}
+          </button>
+        )}
+        {waitingHypotheses.length > 0 && (
+          <button
+            type="button"
+            className={waitingObservations.length ? "ac-secondary" : "ac-primary"}
+            onClick={() => onOpen("Hypotheses")}
+          >
+            Review {waitingHypotheses.length} {waitingHypotheses.length === 1 ? "hypothesis" : "hypotheses"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 /**
  * One investigation on the new navigation (stage 8, 8.1): the same four sections as one complaint's page, under one
@@ -215,6 +271,13 @@ export function CaseSections({
                 </Embedded>
               </div>
             )}
+            <AiProposalsCard
+              investigationId={id}
+              onOpen={(next) => {
+                setIntelView(next);
+                go("Evidence", "intelligence");
+              }}
+            />
             <div className="uw-case-part" id={partId("intelligence")}>
               <CaseIntelligencePanel
                 key={id}
