@@ -623,6 +623,16 @@ def test_a_built_sentence_with_real_text_typed_into_a_part_is_refused():
     assert not sample_gate.matches_catalogue(built + " Patient called back at home.")
 
 
+def test_the_follow_up_lot_list_passes_only_while_every_lot_is_sample_text():
+    """W1d's synthetic follow-up joins its lots with "; ": the list passes, a real-text item in it does not."""
+    from backend.app.trial import sample_follow_up
+
+    text = sample_follow_up.content_text()
+    assert sample_gate.matches_catalogue(text)
+    assert not sample_gate.matches_catalogue(text.replace("; FU-LOT-102", "; Asha Rao, 98450 12345; FU-LOT-102"))
+    assert not sample_gate.matches_catalogue(text.replace("FU-LOT-103 built day", "Patient called back at home built"))
+
+
 @pytest.fixture
 def case_features_on(monkeypatch, trial, chain_on):
     """Ask and case analysis switched on for the trial (on top of chain_on)."""

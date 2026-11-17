@@ -105,7 +105,11 @@ def templates() -> tuple[re.Pattern, ...]:
 def _sample_part(text: str) -> bool:
     text = text.strip()
     # A part may itself be built from parts (SIGNAL_TEXT inside the signal sentence); each level is shorter, so it ends.
-    return not text or bool(_IDENTIFIER.fullmatch(text)) or text in catalogue() or _built_from_parts(text)
+    if not text or _IDENTIFIER.fullmatch(text) or text in catalogue() or _built_from_parts(text):
+        return True
+    # A "; "-joined list of built items (the synthetic follow-up's lots, W1d): every item must be sample text itself.
+    items = text.split("; ")
+    return len(items) > 1 and all(_sample_part(item) for item in items)
 
 
 def _built_from_parts(text: str) -> bool:
