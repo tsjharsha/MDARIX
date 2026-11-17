@@ -830,6 +830,11 @@ export const FLAGSHIP_BRIEF_LINE =
 export const RISK_LINE = "Risk file: reassess SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor";
 
 /** What only some steps say: the AI's state, the brief's author, the signature, the action's three lines. */
+/** Why the trend's lot 005 is not in the case (W1 open item 2): it was built with the next sensor lot. */
+export const LOT_005_LINE =
+  "The trend also shows lot 005: a no-fault-found return and a free-flow report. Lot 005 was built with the next " +
+  "sensor lot (NS-SL-2533), so the investigation keeps to lots 003 and 004, which share sensor lot NS-SL-2417.";
+
 function FlagshipExtra({
   run,
   index,
@@ -842,6 +847,7 @@ function FlagshipExtra({
   onRisk: () => void;
 }) {
   const note = run.steps[index].note;
+  if (index === 0 || index === 1) return <p className="uw-os-differ">{LOT_005_LINE}</p>;
   if (index === 3)
     return (
       <div className="uw-os-differ">

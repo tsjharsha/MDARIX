@@ -143,6 +143,11 @@ describe("Getting started leads with the flagship", () => {
     expect(html).toContain("OrbitCare 300 · Rev B · SAMPLE-INV-001 · Step 1 of 7");
   });
 
+  it("explains the trend's lot 005 on the first two step cards", () => {
+    const html = render(<FlagshipView story={story(flagship(1))} run={flagship(1)} />);
+    expect(html).toContain("Lot 005 was built with the next sensor lot (NS-SL-2533)");
+  });
+
   it("W2: before the first step, one calm screen: the button in the band, the steps folded", () => {
     reads.data[ONE_STORY_PATH] = story(flagship());
     const html = render(<OneStory />);
