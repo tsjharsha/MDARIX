@@ -437,6 +437,16 @@ def watch(
             if shortest is None:
                 shortest = triage_shortest(db, control_db, tenant_id, today, complaint_ids)
             seen["binding"] = shortest_binding(seen["binding"], shortest.get(str(complaint.id)))
+        elif seen["binding"] is None and seen["triggers"] and complaint.source_system == "MDARIX_CASE":
+            # Review G-05: a complaint made from a case whose triggers start no window of its own market yet (harm
+            # unknown) keeps triage's provisional clock until the market is assessed, as its case showed it. Only
+            # those complaints: the triage read is the page's extra cost (B6a query budget).
+            if shortest is None:
+                shortest = triage_shortest(db, control_db, tenant_id, today, complaint_ids)
+            first = shortest.get(str(complaint.id))
+            if first:
+                base = {key: first.get(key) for key in ("days", "day_basis", "market")}
+                seen["binding"] = shortest_binding({**base, "triggers": [], "basis": []}, first)
         if str(complaint.id) in backlog:
             seen["binding"] = backlog_binding(seen["binding"], backlog[str(complaint.id)], today)
         # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's

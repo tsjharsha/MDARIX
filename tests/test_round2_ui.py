@@ -65,3 +65,31 @@ def test_a_gb_mir_on_a_sample_product_opens_with_its_submitter_block(trial):  # 
     assert "Orbit Medical Devices (Sample)" in str(fields["1_3_2A"]["value"])
     assert "Sample UK Responsible Person (Sample)" in str(fields["1_3_3"]["value"])
     assert fields["1_2B"]["value"] and fields["1_2C"]["value"]
+
+
+def test_the_cases_provisional_gb_clock_carries_to_the_escalated_complaint(trial):  # G-05
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.db.tenant_scope import bind_tenant
+    from tests.test_getting_started_part1 import INTAKE, _answers, _ok, _save, _sign
+
+    user = trial["client"]
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        event = str(
+            db.query(IntakeEvent.id)
+            .filter(IntakeEvent.tenant_id == trial["tenant_id"], IntakeEvent.reference == "SAMPLE-CALL-03")
+            .scalar()
+        )
+    clock = _ok(user.get(f"{INTAKE}/{event}"))["clock"]
+    assert clock["market"] == "GB" and clock["due_at"]
+    # A malfunction, a patient involved, harm not known: no GB window starts on these answers alone.
+    _save(
+        user,
+        event,
+        _answers(Q1="YES", Q2="YES", Q3="YES", Q4="YES", Q5="UNKNOWN", Q6="UNKNOWN", Q7="NO", Q8="YES", Q9="NO"),
+    )
+    assert _sign(user, event, "BOTH", create_new=True).status_code == 200
+    ref = _ok(user.get(f"{INTAKE}/{event}"))["complaint_ref"]
+    due = _ok(user.get(f"/api/v1/oversight/events/{ref}"))["work"]["due"]
+    gb = [item for item in due if item["market"] == "GB"]
+    assert gb and gb[0]["due_at"] == clock["due_at"] and "provisional" in gb[0]["title"]
