@@ -9307,8 +9307,11 @@ details.uw-team-change[open] {
   padding: var(--ms-space-5);
   margin-bottom: var(--ms-space-4);
 }
+/* Two lines, not three balanced ones, so the four tiles fit on a 1280x720 projector. */
+.uw-hybrid .ac-main .uw-dsum-head h2,
 .uw-dsum-head h2 {
   max-width: none;
+  text-wrap: wrap;
   margin: 4px 0 6px;
   font-size: var(--ms-fs-24);
   line-height: 1.25;
