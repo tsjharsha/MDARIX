@@ -971,6 +971,8 @@ export type AiStatus = {
   manual_paths?: unknown;
   /** A free trial, whose AI is off. */
   trial?: boolean | null;
+  /** A free trial whose AI services are set up: AI may run on the sample data once it is switched on. */
+  sample_data_only?: boolean | null;
 };
 
 export type AiBanner = {
@@ -993,7 +995,7 @@ const MANUAL_PATHS: AiBanner["manual"] = [
 ];
 
 const BANNER_TEXT: Record<
-  AiBanner["reason"] | "TRIAL",
+  AiBanner["reason"] | "TRIAL" | "TRIAL_ORG_OFF" | "TRIAL_USER_OFF",
   { title: string; message: string; disabled: string; short: string }
 > = {
   AI_DISABLED: {
@@ -1021,6 +1023,20 @@ const BANNER_TEXT: Record<
     disabled: "AI is off for free trials.",
     short: "AI is off for free trials",
   },
+  // The trial's AI services are ready; the person who started the trial has not switched AI on yet.
+  TRIAL_ORG_OFF: {
+    title: "AI is not switched on for your organization yet",
+    message:
+      "The person who started this trial switches it on under Settings › AI on the sample data. Until then every step works by hand.",
+    disabled: "AI is not switched on for your organization yet.",
+    short: "AI is not switched on yet",
+  },
+  TRIAL_USER_OFF: {
+    title: "AI is not switched on for your account",
+    message: "The person who started this trial can switch it on for you. Every step works by hand meanwhile.",
+    disabled: "AI is not switched on for your account.",
+    short: "AI is not on for your account",
+  },
 };
 
 /**
@@ -1041,7 +1057,16 @@ export function aiStatusBanner(status: AiStatus | null | undefined): AiBanner | 
           : null;
   if (!reason) return null;
   const trial = status.trial === true && reason !== "BUDGET_EXHAUSTED";
-  const text = BANNER_TEXT[trial ? "TRIAL" : reason];
+  const text =
+    BANNER_TEXT[
+      !trial
+        ? reason
+        : reasonCode === "USER_AI_INACTIVE"
+          ? "TRIAL_USER_OFF"
+          : status.sample_data_only === true && reason === "AI_DISABLED"
+            ? "TRIAL_ORG_OFF"
+            : "TRIAL"
+    ];
   const server = trial ? null : safeText(status.message);
   const offered = list<string>(status.manual_paths)
     .map((path) => MANUAL_PATHS.find((item) => code(item.view) === code(path) || code(path).includes(code(item.view))))

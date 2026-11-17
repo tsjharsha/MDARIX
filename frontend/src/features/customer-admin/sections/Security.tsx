@@ -114,7 +114,7 @@ function Posture() {
   );
 }
 
-type AiSettings = {
+export type AiSettings = {
   ai_processing_allowed: boolean;
   monthly_token_budget: number;
   tokens_used: number;
@@ -132,15 +132,28 @@ type AiSettings = {
   trial_chain_on?: boolean;
   /** Each AI feature with its intended use and risk, and whether it is on for the organization. */
   features?: AiFeature[];
+  /** Whether the signed-in person may change the switch (absent on an older server: then the answer itself says so). */
+  can_change?: boolean;
 };
 
-/** Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. */
-function AiProcessing() {
+export const AI_SETTINGS_PATH = "/api/v1/admin/ai-settings";
+// A free trial's AI goes through the trial's own services: named in general words, never by provider.
+const TRIAL_SERVICES = "the free trial AI services";
+
+/**
+ * Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. In
+ * ``trialOwner`` view (the person who started a free trial, in the workspace Settings) the pilot release gate is left
+ * out: it is about pilots, not the sample data.
+ */
+export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
   const { confirm } = useConsole();
-  const settings = useResource<AiSettings>("/api/v1/admin/ai-settings");
+  const settings = useResource<AiSettings>(AI_SETTINGS_PATH);
   const data = settings.data;
   const on = data?.ai_processing_allowed ?? false;
   const trial = Boolean(data?.free_trial);
+  const provider = trial ? TRIAL_SERVICES : data?.provider_name;
+  // A trial whose AI services MDARIX has not set up yet cannot switch AI on (the server answers 409).
+  const waitsForServices = trial && !on && data?.trial_chain_on === false;
   const share =
     data && data.monthly_token_budget ? Math.min(100, (data.tokens_used / data.monthly_token_budget) * 100) : 0;
   const change = () =>
@@ -148,7 +161,7 @@ function AiProcessing() {
       title: on ? "Turn AI processing off?" : "Turn AI processing on?",
       body: on
         ? "Nothing from your organization will be sent to an AI model. Ask MDARIX, hypotheses and briefs answer from rules only, and say so."
-        : `AI features (Ask MDARIX, hypotheses, challenges and briefs) will send the records an answer needs to ${providerLabel(data?.provider_name)}. ${MASKING_SUMMARY}`,
+        : `AI features (Ask MDARIX, hypotheses, challenges and briefs) will send the records an answer needs to ${providerLabel(provider)}. ${MASKING_SUMMARY}`,
       confirmLabel: on ? "Turn AI off" : "Turn AI on",
       reason: { label: "Reason for the change", min: 10 },
       // Turning AI on is signature-grade: the password and an authenticator code (the server checks both).
@@ -156,8 +169,8 @@ function AiProcessing() {
         ? {}
         : {
             acknowledge: trial
-              ? `${aiAcknowledgement(data?.provider_name)} ${TRIAL_AI_ACKNOWLEDGEMENT}`
-              : aiAcknowledgement(data?.provider_name),
+              ? `${aiAcknowledgement(provider)} ${TRIAL_AI_ACKNOWLEDGEMENT}`
+              : aiAcknowledgement(provider),
             password: true,
             mfaCode: true,
           }),
@@ -234,7 +247,7 @@ function AiProcessing() {
               type="button"
               className={on ? "ac-secondary" : "ac-primary"}
               onClick={change}
-              disabled={!data || (!on && gateBlocksSwitchOn(data.release_gate))}
+              disabled={!data || waitsForServices || (!on && gateBlocksSwitchOn(data.release_gate))}
             >
               {on ? "Turn AI off" : "Turn AI on"}
             </button>
@@ -242,6 +255,11 @@ function AiProcessing() {
           {!on && gateBlocksSwitchOn(data?.release_gate) && (
             <p className="ac-muted" role="note">
               AI can be turned on once the AI release gate below is met.
+            </p>
+          )}
+          {waitsForServices && (
+            <p className="ac-muted" role="note">
+              MDARIX is still setting up the trial&apos;s AI services. Once they are ready you can switch AI on here.
             </p>
           )}
           <p className="ac-muted">
@@ -257,15 +275,13 @@ function AiProcessing() {
           </ul>
           <p className="ac-muted">
             {data?.models.length
-              ? `Model in use: ${data.models.map((item) => `${readable(item.provider)} (${item.model})`).join(", ")}${
-                  data.provider_name ? ` · provider: ${data.provider_name}` : ""
-                }.`
+              ? `Model in use · configured${!trial && data.provider_name ? ` · provider: ${data.provider_name}` : ""}.`
               : "No AI model is configured on this server, so every answer comes from rules."}
           </p>
         </Panel>
       </div>
       <AiFeatures features={data?.features} onSwitch={switchFeature} />
-      <AiReleaseGate gate={data?.release_gate} />
+      {!trialOwner && <AiReleaseGate gate={data?.release_gate} />}
     </>
   );
 }

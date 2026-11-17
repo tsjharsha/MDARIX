@@ -24,9 +24,11 @@ import { AttemptsSetting } from "./Communications";
 import { IMPORT_PATH, type ImportSetup } from "./ImportData";
 import { WhoCanChange } from "./Views";
 import { PRODUCT_EDITORS, ProductIdentityPanel, ResponsibleParties } from "./ImportReports";
+import { TRIAL_AI_TAB, TrialAiSettings, useTrialAiOwner } from "./TrialAi";
 
 export const SETTINGS_TABS = NEW_PLACES.Settings.tabs;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
+type OfferedTab = SettingsTab | typeof TRIAL_AI_TAB;
 
 /** Who may change each setting: the permission the server checks (each screen keeps its own check as well). */
 export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermission[]> = {
@@ -49,14 +51,22 @@ export function SettingsSection({ tab }: { tab?: string }) {
   // A sample-only trial imports nothing, so it has no import templates (0.10.71).
   const sampleOnly = !!useWorkspace().session?.sample_only;
   const routine = useRoutinePath();
-  const tabs = SETTINGS_TABS.filter(
-    (item) => !(sampleOnly && item === "Import templates") && !(!routine && item === "Alerts and files"),
+  // The person who started a free trial also switches its AI on here (F1); nobody else sees the tab.
+  const trialAiOwner = useTrialAiOwner();
+  const tabs: OfferedTab[] = [
+    ...SETTINGS_TABS.filter(
+      (item) => !(sampleOnly && item === "Import templates") && !(!routine && item === "Alerts and files"),
+    ),
+    ...(trialAiOwner ? [TRIAL_AI_TAB] : []),
+  ];
+  const [chosen, setActive] = useReportedTab<OfferedTab>(() =>
+    // The AI tab is offered once the settings answer; a link to it waits for that instead of falling back.
+    offeredTab(tab, [...tabs, TRIAL_AI_TAB], "Complaint review rules"),
   );
-  const [chosen, setActive] = useReportedTab<SettingsTab>(() => offeredTab(tab, tabs, "Complaint review rules"));
   const active = tabs.includes(chosen) ? chosen : tabs[0];
   return (
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Settings">
-      <SettingOwner tab={active} />
+      {active === TRIAL_AI_TAB ? <TrialAiSettings /> : <SettingOwner tab={active} />}
       {active === "Complaint review rules" && <ReviewSettingsPanel />}
       {active === "Reporting windows" && <ReportingWindows />}
       {active === "Reportability guides" && <DecisionGuides />}
