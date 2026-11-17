@@ -115,9 +115,10 @@ describe("Decision trees › Rules", () => {
 describe("Rules used", () => {
   it("keeps the event, today and the decision apart", () => {
     const lines = rulesUsedLines(USED)!;
-    expect(lines.atEvent).toContain("US-floor-1, in force on the awareness day");
+    expect(lines.atEvent).toContain("US starter rules (version 1), in force on");
+    expect(lines.atEvent).toContain("the awareness day");
     expect(lines.atEvent).toContain("F-US-1 applies");
-    expect(lines.today).toContain("US-floor-2: differs; not applied to this event");
+    expect(lines.today).toContain("US starter rules (version 2): differs; not applied to this event");
     expect(lines.decided).toBe("Not signed yet.");
     const html = renderToStaticMarkup(<RulesUsedPanel used={USED} />);
     expect(html).toContain("At the event");
@@ -138,14 +139,15 @@ describe("Rules used", () => {
       rules_applied: USED.at_event.rules_applied,
     };
     expect(rulesUsedLines({ ...before, decided: signed })!.decided).toContain(
-      "Signed under US-floor-1. F-US-1 applies",
+      "Signed under US starter rules (version 1). F-US-1 applies",
     );
-    expect(rulesUsedLines(before)!.today).toBe("US-floor-1: the same.");
+    expect(rulesUsedLines(before)!.today).toBe("US starter rules (version 1): the same.");
   });
 
-  it("says the rules were not recorded rather than that none applied", () => {
+  it("leaves out rules that were not recorded rather than saying none applied (F-M2)", () => {
     const lines = rulesUsedLines({ ...USED, at_event: { ...USED.at_event, rules_applied: null } })!;
-    expect(lines.atEvent).toContain("Rules applied: not recorded");
+    expect(lines.atEvent).not.toContain("not recorded");
+    expect(lines.atEvent).toMatch(/the awareness day\.$/);
     expect(lines.atEvent).not.toContain("No floor rule applies");
   });
 

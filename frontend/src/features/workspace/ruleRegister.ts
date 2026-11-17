@@ -94,14 +94,29 @@ export function registerPath(filters: { market?: string; kind?: string; asAt?: s
   return `/api/v1/rule-register${text ? `?${text}` : ""}`;
 }
 
-/** The rules that decided, in words: "F-US-1 applies; F-US-2 could apply". */
+/** A rule set's code in words: "US-floor-1" -> "US starter rules (version 1)" (hero review 2, F-M2). */
+export function floorName(code: string | null | undefined): string {
+  const match = /^([A-Z_]+?)(?:-(IMP|UF))?-floor-(\d+)$/.exec(code ?? "");
+  if (!match) return code ?? "";
+  const role = match[2] === "IMP" ? " importer" : match[2] === "UF" ? " user facility" : "";
+  return `${match[1].replace(/_/g, "/")}${role} starter rules (version ${match[3]})`;
+}
+
+/** The rules that decided, in words: "F-US-1 applies; F-US-2 could apply"; nothing when none were recorded. */
 export function appliedText(applied: RulesApplied | null | undefined): string {
-  if (!applied) return "Rules applied: not recorded";
+  if (!applied) return "";
   if (!applied.rules.length) return "No floor rule applies to these answers";
   return applied.rules
     .map((rule) => `${rule.id} ${rule.state === "APPLIES" ? "applies" : "could apply (an answer is Unknown)"}`)
     .join("; ");
 }
+
+/** Sentences joined, each ending with a full stop; empty ones left out. */
+const sentences = (...parts: string[]) =>
+  parts
+    .filter(Boolean)
+    .map((part) => `${part}.`)
+    .join(" ");
 
 /** The three lines of the panel, as plain sentences (null: the register is off; nothing to show). */
 export function rulesUsedLines(used: RulesUsed | null | undefined) {
@@ -109,17 +124,18 @@ export function rulesUsedLines(used: RulesUsed | null | undefined) {
   const day = used.at_event.day ? formatDay(used.at_event.day) : null;
   const decided = used.decided;
   return {
-    atEvent: `${used.at_event.code}${day ? `, in force on the awareness day (${day})` : ""}. ${appliedText(
-      used.at_event.rules_applied,
-    )}.`,
+    atEvent: sentences(
+      `${floorName(used.at_event.code)}${day ? `, in force on ${day}, the awareness day` : ""}`,
+      appliedText(used.at_event.rules_applied),
+    ),
     today: used.today.same
-      ? `${used.today.code}: the same.`
-      : `${used.today.code}: differs; not applied to this event${day ? ` (aware on ${day})` : ""}.`,
+      ? `${floorName(used.today.code)}: the same.`
+      : `${floorName(used.today.code)}: differs; not applied to this event${day ? ` (aware on ${day})` : ""}.`,
     decided: !decided
       ? "Not signed yet."
       : decided.before_register
         ? "Signed before the rule register: it keeps what it signed."
-        : `Signed under ${decided.floor_code}. ${appliedText(decided.rules_applied)}.${
+        : `${sentences(`Signed under ${floorName(decided.floor_code)}`, appliedText(decided.rules_applied))}${
             decided.date_calc?.due_date
               ? ` Due ${formatDay(decided.date_calc.due_date)} (${decided.date_calc.window ?? "the regulation"}).`
               : ""

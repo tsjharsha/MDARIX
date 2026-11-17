@@ -591,7 +591,8 @@ export function StagePath({
 }) {
   return (
     <div className="uw-stageline">
-      <b className="uw-stageline-count">{stageCount(stages)} ·</b>
+      {/* The separator is drawn before the stage list, so it never dangles when the list is hidden (F-C3). */}
+      <b className="uw-stageline-count">{stageCount(stages)}</b>
       <ol className="uw-stageline-ol" aria-label="Stage">
         {stages.map((stage) => {
           const state =

@@ -144,7 +144,7 @@ export function useWorkContext(caseLink?: string | null): WorkContext {
   useEffect(() => {
     const available = products.find((product) => product.id === productId)?.available_versions ?? [];
     if (available.length && !available.includes(version)) setVersion(available[available.length - 1]);
-    if (!available.length && !version) setVersion("D");
+    // No guessed version ("D" was asked of every product before the list arrived, a 404 on every page; F-H6).
   }, [productId, products]);
 
   useEffect(() => {

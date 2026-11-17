@@ -11,6 +11,8 @@ import { NEW_HEADS } from "./UserWorkspace";
 import { Tabs } from "../customer-admin/shared";
 import { SignupForm, TRIAL_AI_LINE } from "../auth/SignupForm";
 import { countOf } from "../admin/console/AdminOverview";
+import { MirNeeds } from "./sections/MirFiles";
+import type { ReportDetail } from "./authorityReports";
 
 // Hero review 2 (17 Nov 2026), front-end fix pass 3: the findings are named by their review IDs.
 
@@ -196,5 +198,18 @@ describe("F-W2, F-X4: first screens read in one glance", () => {
     expect(countOf(2, "active tenant")).toBe("2 active tenants");
     expect(countOf(1, "person", "people")).toBe("1 person");
     expect(countOf(3, "person", "people")).toBe("3 people");
+  });
+});
+
+describe("F-M6: a draft MIR says how many fields are left, the schema keys folded", () => {
+  it("counts first and folds the keys", () => {
+    const detail = {
+      stage: "DRAFT",
+      form: { code: "GB_MIR" },
+      mir: { missing: ["1.2d (1_2D)", "1.2f (1_2F)"], errors: [], snapshot: null },
+    } as unknown as ReportDetail;
+    const html = renderToStaticMarkup(<MirNeeds detail={detail} />);
+    expect(html).toContain("<strong>2 fields left</strong>");
+    expect(html.indexOf("<details")).toBeLessThan(html.indexOf("1.2d (1_2D)"));
   });
 });

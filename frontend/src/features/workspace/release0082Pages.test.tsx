@@ -76,7 +76,8 @@ describe("every record page: one Next step, which is the story's, and one progre
     expect(rail).toContain("Open the tree");
     // One main button on the page, and one progress indicator: the status line, no chevron path.
     expect(html.match(/class="ac-primary"/g)).toHaveLength(1);
-    expect(html).toContain("Stage 2 of 6 ·");
+    expect(html).toContain("Stage 2 of 6</b>");
+    expect(html).not.toContain("Stage 2 of 6 ·");
     expect(html).not.toContain('class="uw-path"');
   });
 
@@ -107,6 +108,14 @@ describe("Home for every persona (D1.6)", () => {
       expect(html).toContain("Continue the story");
       expect(html).not.toContain("Review this sample event");
     }
+    // Hero review 2 (F-H3, F-H7): the reference on its own line, and on steps 1-2 the call Getting started names.
+    expect(home()).toContain('<span class="ac-muted uw-home-ref">SAMPLE-RV-11</span>');
+    resources.data[ONE_STORY_PATH] = {
+      sample: { ...run(0), case: { id: "c11", ref: "SAMPLE-CASE-11", classification: null, state: "OPEN" } },
+      yours: null,
+    };
+    expect(home()).toContain("SAMPLE-CASE-11, the call behind SAMPLE-RV-11");
+    resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
   });
 
   it("on your data leads with the most urgent complaint and what the file did not say", () => {

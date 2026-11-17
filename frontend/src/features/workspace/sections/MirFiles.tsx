@@ -18,13 +18,20 @@ export function MirNeeds({ detail }: { detail: MirDetail & Pick<ReportDetail, "s
     <div className="ac-muted" id="rp-mir-needs">
       <p>
         Send for approval checks the MIR file against {isGb(detail) ? "MHRA's GB schema" : "the Commission's schema"}.
-        It still needs:
+        <strong>
+          {needs.length} {needs.length === 1 ? "field" : "fields"} left
+        </strong>
+        .
       </p>
-      <ul>
-        {needs.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
+      {/* The schema's own keys stay in a fold: the count is what a reader needs first (F-M6). */}
+      <details className="uw-more">
+        <summary>Show {needs.length === 1 ? "it" : "them"}</summary>
+        <ul>
+          {needs.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

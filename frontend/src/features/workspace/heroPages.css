@@ -1792,6 +1792,13 @@
 .uw-hybrid .ac-table .col-grip::after {
   background: var(--ms-line-control);
 }
+/* Shown only on hover or keyboard focus, so a header at rest has no bars (hero review 2, F-C1). */
+.uw-hybrid .ac-table .col-grip:not(:hover, :focus-visible)::after {
+  opacity: 0;
+}
+.uw-hybrid .ac-table th:hover .col-grip::after {
+  opacity: 1;
+}
 .uw-hybrid .ac-main :is(select, textarea, input):focus-visible {
   border-color: var(--ms-teal-mark);
   outline: 2px solid color-mix(in srgb, var(--ms-teal-mark) 35%, transparent);
@@ -2004,4 +2011,8 @@
   margin: 0;
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-13);
+}
+/* The sample story's reference under its step on the Home banner (F-H3). */
+.uw-home-banner .uw-home-ref {
+  display: block;
 }

@@ -320,7 +320,11 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
           <b>
             Step {run.current + 1} of {STORY_STEPS}: {run.steps[run.current].label}
           </b>{" "}
-          <span className="ac-muted">· {run.complaint.ref}</span>
+          {/* The reference on its own line, never a line that starts with its separator (F-H3). */}
+          <span className="ac-muted uw-home-ref">
+            {/* Steps 1 and 2 work on the call: the same reference as Getting started says (F-H7). */}
+            {run.case && run.current < 2 ? `${run.case.ref}, the call behind ${run.complaint.ref}` : run.complaint.ref}
+          </span>
         </span>
         <button type="button" className="ac-primary" onClick={go}>
           Continue the story <ChevronRight size={15} aria-hidden="true" />
