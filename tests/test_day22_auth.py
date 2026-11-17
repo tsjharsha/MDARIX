@@ -1,5 +1,8 @@
 """Password hashing and the password rules (auth/service.py)."""
 
+import hashlib
+import secrets
+
 import pytest
 
 from auth import service
@@ -68,3 +71,28 @@ def test_unknown_email_spends_the_time_of_a_password_check(monkeypatch):
     monkeypatch.setattr(service, "_verify", lambda password, stored: calls.append(stored) or original(password, stored))
     service.burn_verification_time("whatever password")
     assert calls
+
+
+# OWASP Password Storage Cheat Sheet: scrypt at N=2^17, r=8, p=1 or one of its listed equivalents.
+OWASP_SCRYPT = {(17, 8, 1), (16, 8, 2), (15, 8, 3), (14, 8, 5), (13, 8, 10)}
+
+
+def test_the_default_cost_is_an_owasp_scrypt_setting(monkeypatch):
+    """P7 (owner, 17 Nov 2026): N=2^15, r=8, p=3, an OWASP equivalent of the minimum, under a second per hash."""
+    monkeypatch.delenv("MDARIX_PASSWORD_SCRYPT_LOG2_N", raising=False)
+    stored = _hash("Default cost 12345")
+    log2_n, r, p = (int(part) for part in stored.split("$")[1:4])
+    assert (log2_n, r, p) == (15, 8, 3)
+    assert (log2_n, r, p) in OWASP_SCRYPT
+    assert _verify("Default cost 12345", stored) and not needs_rehash(stored)
+
+
+def test_a_hash_at_the_old_cost_still_verifies_and_is_rehashed_at_sign_in(monkeypatch):
+    """Hashes written at N=2^17, r=8, p=1 (until 0.10.97) keep working and move to the new cost on the next sign-in."""
+    monkeypatch.delenv("MDARIX_PASSWORD_SCRYPT_LOG2_N", raising=False)
+    salt = secrets.token_bytes(16)
+    digest = hashlib.scrypt(b"Old cost 1234567", salt=salt, n=2**17, r=8, p=1, maxmem=256 * 8 * 2**17 + 2**20)
+    old = f"scrypt$17$8$1${salt.hex()}${digest.hex()}"
+    assert _verify("Old cost 1234567", old)
+    assert not _verify("Old cost 7654321", old)
+    assert needs_rehash(old)

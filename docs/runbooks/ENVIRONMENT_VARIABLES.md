@@ -68,7 +68,7 @@ not list.
 | `MDARIX_DEMO_REQUEST_SALT` | yes | Salts the hashed address of demo requests. |
 | `MDARIX_DEMO_REQUESTS_PER_SOURCE_HOUR`, `MDARIX_DEMO_REQUESTS_PER_DAY` | no | Demo request limits per sending address per hour (5) and in total per day (200). |
 | `MDARIX_RATE_LIMIT_SALT` | yes | Salts rate-limit keys. |
-| `MDARIX_PASSWORD_SCRYPT_LOG2_N` | no | Password hash cost (default 17; production refuses less). Tests use 14. |
+| `MDARIX_PASSWORD_SCRYPT_LOG2_N` | no | Password hash cost. Unset (production default): N=2^15, r=8, p=3, an OWASP equivalent of N=2^17, p=1. When set, N=2^value with p=1; production refuses less than 17. Tests use 14. |
 | `MDARIX_PASSWORD_HASH_CONCURRENCY` | no | Maximum password hashes allowed concurrently in one process (default 3), limiting CPU and memory pressure during sign-in bursts. |
 | `MDARIX_RATE_LIMITS_ENABLED` | no | `false` only in automated tests; refused in production. |
 | `MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR` | no | Free-trial sign-up requests per network address per hour (default 30, since 0.10.62; 5 before). A venue's Wi-Fi is one address for everyone in the room. A missing, invalid or non-positive value keeps 30. Read when the API starts. |

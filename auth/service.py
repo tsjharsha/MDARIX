@@ -7,9 +7,12 @@ Hashes are scrypt with a random 16-byte salt. New hashes record their cost:
 Hashes written before that format (``<salt hex>:<digest hex>``, N=2^14, r=8, p=1) still verify; ``needs_rehash``
 reports them (and any hash below the current cost) so sign-in can upgrade them while the password is at hand.
 
-The cost defaults to N=2^17, r=8, p=1 (OWASP Password Storage guidance; 128 MiB per hash).
-``MDARIX_PASSWORD_SCRYPT_LOG2_N`` may lower it for automated tests only; production refuses a value below 17
-(``backend/app/config_check.py``). At most ``MDARIX_PASSWORD_HASH_CONCURRENCY`` hashes (default 3) run at once in a
+The cost defaults to N=2^15, r=8, p=3 (owner decision P7, 17 Nov 2026): one of the OWASP Password Storage
+equivalents of its minimum N=2^17, r=8, p=1 (the cost until 0.10.97), about two thirds of its time and 32 MiB per hash
+instead of 128, so activation and sign-in stay well under a second. Hashes at the old cost still verify and are
+re-hashed at the next sign-in (``needs_rehash``: p below 3). ``MDARIX_PASSWORD_SCRYPT_LOG2_N`` sets N with p=1: below
+15 for automated tests only, and production refuses a value below 17 (``backend/app/config_check.py``), so every
+production cost stays at or above the OWASP minimum. At most ``MDARIX_PASSWORD_HASH_CONCURRENCY`` hashes (default 3) run at once in a
 process; the rest wait, so a burst of sign-ins cannot exhaust memory.
 
 Passwords follow NIST SP 800-63B: 12 to 128 characters, no composition rules, no periodic expiry, and refused when
@@ -30,9 +33,9 @@ from pathlib import Path
 
 MIN_LENGTH = 12
 MAX_LENGTH = 128
-DEFAULT_LOG2_N = 17
+DEFAULT_LOG2_N = 15
+DEFAULT_P = 3
 _R = 8
-_P = 1
 _LEGACY_LOG2_N = 14
 _PREFIX = "scrypt$"
 _BREACHED = Path(__file__).resolve().parent / "data" / "breached_passwords.txt.gz"
@@ -46,6 +49,12 @@ def _log2_n() -> int:
     except ValueError:
         return DEFAULT_LOG2_N
     return min(max(value, 10), 20)
+
+
+def _p() -> int:
+    """Parallelism: 3 with the default N (the OWASP equivalent N=2^15, p=3); 1 when MDARIX_PASSWORD_SCRYPT_LOG2_N sets N
+    (tests lower it; production may only raise it to 17 or more, where p=1 meets the minimum)."""
+    return 1 if os.getenv("MDARIX_PASSWORD_SCRYPT_LOG2_N") else DEFAULT_P
 
 
 def _hash_concurrency() -> int:
@@ -76,9 +85,9 @@ def _scrypt(password: str, salt: bytes, log2_n: int, r: int, p: int) -> bytes:
 def _hash(password: str, salt: bytes | None = None) -> str:
     """A new scrypt hash of ``password`` at the current cost."""
     salt = salt or secrets.token_bytes(16)
-    log2_n = _log2_n()
-    digest = _scrypt(password, salt, log2_n, _R, _P)
-    return f"{_PREFIX}{log2_n}${_R}${_P}${salt.hex()}${digest.hex()}"
+    log2_n, p = _log2_n(), _p()
+    digest = _scrypt(password, salt, log2_n, _R, p)
+    return f"{_PREFIX}{log2_n}${_R}${p}${salt.hex()}${digest.hex()}"
 
 
 def _parse(stored: str) -> tuple[int, int, int, bytes, bytes]:
@@ -110,7 +119,7 @@ def needs_rehash(stored: str) -> bool:
         log2_n, r, p, _salt, _digest = _parse(stored)
     except ValueError:
         return False
-    return not stored.startswith(_PREFIX) or log2_n < _log2_n() or r < _R or p < _P
+    return not stored.startswith(_PREFIX) or log2_n < _log2_n() or r < _R or p < _p()
 
 
 @lru_cache(maxsize=4)
@@ -123,7 +132,7 @@ def _dummy_hash(cost_key: int) -> str:
 def burn_verification_time(password: str) -> None:
     """Spend the time of one password check, so an unknown email answers as slowly as a wrong password."""
     try:
-        _verify(password, _dummy_hash(_log2_n()))
+        _verify(password, _dummy_hash(_log2_n() * 100 + _p()))
     except ValueError:
         pass
 
