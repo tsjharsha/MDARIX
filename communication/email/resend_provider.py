@@ -14,6 +14,10 @@ class ResendProvider:
         self.reply_to = reply_to or os.getenv("RESEND_REPLY_TO")
 
     def health(self) -> dict[str, object]:
+        from auth.emailer import delivery_off
+
+        if delivery_off():
+            return {"provider": "resend", "configured": False, "delivery_off": True}
         sender_domain = parseaddr(self.sender or "")[1].split("@")[-1] if "@" in parseaddr(self.sender or "")[1] else ""
         verified_domain = os.getenv("RESEND_VERIFIED_DOMAIN", "")
         return {
@@ -30,6 +34,11 @@ class ResendProvider:
         }
 
     def send(self, message: EmailMessage) -> str:
+        from auth.emailer import delivery_off
+
+        # MDARIX_EMAIL_DELIVERY=off (or a demo database) wins over any key a dotenv file supplies.
+        if delivery_off():
+            raise RuntimeError("EMAIL_DELIVERY_OFF")
         if not self.api_key or not self.sender:
             raise RuntimeError("RESEND_NOT_CONFIGURED")
         verified_domain = os.getenv("RESEND_VERIFIED_DOMAIN")
