@@ -43,6 +43,7 @@ import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
 import { CaseDecisionPanel } from "./CaseDecision";
+import { DecisionSummaryView } from "./DecisionSummary";
 import { DidItWorkView } from "./DidItWork";
 import { CaseIntegrity, CaseTimeline } from "./CaseAudit";
 import { Embedded } from "./common";
@@ -142,6 +143,8 @@ export function CaseSections({
   // The brief's status changed (accepted for decision...): the decision form and the case's header read it again.
   const [briefRound, setBriefRound] = useState(0);
   const [lotRound, setLotRound] = useState(0);
+  // A decision signed (or a follow-up changed) on this screen: the decision summary reads it again.
+  const [signedRound, setSignedRound] = useState(0);
   const scope = useResource<{ current?: { version: number; included_complaints?: Array<{ id: string }> } | null }>(
     work.investigationId ? `/api/v1/investigations/${encodeURIComponent(work.investigationId)}/scope` : null,
   );
@@ -327,6 +330,14 @@ export function CaseSections({
         )}
         {active === "Decisions & actions" && (
           <>
+            {/* E3 + W6: once signed, the decision and its impact lead the section, on one screen. */}
+            <div className="uw-case-part" id={partId(part === "record" ? "record" : "summary")}>
+              <DecisionSummaryView
+                key={`${id}:${briefRound}:${signedRound}`}
+                investigationId={id}
+                recordOpen={part === "record"}
+              />
+            </div>
             {quiet.length > 0 && (
               <p className="uw-cr-meta uw-not-started">
                 Not started yet: {quiet.map((item) => item.label).join(", ")} ·{" "}
@@ -367,7 +378,10 @@ export function CaseSections({
                 caseLabel={caseLabel}
                 initialFollowUp={id === reviewCase ? requestedDecision.followUp : null}
                 initialAssessment={id === reviewCase ? requestedDecision.assessment : null}
-                onCaseChanged={onChanged}
+                onCaseChanged={() => {
+                  setSignedRound((round) => round + 1);
+                  onChanged();
+                }}
                 onReviewBrief={() => {
                   setReviewFocus(true);
                   go("Decisions & actions", "brief");

@@ -9301,3 +9301,103 @@ details.uw-team-change[open] {
 .uw-flagship-card .uw-os-lines dd {
   font-size: var(--ms-fs-16);
 }
+
+/* E3 + W6: the decision and its impact on one screen (projector 1280x720), flat (G-2); the formal record folded below. */
+.uw-dsum {
+  padding: var(--ms-space-5);
+  margin-bottom: var(--ms-space-4);
+}
+.uw-dsum-head h2 {
+  margin: 4px 0 6px;
+  font-size: var(--ms-fs-24);
+  line-height: 1.25;
+  color: var(--ms-ink);
+}
+.uw-dsum-by {
+  margin: 0 0 var(--ms-space-4);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-16);
+}
+.uw-dsum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ms-space-3);
+}
+.uw-dsum-tile {
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  padding: var(--ms-space-3) var(--ms-space-4);
+  background: var(--ms-surface);
+  font-size: var(--ms-fs-16);
+}
+.uw-dsum-tile h3 {
+  margin: 0 0 8px;
+  font-size: var(--ms-fs-13);
+  font-weight: var(--ms-fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+.uw-dsum-tile p {
+  margin: 0 0 6px;
+}
+.uw-dsum-tile.is-good {
+  border-color: var(--ms-good-line);
+  background: var(--ms-good-bg);
+}
+.uw-dsum-tile.is-critical {
+  border-color: var(--ms-crit-line);
+  background: var(--ms-crit-bg);
+}
+.uw-dsum-list {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+}
+.uw-dsum-list li {
+  margin-bottom: 2px;
+}
+.uw-dsum-facts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.uw-dsum-facts > div,
+.uw-dsum-record > div {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 8px;
+}
+.uw-dsum-facts dt,
+.uw-dsum-record dt {
+  color: var(--ms-muted);
+}
+.uw-dsum-facts dd,
+.uw-dsum-record dd {
+  margin: 0;
+}
+.uw-dsum-line {
+  margin: 4px 0 0;
+}
+.uw-dsum-more {
+  margin-top: var(--ms-space-4);
+}
+.uw-dsum-record {
+  display: grid;
+  gap: 10px;
+  margin: var(--ms-space-3) 0 0;
+}
+.uw-dsum-record > div {
+  grid-template-columns: 11em 1fr;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.ca-drawer-section .uw-dsum-record > div {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+@media (max-width: 760px) {
+  .uw-dsum-grid,
+  .uw-dsum-record > div {
+    grid-template-columns: 1fr;
+  }
+}

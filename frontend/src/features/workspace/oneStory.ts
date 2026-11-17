@@ -297,6 +297,29 @@ export function flagshipPlace(run: FlagshipRun, index: number): FlagshipPlace {
     : { section: "Records", tab: "Effectiveness checks" };
 }
 
+/** G-06: the flagship signal in the trend check's own number (the figure Home and Trends show), never a figure of
+ * its own; without a trend row for the product, the sentence has no number. */
+export function signalWhy(
+  items: ReadonlyArray<{ product: { id: string }; ratio: number | null }> | undefined,
+  productId: string | null | undefined,
+): string {
+  const ratios = (items ?? [])
+    .filter((row) => row.product.id === productId && typeof row.ratio === "number")
+    .map((row) => row.ratio as number);
+  const lead = ratios.length
+    ? `Pressure-alarm complaints on one pump are at ${Math.max(...ratios).toFixed(1)}× the earlier average after Rev B.`
+    : "Pressure-alarm complaints on one pump are rising after Rev B.";
+  return `${lead} A rise like this starts an investigation.`;
+}
+
+/** E3 + W6: the signed decision's summary and record, leading the case's Decisions & actions. */
+export const summaryPlace = (run: FlagshipRun): FlagshipPlace => ({
+  section: "Investigations",
+  tab: "Decisions & actions?part=summary",
+  caseId: run.investigation.id,
+  productId: run.product.id,
+});
+
 /** The optional branch (W1): is SAMPLE-RV-06 reportable in each market? Its US decision tree. */
 export const branchPlace = (run: FlagshipRun): Place | null =>
   run.branch ? treePlace("US", run.branch.complaint_id) : null;

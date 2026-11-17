@@ -25,7 +25,7 @@ import { errorText, send, useResource } from "../../customer-admin/shared";
 import { useRoutinePath, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
-import { chanceText, runPath, trendCountText, trendResultLabel, type TrendItem } from "../signalAi";
+import { chanceText, runPath, trendCountText, trendPath, trendResultLabel, type TrendItem } from "../signalAi";
 import { useAiReady } from "../useAiStatus";
 import { RecordedChip } from "../../shared/AiReview";
 import { flagshipBarParts } from "./FlagshipBar";
@@ -34,6 +34,8 @@ import {
   LOT_005_LINE,
   STORY_STEPS,
   branchPlace,
+  signalWhy,
+  summaryPlace,
   openFlagshipStep,
   casePlace,
   moreCasePlace,
@@ -789,7 +791,8 @@ export function flagshipCopy(run: FlagshipRun, index: number, aiReady: boolean |
 /** Why each flagship step is needed, who takes it and what ticks it. */
 export const FLAGSHIP_INFO: ReadonlyArray<{ why: string; who: string; evidence: string }> = [
   {
-    why: "Pressure-alarm complaints on one pump rose about sevenfold after Rev B. A rise like this starts an investigation.",
+    // G-06: shown with the trend check's own number (signalWhy); this is the wording while it loads.
+    why: signalWhy(undefined, null),
     who: "Quality Leader",
     evidence: "The OrbitCare 300 trend opened",
   },
@@ -826,6 +829,7 @@ export const FLAGSHIP_INFO: ReadonlyArray<{ why: string; who: string; evidence: 
 ];
 
 const FLAGSHIP_ICONS: readonly LucideIcon[] = [TrendingUp, Package, ListChecks, Sparkles, FileText, PencilLine, Wrench];
+export const SUMMARY_LINE = "See the decision and its impact on one screen";
 export const FLAGSHIP_BRIEF_LINE =
   "Written by the sample author before the AI proposal; your accepted proposal is on the case.";
 export const RISK_LINE = "Risk file: reassess SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor";
@@ -836,13 +840,21 @@ function FlagshipExtra({
   index,
   aiReady,
   onRisk,
+  onSummary,
 }: {
   run: FlagshipRun;
   index: number;
   aiReady: boolean | null;
   onRisk: () => void;
+  onSummary: () => void;
 }) {
   const note = run.steps[index].note;
+  // E3 + W6: once the decision is signed, its summary is one click away from steps 6 and 7.
+  const summary = run.steps[5].done ? (
+    <button type="button" className="ac-link" onClick={onSummary}>
+      {SUMMARY_LINE}
+    </button>
+  ) : null;
   if (index === 0 || index === 1) return <p className="uw-os-differ">{LOT_005_LINE}</p>;
   if (index === 3)
     return (
@@ -859,10 +871,13 @@ function FlagshipExtra({
   if (index === 4) return <p className="uw-os-differ">{FLAGSHIP_BRIEF_LINE}</p>;
   if (index === 5)
     return (
-      <p className="uw-os-differ">
-        {note ??
-          "The follow-ups come prefilled from the brief's actions. You sign with password and authenticator code."}
-      </p>
+      <div className="uw-os-differ">
+        <p>
+          {note ??
+            "The follow-ups come prefilled from the brief's actions. You sign with password and authenticator code."}
+        </p>
+        {summary && <p>{summary}</p>}
+      </div>
     );
   if (index === 6)
     return (
@@ -878,6 +893,7 @@ function FlagshipExtra({
             {RISK_LINE}
           </button>
         </li>
+        {summary && <li>{summary}</li>}
       </ul>
     );
   return null;
@@ -909,6 +925,10 @@ export function FlagshipView({
   const selected = picked ?? Math.min(run.current, FLAGSHIP_STEPS - 1);
   const finished = run.finished && picked === null;
   const previewing = picked !== null && picked !== run.current;
+  // G-06: step 1 says the rise in the trend check's own number.
+  const signal = useResource<{ items?: TrendItem[] }>(
+    selected === 0 && !finished && run.product.id ? trendPath("version", run.product.id) : null,
+  );
   const go = (section: string, tab?: string) => open(section as WorkspaceSection, tab);
   const start = async (index: number) => {
     startStory?.("flagship");
@@ -924,6 +944,11 @@ export function FlagshipView({
       }
     }
     openFlagshipStep(run, index, go, work?.setInvestigationId);
+  };
+  const openSummary = () => {
+    const place = summaryPlace(run);
+    if (place.caseId) work?.setInvestigationId?.(place.caseId, place.productId);
+    go(place.section, place.tab);
   };
   const branch = () => {
     const place = branchPlace(run);
@@ -981,6 +1006,11 @@ export function FlagshipView({
           From a rising signal to a signed decision and a planned effectiveness check, each step read from its saved
           record. Nothing says the action worked until a person signs that check.
         </p>
+        <p className="uw-wt-hint">
+          <button type="button" className="ac-link" onClick={openSummary}>
+            {SUMMARY_LINE}
+          </button>
+        </p>
         <div className="ca-action-row">
           {session?.sample_only ? (
             <button type="button" className="ac-primary uw-os-go" onClick={() => open("Next steps")}>
@@ -997,6 +1027,7 @@ export function FlagshipView({
   } else {
     const copy = flagshipCopy(run, selected, aiReady);
     const info = FLAGSHIP_INFO[selected];
+    const why = selected === 0 ? signalWhy(signal.data?.items, run.product.id) : info.why;
     const step = run.steps[selected];
     const Icon = FLAGSHIP_ICONS[selected];
     body = (
@@ -1033,7 +1064,7 @@ export function FlagshipView({
         <dl className="uw-os-lines">
           <div>
             <dt>Why</dt>
-            <dd>{info.why}</dd>
+            <dd>{why}</dd>
           </div>
           <div>
             <dt>Who</dt>
@@ -1051,7 +1082,13 @@ export function FlagshipView({
         ) : step.earlier ? (
           <span className="ms-chip uw-os-state">Done earlier · ticked once the steps before it are done</span>
         ) : null}
-        <FlagshipExtra run={run} index={selected} aiReady={aiReady} onRisk={() => go("Records", "Risk file input")} />
+        <FlagshipExtra
+          run={run}
+          index={selected}
+          aiReady={aiReady}
+          onRisk={() => go("Records", "Risk file input")}
+          onSummary={openSummary}
+        />
         {(selected === 2 || selected === 6) && run.branch && (
           <p className="uw-wt-hint">
             <button type="button" className="ac-link" onClick={branch}>
