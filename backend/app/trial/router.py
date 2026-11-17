@@ -526,16 +526,17 @@ def one_story(
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     request = team.trial_request(db, tenant_id)
     if request is None:
-        return {"sample": None, "yours": None}
+        return {"sample": None, "yours": None, "flagship": None}
     return story.progress(data, db, ctx, tenant_id, request)
 
 
 class OneStoryMark(BaseModel):
-    run: str = Field(pattern="^(sample|yours)$")
-    # 0.10.93: steps 1 and 2 read the Case's records; the "call" mark is no longer kept.
-    step: str = Field(pattern="^(form|records|trends)$")
+    run: str = Field(pattern="^(sample|yours|flagship)$")
+    # 0.10.93: steps 1 and 2 read the Case's records; the "call" mark is no longer kept. W1: the flagship story's
+    # first three steps (signal, product, evidence) are marks too.
+    step: str = Field(pattern="^(form|records|trends|signal|product|evidence)$")
     # The complaint the person's screen showed: the story's complaint can move (a new urgent import), and a mark
-    # must never land on a complaint the person did not open.
+    # must never land on a complaint the person did not open. For the flagship run, the investigation's id.
     complaint_id: uuid.UUID
 
 
@@ -548,26 +549,38 @@ def mark_one_story(
 ):
     """The person opened a step's screen from the story (the report, Records, Trends): kept on the trial's
     request under their name, and counted for the whole team. No business record changes."""
+    from backend.app.trial import flagship
     from backend.app.trial import one_story as story
 
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
+    index = story.mark_index(payload.run, payload.step)
+    if index is None:
+        raise HTTPException(422, detail={"code": "NOT_A_STORY_STEP", "message": "This story has no such step to open"})
     request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
-    complaint = story.subject(data, db, tenant_id, payload.run, request) if request is not None else None
-    if request is None or complaint is None:
+    if payload.run == flagship.RUN:
+        case = flagship.find_case(data, tenant_id) if request is not None else None
+        subject, ref = (case.id, flagship.CASE) if case is not None else (None, None)
+    else:
+        complaint = story.subject(data, db, tenant_id, payload.run, request) if request is not None else None
+        subject, ref = (complaint.id, complaint.complaint_identifier) if complaint is not None else (None, None)
+    if request is None or subject is None:
         raise HTTPException(404, detail={"code": "NO_STORY_COMPLAINT", "message": "This story has no complaint yet"})
-    if complaint.id != payload.complaint_id:
+    if subject != payload.complaint_id:
         raise HTTPException(
             409,
             detail={
                 "code": "STORY_MOVED",
-                "message": f"The story now follows {complaint.complaint_identifier}. Open Getting started again.",
+                "message": f"The story now follows {ref}. Open Getting started again.",
             },
         )
     # A mark counts only at its place in the story: Records or Trends opened before the steps ahead of it are done is
     # not credited later.
-    index = story.MARK_STEP[payload.step]
-    run = story.run_progress(data, db, ctx, tenant_id, request, payload.run)
+    run = (
+        flagship.run_progress(data, db, tenant_id, request)
+        if payload.run == flagship.RUN
+        else story.run_progress(data, db, ctx, tenant_id, request, payload.run)
+    )
     if run["current"] < index:
         raise HTTPException(
             409,
@@ -577,7 +590,7 @@ def mark_one_story(
                 f"step {run['current'] + 1} is next.",
             },
         )
-    story.record_mark(request, str(ctx.user_id), payload.run, complaint.id, payload.step, datetime.now(timezone.utc))
+    story.record_mark(request, str(ctx.user_id), payload.run, subject, payload.step, datetime.now(timezone.utc))
     db.commit()
     return story.progress(data, db, ctx, tenant_id, request)
 
