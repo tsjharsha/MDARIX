@@ -72,6 +72,7 @@ CONTROL_ONLY = (
     "genai_provider_rest",
     "ai_usage_monthly",
     "tenant_exports",
+    "validation_test_runs",
 )
 
 
