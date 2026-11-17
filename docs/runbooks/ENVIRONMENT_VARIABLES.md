@@ -154,6 +154,8 @@ not list.
 | `MDARIX_GENAI_MAX_INPUT_TOKENS`, `MDARIX_GENAI_MAX_OUTPUT_TOKENS`, `MDARIX_GENAI_COST_PER_1K_TOKENS` | no | Size limits and cost estimate. |
 | `MDARIX_GENAI_RATE_LIMIT_REST_SECONDS`, `MDARIX_GENAI_OUTAGE_REST_SECONDS` | no | How long a limited or failing provider rests. |
 | `MDARIX_GENAI_SHARED_REST` | no | `true` (default): a resting provider is skipped by every API, worker and scheduler process (table `genai_provider_rest`). Tests set `false`. |
+| `MDARIX_AI_FEATURES` | for any AI | The AI features this server lets call a model, comma-separated (`ask`, `summaries`, `case_analysis`, `drafting`, `evidence_extraction`, `code_suggestions`); empty (default) = none, so switching AI on for an organization runs nothing. The startup check warns when `MDARIX_AI_TRIAL_CHAIN` is set and this is empty; `/health/ready` reports it under `trial_ai_chain`. |
+| `MDARIX_AI_TRIAL_CHAIN` | for free-trial AI | The free-trial providers in order, for example `freellmapi,omniroute`; empty (default) = no AI for free trials. Each must be in `genai/vetted_providers.json`; in staging and production FreeLLMAPI and OmniRoute must be at 127.0.0.1 (reached through the loopback forwarders, `docs/runbooks/AI_PROVIDERS.md`). |
 | `MDARIX_AI_TRIAL_MONTHLY_TOKENS` | no | Monthly AI token allowance of a free trial without its own (200,000; lower than paid). |
 | `MDARIX_GENAI_LOCATION` | with `vertex` | Vertex AI region (default `asia-south1`, Mumbai); production refuses another region unless `MDARIX_GENAI_VERTEX_REGION_EXCEPTION=true`. |
 | `MDARIX_GENAI_TENANT_MONTHLY_TOKENS` | no | Monthly AI token allowance of an organization without its own (2,000,000). Platform administrators set per-organization allowances; customer administrators can switch AI off. |

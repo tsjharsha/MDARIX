@@ -253,6 +253,43 @@ def _clock() -> dict:
     return {"name": "clock", "ok": ok, **result, "ms": round((time.perf_counter() - started) * 1000, 1)}
 
 
+def _trial_ai_chain() -> dict:
+    """Review G10: the free-trial AI chain (MDARIX_AI_TRIAL_CHAIN). Off when no chain is set. Otherwise each provider:
+    usable (vetted, configured, on loopback where required), resting after a failure, and for a gateway on this server
+    whether its port accepts a connection (no request is sent to any AI service). Not ok when no provider is usable,
+    reachable and awake, or when no AI feature is switched on for the server (MDARIX_AI_FEATURES). It reports and
+    alerts like the clock: it leaves the readiness status as it is, since AI is never required for the service."""
+    import socket
+    from urllib.parse import urlparse
+
+    from genai import provider as genai
+    from genai.features import platform_features
+
+    names = genai.trial_chain_names()
+    if not names:
+        return {"state": "OFF"}
+    problems = genai.trial_chain_problems(names)
+    resting_until = genai._resting_until()
+    providers = []
+    for name in names:
+        item = {"provider": name, "usable": name not in problems, "resting": resting_until.get(name, 0) > time.time()}
+        if name in ("freellmapi", "omniroute") and item["usable"]:
+            url = os.getenv(f"MDARIX_GENAI_{name.upper()}_BASE_URL") or genai.OPENAI_COMPATIBLE[name][0]
+            parsed = urlparse(url)
+            try:
+                socket.create_connection((parsed.hostname, parsed.port or 80), timeout=1.0).close()
+                item["reachable"] = True
+            except OSError:
+                item["reachable"] = False
+        providers.append(item)
+    features = sorted(platform_features())
+    if not features:
+        raise RuntimeError("NO_AI_FEATURES: the trial chain is set but MDARIX_AI_FEATURES lists no feature")
+    if not any(p["usable"] and not p["resting"] and p.get("reachable", True) for p in providers):
+        raise RuntimeError(f"TRIAL_AI_CHAIN_DOWN: {providers}")
+    return {"state": "ON", "providers": providers, "features": features}
+
+
 def readiness_report() -> dict:
     global _cached
     with _lock:
@@ -275,7 +312,7 @@ def readiness_report() -> dict:
             status = "degraded"
         # B6a G19: reported, and alerted by the operations job, but it leaves the status (and the public status page)
         # as it was (spec 3.4).
-        report = {"status": status, "checks": [database, *others, _clock()]}
+        report = {"status": status, "checks": [database, *others, _clock(), _check("trial_ai_chain", _trial_ai_chain)]}
         # Cached from when the report is ready: probes that time out (a database down) take longer than the cache.
         _cached = (time.monotonic(), report)
         return report

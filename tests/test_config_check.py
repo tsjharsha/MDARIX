@@ -535,3 +535,14 @@ def test_the_command_explains_that_development_is_not_checked(production, capsys
 def test_production_refuses_the_no_send_switch(production, name, value):
     production.setenv(name, value)
     assert "E-mail delivery is off" in found()
+
+
+def test_a_trial_ai_chain_without_any_ai_feature_is_a_startup_warning(production, monkeypatch):
+    """Review G7: the chain set and MDARIX_AI_FEATURES empty means trial AI switches on and nothing runs."""
+    monkeypatch.setattr(config_check.keyring, "warnings", lambda name: [])
+    assert config_check.warnings() == []
+    monkeypatch.setenv("MDARIX_AI_TRIAL_CHAIN", "freellmapi")
+    (found,) = config_check.warnings()
+    assert "MDARIX_AI_TRIAL_CHAIN is set but MDARIX_AI_FEATURES lists no AI feature" in found
+    monkeypatch.setenv("MDARIX_AI_FEATURES", "ask,summaries")
+    assert config_check.warnings() == []

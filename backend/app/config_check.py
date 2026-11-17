@@ -564,10 +564,27 @@ def _runtime_role_problem() -> str | None:
 
 def warnings() -> list[str]:
     """What an operator should know about this staging or production server that does not stop it (empty when
-    nothing): older encryption keys still loaded after a rotation."""
+    nothing): older encryption keys still loaded after a rotation, and a free-trial AI chain with no AI feature on."""
     if not is_production_like():
         return []
-    return [item for name in KEYRING_SETTINGS for item in keyring.warnings(name)]
+    found = [item for name in KEYRING_SETTINGS for item in keyring.warnings(name)]
+    found.extend(ai_feature_warnings())
+    return found
+
+
+def ai_feature_warnings() -> list[str]:
+    """Review G7: with MDARIX_AI_TRIAL_CHAIN set and MDARIX_AI_FEATURES empty, a trial owner can switch AI on and
+    nothing runs (every feature is off on the platform)."""
+    from genai.features import FEATURES_SETTING, platform_features
+    from genai.provider import TRIAL_CHAIN_SETTING, trial_chain_names
+
+    if trial_chain_names() and not platform_features():
+        return [
+            f"{TRIAL_CHAIN_SETTING} is set but {FEATURES_SETTING} lists no AI feature: free trials can switch AI on "
+            f"and nothing will run. Set {FEATURES_SETTING} (for example ask,summaries,case_analysis,drafting,"
+            "evidence_extraction,code_suggestions)."
+        ]
+    return []
 
 
 def enforce() -> None:
