@@ -101,7 +101,7 @@ describe("F-A1: the trial AI-off line says why", () => {
     })!;
     expect(user.title).toBe("AI is not switched on for your account");
     const none = aiStatusBanner({ enabled: false, reason_code: "PROVIDER_UNAVAILABLE", trial: true })!;
-    expect(none.title).toBe("AI is off for free trials");
+    expect(none.title).toBe("AI is not switched on for this trial");
   });
 });
 

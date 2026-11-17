@@ -1768,7 +1768,7 @@ def test_ask_mdarix_without_ai_answers_the_natural_trial_question_in_plain_words
         [*map(str, response["limitations"]), str(body["structured"].get("ai_note")), *body["structured"]["limitations"]]
     )
     assert "not configured" not in shown.lower() and "Live GenAI" not in shown
-    assert "AI is off for free trials" in shown
+    assert "AI is not switched on for this trial" in shown and "AI is off for free trials" not in shown  # G-07
     assert not any("It does not count complaints" in text for text in body["structured"]["limitations"])
     # The AI status every screen reads says why the AI buttons are off (UX-02).
     status = user.get("/api/v1/ai/status").json()

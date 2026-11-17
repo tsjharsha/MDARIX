@@ -8,7 +8,8 @@ import { formName } from "./TreeSign";
 import { FieldRow, useAction } from "./Reports";
 import { InlineError } from "./boardParts";
 import { TraceLink } from "./TraceValue";
-import { useCanRunAi, useWorkspace } from "../workspaceContext";
+import { useCan, useCanRunAi, useWorkspace } from "../workspaceContext";
+import { useAiOffReason } from "../useAiStatus";
 import "./decide.css";
 import "../../shared/statement-kind.css";
 import { AiWaiting } from "../../shared/AiWaiting";
@@ -217,14 +218,16 @@ export function AiCodeSuggestions({
   detail: ReportDetail;
   onChanged: (detail: ReportDetail) => void;
 }) {
-  const canRun = useCanRunAi();
+  const allowed = useCan("ai.run");
+  const off = useAiOffReason(useCanRunAi());
   const action = useAction(onChanged, "The code was not entered.");
   const [reply, setReply] = useState<AiCodeReply | null>(null);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
   const [entered, setEntered] = useState<string[]>([]);
   const coded = detail.sections.some((section) => section.fields.some((item) => item.code_annex));
-  if (!detail.editable || !canRun || !coded) return null;
+  // Shown whether or not AI answers now; only a role that may not run AI never sees it (G-07).
+  if (!detail.editable || !allowed || !coded) return null;
   const ask = async () => {
     setAsking(true);
     setError("");
@@ -249,11 +252,12 @@ export function AiCodeSuggestions({
           {reply?.ai.label ??
             "AI can propose IMDRF codes from the complaint's own words. You enter each one; nothing is entered for you."}
         </p>
-        <button type="button" className="ac-secondary ac-ai" disabled={asking} onClick={() => void ask()}>
+        <button type="button" className="ac-secondary ac-ai" disabled={asking || !!off} onClick={() => void ask()}>
           <Sparkles size={15} aria-hidden="true" />{" "}
           {asking ? "Suggesting…" : reply ? "Suggest again" : "Suggest IMDRF codes with AI"}
         </button>
       </div>
+      {off && <p className="ac-note">{off}. Enter the codes by hand below.</p>}
       {asking && <AiWaiting label="Suggesting IMDRF codes" />}
       {reply && !asking && (
         <AiCodeSuggestionList

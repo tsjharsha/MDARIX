@@ -44,6 +44,9 @@ from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, r
 logger = logging.getLogger("mdarix.stage3")
 router = APIRouter(prefix="/api/v1/stage3", tags=["Stage 3 Workflow"])
 NOW = lambda: datetime.now(timezone.utc)
+# A trial whose AI cannot answer: never "off for free trials", which is wrong for a trial that has AI (review G-07).
+TRIAL_AI_NOT_ON = "AI is not switched on for this trial."
+TRIAL_AI_NOTE = "AI is not switched on for this trial, so this answer comes from your records only."
 
 
 class InteractionRequest(BaseModel):
@@ -406,9 +409,9 @@ def create_interaction(
             )
         if result.output.get("status") == "PROVIDER_NOT_CONFIGURED":
             # No model was asked: say so in plain words (the provider's own note is for operators).
-            from genai.structured_answer import AI_NOTE_NOT_CONFIGURED, AI_NOTE_TRIAL
+            from genai.structured_answer import AI_NOTE_NOT_CONFIGURED
 
-            response["limitations"] = [AI_NOTE_TRIAL if trial else AI_NOTE_NOT_CONFIGURED]
+            response["limitations"] = [TRIAL_AI_NOTE if trial else AI_NOTE_NOT_CONFIGURED]
         if reading.status == "INVALID":
             from genai.structured_answer import AI_NOTE_INVALID
 
@@ -430,7 +433,7 @@ def create_interaction(
             "GENAI_PROVIDER_NOT_ALLOWED",
             "GENAI_OFF_FOR_FREE_TRIAL",
         ):
-            refusal = {**refusal, "user_message": "AI is off for free trials."}
+            refusal = {**refusal, "user_message": TRIAL_AI_NOT_ON}
         response["refusal"] = refusal
         response["limitations"] = [refusal["user_message"]]
         provenance = {
@@ -449,7 +452,7 @@ def create_interaction(
 
     if reading is not None and reading.status != "OK" and ai_note is None:
         if (response.get("provider_output") or {}).get("status") == "PROVIDER_NOT_CONFIGURED":
-            ai_note = structured_module.AI_NOTE_TRIAL if trial else structured_module.AI_NOTE_NOT_CONFIGURED
+            ai_note = TRIAL_AI_NOTE if trial else structured_module.AI_NOTE_NOT_CONFIGURED
             reason_code = "PROVIDER_UNAVAILABLE"
         else:
             ai_note = {

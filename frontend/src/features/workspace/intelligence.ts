@@ -999,7 +999,7 @@ const MANUAL_PATHS: AiBanner["manual"] = [
 ];
 
 const BANNER_TEXT: Record<
-  AiBanner["reason"] | "TRIAL" | "TRIAL_ORG_OFF" | "TRIAL_USER_OFF",
+  AiBanner["reason"] | "TRIAL" | "TRIAL_BUSY" | "TRIAL_ORG_OFF" | "TRIAL_USER_OFF",
   { title: string; message: string; disabled: string; short: string }
 > = {
   AI_DISABLED: {
@@ -1020,12 +1020,20 @@ const BANNER_TEXT: Record<
     disabled: "Your organization's AI allowance is used up.",
     short: "Your AI allowance is used up",
   },
-  // A free trial runs without AI: said plainly, without pointing at a setting nobody in the trial can change.
+  // A trial without AI services: said plainly, without pointing at a setting nobody in the trial can change. Never
+  // "off for free trials", which is wrong for a trial that has AI (review G-07).
   TRIAL: {
-    title: "AI is off for free trials",
+    title: "AI is not switched on for this trial",
     message: "Every step works by hand, and Ask MDARIX answers from your records.",
-    disabled: "AI is off for free trials.",
-    short: "AI is off for free trials",
+    disabled: "AI is not switched on for this trial.",
+    short: "AI is not switched on for this trial",
+  },
+  // The trial's AI services are set up and switched on, but none answers right now.
+  TRIAL_BUSY: {
+    title: "AI is busy",
+    message: "Try again in a minute. Every step works by hand meanwhile.",
+    disabled: "AI is busy right now.",
+    short: "AI is busy, try again in a minute",
   },
   // The trial's AI services are ready; the person who started the trial has not switched AI on yet.
   TRIAL_ORG_OFF: {
@@ -1069,7 +1077,9 @@ export function aiStatusBanner(status: AiStatus | null | undefined): AiBanner | 
           ? "TRIAL_USER_OFF"
           : status.sample_data_only === true && reason === "AI_DISABLED"
             ? "TRIAL_ORG_OFF"
-            : "TRIAL"
+            : status.sample_data_only === true && reason === "PROVIDER_UNAVAILABLE"
+              ? "TRIAL_BUSY"
+              : "TRIAL"
     ];
   const server = trial ? null : safeText(status.message);
   const offered = list<string>(status.manual_paths)

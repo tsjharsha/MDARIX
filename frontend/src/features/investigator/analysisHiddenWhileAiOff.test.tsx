@@ -62,6 +62,6 @@ describe("the R1 analysis while AI is off", () => {
     expect(on).toContain("AI outputs inform the workflow.");
     expect(on).not.toContain("AI is off");
     const off = render(false, aiStatusBanner({ enabled: false, trial: true }));
-    expect(off).toContain("AI is off for free trials. Authorized humans record");
+    expect(off).toContain("AI is not switched on for this trial. Authorized humans record");
   });
 });
