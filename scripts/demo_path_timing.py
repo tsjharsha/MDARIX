@@ -51,6 +51,8 @@ class Walk:
         key = (self.step, method, label or path)
         self.samples[key].append((time.perf_counter() - start) * 1000)
         self.statuses[key].add(response.status_code)
+        if response.status_code >= 400 and method != "GET":
+            print(f"{self.step}: {method} {label or path} -> {response.status_code} {response.text[:200]}")
         return response
 
     def read(self, client, path: str, label: str | None = None, **kwargs) -> httpx.Response:

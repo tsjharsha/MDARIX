@@ -65,6 +65,9 @@ def test_a_setting_kept_for_the_request_is_read_again_after_a_write():  # B6a ru
     with SessionLocal() as db:
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1  # kept: not read again
+        with db.begin_nested():  # a section read in a savepoint, released: nothing written, still kept
+            db.execute(text("SELECT 1"))
+        assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 1
         db.commit()  # a write (commit, flush or rollback) drops what was kept
         assert once(db, ("k",), lambda: reads.append(1) or len(reads)) == 2
         db.execute(text("SELECT 1"))  # a transaction in progress, so the rollback is a real one
