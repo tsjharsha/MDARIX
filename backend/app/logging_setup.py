@@ -66,7 +66,11 @@ class TextFormatter(logging.Formatter):
     """The local-development line format, with the same redaction as the JSON output."""
 
     def format(self, record: logging.LogRecord) -> str:
-        return redact(super().format(record))
+        line = super().format(record)
+        duration = getattr(record, "duration_ms", None)
+        if duration is not None:  # the request line says how long it took, as the JSON output does (review O3)
+            line += f" {duration}ms"
+        return redact(line)
 
 
 def _json_output() -> bool:
