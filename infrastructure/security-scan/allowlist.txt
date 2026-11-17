@@ -93,3 +93,13 @@ bandit | B310 | scripts/seed_provider_simulators.py | operator script: URL from 
 bandit | B310 | scripts/validate_local_stack.py | operator script: URL from environment settings with 127.0.0.1 defaults (sql-text-review #34 B310 review, 2026-11-14)
 bandit | B310 | scripts/validate_mvp_validation_matrix.py | operator script: URL is a literal 127.0.0.1 simulator address (sql-text-review #34 B310 review, 2026-11-14)
 bandit | B310 | scripts/validate_production_operations.py | operator script: URL from MDARIX_OPERATIONAL_URLS or MDARIX_APP_URL (sql-text-review #34 B310 review, 2026-11-14)
+#
+# Reviewed in the WHIF hero-backend build (2026-11-17): every value in these statements is a module constant or a
+# catalogue name; no request input reaches them.
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | infrastructure/database/migrations/versions/tr25_trial_routine_path.py | false positive: server default built from a literal in the migration (build run, 2026-11-17)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | infrastructure/database/migrations/versions/tr32_trial_ai_ready.py | false positive: server default built from a literal in the migration (build run, 2026-11-17)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | infrastructure/database/migrations/versions/tr29_trial_party_parts.py | false positive: the downgrade guard's column names come from the migration's own PARTS constant (build run, 2026-11-17)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | infrastructure/database/migrations/versions/tr31_trial_other_countries.py | false positive: the downgrade guard's table names are the migration's own constants (build run, 2026-11-17)
+semgrep | python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text | scripts/recovery_check.py | false positive: table names read from pg_catalog and quoted by the dialect's identifier preparer; an operator script (build run, 2026-11-17)
+semgrep | python.lang.security.use-defused-xml-parse.use-defused-xml-parse | validation/pack.py | parses only the JUnit XML the local test run wrote, never uploaded or remote input (build run, 2026-11-17)
+semgrep | python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args | object_storage/service.py | accepted: MDARIX_MALWARE_SCANNER_COMMAND is the operator's own server setting (no shell, list arguments, 15 s timeout); file content goes on stdin only; production uses MDARIX_CLAMD_HOST (build run, 2026-11-17)
