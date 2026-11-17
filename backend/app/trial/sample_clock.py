@@ -48,6 +48,7 @@ _MOMENTS = ("timestamp with time zone", "timestamp without time zone")
 def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     """The whole sample story, dated from ``now``, with ``owner_id`` (the person who started the trial) as its owner of
     the open request, the absence's backup and the two events. Flushes; the caller commits. Each part is idempotent."""
+    from backend.app.trial.sample_ai import stage_sample_ai
     from backend.app.trial.sample_assessments import stage_sample_assessments
     from backend.app.trial.sample_calm import stage_calm_story
     from backend.app.trial.sample_data import (
@@ -75,7 +76,9 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     sample["lot_quantities"] = seed_lot_quantities(db, tenant_id)
     # The guided investigation's Decision Brief, written by a sample author and submitted for quality review.
     sample["decision"] = stage_sample_decision(db, tenant_id, now)
-    # A signed EU/NI market assessment and a pending US draft.
+    # Pre-recorded AI proposals on the guided investigation (no model called), waiting for a person's review.
+    sample["ai"] = stage_sample_ai(db, tenant_id, now)
+    # Signed EU/NI and Canada assessments of one event, and a pending US draft.
     sample["assessments"] = stage_sample_assessments(db, tenant_id, now)
     # The routine complaints, their proposed classifications and a signed service-level example.
     sample["routine"] = seed_routine_examples(db, tenant_id, now)

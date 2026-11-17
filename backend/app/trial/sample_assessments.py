@@ -4,6 +4,9 @@
   finished example: "might have led to" a life-threatening deterioration answered Yes with its reason, a causal
   relationship reasonably possible, conclusion reportable (the 15-day report). The sample author holds the practice
   training acknowledgements it relies on.
+- The same event has a signed Canada assessment (WHIF demo, "the right decision in every market"): a foreign incident
+  of a device that is not Class I, so not reportable to Health Canada under s. 59, although the EU/NI answer is
+  reportable. The sample author holds the Canada practice training too.
 - SAMPLE-RV-08 (OrbitCare 300, US, free flow, outcome not known) has a saved US assessment: the patient's harm is
   Unknown, so the suggestion is pending information and "not reportable" is refused while it remains.
 - SAMPLE-RV-06 (OrbitCare 300, US, under-infusion) waits for the trial user.
@@ -57,6 +60,27 @@ EU_EXAMPLE = {
         "YES", "The zero reading came from the device's flow sensor: a causal relationship is reasonably possible."
     ),
     "EU6": _answer("NO", "A loss of flow reading is a hazard already in the risk file (SAMPLE-RSK-03)."),
+}
+# The same France event for Canada: sold there and a failure that could seriously harm were it to recur, but it
+# happened outside Canada and VentraLink 250 is not a Class I device, so s. 59(1.1) does not apply.
+CA_EXAMPLE = {
+    "CA1": _answer("YES", "VentraLink 250 is sold in Canada (sample market list)."),
+    "CA2": _answer(
+        "YES", "The flow sensor read zero for 40 seconds: a failure of the device.", "Complaint description"
+    ),
+    "CA3": _answer("NO", "No harm: staff switched to manual ventilation and the patient was unharmed."),
+    "CA4": _answer(
+        "YES",
+        "Forty seconds without a valid flow reading on a ventilated patient could lead to a serious deterioration "
+        "were it to recur.",
+        "Complaint description",
+    ),
+    "CA5": _answer("NO", "The event happened in France, outside Canada."),
+    "CA6": _answer(
+        "NO",
+        "VentraLink 250 is not a Class I device in Canada; a foreign issue of a Class II to IV device is weighed "
+        "under s. 61.2, not this tree.",
+    ),
 }
 US_PENDING = {
     "US1": _answer("NO", "No death reported by the nurse."),
@@ -146,16 +170,69 @@ def _row(db: Session, tenant_id, complaint, market: str, answers: dict, level, t
     return row, evaluation, clock
 
 
-def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None) -> dict:
-    """Add the sample answers (see the module docstring). ``{"created": False, ...}`` when the sample story's
-    complaints are missing or the sample answers are there already."""
+def _sign(db: Session, tenant_id, complaint, market: str, answers: dict, conclusion: str, author_id: str, signed_at):
+    """One finished example: the assessment of ``complaint`` for ``market``, signed by the sample author."""
     from backend.app.db.models.foundation import SignedApprovalRecord
     from backend.app.human_decision.rules import fingerprint, signature_hash
     from backend.app.reportability import markets
     from backend.app.reportability.assessment_router import DECISION_TYPE, OBJECT_TYPE, SIGNATURE_CODES
-    from backend.app.signer_training import service as training
     from backend.app.standards import STARTER_MARK
-    from backend.app.trial.sample_decision import SAMPLE_AUTHOR_ROLE, sample_author
+    from backend.app.trial.sample_decision import SAMPLE_AUTHOR_ROLE
+
+    row, evaluation, clock = _row(
+        db, tenant_id, complaint, market, answers, markets.NEGLIGIBLE, "NO_HEALTH_CONSEQUENCE", author_id, signed_at
+    )
+    ref = complaint.business_id or complaint.complaint_identifier
+    material = {
+        "complaint_id": str(row.complaint_id),
+        "complaint": ref,
+        "market": row.market,
+        "version": 1,
+        "question_set": row.question_set,
+        "answers": answers,
+        "harm_level": row.harm_level,
+        "harm_code": row.harm_code,
+        "scale_version": row.scale_version,
+        "suggested": evaluation["suggested"],
+        "conclusion": conclusion,
+        "report_type": evaluation["report_type"],
+        "due_on": clock["due_date"] if clock else None,
+        "starter_mark": STARTER_MARK,
+        "practice_label": markets.PRACTICE_LABEL,
+        "sample": True,
+    }
+    content_fingerprint = fingerprint(material)
+    record = SignedApprovalRecord(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        object_type=OBJECT_TYPE,
+        object_id=row.id,
+        object_version="1",
+        decision_type=DECISION_TYPE,
+        decision=SIGNATURE_CODES[conclusion],
+        remarks="Sample: a finished example signed by the MDARIX sample author",
+        signer_user_id=author_id,
+        signer_role=SAMPLE_AUTHOR_ROLE,
+        signature_meaning=markets.signature_meaning(ref, market, row.question_set, conclusion),
+        content_fingerprint=content_fingerprint,
+        signature_hash=signature_hash(content_fingerprint, author_id, "1"),
+        status="SIGNED",
+        signed_at=signed_at,
+        created_at=signed_at,
+    )
+    db.add(record)
+    row.conclusion = conclusion
+    row.signed_record_id, row.content_fingerprint = record.id, content_fingerprint
+    row.signed_by, row.signed_at = author_id, signed_at
+    db.add(row)
+
+
+def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None) -> dict:
+    """Add the sample answers (see the module docstring). ``{"created": False, ...}`` when the sample story's
+    complaints are missing or the sample answers are there already."""
+    from backend.app.reportability import markets
+    from backend.app.signer_training import service as training
+    from backend.app.trial.sample_decision import sample_author
 
     now = now or datetime.now(timezone.utc)
     if has_sample_assessments(db, tenant_id):
@@ -174,7 +251,7 @@ def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None
         author = sample_author(db, tenant_id, now)
         author_id = str(author.id)
         signed_at = now - timedelta(minutes=20)
-        for document in training.for_market(markets.EU_NI):
+        for document in (*training.for_market(markets.EU_NI), *training.for_market(markets.CA)):
             training.acknowledge(
                 db,
                 tenant_id,
@@ -184,60 +261,11 @@ def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None
                 trial=True,
                 source_system=SAMPLE_SOURCE,
             )
-        eu, evaluation, clock = _row(
-            db,
-            tenant_id,
-            found["SAMPLE-RV-07"],
-            markets.EU_NI,
-            EU_EXAMPLE,
-            markets.NEGLIGIBLE,
-            "NO_HEALTH_CONSEQUENCE",
-            author_id,
-            signed_at,
-        )
-        ref = found["SAMPLE-RV-07"].business_id or "SAMPLE-RV-07"
-        material = {
-            "complaint_id": str(eu.complaint_id),
-            "complaint": ref,
-            "market": eu.market,
-            "version": 1,
-            "question_set": eu.question_set,
-            "answers": EU_EXAMPLE,
-            "harm_level": eu.harm_level,
-            "harm_code": eu.harm_code,
-            "scale_version": eu.scale_version,
-            "suggested": evaluation["suggested"],
-            "conclusion": markets.REPORTABLE,
-            "report_type": evaluation["report_type"],
-            "due_on": clock["due_date"] if clock else None,
-            "starter_mark": STARTER_MARK,
-            "practice_label": markets.PRACTICE_LABEL,
-            "sample": True,
-        }
-        content_fingerprint = fingerprint(material)
-        record = SignedApprovalRecord(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            object_type=OBJECT_TYPE,
-            object_id=eu.id,
-            object_version="1",
-            decision_type=DECISION_TYPE,
-            decision=SIGNATURE_CODES[markets.REPORTABLE],
-            remarks="Sample: a finished example signed by the MDARIX sample author",
-            signer_user_id=author_id,
-            signer_role=SAMPLE_AUTHOR_ROLE,
-            signature_meaning=markets.signature_meaning(ref, markets.EU_NI, eu.question_set, markets.REPORTABLE),
-            content_fingerprint=content_fingerprint,
-            signature_hash=signature_hash(content_fingerprint, author_id, "1"),
-            status="SIGNED",
-            signed_at=signed_at,
-            created_at=signed_at,
-        )
-        db.add(record)
-        eu.conclusion = markets.REPORTABLE
-        eu.signed_record_id, eu.content_fingerprint = record.id, content_fingerprint
-        eu.signed_by, eu.signed_at = author_id, signed_at
-        db.add(eu)
+        for market, answers, conclusion in (
+            (markets.EU_NI, EU_EXAMPLE, markets.REPORTABLE),
+            (markets.CA, CA_EXAMPLE, markets.NOT_REPORTABLE),
+        ):
+            _sign(db, tenant_id, found["SAMPLE-RV-07"], market, answers, conclusion, author_id, signed_at)
         us, _, _ = _row(db, tenant_id, found["SAMPLE-RV-08"], markets.US, US_PENDING, None, None, author_id, now)
         db.add(us)
         db.flush()
@@ -246,4 +274,4 @@ def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None
         savepoint.rollback()
         logger.exception("Trial sample assessments could not be staged")
         return {"created": False, "why": "ERROR", "severities": severities}
-    return {"created": True, "signed": 1, "saved": 1, "acknowledgements": 2, "severities": severities}
+    return {"created": True, "signed": 2, "saved": 1, "severities": severities}
