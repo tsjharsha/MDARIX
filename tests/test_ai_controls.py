@@ -369,6 +369,20 @@ def test_a_customer_administrator_switches_ai_off_for_their_organization_with_a_
     assert "acknowledgement" not in (event.details or {})  # switching off needs no acknowledgement
 
 
+def test_two_administrators_switching_at_once_the_second_is_told_to_refresh(tenant):  # review D3
+    from tests.test_business_permissions import _client_with_role
+
+    admin = _client_with_role("CUSTOMER_ADMIN")
+    read = admin.get("/api/v1/admin/ai-settings").json()["lock_version"]
+    body = {"ai_processing_allowed": False, "reason": "First administrator's change"}
+    assert admin.put("/api/v1/admin/ai-settings", json={**body, "lock_version": read}).status_code == 200
+    stale = admin.put(
+        "/api/v1/admin/ai-settings", json={**body, "reason": "Second, on the old page", "lock_version": read}
+    )
+    assert stale.status_code == 409 and stale.json()["detail"]["code"] == "STALE_RECORD"
+    assert admin.get("/api/v1/admin/ai-settings").json()["lock_version"] == read + 1
+
+
 def signed_off(monkeypatch) -> None:
     """The signature-grade check passes (its own tests cover the password and the code)."""
     monkeypatch.setattr("backend.app.governance_router.verify_signing_credentials", lambda *args, **kwargs: None)

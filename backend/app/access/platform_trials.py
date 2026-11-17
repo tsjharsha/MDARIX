@@ -451,6 +451,9 @@ def _organization_switched_on(db: Session, tenant: Tenant):
 
 
 def _names(db: Session, refs) -> dict[str, str]:
+    """Names of any organization's accounts: for the Platform Administrator's trial pages only, whose actors are trial
+    people and platform staff. A customer-facing read uses ``workflow.people.names_by_id`` with its own tenant
+    (review S3)."""
     ids = []
     for ref in refs:
         try:

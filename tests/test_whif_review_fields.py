@@ -140,3 +140,29 @@ def test_signed_records_read_mfa_verified_from_the_signing_event_of_any_kind(tri
         db.commit()
     items = trial["client"].get("/api/v1/governance/signed-records").json()["items"]
     assert next(item for item in items if item["signature_id"] == other["signature_id"])["mfa_verified"] is False
+
+
+def test_the_sample_accounts_store_no_password_hash(trial):  # review P1: no scrypt for accounts that never sign in
+    from auth.service import NO_PASSWORD, _verify
+
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        sample = db.query(AuthUser).filter(AuthUser.tenant_id == trial["tenant_id"], AuthUser.status == "DISABLED")
+        hashes = {row.password_hash for row in sample}
+    assert hashes == {NO_PASSWORD}
+    assert _verify(NO_PASSWORD, NO_PASSWORD) is False and _verify("", NO_PASSWORD) is False
+
+
+def test_the_audit_history_pages_with_a_cursor(trial):  # review A2
+    client = trial["client"]
+    first = client.get("/api/v1/admin/audit-history", params={"paged": "true", "limit": 2})
+    assert first.status_code == 200, first.text
+    page = first.json()
+    assert len(page["items"]) == 2 and page["next_cursor"]
+    second = client.get(
+        "/api/v1/admin/audit-history", params={"paged": "true", "limit": 2, "before": page["next_cursor"]}
+    ).json()
+    assert not {item["id"] for item in page["items"]} & {item["id"] for item in second["items"]}
+    whole = client.get("/api/v1/admin/audit-history").json()
+    assert isinstance(whole, list)  # without paged=true the answer is the list it always was
+    assert len(whole) >= 4

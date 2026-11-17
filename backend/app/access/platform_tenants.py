@@ -1376,9 +1376,11 @@ def _tenant_audit(db: Session, admin: AuthUser, tenant_id: uuid.UUID, request: R
         .limit(100)
         .all()
     )
-    from backend.app.access.platform_trials import _names
+    from backend.app.workflow.people import names_by_id
 
-    names = _names(db, {row.actor_ref for row in rows})
+    # The organization's own people and the platform's staff (support access): each read in its own organization.
+    refs = {row.actor_ref for row in rows}
+    names = {**names_by_id(db, admin.tenant_id, refs), **names_by_id(db, tenant_id, refs)}
     return {
         "tenant_id": str(tenant_id),
         "complete": tenant_id in opened,
