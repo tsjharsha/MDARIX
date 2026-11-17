@@ -1,10 +1,10 @@
 """Time the WHIF demo path's API calls against a running local backend, and flag server errors and slow calls.
 
-Run only against a local backend on a *_test database (the script refuses anything else), for example:
+The script starts its own local backend on a mdarix_whif_* demo database or a *_test database (it refuses
+anything else), with e-mail delivery and alerts forced off (NO_SEND), for example:
 
-    $env:POSTGRES_DB = "mdarix_demo_test"
-    python -m uvicorn backend.app.main:app --port 8017          # in one window
-    python scripts/demo_path_timing.py --base-url http://127.0.0.1:8017 --rounds 20 --out timing.md
+    $env:POSTGRES_DB = "mdarix_whif_demo"
+    python scripts/demo_path_timing.py --port 8017 --rounds 20 --out timing.md
 
 It signs a new trial up, approves it as a Platform Administrator (a session minted for an existing PLATFORM_ADMIN test
 account), signs in as the trial owner and walks the nine story steps: each read is repeated --rounds times, each write
@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -260,24 +261,75 @@ def walk(w: Walk) -> None:
     w.read(admin, f"{org}/ai-metrics", "/trial-organizations/{id}/ai-metrics")
 
 
+# Settings the backend and this script run with, whatever the developer's dotenv file holds: no e-mail, no alert
+# webhook or alert e-mail. python-dotenv never replaces a variable that is present, so an empty value keeps it out.
+NO_SEND = {
+    "MDARIX_EMAIL_DELIVERY": "off",
+    "MDARIX_SMTP_HOST": "",
+    "MDARIX_SMTP_USERNAME": "",
+    "MDARIX_SMTP_PASSWORD": "",
+    "MDARIX_ALERT_WEBHOOK": "",
+    "MDARIX_ALERT_FALLBACK_WEBHOOK": "",
+    "MDARIX_ALERT_EMAIL": "",
+}
+
+
+def checked_database(database: str) -> str:
+    """A WHIF demo database (mdarix_whif_*) or a *_test database other than the shared ones; anything else refused."""
+    if database.startswith("mdarix_whif_"):
+        from scripts.demo_database import guard
+
+        return guard(database)
+    if not database.endswith("_test") or database in ("mdarix_r1_test",):
+        raise SystemExit(
+            f"Refusing: POSTGRES_DB must name a mdarix_whif_* or *_test database other than mdarix_r1_test, "
+            f"not {database!r}"
+        )
+    return database
+
+
+def backend_env(database: str) -> dict[str, str]:
+    return {**os.environ, **NO_SEND, "POSTGRES_DB": database, "PYTHONPATH": str(ROOT)}
+
+
+def start_backend(database: str, port: int) -> subprocess.Popen:
+    """Start the local backend this walk times, with NO_SEND forced on, and wait for /health."""
+    server = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--port", str(port), "--no-access-log"],
+        cwd=ROOT,
+        env=backend_env(database),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        if server.poll() is not None:
+            raise SystemExit(f"The backend stopped at start (exit code {server.returncode})")
+        try:
+            if httpx.get(f"http://127.0.0.1:{port}/health", timeout=2).status_code == 200:
+                return server
+        except httpx.HTTPError:
+            pass
+        time.sleep(1)
+    server.terminate()
+    raise SystemExit("The backend did not answer /health within 120 s")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--base-url", default="http://127.0.0.1:8017")
+    parser.add_argument("--port", type=int, default=8017, help="local port for the backend this script starts")
     parser.add_argument("--rounds", type=int, default=20, help="repeats of each read (default 20)")
     parser.add_argument("--out", help="also write the results table to this Markdown file")
     args = parser.parse_args()
-    database = os.environ.get("POSTGRES_DB", "")
-    if not database.endswith("_test") or database in ("mdarix_r1_test",):
-        raise SystemExit(
-            f"Refusing: POSTGRES_DB must name a *_test database other than mdarix_r1_test, not {database!r}"
-        )
-    host = urlparse(args.base_url).hostname
-    if host not in ("127.0.0.1", "localhost"):
-        raise SystemExit("Refusing: the demo path timing runs against a local backend only")
-    w = Walk(args.base_url, args.rounds)
+    database = checked_database(os.environ.get("POSTGRES_DB", ""))
+    os.environ.update(NO_SEND)  # this process reads the database too; it must not send either
+    server = start_backend(database, args.port)
+    w = Walk(f"http://127.0.0.1:{args.port}", args.rounds)
     try:
         walk(w)
     finally:
+        server.terminate()
+        server.wait(timeout=30)
         table, ok = w.table()
         print(table)
         if args.out:

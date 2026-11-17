@@ -529,3 +529,9 @@ def test_the_command_explains_that_development_is_not_checked(production, capsys
     production.setenv("MDARIX_ENV", "development")
     assert config_check.main([]) == 0
     assert "configuration checks apply to staging and production only" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name, value", [("MDARIX_EMAIL_DELIVERY", "off"), ("POSTGRES_DB", "mdarix_whif_demo")])
+def test_production_refuses_the_no_send_switch(production, name, value):
+    production.setenv(name, value)
+    assert "E-mail delivery is off" in found()

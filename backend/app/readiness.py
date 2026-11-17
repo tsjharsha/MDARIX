@@ -179,8 +179,10 @@ def _outbox() -> dict:
 def _email(failing: int = 0) -> dict:
     """Configured, and not failing: ``failing`` e-mails the outbox retries after the provider refused them (read by
     the outbox check) make it degraded."""
-    from auth.emailer import smtp_configuration_status
+    from auth.emailer import delivery_off, smtp_configuration_status
 
+    if delivery_off():
+        return {"delivery": "off"}  # a demo or local run that must not e-mail anyone: by design, not a fault
     if not smtp_configuration_status().get("configured"):
         raise RuntimeError("SMTP not configured")
     if failing:

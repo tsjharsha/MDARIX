@@ -41,18 +41,16 @@ def test_a_server_error_or_a_slow_read_fails_the_table():
     assert ok is False and "| OVER |" in table
 
 
-@pytest.mark.parametrize(
-    "database, url",
-    [
-        ("mdarix_r1", "http://127.0.0.1:8017"),
-        ("mdarix_r1_test", "http://127.0.0.1:8017"),
-        ("x_test", "https://mdarix.com"),
-    ],
-)
-def test_it_refuses_a_shared_database_or_a_remote_host(monkeypatch, database, url):
+@pytest.mark.parametrize("database", ["mdarix_r1", "mdarix_r1_test", "mdarix_demo", "mdarix_whif_x;drop"])
+def test_it_refuses_a_shared_or_non_demo_database(monkeypatch, database):
     script = _script()
     monkeypatch.setenv("POSTGRES_DB", database)
-    monkeypatch.setattr(sys, "argv", ["demo_path_timing.py", "--base-url", url])
+    monkeypatch.setattr(sys, "argv", ["demo_path_timing.py"])
     with pytest.raises(SystemExit) as refused:
         script.main()
     assert "Refusing" in str(refused.value)
+
+
+@pytest.mark.parametrize("database", ["mdarix_whif_demo", "mdarix_demo_test"])
+def test_it_accepts_a_whif_demo_or_a_test_database(database):
+    assert _script().checked_database(database) == database
