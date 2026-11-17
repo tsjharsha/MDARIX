@@ -22,6 +22,14 @@ describe("free trial request form", () => {
     expect(GUIDE_STEPS[0].actions.join(" ")).toContain("authenticator app on your phone");
   });
 
+  it("names the email field Work email only, with its hint described, not labelled (G-21)", () => {
+    const html = renderToStaticMarkup(<SignupForm />);
+    const label = html.match(/<label for="su-email">.*?<\/label>/s)?.[0] ?? "";
+    expect(label).toContain("Work email");
+    expect(label).not.toContain("su-email-hint");
+    expect(html).toMatch(/<input id="su-email"[^>]*aria-describedby="su-email-hint"/);
+  });
+
   it("says before the request what happens next, by default the same for a company and a personal address", () => {
     // The pre-rendered page, before site-info answers: the server's default (company-and-personal).
     const html = renderToStaticMarkup(<SignupForm />);

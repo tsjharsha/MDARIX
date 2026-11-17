@@ -178,6 +178,13 @@ export function signupBody(email: string, name: string, company: string, profile
   };
 }
 
+const UNNAMED_REGIONS: Record<string, string> = {
+  AC: "Ascension Island",
+  EH: "Western Sahara",
+  TA: "Tristan da Cunha",
+  XK: "Kosovo",
+};
+
 export type Country = { code: string; name: string; dial: string; label: string };
 
 /**
@@ -190,7 +197,9 @@ export function countries(locale = "en"): Country[] {
     typeof Intl !== "undefined" && "DisplayNames" in Intl ? new Intl.DisplayNames([locale], { type: "region" }) : null;
   return DIALING_CODES.filter(([code]) => !SANCTIONED_REGIONS.has(code))
     .map(([code, dial]) => {
-      const name = names?.of(code) ?? code;
+      // Some browsers have no name for a few territories and return the code ("EH"): a plain name instead (G-21).
+      const shown = names?.of(code);
+      const name = shown && shown !== code ? shown : (UNNAMED_REGIONS[code] ?? code);
       return { code, name, dial, label: name };
     })
     .sort((a, b) => a.name.localeCompare(b.name, locale));
