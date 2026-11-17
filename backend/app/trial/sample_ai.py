@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from backend.app.trial.flagship import SIGNAL_TEXT
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 
 PROVIDER = "sample-recorded"
@@ -37,8 +38,7 @@ OBSERVATIONS = (
     ),
     (
         "SAMPLE-EV-003",
-        "Pressure-alarm complaints rose about sevenfold after Rev B (0.8 to 5.6 per month), mostly from lots 003 and "
-        "004. (Sample)",
+        f"Pressure-alarm complaints on Rev B are at {SIGNAL_TEXT}, mostly from lots 003 and 004. (Sample)",
     ),
 )
 HYPOTHESIS = (

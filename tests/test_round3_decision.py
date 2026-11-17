@@ -47,6 +47,38 @@ def test_before_signing_there_is_no_decision_and_nothing_is_invented(trial):
     assert body["investigation"]["ref"] == "SAMPLE-INV-001" and "Rev B" in body["investigation"]["question"]
 
 
+def test_g06_the_orbitcare_rise_reads_the_trend_checks_one_number_everywhere(trial):
+    from backend.app.trial import flagship, sample_ai, sample_decision
+
+    user = trial["user"]
+    product_id = _flag(user)["product"]["id"]
+    rows = _ok(user.get(f"/api/v1/triage/trends?group=version&product_id={product_id}"))["items"]
+    ratio = max(row["ratio"] for row in rows if row["product"]["id"] == product_id and row["ratio"] is not None)
+    assert f"{ratio:.1f}" == f"{flagship.SIGNAL_RATIO:.1f}"
+    # The AI note, the evidence document and the brief state that number, and no other figure for the rise.
+    texts = [
+        *(text for _, text in sample_ai.OBSERVATIONS),
+        sample_decision.NARRATIVE["problem_statement"],
+        *sample_decision.SAMPLE_CHALLENGE_ANSWERS.values(),
+    ]
+    assert sum(flagship.SIGNAL_TEXT in text for text in texts) == 2
+    assert not any("sevenfold" in text or "5.6" in text or "0.8 a month" in text for text in texts)
+    # As the trial shows them: the recorded AI observation and the trend summary evidence.
+    case_id = trial["case_id"]
+    observations = [row for row in _intel(user, case_id, "observations") if row.get("ai_execution_id")]
+    assert any(flagship.SIGNAL_TEXT in row["statement"] for row in observations)
+    from backend.app.db.models.foundation import Evidence
+
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        content = (
+            db.query(Evidence.content)
+            .filter(Evidence.tenant_id == trial["tenant_id"], Evidence.evidence_identifier == "SAMPLE-EV-003")
+            .scalar()
+        )
+    assert flagship.SIGNAL_TEXT in content
+
+
 def test_the_signed_record_shows_exactly_what_was_recorded(trial, monkeypatch):
     from auth import totp
 

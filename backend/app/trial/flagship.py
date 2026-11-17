@@ -39,6 +39,11 @@ STEPS = (
     ("action", "Action and impact"),
 )
 MARKS = ("signal", "product", "evidence")
+# G-06: the OrbitCare 300 Rev B pressure-alarm rise as the trend check computes it on the sample (its last 30 days
+# against the expected count). The sample's texts that state the rise use this one number; a test checks it against
+# the trend check, so a change to the sample data that moves the trend fails until the texts follow.
+SIGNAL_RATIO = 9.3
+SIGNAL_TEXT = f"{SIGNAL_RATIO:.1f}× the earlier average in the trend check"
 # The short name the story bar reads ("OrbitCare 300 · Rev B"); another product shows its own name.
 SHORT_NAMES = {"SAMPLE-ORBIT-300": "OrbitCare 300"}
 NO_PROPOSAL = "No AI proposal on this case yet"

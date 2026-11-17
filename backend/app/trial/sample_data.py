@@ -34,6 +34,7 @@ from backend.app.db.models.foundation import (
     Supplier,
 )
 
+from backend.app.trial.flagship import SIGNAL_TEXT  # noqa: E402 (G-06: one number for the OrbitCare rise)
 from backend.app.trial.sample_source import SAMPLE_SOURCE  # noqa: E402 (one definition; re-exported)
 
 # (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
@@ -519,8 +520,8 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                 ),
                 (
                     "Complaint trend summary",
-                    "Pressure-alarm complaints averaged 0.8 per month in the 150 days before Rev B and 5.6 per month after Rev B, with "
-                    "most from lots 003 and 004.",
+                    f"Pressure-alarm complaints on Rev B are at {SIGNAL_TEXT} (its last 30 days against the "
+                    "expected count), with most from lots 003 and 004.",
                     "Quantifies the signal. It does not by itself establish the cause.",
                 ),
             ),
