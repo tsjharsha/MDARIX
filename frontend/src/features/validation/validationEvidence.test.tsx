@@ -42,6 +42,7 @@ const evidence = (extra: Partial<ValidationEvidenceData> = {}): ValidationEviden
   protocol: { id: "MDX-VAL-007-P", signed: false, expected_results: 181, expected_confirmed: 0 },
   release: "0.11.0",
   run: null,
+  framing: "Risk-based: this evidence supports your Computer Software Assurance and validation of MDARIX.",
   ...extra,
 });
 
@@ -56,6 +57,7 @@ describe("Validation evidence", () => {
     expect(html).toContain("No test covers this requirement yet");
     expect(html).toContain(NO_RUN);
     expect(html).toContain("Not yet signed");
+    expect(html).toContain("supports your Computer Software Assurance");
     expect(html).toContain("Download the release validation pack (0.11.0)");
     // Honest wording: never a compliance or certification claim, and no recording button for a customer.
     expect(html).not.toMatch(/validated|compliant|certified/i);

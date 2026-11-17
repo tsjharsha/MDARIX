@@ -3,6 +3,11 @@
   margin: 0 0 12px;
   max-width: 72ch;
 }
+.ve-framing {
+  margin: -4px 0 12px;
+  max-width: 110ch;
+  font-size: var(--ms-fs-12);
+}
 .ve-stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 12px;

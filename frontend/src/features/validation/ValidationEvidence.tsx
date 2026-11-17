@@ -47,6 +47,8 @@ export type ValidationEvidenceData = {
   protocol: { id: string; signed: boolean; expected_results: number; expected_confirmed: number };
   release: string;
   run: TestRun | null;
+  /** The regulatory framing (QMSR, risk-based CSA) in docs/validation's words: validation/evidence_view.py FRAMING. */
+  framing?: string;
 };
 
 const TONES: Record<string, Tone> = {
@@ -192,6 +194,7 @@ export function ValidationEvidence({ canRecord = false }: { canRecord?: boolean 
           Each MDARIX requirement, the automated tests that cover it and their last recorded result. Use it as input to
           your own computer system validation; it does not validate your use of MDARIX.
         </p>
+        {data?.framing && <p className="ac-muted ve-framing">{data.framing}</p>}
         <section className="ac-stats ve-stats" aria-label="Validation evidence at a glance">
           <StatTile
             label="Requirements"

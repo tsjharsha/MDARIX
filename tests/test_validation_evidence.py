@@ -58,6 +58,9 @@ def test_without_a_recorded_run_every_result_says_no_run_recorded():
     assert view["counts"]["passed"] == view["counts"]["failed"] == 0
     # The OQ protocol is not signed (owner decision): the screen says so, never "validated".
     assert view["protocol"]["signed"] is False
+    # Risk-based framing, in the repository's own words and dates (MDX-B10-002): never "compliant by itself".
+    assert "risk-based assurance" in view["framing"] and "confirm against current FDA guidance" in view["framing"]
+    assert "does not establish compliance" in view["framing"]
 
 
 @pytest.mark.unit
@@ -164,6 +167,9 @@ def test_the_release_validation_pack_downloads_as_a_marked_dry_run(trial):
     assert any(name.endswith("/MDX-VAL-009-RTM.pdf") for name in names)
     checks = archive.read(next(name for name in names if name.endswith("/checks.txt"))).decode()
     assert "is not signed" in checks
+    framing = archive.read(next(name for name in names if name.endswith("/READ-ME-FIRST.txt"))).decode()
+    assert "Computer Software Assurance" in framing and "effective 2 Feb 2026" in framing
+    assert "does not establish compliance" in framing
 
 
 @pytest.mark.db

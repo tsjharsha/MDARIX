@@ -22,6 +22,15 @@ from validation import pack
 ROOT = Path(__file__).resolve().parents[1]
 NO_RUN = "No run recorded"
 MAX_JUNIT_BYTES = 20 * 1024 * 1024
+# The regulatory framing of the screen and the pack, in the words and dates of docs/validation (MDX-B10-002 rows 2 and 3,
+# MDX-VAL-001 R11): the QMSR date is stated there; the CSA guidance's title, date and status are marked "to confirm".
+FRAMING = (
+    "Risk-based: this evidence supports your Computer Software Assurance and validation of MDARIX for your intended "
+    "use. In the US the QMSR (21 CFR Part 820 as amended, incorporating ISO 13485:2016 by reference) is effective "
+    "2 Feb 2026. Aligned with a risk-based assurance approach (FDA Computer Software Assurance guidance); confirm "
+    "against current FDA guidance. MDARIX functionality alone does not establish compliance: your risk assessment, "
+    "procedures and validation decide it."
+)
 
 
 def current_release(root: Path = ROOT) -> str:
@@ -149,6 +158,7 @@ def evidence(sources: pack.Sources, run: dict | None) -> dict:
             "expected_confirmed": sum(bool(r.get("confirmed_by", "").strip()) for r in expected),
         },
         "release": release,
+        "framing": FRAMING,
     }
 
 
@@ -175,4 +185,5 @@ def release_pack(sources: pack.Sources, run: dict | None, release: str, date: st
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, raw in sorted(files.items()):
             archive.writestr(f"validation-pack-{release}/{name}", raw)
+        archive.writestr(f"validation-pack-{release}/READ-ME-FIRST.txt", (FRAMING + "\n").encode("utf-8"))
     return buffer.getvalue()
