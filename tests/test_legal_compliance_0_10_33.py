@@ -63,7 +63,7 @@ def test_a_free_trial_never_reaches_a_model_even_with_its_switch_on():
                 governance.check_allowed(100)
         assert refused.value.code == "GENAI_OFF_FOR_FREE_TRIAL"
         assert refused.value.user_message == REFUSAL_MESSAGES["GENAI_OFF_FOR_FREE_TRIAL"]
-        assert "free trials" in refused.value.user_message
+        assert "not switched on for this trial" in refused.value.user_message
     finally:
         _set_tenant(tenant_id, ai_processing_allowed=False)
 
@@ -95,7 +95,7 @@ def test_ai_cannot_be_switched_on_for_a_free_trial_and_its_status_says_off():
     try:
         status = user.get("/api/v1/ai/status").json()
         assert status["trial"] is True and status["enabled"] is False
-        assert "free trials" in status["message"]
+        assert "not switched on for this trial" in status["message"]
     finally:
         _set_tenant(tenant_id, ai_processing_allowed=False)
 

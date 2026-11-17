@@ -54,6 +54,11 @@ SAMPLE_SUFFIX = "(Sample)"
 _SPACE = re.compile(r"\s+")
 
 
+def _sample_paths() -> list[Path]:
+    # The flagship story's sentences (trial/flagship.py, such as SIGNAL_TEXT) are built into sample records too (W1, G-06).
+    return [*sorted(SAMPLE_MODULES.glob("sample*.py")), SAMPLE_MODULES / "flagship.py"]
+
+
 class SampleGateRefused(Exception):
     pass
 
@@ -66,7 +71,7 @@ def _normal(text: str) -> str:
 def catalogue() -> str:
     """Every string constant of the sample modules, whitespace-normalized, joined by a separator no text holds."""
     found: set[str] = set()
-    for path in sorted(SAMPLE_MODULES.glob("sample*.py")):
+    for path in _sample_paths():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.JoinedStr):
@@ -83,7 +88,7 @@ def templates() -> tuple[re.Pattern, ...]:
     """The sample modules' f-strings as patterns: their literal text exact (whitespace-normalized), each ``{...}`` one
     filled-in part."""
     found: set[str] = set()
-    for path in sorted(SAMPLE_MODULES.glob("sample*.py")):
+    for path in _sample_paths():
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.JoinedStr):
                 continue
@@ -99,7 +104,8 @@ def templates() -> tuple[re.Pattern, ...]:
 
 def _sample_part(text: str) -> bool:
     text = text.strip()
-    return not text or bool(_IDENTIFIER.fullmatch(text)) or text in catalogue()
+    # A part may itself be built from parts (SIGNAL_TEXT inside the signal sentence); each level is shorter, so it ends.
+    return not text or bool(_IDENTIFIER.fullmatch(text)) or text in catalogue() or _built_from_parts(text)
 
 
 def _built_from_parts(text: str) -> bool:

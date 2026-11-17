@@ -23,10 +23,11 @@ pytestmark = pytest.mark.db
 # the request context and trial subscription read once, the checklist facts kept per request, the case graph and the
 # workspace evidence read per kind. Measured: story 82, short story 88, RV-11 86, RV-09 95, reports 65,
 # workspace 55 (it was 118); one story 103 with imports (it was 140 ceiling); each ceiling is the measure plus about 10%.
+# W1 merge (17 Nov): one story also reports the flagship story's progress, measured 116 and flat with size.
 BUDGET = {
     "/api/v1/oversight/events/SAMPLE-RV-11": 95,
     "/api/v1/oversight/events/SAMPLE-RV-09": 105,
-    "/api/v1/trial/one-story": 113,
+    "/api/v1/trial/one-story": 128,
     "/api/v1/trial/story": 90,
     "/api/v1/trial/short-story": 97,
     "/api/v1/reports": 72,
