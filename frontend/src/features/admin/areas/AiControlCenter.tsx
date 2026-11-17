@@ -8,6 +8,7 @@ import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, TenantCell } from "./common";
 import { AiReleaseGate, type ReleaseGate } from "../../customer-admin/sections/AiReleaseGate";
+import { PlatformAiGovernanceView } from "../../customer-admin/sections/AiGovernance";
 
 type Model = {
   provider: string;
@@ -44,6 +45,7 @@ type AiActivity = {
 };
 
 export function AiControlCenter({ section }: { section: string }) {
+  if (section === "Governance") return <PlatformAiGovernanceView />;
   if (section === "Evaluations") return <TrustEvaluation canStart />;
   if (section === "AI runs") return <Executions />;
   if (section === "Agents & guardrails") return <Agents />;

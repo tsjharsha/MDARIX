@@ -4,7 +4,7 @@
 import { safeText } from "../../app/displayId";
 import { formatDay } from "../../app/dates";
 import { actionsOf, forAndAgainst, type BriefVersion } from "./decisionBrief";
-import { NOT_RECORDED, headline, mfaText, type DecisionSummary } from "./decisionSummary";
+import { NOT_RECORDED, headline, lockedAiLines, mfaText, type DecisionSummary } from "./decisionSummary";
 import type { LotImpactView } from "./lotImpact";
 
 export const VERSION_NOT_KNOWN = "Version not known (unverified)";
@@ -178,6 +178,12 @@ export function briefPage(
     { key: "risk", title: "Risk implications", lines: riskLines },
     { key: "action", title: "Recommended action", lines: actionLines },
     { key: "decision", title: "Decision and approval", lines: decisionLines },
+    {
+      key: "ai",
+      title: "AI used, as locked at signing",
+      // Nothing is locked before the decision is signed: the part says "Not recorded".
+      lines: decision ? lockedAiLines(summary?.ai?.locked) : [],
+    },
     { key: "effectiveness", title: "Effectiveness criteria for the follow-up", lines: effectiveness },
   ];
 }

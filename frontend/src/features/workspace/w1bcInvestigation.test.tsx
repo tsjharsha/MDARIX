@@ -172,6 +172,7 @@ const TITLES = [
   "Risk implications",
   "Recommended action",
   "Decision and approval",
+  "AI used, as locked at signing",
   "Effectiveness criteria for the follow-up",
 ];
 
@@ -276,7 +277,7 @@ describe("W1c: the Investigation Brief on one page", () => {
       </WorkspaceContext.Provider>,
     );
     for (const title of TITLES) expect(html).toContain(`aria-label="${title}"`);
-    expect(html.split(`<p class="ac-muted">Not recorded</p>`).length - 1).toBe(10);
+    expect(html.split(`<p class="ac-muted">Not recorded</p>`).length - 1).toBe(11);
     expect(html).toContain("Print or save as PDF");
   });
 

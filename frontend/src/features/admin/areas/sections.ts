@@ -74,7 +74,7 @@ export const dataIntegrationStep = (section: string) => {
   const stage = DATA_INTEGRATION_STAGES.find((item) => (item.sections as readonly string[]).includes(section));
   return { number: index + 1, total: DATA_INTEGRATION_SECTIONS.length, stage: stage?.stage ?? "" };
 };
-export const AI_SECTIONS = ["Overview", "Evaluations", "AI runs", "Agents & guardrails"] as const;
+export const AI_SECTIONS = ["Overview", "Governance", "Evaluations", "AI runs", "Agents & guardrails"] as const;
 export const SECURITY_SECTIONS = ["Overview", "Audit trail", "Support access", "Retention"] as const;
 export const OPERATIONS_SECTIONS = [
   "System health",
@@ -117,6 +117,7 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
   },
   "AI Control Center": {
     Overview: "Which AI model is in use, how often it ran in the last 30 days and how fast it answers.",
+    Governance: "Approved providers, and each organization's AI outputs and reviews, with sample answers apart.",
     Evaluations: "Test results that show the AI gives the expected answers before a release.",
     "AI runs": "Every recent AI run: for which tenant, with which model, and how it went.",
     "Agents & guardrails": "The AI assistants in MDARIX and the safety limits they work within.",
