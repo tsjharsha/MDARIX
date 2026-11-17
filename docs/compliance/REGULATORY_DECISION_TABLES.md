@@ -413,8 +413,8 @@ signed before keep the version they were signed with.
 | VR-12 | Great Britain form | GB MIR 7.2.1 (04/06/2025) |
 | VR-13 | Canada form | HC Pub. 110180 (April 2018) |
 | VR-14 | US reportability floor (rule register) | US-floor-1 |
-| VR-15 | EU and Northern Ireland reportability floor (rule register) | EU-floor-1 |
-| VR-16 | Great Britain reportability floor (rule register) | GB-floor-1 |
+| VR-15 | EU and Northern Ireland reportability floor (rule register; G-10 correction of EU-floor-1) | EU-floor-2 |
+| VR-16 | Great Britain reportability floor (rule register; G-10 correction of GB-floor-1) | GB-floor-2 |
 | VR-17 | India reportability floor (rule register; B9 correction of IN-floor-1) | IN-floor-2 |
 | VR-18 | Canada reportability floor (rule register; B9 correction of CA-floor-1) | CA-floor-2 |
 | VR-19 | US importer reportability floor (rule register, B9) | US-IMP-floor-1 |

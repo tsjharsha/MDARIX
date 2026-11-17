@@ -189,8 +189,9 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
         # B4 (ED-15, RR-16): each market row keeps the floor in force on its awareness day and the routine basis.
         # Switched off (MDARIX_RULE_REGISTER=off), no floor is recorded. B9 steps 19-20: IN-floor-2 and CA-floor-2
         # correct version 1 from the start, so each is the floor on every awareness day while its switch is on.
+        # G-10 (owner, 17 Nov 2026): EU-floor-2 and GB-floor-2 correct version 1 from the start, with no switch.
         on = feature_set.rule_register()
-        second = {
+        second = {"EU", "GB"} | {
             prefix
             for prefix, switch in (("CA", "MDARIX_B9_CANADA"), ("IN", "MDARIX_B9_INDIA"))
             if feature_set.switched_on(switch)
