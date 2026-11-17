@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Integer, String
+from sqlalchemy import Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,7 @@ __all__ = ["ValidationTestRun"]
 
 class ValidationTestRun(Base):
     __tablename__ = "validation_test_runs"
+    __table_args__ = (Index("ix_validation_test_runs_uploaded_at", "uploaded_at"),)
     id = uuid_pk()
     commit: Mapped[str] = mapped_column(String(40), nullable=False)
     ran_at = tz()

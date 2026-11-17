@@ -44,3 +44,4 @@ from backend.app.db.models.oversight import *
 from backend.app.db.models.case_ai import *
 from backend.app.db.models.ai_records import *
 from backend.app.db.models.lot_impact import *
+from backend.app.db.models.validation_runs import *

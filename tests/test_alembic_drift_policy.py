@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from infrastructure.database.migrations.business_ids import COUNTER_TABLE, INDEX_NAMES
@@ -50,3 +52,21 @@ def test_ci_runs_alembic_check_after_applying_migrations():
     upgrade_position = workflow.index("run: alembic upgrade head")
     check_position = workflow.index("run: alembic check")
     assert upgrade_position < check_position
+
+
+def test_alembic_metadata_holds_every_model_table():
+    # Alembic's env imports backend.app.db.base only; a model module base.py does not import is missing from its
+    # metadata, so "alembic check" asks to drop that table (validation_test_runs, E2). A fresh process, because the
+    # app import in this one loads every model anyway.
+    probe = (
+        "import importlib, pkgutil\n"
+        "from backend.app.db.base import Base\n"
+        "seen = set(Base.metadata.tables)\n"
+        "import backend.app.db.models as models\n"
+        "for item in pkgutil.iter_modules(models.__path__):\n"
+        "    importlib.import_module(f'backend.app.db.models.{item.name}')\n"
+        "print(sorted(set(Base.metadata.tables) - seen))\n"
+    )
+    result = subprocess.run([sys.executable, "-c", probe], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip().splitlines()[-1] == "[]", result.stdout
