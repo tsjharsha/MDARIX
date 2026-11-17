@@ -39,7 +39,14 @@ def _day(value) -> date | None:
 
 def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = None) -> dict:
     """The organization's settings; with ``control_db`` also who last changed them, by name (never their user id)."""
-    row = db.query(ComplaintSettings).filter(ComplaintSettings.tenant_id == tenant_id).first()
+    from backend.app.db.request_memo import once
+
+    # Read once per request (the trial story read it three times); any write reads it again.
+    row = once(
+        db,
+        ("complaint_settings", str(tenant_id)),
+        lambda: db.query(ComplaintSettings).filter(ComplaintSettings.tenant_id == tenant_id).first(),
+    )
     custom = row is not None and row.second_look_words is not None
     editor = row.updated_by if row else None
     names = people(control_db, tenant_id, [editor]) if editor and control_db is not None else {}

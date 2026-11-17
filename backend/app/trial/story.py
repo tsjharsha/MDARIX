@@ -222,9 +222,22 @@ def chapter_counters() -> tuple:
 
 def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
     """How often the organization acted in each chapter (records it created in MDARIX), sample data excluded."""
+    from sqlalchemy import select
+
     counts = dict.fromkeys(CODES, 0)
-    for code, model, conditions in chapter_counters():
-        counts[code] += _count(db, db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions))
+    counters = chapter_counters()
+    queries = [
+        db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *where) for _, model, where in counters
+    ]
+    try:
+        # One statement for every counter (they were twelve round trips on the trial story).
+        found = db.execute(select(*(query.scalar_subquery() for query in queries))).one()
+    except Exception:  # an older database without one of the tables: count one by one, a missing one reads 0
+        logger.exception("Trial story: the counts could not be read together")
+        db.rollback()
+        found = [_count(db, query) for query in queries]
+    for (code, _, _), value in zip(counters, found):
+        counts[code] += int(value or 0)
     return counts
 
 

@@ -16,7 +16,15 @@ from tests.test_free_trial import _approved_trial_client
 pytestmark = pytest.mark.db
 
 # Queries per call, measured in B6a run 3 at 5,000 imported complaints (106 and 129), plus about 10%.
-BUDGET = {"/api/v1/oversight/events/SAMPLE-RV-11": 115, "/api/v1/trial/one-story": 140}
+# The trial story and the reports list (WHIF hero pass, 17 Nov): 122 and 71 at 1,000 imported
+# complaints; the story read 135 before its chapter counts were batched into one statement. The reports list reads
+# each started report's worksheet (about 12 queries a report; the trial sample has 4): flat with size, pinned here.
+BUDGET = {
+    "/api/v1/oversight/events/SAMPLE-RV-11": 115,
+    "/api/v1/trial/one-story": 140,
+    "/api/v1/trial/story": 125,
+    "/api/v1/reports": 75,
+}
 
 
 def _queries(client, path: str) -> int:
