@@ -47,7 +47,9 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
     assert [item["code"] for item in floors] == [
         *canada,
         "EU-floor-1",
+        "EU-floor-2",
         "GB-floor-1",
+        "GB-floor-2",
         *india,
         *other,
         *roles,
@@ -58,6 +60,7 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
     # B9 step 5: emdr-rule-book-2 corrects version 1 (adds the importer and user facility rows), from the start.
     replaced = ({"IN-floor-1"} if len(india) == 2 else set()) | {"emdr-rule-book-1"}
     replaced |= {"CA-floor-1"} if len(canada) == 2 else set()  # B9 step 20: CA-floor-2 corrects it from the start
+    replaced |= {"EU-floor-1", "GB-floor-1"}  # G-10 (owner, 17 Nov 2026): version 2 corrects the question-6 wording
     assert all(item["state"] == ("REPLACED" if item["code"] in replaced else "IN_FORCE") for item in body["items"])
     assert all(item["source"] is not None for item in body["items"])
     # No organization's data, and no implementation detail for customers.
