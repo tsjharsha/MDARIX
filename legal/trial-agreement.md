@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this agreement will be updated with the company's details and we will tell you by email.
 
-Last updated: 3 November 2026
+Last updated: 17 November 2026
 
 This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we", "us"), gives your organization a free trial of the MDARIX product investigation platform (the "Service"). Our [Terms of service](/terms) and [Privacy policy](/privacy) also apply to the trial. Where they conflict with this agreement, this agreement prevails for the trial.
 
@@ -24,7 +24,7 @@ This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we",
 - **Sample data:** the workspace starts with sample data so you can explore the Service straight away.
 - **Price:** the trial is free of charge, and no payment details are needed.
 
-Some features may be limited or unavailable during the trial. AI features are off for free trials during the product validation phase, and they cannot be switched on for a trial.
+Some features may be limited or unavailable during the trial. In a free trial, AI features work on the trial's built-in sample data only. The sample data is synthetic and contains no personal data and no data of yours; the server refuses to send your own or edited records to an AI provider from a trial. AI output is labelled as an AI proposal, and a person must review it before anyone relies on it. AI in a trial is switched on by MDARIX for the trial organization and for each user, and can be switched off at any time.
 
 ## 3. Using the trial
 

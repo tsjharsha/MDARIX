@@ -344,7 +344,7 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
     points: [
       "An append-only audit trail records who did what and when; each event is hash-chained to the one before it and verified daily, so any change to history is detected. Electronic signatures record the signer, meaning and time.",
       "AI suggestions are advisory: they show the evidence they used, flag what could not be verified, and a person makes every decision. AI is off until an organization's administrator switches it on; in a free trial it works on the trial's sample data only.",
-      "In production, AI processing uses only providers under a contract that forbids training on your data, or models we host ourselves.",
+      "For paying organizations, AI processing uses only providers under a contract that forbids training on your data, or models we host ourselves. In a free trial, AI receives only the synthetic sample data, through providers whose terms do not allow training on it.",
     ],
   },
 ];
