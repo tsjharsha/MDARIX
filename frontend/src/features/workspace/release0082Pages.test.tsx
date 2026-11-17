@@ -11,7 +11,7 @@ import { rv11 } from "../../test/rv11";
 import { PersonaSwitch } from "./HybridShell";
 import { HomeSection } from "./sections/Home";
 import { IMPORTED_SOURCE } from "./complaintList";
-import { trendPath } from "./signalAi";
+import { monthlyRates, trendPath } from "./signalAi";
 import { SERVER_VIEWS } from "./listViews";
 import { OVERDUE_PATH, OVERDUE_VIEW } from "./home";
 
@@ -150,6 +150,7 @@ describe("Home for every persona (D1.6)", () => {
           name: "OrbitCare 300 Rev B",
           product: { id: "o" },
           recent: 9,
+          recent_days: 30,
           expected: 0.97,
           ratio: 9.3,
           result: "SIGNIFICANT",
@@ -158,7 +159,13 @@ describe("Home for every persona (D1.6)", () => {
       ],
     };
     const html = home();
-    expect(html).toContain("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×)");
+    expect(html).toContain("OrbitCare 300 Rev B: 9 complaints in the last 30 days against 1.0 expected");
+    // Owner, 17 Nov 2026: the card's figure is complaints a month, before → after, the trend's own monthly rates
+    // (expected and recent over the 30-day window); the ratio is not shown beside it.
+    const rates = monthlyRates({ recent: 9, expected: 0.97, recent_days: 30 })!;
+    expect([rates.before, rates.after]).toEqual([0.97, 9]);
+    expect(html).toContain("1.0 → 9.0 <small>complaints a month</small>");
+    expect(html).not.toContain("9.3×");
     expect(html.match(/class="uw-bar-fill/g)).toHaveLength(2);
     expect(SERVER_VIEWS[OVERDUE_VIEW].code).toBe("overdue");
     expect(OVERDUE_PATH).toContain("view=overdue");

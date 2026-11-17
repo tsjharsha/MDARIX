@@ -68,8 +68,9 @@ export function lotsText(lots: readonly string[], counts?: Record<string, number
  * lots 003 and 004". */
 export function risingSentence(
   item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots" | "lot_counts"> & { recent_days?: number },
+  { ratio: withRatio = true }: { ratio?: boolean } = {},
 ): string {
-  const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
+  const ratio = withRatio && typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
   const lots = item.lots?.length
     ? `, ${item.lots.length === 1 ? "lot" : "lots"} ${lotsText(item.lots, item.lot_counts)}`
     : "";
@@ -78,6 +79,23 @@ export function risingSentence(
   const window = item.recent_days ? ` in the last ${item.recent_days} days` : "";
   return `${item.name}: ${grouped(item.recent)} complaints${window} against ${grouped(item.expected, 1)} expected${ratio}${lots}`;
 }
+
+/**
+ * The rise as complaints a month, before and after (owner, 17 Nov 2026), from the trend check's own counts: "after" is
+ * what arrived in the recent window, "before" what the earlier average predicts for that same window, each over 30
+ * days. Their ratio is the trend's ratio. Null without a recent window.
+ */
+export function monthlyRates(
+  item: Pick<TrendItem, "recent" | "expected"> & { recent_days?: number | null },
+): { before: number; after: number } | null {
+  const days = item.recent_days ?? 0;
+  if (!(days > 0) || typeof item.expected !== "number") return null;
+  return { before: (item.expected / days) * 30, after: (item.recent / days) * 30 };
+}
+
+/** "0.8 → 5.6", one decimal each. */
+export const monthlyText = (rates: { before: number; after: number }) =>
+  `${rates.before.toFixed(1)} → ${rates.after.toFixed(1)}`;
 
 /** The comparison basis in one line, saying plainly when unit quantities are missing. */
 export function comparisonLine(
