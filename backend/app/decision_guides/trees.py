@@ -72,7 +72,7 @@ def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
             if approved and row.approved_at
             else f"Your version {view['version']}"
             if approved
-            else "MDARIX starter · version 1, for your consultant to confirm"
+            else "MDARIX starter · version 1"  # the starter mark is the page's footnote (G-17)
         ),
         "tests": {"passed": passed, "total": passed + failed, "current": bool(results.get("current"))},
         "questions": [

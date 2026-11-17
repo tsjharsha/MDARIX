@@ -336,7 +336,8 @@ def test_the_decision_trees_show_each_market_and_the_path_a_complaint_took(trial
         "Your version 2 · approved"
     )
     assert (by_market["IN"]["status"], by_market["IN"]["version"]) == ("STARTER", 1)
-    assert "consultant" in by_market["IN"]["version_label"]
+    # G-17: the starter mark is the page's footnote, not part of the version label.
+    assert by_market["IN"]["version_label"] == "MDARIX starter · version 1"
     assert us["tests"]["total"] > 0 and us["tests"]["passed"] == us["tests"]["total"]
     assert [question["id"] for question in us["questions"]][:3] == ["US1", "US2A", "US2B"]
     assert all(question["clause"] for question in us["questions"])
