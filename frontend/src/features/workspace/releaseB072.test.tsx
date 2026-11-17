@@ -92,7 +92,7 @@ describe("B2: the investigation leads with what the decision rests on", () => {
       <DecisionBoard row={{ owner_name: "Asha Quality" }} readiness={READINESS} content={OLD_SAMPLE_BRIEF} />,
     );
     expect(html).toContain("Leading explanation:</strong> The NovaSense pressure sensors read high. (Sample)");
-    expect(html).toContain("For it (2)");
+    expect(html).toContain("For the leading explanation (2)");
     expect(html).toContain("Against it (0)");
     expect(html).toContain(
       "<strong>Unknowns are answered</strong>: 2 open unknowns still to answer · Owner: Asha Quality",

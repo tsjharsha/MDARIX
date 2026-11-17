@@ -107,3 +107,11 @@ describe("the triage panel's × closes it", () => {
     });
   }
 });
+
+describe("a complaint logged as it was heard (hero review 2, F-C4)", () => {
+  it("says it was logged at once, not that it reached MDARIX 0 hours later", () => {
+    const html = render("To triage", () => undefined);
+    expect(html).toContain("logged at once");
+    expect(html).not.toContain("later");
+  });
+});

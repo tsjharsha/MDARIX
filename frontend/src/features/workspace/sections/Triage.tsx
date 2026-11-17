@@ -286,7 +286,8 @@ function TriageCard({
         </p>
         <p className="uw-cr-meta">
           Aware {awarenessText(item.awareness.at, item.awareness.date_only)} ({item.awareness.source_label}
-          {item.awareness.linked_ref ? `: ${item.awareness.linked_ref}` : ""}) · reached MDARIX {item.delay.text} later
+          {item.awareness.linked_ref ? `: ${item.awareness.linked_ref}` : ""}) ·{" "}
+          {item.delay.hours < 1 ? "logged at once" : `reached MDARIX ${item.delay.text} later`}
         </p>
         {first && (
           <p className="uw-cr-meta">

@@ -365,7 +365,7 @@ export function DecisionBoard({
           </p>
           <div className="uw-board-sides">
             <section aria-label="Evidence for it">
-              <h3>For it ({supporting.length})</h3>
+              <h3>For the leading explanation ({supporting.length})</h3>
               {supporting.length ? (
                 <ul>
                   {supporting.map((line) => (

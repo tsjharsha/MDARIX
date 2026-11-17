@@ -36,6 +36,8 @@ import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
 import { awarenessText, zoneName, zoneless } from "../../../app/dates";
+// "open" -> "Open" (F-C4).
+const sentenceCase = (text: string | null | undefined) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : "—");
 import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
@@ -476,8 +478,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                         : "None of your reporting markets applies"}
                     <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>
-                  <dt>In your QMS</dt>
-                  <dd>{event.status_in_qms}</dd>
+                  <dt>Status in your QMS</dt>
+                  <dd>{sentenceCase(event.status_in_qms)}</dd>
                 </dl>
                 <details className="uw-rec-part uw-cp-fold">
                   <summary>
