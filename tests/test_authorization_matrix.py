@@ -129,7 +129,12 @@ ADMIN_ROUTES_FOR = {
 }  # a long real-pipeline run; tenant scope in test_evaluation_router.py
 # Customer administration that a free trial's owner also runs (AI-R decision T5: the trial admin switches trial AI on,
 # acknowledged and audited; ai_settings._settings_admin). Nobody else without an administrator role.
-TRIAL_OWNER_ADMIN_ROUTES = {"/api/v1/admin/ai-settings"}
+TRIAL_OWNER_ADMIN_ROUTES = {
+    "/api/v1/admin/ai-settings",
+    # The trial's own audit trail and its chain check (WHIF review F-E1): a trial has no customer administrator.
+    "/api/v1/admin/audit-history",
+    "/api/v1/admin/audit-chain",
+}
 
 _WORK = {RECORDS_WRITE, AI_RUN, DATA_EXPORT}
 _EVIDENCE = {EVIDENCE_REVIEW, EVIDENCE_REQUEST}

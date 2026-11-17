@@ -260,7 +260,15 @@ def trial_users_ai_access(tenant_id: uuid.UUID, request: Request, db: Session = 
 
     admin = _require_platform_admin(request, db)
     tenant = _trial(db, tenant_id, admin, "AI_ACCESS_LIST")
+    from backend.app.trial.sample_decision import _author_email
+
     rows = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).order_by(AuthUser.display_name).all()
+    author, chain_on = _author_email(tenant_id), bool(trial_chain_names())
+    organization_on = bool(tenant.ai_processing_allowed)
+
+    def active(row) -> bool:
+        return (row.ai_access or governance.USER_AI_ACTIVE) == governance.USER_AI_ACTIVE
+
     switched_on = _organization_switched_on(db, tenant) if tenant.ai_processing_allowed else None
     by = _names(db, {switched_on.actor_ref}) if switched_on else {}
     return {
@@ -269,12 +277,16 @@ def trial_users_ai_access(tenant_id: uuid.UUID, request: Request, db: Session = 
         # Who switched it on, and when (the latest switch-on in the trial's audit trail); None while it is off.
         "organization_on_by": by.get(str(switched_on.actor_ref), "MDARIX") if switched_on else None,
         "organization_on_at": switched_on.created_at.isoformat() if switched_on and switched_on.created_at else None,
-        "trial_chain_on": bool(trial_chain_names()),
+        "trial_chain_on": chain_on,
         "items": [
             {
                 "user_id": str(row.id),
                 "display_name": row.display_name,
-                "active": (row.ai_access or governance.USER_AI_ACTIVE) == governance.USER_AI_ACTIVE,
+                "active": active(row),
+                # The sample's author account (signs the sample's finished examples; never signs in): not a person.
+                "system_user": row.username == author,
+                # Whether this person gets AI now: their switch, the organization's and the trial chain together.
+                "effective": active(row) and organization_on and chain_on and row.status == "ACTIVE",
             }
             for row in rows
         ],

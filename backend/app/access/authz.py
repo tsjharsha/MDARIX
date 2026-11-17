@@ -184,5 +184,20 @@ def _admin_tenant(request: Request, db: Session) -> AuthUser:
     return _require_administrator(request, db)
 
 
+def admin_or_trial_owner(request: Request, db: Session) -> AuthUser:
+    """A customer administrator, or in a free trial (which has no customer administrator) the person who started it:
+    the trial's own administrator (AI-R decision T5; the trial's audit trail, WHIF review F-E1)."""
+    from genai import governance
+    from backend.app.trial.team import is_trial_owner
+
+    try:
+        return _admin_tenant(request, db)
+    except HTTPException as refused:
+        user = _authenticated_user(request, db)
+        if governance.is_free_trial(db, user.tenant_id) and is_trial_owner(db, user.tenant_id, user):
+            return user
+        raise refused
+
+
 def _admin_detail_tenant(request: Request, db: Session):
     return _admin_tenant(request, db).tenant_id

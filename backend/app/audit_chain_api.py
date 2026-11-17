@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from backend.app.access.authz import _admin_tenant, _require_platform_admin
+from backend.app.access.authz import _require_platform_admin
 from backend.app.audit_chain import verify_tenant_chain
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import get_db
@@ -17,8 +17,10 @@ router = APIRouter(prefix="/api/v1", tags=["Audit"])
 
 @router.get("/admin/audit-chain")
 def verify_own_audit_chain(request: Request, db: Session = Depends(get_db)):
-    """Recompute this organization's whole audit hash chain now."""
-    admin = _admin_tenant(request, db)
+    """Recompute this organization's whole audit hash chain now (also for a free trial's owner, WHIF F-E1)."""
+    from backend.app.access.authz import admin_or_trial_owner
+
+    admin = admin_or_trial_owner(request, db)
     return verify_tenant_chain(db, admin.tenant_id)
 
 

@@ -56,13 +56,24 @@ def admin_smtp_status(request: Request, db: Session = Depends(get_db)):
 
 
 PLATFORM_ACTOR_LABEL = "MDARIX platform administrator"
+# A trial sample's pre-recorded AI answer (backend/app/trial/sample_ai.py) is shown as a sample, never counted as an AI
+# run or as use (WHIF review F-X2).
+SAMPLE_RECORDED_PROVIDER = "sample-recorded"
+
+
+def real_ai_runs():
+    """AI executions a model actually made: the sample's pre-recorded answers left out."""
+    return AIExecution.provider != SAMPLE_RECORDED_PROVIDER
 
 
 @router.get("/admin/audit-history")
 def audit_history(
     request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)
 ):
-    admin = _admin_tenant(request, db)
+    from backend.app.access.authz import admin_or_trial_owner
+    from backend.app.access.platform_trials import _names
+
+    admin = admin_or_trial_owner(request, db)  # a free trial's owner reads the trial's own trail (WHIF F-E1)
     query = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
     if action:
         query = query.filter(AuditEvent.action == action)
@@ -73,6 +84,7 @@ def audit_history(
     actor_business_ids = business_id_map(db, AuthUser, (row.actor_ref for row in rows))
     # Staff accounts live in the platform's organization, which this organization's session cannot read.
     platform_actors = set() if _is_platform_admin(admin) else set(staff_accounts(row.actor_ref for row in rows))
+    names = _names(db, {row.actor_ref for row in rows if str(row.actor_ref) not in platform_actors})
     return [
         {
             "id": str(row.id),
@@ -82,7 +94,9 @@ def audit_history(
             if str(row.actor_ref) in platform_actors
             else actor_business_ids.get(str(row.actor_ref)),
             "actor_label": PLATFORM_ACTOR_LABEL if str(row.actor_ref) in platform_actors else None,
+            "actor_name": None if str(row.actor_ref) in platform_actors else names.get(str(row.actor_ref)),
             "action": row.action,
+            "action_label": (row.action or "").replace("_", " ").capitalize(),
             "entity_type": row.entity_type,
             "entity_id": str(row.entity_id) if row.entity_id else None,
             "details": row.details,
@@ -404,6 +418,7 @@ def tenant_dashboard_trends(request: Request, days: int = 30, db: Session = Depe
             since,
             AIExecution.execution_timestamp,
             AIExecution.tenant_id == tenant_id,
+            real_ai_runs(),
             key=AIExecution.error_state.is_(None),
         )
         investigations = (
