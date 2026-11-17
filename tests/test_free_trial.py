@@ -1773,3 +1773,27 @@ def test_ask_mdarix_without_ai_answers_the_natural_trial_question_in_plain_words
     # The AI status every screen reads says why the AI buttons are off (UX-02).
     status = user.get("/api/v1/ai/status").json()
     assert status["trial"] is True and status["message"].startswith("AI is off for free trials")
+
+
+def test_the_samples_ai_observations_are_not_counted_as_validated():
+    """Review G14: the pre-recorded AI observations were seeded VALIDATED, so the evidence summary counted an
+    unreviewed AI output as validated evidence."""
+    from backend.app.db.models.evidence_intelligence import EvidenceObservation
+    from backend.app.db.models.foundation import Evidence
+    from backend.app.db.tenant_scope import bind_system
+    from evidence.services.evidence_service import build_evidence_summary
+
+    _user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        observations = (
+            db.query(EvidenceObservation)
+            .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.extraction_method == "GENAI")
+            .all()
+        )
+        assert observations and {row.quality_status for row in observations} == {"PROPOSED"}
+        row = observations[0]
+        summary = build_evidence_summary(db.get(Evidence, row.evidence_id), [row], tenant_id)
+        assert summary["sufficiency"] != "SUFFICIENT_FOR_REVIEW"
+        assert row.statement in summary["unresolved_evidence"]
