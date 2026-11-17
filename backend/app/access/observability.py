@@ -66,9 +66,18 @@ def real_ai_runs():
     return AIExecution.provider != SAMPLE_RECORDED_PROVIDER
 
 
+# Technical rows written on every request or read: stored and exported (the chain needs them), but hidden from an
+# organization's own trail unless it asks for system events, so the business events stay readable (review G-03).
+SYSTEM_AUDIT_ACTIONS = ("REQUEST_MUTATION_COMPLETED", "PRODUCT360_TEMPORAL_RETRIEVAL")
+
+
 @router.get("/admin/audit-history")
 def audit_history(
-    request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)
+    request: Request,
+    action: str | None = None,
+    entity_type: str | None = None,
+    include_system: bool = False,
+    db: Session = Depends(get_db),
 ):
     from backend.app.access.authz import admin_or_trial_owner
     from backend.app.access.platform_trials import _names
@@ -77,6 +86,8 @@ def audit_history(
     query = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
     if action:
         query = query.filter(AuditEvent.action == action)
+    elif not include_system and not _is_platform_admin(admin):
+        query = query.filter(AuditEvent.action.notin_(SYSTEM_AUDIT_ACTIONS))
     if entity_type:
         query = query.filter(AuditEvent.entity_type == entity_type)
     rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()

@@ -141,6 +141,8 @@ describe("F-E1 to F-E6: records an inspector can trust", () => {
     expect(html).toContain("Decision signed");
     expect(html).toContain("Asha Rao (fictional)");
     expect(html).toContain("Check the audit trail is intact");
+    // G-03: system events are hidden by the server unless asked for here.
+    expect(html).toContain("Show system events");
   });
 
   it("opens verification on the latest signed records, with signer, MFA and training", () => {

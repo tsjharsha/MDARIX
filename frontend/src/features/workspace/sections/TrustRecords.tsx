@@ -128,7 +128,9 @@ type AuditRow = {
 
 /** The organization's own audit trail for the trial owner, with the chain check (F-E1). */
 export function OrganizationAuditTrail() {
-  const audit = useResource<AuditRow[]>("/api/v1/admin/audit-history");
+  // System events (every request, every product read) are kept and exported, but shown only when asked (G-03).
+  const [system, setSystem] = useState(false);
+  const audit = useResource<AuditRow[]>(`/api/v1/admin/audit-history${system ? "?include_system=true" : ""}`);
   const [chain, setChain] = useState<{ valid: boolean; checked: number } | "checking" | "failed" | null>(null);
   const rows = listOf(audit.data) as AuditRow[];
   if (audit.state !== "ready" || !rows.length) return null;
@@ -156,6 +158,10 @@ export function OrganizationAuditTrail() {
               ? "The check could not run right now."
               : "Each event is chained to the one before it, so any change is detected."}
         </span>
+        <label className="ac-muted">
+          <input type="checkbox" checked={system} onChange={(event) => setSystem(event.target.checked)} /> Show system
+          events
+        </label>
       </div>
       <Table
         caption="Audit events"
