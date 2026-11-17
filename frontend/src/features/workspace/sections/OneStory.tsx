@@ -8,11 +8,15 @@ import {
   GitFork,
   ListChecks,
   Minus,
+  Package,
+  PencilLine,
   Phone,
   Send,
+  Sparkles,
   Stethoscope,
   TrendingUp,
   UserCheck,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
@@ -21,9 +25,18 @@ import { errorText, send, useResource } from "../../customer-admin/shared";
 import { useRoutinePath, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
-import { chanceText, trendCountText, trendResultLabel, type TrendItem } from "../signalAi";
+import { chanceText, runPath, trendCountText, trendPath, trendResultLabel, type TrendItem } from "../signalAi";
+import { useAiReady } from "../useAiStatus";
+import { RecordedChip } from "../../shared/AiReview";
+import { flagshipBarParts } from "./FlagshipBar";
 import {
+  FLAGSHIP_STEPS,
+  LOT_005_LINE,
   STORY_STEPS,
+  branchPlace,
+  signalWhy,
+  summaryPlace,
+  openFlagshipStep,
   casePlace,
   moreCasePlace,
   openStep,
@@ -33,6 +46,7 @@ import {
   stepPlace,
   takeMarkProblem,
   useOneStory,
+  type FlagshipRun,
   type MoreCase,
   type OneStory as OneStoryData,
   type StoryRun,
@@ -278,17 +292,25 @@ export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolea
  * instruction, a short summary of the complaint from its own record and one main button that opens the real screen.
  * Ticks come from the saved record (the server's one-story read), never from the screen on show or a click here.
  */
-export function OneStory({ heading }: { heading?: RefObject<HTMLHeadingElement | null> }) {
+export function OneStory({ heading, more }: { heading?: RefObject<HTMLHeadingElement | null>; more?: ReactNode }) {
   const story = useOneStory();
+  const { dataSource } = useWorkspace();
   const team = useResource<{ seats_used: number }>(story.data?.yours?.finished ? TEAM_PATH : null);
+  // W1 (D3): the flagship story leads every trial while its sample is there; your data's walkthrough when chosen.
+  const flagship = story.data?.flagship;
+  if (flagship && !(dataSource === IMPORTED_SOURCE && story.data?.yours))
+    return <FlagshipView story={story.data!} run={flagship} heading={heading} more={more} />;
   return (
-    <StoryView
-      story={story.data}
-      state={story.state}
-      onRetry={story.reload}
-      heading={heading}
-      colleagues={team.data?.seats_used ?? 1}
-    />
+    <>
+      <StoryView
+        story={story.data}
+        state={story.state}
+        onRetry={story.reload}
+        heading={heading}
+        colleagues={team.data?.seats_used ?? 1}
+      />
+      {more}
+    </>
   );
 }
 
@@ -314,6 +336,7 @@ export function StoryView({
   onRetry,
   heading,
   colleagues = 1,
+  folded = false,
 }: {
   story: OneStoryData | null;
   /** The read's state. With no story read yet, the card says it is loading, failed (with Try again) or refused. */
@@ -322,6 +345,8 @@ export function StoryView({
   heading?: RefObject<HTMLHeadingElement | null>;
   /** The people on the trial, the owner included. */
   colleagues?: number;
+  /** Shown inside "More sample stories" under the flagship (W1): no page header of its own. */
+  folded?: boolean;
 }) {
   const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
@@ -571,7 +596,7 @@ export function StoryView({
   }
   return (
     <div className="uw-os">
-      {header}
+      {!folded && header}
       <section className="uw-wt" aria-labelledby="uw-wt-title">
         <div className="uw-wt-head">
           <h2 id="uw-wt-title">{sample ? "Your sample walkthrough" : "Your data walkthrough"}</h2>
@@ -650,7 +675,6 @@ export function StoryView({
           </ol>
           <div className={`uw-os-main${previewing ? " is-preview" : ""}`}>{body}</div>
         </div>
-        <p className="uw-wt-hint uw-os-coming">Coming next: investigation to CAPA · trends to product improvement</p>
       </section>
       <MoreCases cases={story?.more_cases ?? []} onOpen={go} />
     </div>
@@ -742,3 +766,463 @@ export function StoryPill({ run }: { run: StoryRun }) {
 }
 
 export type { OneStoryData };
+
+// ------------------------------------------------------------------------------------ The flagship story (W1)
+
+/** Each flagship step's heading and its one main button (spec section 1). Step 4's button asks AI when AI answers. */
+export function flagshipCopy(run: FlagshipRun, index: number, aiReady: boolean | null): { h: string; b: string } {
+  return [
+    {
+      h: "Pressure alarms are rising",
+      b: run.steps[0].done ? "Open the OrbitCare 300 trend" : "Start the sample investigation",
+    },
+    { h: "Product reality: what changed in Rev B", b: "Compare Rev B with Rev A" },
+    { h: "What is known, unknown, contradicted and missing", b: "See what is known and what is not" },
+    {
+      h: "AI proposes competing explanations; a person reviews them",
+      b: aiReady === true ? "Ask AI for competing explanations" : "Review the AI proposals",
+    },
+    { h: "The Investigation Brief, checked by a second person", b: "Review the brief" },
+    { h: "Your decision, signed with your authenticator", b: "Sign the decision" },
+    { h: "Action and impact", b: "Plan the effectiveness check" },
+  ][index];
+}
+
+/** Why each flagship step is needed, who takes it and what ticks it. */
+export const FLAGSHIP_INFO: ReadonlyArray<{ why: string; who: string; evidence: string }> = [
+  {
+    // G-06: shown with the trend check's own number (signalWhy); this is the wording while it loads.
+    why: signalWhy(undefined, null),
+    who: "Quality Leader",
+    evidence: "The OrbitCare 300 trend opened",
+  },
+  {
+    why: "Rev B changed the pressure sensor's supplier and cut incoming inspection from 32 to 13 sensors per lot.",
+    who: "Quality Leader, Investigator",
+    evidence: "Rev B's product page opened",
+  },
+  {
+    why: "Every statement names its record. What is unknown or contradicted stays in view and is never filled in.",
+    who: "Investigator",
+    evidence: "The case's evidence overview opened",
+  },
+  {
+    why: "AI proposes, people decide. Each proposal stays labelled until a person accepts, edits or rejects it.",
+    who: "Investigator",
+    evidence: "A person's review of an AI proposal",
+  },
+  {
+    why: "A second person checks the brief before anyone decides: the writer never approves their own brief.",
+    who: "Quality reviewer",
+    evidence: "The brief accepted for decision",
+  },
+  {
+    why: "A person decides and signs with password and authenticator code. The server records what the signature means.",
+    who: "Decision Maker",
+    evidence: "A signed decision",
+  },
+  {
+    why: "The CAPA restores inspection. Only a signed effectiveness check can say that it worked.",
+    who: "Quality Leader",
+    evidence: "An effectiveness check planned",
+  },
+];
+
+const FLAGSHIP_ICONS: readonly LucideIcon[] = [TrendingUp, Package, ListChecks, Sparkles, FileText, PencilLine, Wrench];
+export const SUMMARY_LINE = "See the decision and its impact on one screen";
+export const FLAGSHIP_BRIEF_LINE =
+  "Written by the sample author before the AI proposal; your accepted proposal is on the case.";
+export const RISK_LINE = "Risk file: reassess SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor";
+
+/** What only some steps say: the AI's state, the brief's author, the signature, the action's three lines. */
+function FlagshipExtra({
+  run,
+  index,
+  aiReady,
+  onRisk,
+  onSummary,
+}: {
+  run: FlagshipRun;
+  index: number;
+  aiReady: boolean | null;
+  onRisk: () => void;
+  onSummary: () => void;
+}) {
+  const note = run.steps[index].note;
+  // E3 + W6: once the decision is signed, its summary is one click away from steps 6 and 7.
+  const summary = run.steps[5].done ? (
+    <button type="button" className="ac-link" onClick={onSummary}>
+      {SUMMARY_LINE}
+    </button>
+  ) : null;
+  if (index === 0 || index === 1) return <p className="uw-os-differ">{LOT_005_LINE}</p>;
+  if (index === 3)
+    return (
+      <div className="uw-os-differ">
+        <p>
+          {aiReady === true
+            ? "AI is on: a live run asks the model for competing explanations. Its proposals carry no sample chip."
+            : "AI is off: no model is called. You review the proposals recorded with the sample."}
+        </p>
+        {aiReady !== true && run.ai_proposals > 0 && <RecordedChip recorded />}
+        {note && <p>{note}</p>}
+      </div>
+    );
+  if (index === 4) return <p className="uw-os-differ">{FLAGSHIP_BRIEF_LINE}</p>;
+  if (index === 5)
+    return (
+      <div className="uw-os-differ">
+        <p>
+          {note ??
+            "The follow-ups come prefilled from the brief's actions. You sign with password and authenticator code."}
+        </p>
+        {summary && <p>{summary}</p>}
+      </div>
+    );
+  if (index === 6)
+    return (
+      <ul className="uw-os-differ uw-flagship-lines">
+        <li>{run.capa ? `CAPA ${run.capa.ref}: ${run.capa.title}` : "No CAPA recorded on the case yet"}</li>
+        <li>
+          {run.capa?.check_status
+            ? `Did it work? Signed: ${run.capa.check_status === "EFFECTIVE" ? "effective" : "not effective"}`
+            : "Did it work? Too early: only a signed effectiveness check says an action worked"}
+        </li>
+        <li>
+          <button type="button" className="ac-link" onClick={onRisk}>
+            {RISK_LINE}
+          </button>
+        </li>
+        {summary && <li>{summary}</li>}
+      </ul>
+    );
+  return null;
+}
+
+/**
+ * Getting started's flagship (W1): one investigation, one product, one version, seven steps from the signal to the
+ * action, under the hero header; one main button; the other sample stories folded below, closed. Ticks come from the
+ * server's reading of the saved records.
+ */
+export function FlagshipView({
+  story,
+  run,
+  heading,
+  more,
+}: {
+  story: OneStoryData;
+  run: FlagshipRun;
+  heading?: RefObject<HTMLHeadingElement | null>;
+  more?: ReactNode;
+}) {
+  const { open, session, startStory, chooseDataSource, work } = useWorkspace();
+  const aiReady = useAiReady();
+  const [picked, setPicked] = useState<number | null>(null);
+  const [problem] = useState(takeMarkProblem);
+  const [folded, setFolded] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const done = run.steps.filter((step) => step.done).length;
+  const selected = picked ?? Math.min(run.current, FLAGSHIP_STEPS - 1);
+  const finished = run.finished && picked === null;
+  const previewing = picked !== null && picked !== run.current;
+  // G-06: step 1 says the rise in the trend check's own number.
+  const signal = useResource<{ items?: TrendItem[] }>(
+    selected === 0 && !finished && run.product.id ? trendPath("version", run.product.id) : null,
+  );
+  const go = (section: string, tab?: string) => open(section as WorkspaceSection, tab);
+  const start = async (index: number) => {
+    startStory?.("flagship");
+    // D4: with AI on, step 4 asks the model first; whatever it answers, the proposals open (the recorded ones stay).
+    if (index === 3 && aiReady === true) {
+      setBusy(true);
+      try {
+        await send(runPath(run.investigation.id), "POST", { trigger: "MANUAL" });
+      } catch {
+        // The recorded proposals are still there to review.
+      } finally {
+        setBusy(false);
+      }
+    }
+    openFlagshipStep(run, index, go, work?.setInvestigationId);
+  };
+  const openSummary = () => {
+    const place = summaryPlace(run);
+    if (place.caseId) work?.setInvestigationId?.(place.caseId, place.productId);
+    go(place.section, place.tab);
+  };
+  const branch = () => {
+    const place = branchPlace(run);
+    if (!place) return;
+    startStory?.("flagship-branch");
+    go(place.section, place.tab);
+  };
+  const tenStep = story.sample;
+  // W2: before the first step, one calm screen with one button; the steps and the rest open on request.
+  const fresh = done === 0 && run.current === 0 && picked === null && !run.finished;
+  const yoursNext = () => {
+    if (story.yours) chooseDataSource?.(IMPORTED_SOURCE);
+    else open("Import your data");
+  };
+  const header = (
+    <MonitorBand className="uw-gs-band">
+      <header className="uw-gs-head">
+        <h1 ref={heading} tabIndex={-1}>
+          Getting started
+        </h1>
+        <p>Follow one sample investigation from the signal to the action, in seven steps.</p>
+        {fresh && (
+          <div className="ca-action-row uw-gs-start">
+            <button type="button" className="ac-primary uw-os-go" disabled={busy} onClick={() => void start(0)}>
+              {flagshipCopy(run, 0, aiReady).b} <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        <p className="uw-gs-practice">{practiceLine(true)}</p>
+        {!fresh && (
+          <div className="uw-gs-prog" aria-hidden="true">
+            <ProgressArc done={done} size={64} decorative />
+            <b className="uw-num">
+              {done}
+              <small>/{FLAGSHIP_STEPS}</small>
+            </b>
+          </div>
+        )}
+      </header>
+      <BedsideScene className="uw-gs-scene" />
+    </MonitorBand>
+  );
+  let body: ReactNode;
+  if (finished) {
+    body = (
+      <>
+        <div className="uw-os-art">
+          <SignedSeal size={76} />
+          <div>
+            <p className="uw-wt-label">All seven steps done</p>
+            <h3 id="uw-os-title">The sample investigation is complete</h3>
+          </div>
+        </div>
+        <p className="uw-wt-lead">
+          From a rising signal to a signed decision and a planned effectiveness check, each step read from its saved
+          record. Nothing says the action worked until a person signs that check.
+        </p>
+        <p className="uw-wt-hint">
+          <button type="button" className="ac-link" onClick={openSummary}>
+            {SUMMARY_LINE}
+          </button>
+        </p>
+        <div className="ca-action-row">
+          {session?.sample_only ? (
+            <button type="button" className="ac-primary uw-os-go" onClick={() => open("Next steps")}>
+              Discuss a pilot <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          ) : (
+            <button type="button" className="ac-primary uw-os-go" onClick={yoursNext}>
+              Do the same with your data <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </>
+    );
+  } else {
+    const copy = flagshipCopy(run, selected, aiReady);
+    const info = FLAGSHIP_INFO[selected];
+    const why = selected === 0 ? signalWhy(signal.data?.items, run.product.id) : info.why;
+    const step = run.steps[selected];
+    const Icon = FLAGSHIP_ICONS[selected];
+    body = (
+      <>
+        <div className="uw-os-art">
+          <span className="uw-os-art-ic" aria-hidden="true">
+            <Icon size={36} />
+          </span>
+          <p className="uw-wt-label">
+            Step {selected + 1} · {step.label}
+          </p>
+        </div>
+        {previewing && (
+          <p className="uw-wt-preview">
+            <Eye size={15} aria-hidden="true" />
+            <span>
+              Preview.{" "}
+              {run.finished
+                ? "All seven steps are done."
+                : `Your next step is ${run.current + 1}, ${run.steps[run.current].label}.`}
+            </span>
+            <button type="button" className="ac-link" onClick={() => setPicked(null)}>
+              {run.finished ? "Back to the summary" : `Back to step ${run.current + 1}`}
+            </button>
+          </p>
+        )}
+        <h3 id="uw-os-title">{copy.h}</h3>
+        {/* Hero pass: the one main button right under the heading, above the fold on a projector. */}
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary uw-os-go" disabled={busy} onClick={() => void start(selected)}>
+            {copy.b} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </div>
+        <dl className="uw-os-lines">
+          <div>
+            <dt>Why</dt>
+            <dd>{why}</dd>
+          </div>
+          <div>
+            <dt>Who</dt>
+            <dd>{info.who}</dd>
+          </div>
+          <div>
+            <dt>Evidence</dt>
+            <dd>{info.evidence}</dd>
+          </div>
+        </dl>
+        {step.done ? (
+          <span className="ms-chip is-good uw-os-state">
+            <Check size={13} aria-hidden="true" /> Done · read from the saved record
+          </span>
+        ) : step.earlier ? (
+          <span className="ms-chip uw-os-state">Done earlier · ticked once the steps before it are done</span>
+        ) : null}
+        <FlagshipExtra
+          run={run}
+          index={selected}
+          aiReady={aiReady}
+          onRisk={() => go("Records", "Risk file input")}
+          onSummary={openSummary}
+        />
+        {(selected === 2 || selected === 6) && run.branch && (
+          <p className="uw-wt-hint">
+            <button type="button" className="ac-link" onClick={branch}>
+              Optional: is {run.branch.ref} reportable in each market?
+            </button>
+          </p>
+        )}
+      </>
+    );
+  }
+  const moreStories = (
+    <>
+      {tenStep && tenStep.current > 0 && !tenStep.finished && folded && (
+        <p className="uw-wt-hint">
+          You started the PulseWatch 410 story ({stepCount(tenStep)}).{" "}
+          <button type="button" className="ac-link" onClick={() => setFolded(false)}>
+            Continue it
+          </button>
+        </p>
+      )}
+      <details
+        className="uw-story-more uw-flagship-more"
+        open={!folded}
+        onToggle={(event) => setFolded(!(event.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>More sample stories (optional)</summary>
+        {!folded && (
+          <>
+            <p className="uw-wt-hint">
+              Is it reportable? Follow one complaint from the call to the submission (PulseWatch 410, 10 steps).
+            </p>
+            <StoryView story={story} folded />
+            {more}
+          </>
+        )}
+      </details>
+    </>
+  );
+  if (fresh)
+    return (
+      <div className="uw-os">
+        {header}
+        <section className="uw-wt uw-flagship-card uw-gs-calm" aria-labelledby="uw-wt-title">
+          <div className="uw-wt-head">
+            <h2 id="uw-wt-title">The sample investigation</h2>
+            <h3 className="uw-os-part">{run.investigation.question}</h3>
+            <span className="ms-chip is-sample">Sample data</span>
+            <span className="uw-wt-count uw-num">{flagshipBarParts(run).join(" · ")}</span>
+          </div>
+          <p className="uw-wt-lead">
+            About ten minutes. Each step opens the real screen on the sample records and ticks only from what you save.
+          </p>
+          <details className="uw-story-more">
+            <summary>See the seven steps</summary>
+            <ol className="uw-gs-steps">
+              {run.steps.map((step) => (
+                <li key={step.key}>{step.label}</li>
+              ))}
+            </ol>
+          </details>
+        </section>
+        {moreStories}
+      </div>
+    );
+  return (
+    <div className="uw-os">
+      {header}
+      <section className="uw-wt uw-flagship-card" aria-labelledby="uw-wt-title">
+        <div className="uw-wt-head">
+          <h2 id="uw-wt-title">The sample investigation</h2>
+          <h3 className="uw-os-part">{run.investigation.question}</h3>
+          <span className="ms-chip is-sample">Sample data</span>
+          <span className="uw-wt-count uw-num">{flagshipBarParts(run).join(" · ")}</span>
+          <div
+            className="uw-wt-bar"
+            role="progressbar"
+            aria-label="Investigation progress"
+            aria-valuemin={0}
+            aria-valuemax={FLAGSHIP_STEPS}
+            aria-valuenow={done}
+            aria-valuetext={`${done} of ${FLAGSHIP_STEPS} completed`}
+          >
+            {run.steps.map((step, index) => (
+              <i
+                key={step.key}
+                className={step.done ? "is-on" : !run.finished && index === run.current ? "is-cur" : undefined}
+              />
+            ))}
+          </div>
+        </div>
+        {problem && (
+          <p className="uw-os-problem" role="status">
+            {problem}
+          </p>
+        )}
+        <div className="uw-os-grid">
+          <ol className="uw-os-rail" aria-label="Investigation steps">
+            {run.steps.map((step, index) => {
+              const isNext = !run.finished && index === run.current;
+              const StepIc = FLAGSHIP_ICONS[index];
+              return (
+                <li key={step.key}>
+                  <button
+                    type="button"
+                    className={`uw-os-step${step.done ? " is-done" : isNext ? " is-now" : step.earlier ? " is-earlier" : ""}${!finished && index === selected ? " is-sel" : ""}`}
+                    aria-current={isNext ? "step" : undefined}
+                    aria-pressed={!finished && index === selected}
+                    onClick={() => setPicked(index === run.current ? null : index)}
+                  >
+                    <span className="uw-os-k" aria-hidden="true">
+                      <StepIc size={18} />
+                      {step.done && (
+                        <span className="uw-os-ok">
+                          <Check size={11} />
+                        </span>
+                      )}
+                    </span>
+                    <span className="uw-os-t">
+                      <span className="uw-os-num" aria-hidden="true">
+                        Step {index + 1}
+                      </span>
+                      <span className="sr-only">Step {index + 1}: </span>
+                      {step.label}
+                    </span>
+                    {(step.done || isNext) && <small className="uw-os-s">{step.done ? "Completed" : "Next"}</small>}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <div className={`uw-os-main${previewing ? " is-preview" : ""}`}>{body}</div>
+        </div>
+      </section>
+      {moreStories}
+    </div>
+  );
+}

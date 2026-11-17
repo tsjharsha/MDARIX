@@ -79,6 +79,23 @@ describe("country and phone", () => {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, "en")));
   });
 
+  it("names a territory the browser has no name for, never its bare code (G-21)", async () => {
+    const { countries } = await import("./trialProfile");
+    const real = Intl.DisplayNames;
+    class Bare {
+      of(code: string) {
+        return code === "EH" ? "EH" : new real(["en"], { type: "region" }).of(code);
+      }
+    }
+    (Intl as { DisplayNames: unknown }).DisplayNames = Bare;
+    try {
+      const western = countries().find((country) => country.code === "EH");
+      expect(western?.name).toBe("Western Sahara");
+    } finally {
+      (Intl as { DisplayNames: unknown }).DisplayNames = real;
+    }
+  });
+
   it("leaves out the countries under comprehensive sanctions", async () => {
     const { countries } = await import("./trialProfile");
     const list = countries();

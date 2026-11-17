@@ -44,7 +44,9 @@ EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample
 re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
 confirmed by the sample author, with the values they were approved with), and 0.10.79's two new sample links
 (backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none), and 0.10.96's
-FDA-valid SAMPLE-RV-09 US report with its eMDR file (backend/app/trial/sample_0_10_96.py), and 0.10.97's
+FDA-valid SAMPLE-RV-09 US report with its eMDR file (backend/app/trial/sample_0_10_96.py), and W1's SAMPLE-RV-07
+signed Canada example where the sample answers predate it and the recorded AI proposals on SAMPLE-INV-001 where its
+decision is not signed (backend/app/trial/sample_assessments.py, sample_ai.py), and 0.10.97's
 reply to SAMPLE-RT-03's reporter in the communications log, so the customer-told check is met on day 0
 (backend/app/trial/sample_0_10_97.py; the signed disposition is never edited), and, in every trial
 with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_deadlines.py: every market's starter
@@ -122,7 +124,12 @@ def refresh(db: Session, apply: bool) -> list[dict]:
         seed_story_examples,
     )
     from backend.app.db.models.foundation import Complaint
-    from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
+    from backend.app.trial.sample_assessments import (
+        has_canada_example,
+        has_sample_assessments,
+        stage_canada_example,
+        stage_sample_assessments,
+    )
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
@@ -135,6 +142,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
         stage_lakeside_shipments,
         stage_sample_lot_impact,
     )
+    from backend.app.trial.sample_ai import stage_sample_ai
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
     from backend.app.trial.sample_words import reword_sample
 
@@ -225,6 +233,10 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             told_owed = sample_0_10_97.refresh(session, tenant_id, apply=False)
             # 0.10.94 (W1): Rev A configurations and the evidence linked to NovaSense (Product 360, Supplier 360).
             supply_owed = sample_supply.refresh(session, tenant_id, apply=False, now=datetime.now(timezone.utc))
+            # W1 (review B, G6): the signed Canada example on SAMPLE-RV-07, for sample answers staged before it.
+            canada_missing = not assessments_missing and not has_canada_example(session, tenant_id)
+            # W1: the sample's recorded AI proposals on SAMPLE-INV-001, unless its decision is signed already.
+            ai_missing = sample_ai_owed(session, tenant_id)
             if not (
                 story_missing
                 or flagship_missing
@@ -253,6 +265,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or story_case_missing
                 or supply_owed
                 or lakeside_missing
+                or canada_missing
+                or ai_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -305,6 +319,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     ),
                     *([f"{supply_owed} sample supply-chain rows (0.10.94)"] if supply_owed else []),
                     *(["the shipments to SAMPLE-CASE-11's hospital (0.10.93)"] if lakeside_missing else []),
+                    *(["SAMPLE-RV-07's signed Canada example (W1)"] if canada_missing else []),
+                    *(["the recorded AI proposals on SAMPLE-INV-001 (W1)"] if ai_missing else []),
                 ]
                 results.append(
                     {
@@ -377,6 +393,10 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if supply_owed:
                 # After the lot genealogy above, as in a new trial (sample_clock.seed_sample).
                 added["supply_0_10_94"] = sample_supply.refresh(session, tenant_id, apply=True, now=now)
+            if canada_missing:
+                added["canada_example"] = stage_canada_example(session, tenant_id, now)
+            if ai_missing:
+                added["sample_ai"] = stage_sample_ai(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
@@ -393,6 +413,26 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             seed_demo_signals(session, tenant_id)
             results.append({"tenant": tenant_key, "name": name, "result": f"added {added}"})
     return results
+
+
+def sample_ai_owed(db: Session, tenant_id) -> bool:
+    """W1: SAMPLE-INV-001 is there with no recorded AI proposal and no signed decision (a decided case keeps the story
+    it was decided on)."""
+    from backend.app.db.models.foundation import Decision
+    from backend.app.trial.flagship import find_case
+    from backend.app.trial.sample_ai import has_sample_ai
+
+    case = find_case(db, tenant_id)
+    if case is None or has_sample_ai(db, tenant_id):
+        return False
+    return (
+        db.query(Decision.id)
+        .filter(
+            Decision.tenant_id == tenant_id, Decision.investigation_id == case.id, Decision.decision_status == "SIGNED"
+        )
+        .first()
+        is None
+    )
 
 
 def refresh_plan(db: Session, apply: bool) -> list[str]:

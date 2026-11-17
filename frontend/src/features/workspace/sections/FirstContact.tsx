@@ -1,5 +1,5 @@
 import { SampleDates } from "../../../app/chips";
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
 import {
   ArrowRight,
@@ -102,7 +102,7 @@ export function FirstContact({
         icon={<PhoneCall size={28} />}
         eyebrow="First contact"
         title="Cases"
-        detail="A service call can hide a complaint. Log the reporter's words, answer the ten questions, and the table gives complaint, complaint and service, service only, inquiry, pending or not a complaint. A harm answer or a harm word goes to triage at once."
+        detail="A service call can hide a complaint. Log the reporter's words, answer the nine questions, and the table gives complaint, complaint and service, service only, inquiry, pending or not a complaint. A harm answer or a harm word goes to triage at once."
       >
         <div className="uw-entry-actions">
           {canWrite && (
@@ -135,7 +135,7 @@ export function FirstContact({
       {guide.data && (
         // The guide's version code stays in the tooltip: no internal code on screen (hero review 2).
         <p className="uw-ma-starter" role="note" title={`Guide ${guide.data.version}`}>
-          <FileWarning size={15} aria-hidden="true" /> The ten questions: {guide.data.starter_mark}
+          <FileWarning size={15} aria-hidden="true" /> The nine questions: {guide.data.starter_mark}
         </p>
       )}
       {part === "all" && <Duplicates onChanged={reload} />}
@@ -848,9 +848,9 @@ function LogDrawer({
           </div>
         </details>
         {!urgent && (
-          // The ten questions fold in the log (0.10.85, D3.10): they can be answered now or at the Case check.
+          // The nine questions fold in the log (0.10.85, D3.10): they can be answered now or at the Case check.
           <details className="ca-drawer-section uw-more">
-            <summary>The ten questions: answer now, or at the Case check</summary>
+            <summary>The nine questions: answer now, or at the Case check</summary>
             <p className="uw-hint">{guide.note}</p>
             <Questions guide={guide} answers={form.answers} onChange={(answers) => set({ answers })} />
             <label className="ca-field">
@@ -1215,7 +1215,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
       )}
       {item.kind !== "URGENT" && (
         <section className="ca-drawer-section">
-          <h3>The ten questions</h3>
+          <h3>The nine questions</h3>
           <Questions guide={guide} answers={answers} disabled={!editing || !canWrite || voided} onChange={setAnswers} />
           <details className="uw-ma-history">
             <summary>The outcomes table (fixed)</summary>
@@ -1322,19 +1322,22 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
 function Escalated({ item }: { item: IntakeItem }) {
   const { open } = useWorkspace();
   const ref = item.complaint_ref ?? item.reference;
+  const banner = useRef<HTMLElement>(null);
+  // Signing leaves the drawer scrolled to its foot: bring the success message into view (review G-04).
+  useEffect(() => banner.current?.scrollIntoView?.({ block: "nearest" }), []);
   return (
-    <section className="ca-drawer-section" aria-label="Escalated">
+    <section ref={banner} className="ca-drawer-section uw-escalated" role="status" aria-label="Escalated">
       <h3>
-        <CheckCircle2 size={15} aria-hidden="true" /> {item.reference} is now a complaint
-        {ref !== item.reference ? ` (${ref})` : ""}
+        <CheckCircle2 size={15} aria-hidden="true" /> Done: {item.reference} is now a complaint
       </h3>
+      {ref !== item.reference && <p className="ac-muted">Its complaint number is {ref}.</p>}
       <div className="ca-action-row">
         <button
           type="button"
           className="ac-primary"
           onClick={() => open("Complaint", `Summary?${new URLSearchParams({ ref })}`)}
         >
-          Next: Triage
+          Open the complaint
         </button>
       </div>
     </section>

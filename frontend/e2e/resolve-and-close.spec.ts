@@ -56,7 +56,7 @@ async function signAndEscalate(page: Page, reference: string) {
   await check.getByLabel("Authenticator code").fill(await freshCode(page, owner));
   await check.getByRole("button", { name: "Sign and escalate" }).click();
   await expect(check.getByText(`${reference} is now a complaint`)).toBeVisible({ timeout: 90_000 });
-  await check.getByRole("button", { name: "Next: Triage" }).click();
+  await check.getByRole("button", { name: "Open the complaint" }).click();
 }
 
 test.describe("B7a: Resolve and close a routine complaint, desktop", () => {

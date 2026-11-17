@@ -436,13 +436,14 @@ describe("AI status", () => {
       enabled: false,
       available: false,
       reason_code: "PROVIDER_UNAVAILABLE",
-      message: "AI is off for free trials. Every step works by hand, and Ask MDARIX answers from your records.",
+      message:
+        "AI is not switched on for this trial. Every step works by hand, and Ask MDARIX answers from your records.",
       trial: true,
     })!;
-    expect(trial.title).toBe("AI is off for free trials");
-    expect(trial.shortReason).toBe("AI is off for free trials");
+    expect(trial.title).toBe("AI is not switched on for this trial");
+    expect(trial.shortReason).toBe("AI is not switched on for this trial");
     expect(trial.message).not.toContain("administrator");
-    expect(trial.disabledReason).toBe("AI is off for free trials.");
+    expect(trial.disabledReason).toBe("AI is not switched on for this trial.");
   });
 
   it("offers only the manual paths the server names, when it names any", () => {

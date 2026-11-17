@@ -9246,3 +9246,162 @@ details.uw-team-change[open] {
 .uw-tr-fields dd {
   margin: 0;
 }
+
+/* W1: "At a glance" on a case's evidence overview (flat, G-2): four groups, then the dated records in time order. */
+.rca-glance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.rca-glance-group {
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-left: 4px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.rca-glance-group.tone-good {
+  border-left-color: var(--ac-good);
+}
+.rca-glance-group.tone-warning {
+  border-left-color: var(--ac-warning);
+}
+.rca-glance-group.tone-critical {
+  border-left-color: var(--ac-critical);
+}
+.rca-glance-group h3,
+.rca-glance-when {
+  margin: 0 0 6px;
+  font-size: var(--ms-fs-16);
+}
+.rca-glance-group ul,
+.rca-glance-timeline {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rca-glance-group li {
+  display: grid;
+  gap: 2px;
+}
+.rca-glance-when {
+  margin-top: 14px;
+}
+.rca-glance-timeline li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--ac-line);
+}
+
+/* W1: the flagship story's bar, in the legacy story bar's slot. */
+.uw-flagship-bar b {
+  font-weight: 700;
+}
+.uw-flagship-card .uw-os-lines dd {
+  font-size: var(--ms-fs-16);
+}
+
+/* E3 + W6: the decision and its impact on one screen (projector 1280x720), flat (G-2); the formal record folded below. */
+.uw-dsum {
+  padding: var(--ms-space-5);
+  margin-bottom: var(--ms-space-4);
+}
+/* Two lines, not three balanced ones, so the four tiles fit on a 1280x720 projector. */
+.uw-hybrid .ac-main .uw-dsum-head h2,
+.uw-dsum-head h2 {
+  max-width: none;
+  text-wrap: wrap;
+  margin: 4px 0 6px;
+  font-size: var(--ms-fs-24);
+  line-height: 1.25;
+  color: var(--ms-ink);
+}
+.uw-dsum-by {
+  margin: 0 0 var(--ms-space-4);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-16);
+}
+.uw-dsum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ms-space-3);
+}
+.uw-dsum-tile {
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  padding: var(--ms-space-3) var(--ms-space-4);
+  background: var(--ms-surface);
+  font-size: var(--ms-fs-16);
+}
+.uw-dsum-tile h3 {
+  margin: 0 0 8px;
+  font-size: var(--ms-fs-13);
+  font-weight: var(--ms-fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+.uw-dsum-tile p {
+  margin: 0 0 6px;
+}
+.uw-dsum-tile.is-good {
+  border-color: var(--ms-good-line);
+  background: var(--ms-good-bg);
+}
+.uw-dsum-tile.is-critical {
+  border-color: var(--ms-crit-line);
+  background: var(--ms-crit-bg);
+}
+.uw-dsum-list {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+}
+.uw-dsum-list li {
+  margin-bottom: 2px;
+}
+.uw-dsum-facts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.uw-dsum-facts > div,
+.uw-dsum-record > div {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 8px;
+}
+.uw-dsum-facts dt,
+.uw-dsum-record dt {
+  color: var(--ms-muted);
+}
+.uw-dsum-facts dd,
+.uw-dsum-record dd {
+  margin: 0;
+}
+.uw-dsum-line {
+  margin: 4px 0 0;
+}
+.uw-dsum-more {
+  margin-top: var(--ms-space-4);
+}
+.uw-dsum-record {
+  display: grid;
+  gap: 10px;
+  margin: var(--ms-space-3) 0 0;
+}
+.uw-dsum-record > div {
+  grid-template-columns: 11em 1fr;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.ca-drawer-section .uw-dsum-record > div {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+@media (max-width: 760px) {
+  .uw-dsum-grid,
+  .uw-dsum-record > div {
+    grid-template-columns: 1fr;
+  }
+}

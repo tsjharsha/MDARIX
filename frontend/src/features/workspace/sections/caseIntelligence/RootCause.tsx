@@ -1,13 +1,22 @@
 /** RCA tools on a case: the overview, the fishbone grid and the 5 Whys (G-2: flat operational screens). Plus the
  * Pareto of confirmed causes and the version at the event date. (Part of CaseIntelligence.tsx.) */
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { ArrowDown, CalendarClock, ListTree, Plus, Network } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, Table, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
-import { useCan, useRcaMethods } from "../../workspaceContext";
+import { formatDay } from "../../../../app/dates";
+import { WorkspaceContext, useCan, useRcaMethods } from "../../workspaceContext";
 import { ResolutionTrend } from "../Dispositions";
-import { intelligencePath, type IntelligenceView } from "../../intelligence";
+import {
+  evidenceStates,
+  intelligencePath,
+  versionWords,
+  type EvidenceStates,
+  type FailureChains,
+  type GlanceItem,
+  type IntelligenceView,
+} from "../../intelligence";
 import {
   CAUSE_CATEGORIES,
   PARETO_GROUPS,
@@ -31,6 +40,14 @@ import {
 } from "../../rca";
 import { DrawerActions, DrawerError, Problem, ReasonField, useSend } from "./shared";
 
+const OVERVIEW_TAGS: ReadonlyArray<[string, string]> = [
+  ["Verified fact", "verified facts"],
+  ["Source assertion", "source assertions"],
+  ["Hypothesis", "hypotheses"],
+  ["Contradiction", "contradictions"],
+  ["Unknown", "unknowns"],
+  ["5 Whys", "5 Whys"],
+];
 const CONFIRMED_NOTE = "Each possible cause is a hypothesis. Only a signed decision confirms a cause.";
 
 // ---------------------------------------------------------------------------------------------------- overview
@@ -51,6 +68,24 @@ export function OverviewView({
   const unknowns = useResource<any>(intelligencePath(investigationId, "unknowns"));
   const observations = useResource<any>(intelligencePath(investigationId, "observations"));
   const whys = useResource<any>(methods ? rcaPath(investigationId, "five-whys") : null);
+  const chains = useResource<FailureChains>(intelligencePath(investigationId, "failure-chains"));
+  const versions = useResource<{ items: EventVersion[] }>(rcaPath(investigationId, "event-versions"));
+  // The case's product (the context bar's Product 360): its changes, releases, lots and evidence dates.
+  const view = useContext(WorkspaceContext)?.work.view;
+  const glance = evidenceStates({
+    hypotheses: listOf(hypotheses.data?.items),
+    unknowns: listOf(unknowns.data?.items),
+    chains: listOf(chains.data?.stored),
+    versions: listOf(versions.data?.items),
+    product: view
+      ? {
+          changes: view.changes,
+          versions: view.versions,
+          lots: view.manufacturing?.lots,
+          evidence: view.evidence,
+        }
+      : null,
+  });
   const lines = overviewLines({
     hypotheses: listOf(hypotheses.data?.items),
     contradictions: listOf(contradictions.data?.items ?? contradictions.data),
@@ -61,6 +96,7 @@ export function OverviewView({
   const count = (tag: string) => lines.filter((line) => line.tag === tag).length;
   return (
     <>
+      {hypotheses.state === "ready" && <AtAGlance caseLabel={caseLabel} states={glance} />}
       <Panel eyebrow={caseLabel} title="Version at the event date" className="rca-panel">
         <EventVersions investigationId={investigationId} />
       </Panel>
@@ -70,9 +106,10 @@ export function OverviewView({
           person signs a decision.
         </p>
         <ul className="rca-counts" aria-label="What the overview holds">
-          {["Verified fact", "Source assertion", "Hypothesis", "Contradiction", "Unknown", "5 Whys"].map((tag) => (
+          {/* Only what the case holds, each in its plural (review G-12: "3 hypothesiss", "0 verified facts"). */}
+          {OVERVIEW_TAGS.filter(([tag]) => count(tag) > 0).map(([tag, plural]) => (
             <li key={tag}>
-              <strong>{count(tag)}</strong> {tag === "5 Whys" ? tag : `${tag.toLowerCase()}s`}
+              <strong>{count(tag)}</strong> {count(tag) === 1 && tag !== "5 Whys" ? tag.toLowerCase() : plural}
             </li>
           ))}
         </ul>
@@ -102,51 +139,118 @@ export function OverviewView({
   );
 }
 
+const GLANCE: ReadonlyArray<{
+  key: keyof Omit<EvidenceStates, "timeline">;
+  title: string;
+  tone: string;
+  empty: string;
+}> = [
+  { key: "known", title: "Known", tone: "good", empty: "No evidence linked in support yet." },
+  { key: "unknown", title: "Unknown", tone: "warning", empty: "No open questions." },
+  { key: "contradicted", title: "Contradicted", tone: "critical", empty: "No evidence speaks against an explanation." },
+  { key: "missing", title: "Missing", tone: "neutral", empty: "No failure-chain link is still unknown." },
+];
+
+/**
+ * "At a glance" (W1, flagship step 3): what is known, unknown, contradicted and missing on the case, each with the record
+ * it comes from, then the dated records in time order. Read only; built from the case's own records (evidenceStates).
+ */
+export function AtAGlance({ caseLabel, states }: { caseLabel: string; states: EvidenceStates }) {
+  return (
+    <Panel eyebrow={caseLabel} title="At a glance: what is known and what is not" className="rca-panel rca-glance">
+      <div className="rca-glance-grid">
+        {GLANCE.map((group) => (
+          <section key={group.key} className={`rca-glance-group tone-${group.tone}`} aria-label={group.title}>
+            <h3>
+              {group.title} <span className="uw-num">{states[group.key].length}</span>
+            </h3>
+            {states[group.key].length ? (
+              <ul>
+                {states[group.key].map((item: GlanceItem, index) => (
+                  <li key={`${group.key}-${index}`}>
+                    <span>{item.label}</span>
+                    {item.sources.length > 0 && <small className="ac-muted">{item.sources.join(" · ")}</small>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="ac-muted">{group.empty}</p>
+            )}
+          </section>
+        ))}
+      </div>
+      {states.timeline.length > 0 && (
+        <>
+          <h3 className="rca-glance-when">In time order</h3>
+          <ol className="rca-glance-timeline" aria-label="In time order">
+            {states.timeline.map((event, index) => (
+              <li key={`${event.source}-${index}`}>
+                <b className="uw-num">{formatDay(event.date)}</b> <span>{event.label}</span>{" "}
+                <small className="ac-muted">{event.source}</small>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 export function EventVersions({ investigationId }: { investigationId: string }) {
   const data = useResource<{ items: EventVersion[]; note?: string }>(rcaPath(investigationId, "event-versions"));
   const items = listOf(data.data?.items) as EventVersion[];
   if (data.state === "ready" && !items.length)
     return <Empty title="No complaints in scope" detail="Add complaints to the scope to see their versions." />;
+  const kind = (item: EventVersion) =>
+    [versionWords(item).version, versionWords(item).source, item.flags.map((flag) => flag.code).join()].join("|");
+  const shown = items.filter((item, index) => items.findIndex((other) => kind(other) === kind(item)) === index);
+  const same = items.filter((item) => !shown.includes(item));
+  const row = (item: EventVersion) => (
+    <li key={item.complaint.id} className="rca-version">
+      <CalendarClock size={16} aria-hidden="true" />
+      <div>
+        <strong>{safeText(item.complaint.business_id) ?? safeText(item.complaint.identifier) ?? "Complaint"}</strong>
+        <small className="ac-muted">
+          {item.anchor_label}
+          {item.anchor_date ? `: ${formatDate(item.anchor_date)}` : ""}
+          {item.lot?.identifier ? ` · lot ${item.lot.identifier}` : ""}
+        </small>
+      </div>
+      <div>
+        {/* W1: from the complaint, from the lot, or not known: candidates are listed, never filled in. */}
+        <strong>{versionWords(item).version}</strong>
+        <small className="ac-muted">
+          {versionWords(item).source}
+          {versionWords(item).candidates.length
+            ? ` · Candidates released by then: ${versionWords(item).candidates.join(", ")}`
+            : ""}
+        </small>
+      </div>
+      <div className="rca-version-flags">
+        {item.flags.map((flag) => (
+          <ToneBadge key={flag.code} tone="warning" label={flag.label} />
+        ))}
+        {item.components.length > 0 && (
+          <small className="ac-muted">
+            {item.components.map((c) => `${c.name}${c.revision ? ` ${c.revision}` : ""}`).join(" · ")}
+          </small>
+        )}
+      </div>
+    </li>
+  );
   return (
     <>
       <p className="ac-note">{data.data?.note ?? "A date never chooses a version."}</p>
-      <ul className="rca-versions">
-        {items.map((item) => (
-          <li key={item.complaint.id} className="rca-version">
-            <CalendarClock size={16} aria-hidden="true" />
-            <div>
-              <strong>
-                {safeText(item.complaint.business_id) ?? safeText(item.complaint.identifier) ?? "Complaint"}
-              </strong>
-              <small className="ac-muted">
-                {item.anchor_label}
-                {item.anchor_date ? `: ${formatDate(item.anchor_date)}` : ""}
-                {item.lot?.identifier ? ` · lot ${item.lot.identifier}` : ""}
-              </small>
-            </div>
-            <div>
-              <strong>{item.version?.version_identifier ?? "Version unknown"}</strong>
-              <small className="ac-muted">
-                {item.version
-                  ? item.version_label
-                  : item.candidate_versions.length
-                    ? `Released by then: ${item.candidate_versions.map((v) => v.version_identifier).join(", ")}`
-                    : "No version recorded"}
-              </small>
-            </div>
-            <div className="rca-version-flags">
-              {item.flags.map((flag) => (
-                <ToneBadge key={flag.code} tone="warning" label={flag.label} />
-              ))}
-              {item.components.length > 0 && (
-                <small className="ac-muted">
-                  {item.components.map((c) => `${c.name}${c.revision ? ` ${c.revision}` : ""}`).join(" · ")}
-                </small>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <ul className="rca-versions">{shown.map(row)}</ul>
+      {/* Review G-16: one row per distinct version and source; the identical rest folded, so a contrast shows. */}
+      {same.length > 0 && (
+        <details className="uw-story-more">
+          <summary>
+            {same.length} more {same.length === 1 ? "complaint" : "complaints"} with a version already shown
+          </summary>
+          <ul className="rca-versions">{same.map(row)}</ul>
+        </details>
+      )}
     </>
   );
 }

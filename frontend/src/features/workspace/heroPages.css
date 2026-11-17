@@ -2016,3 +2016,16 @@
 .uw-home-banner .uw-home-ref {
   display: block;
 }
+/* W2: the one call to action sits in the Getting started band, above the fold on a projector. */
+.uw-hybrid .ac-main .uw-gs-band .uw-gs-head .uw-gs-start {
+  margin: 18px 0 10px;
+}
+.uw-gs-calm .uw-wt-lead {
+  max-width: 68ch;
+}
+.uw-gs-steps {
+  margin: 8px 0 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+}

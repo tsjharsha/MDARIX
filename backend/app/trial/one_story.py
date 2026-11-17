@@ -56,6 +56,17 @@ STEPS = (
 )
 MARKS = ("form", "records", "trends")
 MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
+# The marks each run keeps (W1): the flagship story's are its first three steps (backend/app/trial/flagship.py).
+RUN_MARKS = {"sample": MARKS, "yours": MARKS, "flagship": ("signal", "product", "evidence")}
+
+
+def mark_index(run: str, step: str) -> int | None:
+    """The step a mark ticks in its run (0-based), or None when the run keeps no such mark."""
+    if step not in RUN_MARKS.get(run, ()):
+        return None
+    return RUN_MARKS["flagship"].index(step) if run == "flagship" else MARK_STEP[step]
+
+
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.
 REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKNOWLEDGED")
 
@@ -124,7 +135,7 @@ def under_way(request, run: str, rows: list):
     latest = None
     for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
         mine = (person or {}).get(run) or {}
-        stamp = max((mine[step] for step in MARKS if mine.get(step)), default=None)
+        stamp = max((mine[step] for step in RUN_MARKS[run] if mine.get(step)), default=None)
         if stamp and (latest is None or stamp > latest[0]):
             latest = (stamp, mine)
     if latest is None or latest[1].get("trends"):
@@ -164,7 +175,7 @@ def team_marks(request, run: str, complaint_id) -> dict:
     found: dict = {}
     for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
         mine = _slot(person, run, complaint_id)
-        for step in MARKS:
+        for step in RUN_MARKS[run]:
             if mine.get(step) and (not found.get(step) or mine[step] < found[step]):
                 found[step] = mine[step]
     return found
@@ -527,5 +538,11 @@ def _routine_try(data: Session, tenant_id) -> dict | None:
 
 
 def progress(data: Session, control_db: Session, ctx, tenant_id, request) -> dict:
+    from backend.app.trial import flagship
+
     runs = {run: run_progress(data, control_db, ctx, tenant_id, request, run) for run in RUNS}
-    return {**runs, "more_cases": more_cases(data, tenant_id, runs["sample"])}
+    return {
+        **runs,
+        "flagship": flagship.run_progress(data, control_db, tenant_id, request),
+        "more_cases": more_cases(data, tenant_id, runs["sample"]),
+    }

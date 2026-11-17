@@ -5,6 +5,7 @@ import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { StatementKind } from "../../../shared/StatementKind";
+import { RecordedChip } from "../../../shared/AiReview";
 import { useCan, usePanelFlag, usePanelState } from "../../workspaceContext";
 import {
   HUMAN_STATUS,
@@ -218,6 +219,7 @@ function HypothesisCard({
         />
       </header>
       <p className="uw-intel-statement">{safeText(hypothesis.statement) ?? "No statement recorded."}</p>
+      <RecordedChip recorded={hypothesis.recorded} />
       {!ai && safeText(hypothesis.created_by_name) && (
         <small className="ac-muted">Added by {hypothesis.created_by_name}</small>
       )}

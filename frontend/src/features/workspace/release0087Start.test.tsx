@@ -126,7 +126,8 @@ describe("the walkthrough card renders the progress the server reports", () => {
     expect(html).toMatch(/aria-current="step" aria-pressed="true"[^>]*>.*Assess reportability/);
     // Part 1's heading, and the parts still to come (spec 4.8).
     expect(html).toContain("Part 1: from the first contact to the submission</h3>");
-    expect(html).toContain("Coming next: investigation to CAPA · trends to product improvement");
+    // W1: the "Coming next" line is gone (the flagship covers investigation to CAPA).
+    expect(html).not.toContain("Coming next");
     // The large hero and the miniature browser window are gone.
     expect(html).not.toContain("uw-os-mini");
     expect(html).not.toContain("One complaint, from the first call to the signed report");

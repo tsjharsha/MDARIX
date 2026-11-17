@@ -207,7 +207,7 @@ describe("a loaded screen of another record ticks nothing", () => {
       { step: "records", complaintId: "c-other" },
       { step: "trends", product: "OTHER-1" },
     ] as Visit[]) {
-      const index = { form: 5, records: 8, trends: 9 }[visit.step];
+      const index = ({ form: 5, records: 8, trends: 9 } as Record<string, number>)[visit.step];
       await openStep(run(index), index, vi.fn());
       await visited(visit);
       // Nor a screen of a different step.

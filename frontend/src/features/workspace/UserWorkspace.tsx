@@ -37,7 +37,8 @@ import "./workspace.css";
 import "./heroShell.css";
 import "./heroPages.css";
 import { ThemeMenu, useTheme } from "./theme";
-import { shownRun, useOneStory } from "./oneStory";
+import { FLAGSHIP_STEPS, STORY_STEPS, shownRun, useOneStory } from "./oneStory";
+import { IMPORTED_SOURCE } from "./complaintList";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
@@ -127,6 +128,7 @@ import {
 import { ImportYourDataSection } from "./sections/YourData";
 import { ProductHubSection } from "./sections/ProductHub";
 import { StoryBar } from "./sections/Entrance";
+import { FlagshipBar } from "./sections/FlagshipBar";
 import { liveStory, savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
@@ -723,7 +725,13 @@ export function UserWorkspace({
         (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
     ).length,
   );
-  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
+  const oneStory = useOneStory(fresh && !!trial?.is_trial && ringRead).data;
+  // W1: the flagship investigation's seven steps while it leads Getting started (as OneStory.tsx chooses).
+  const flagship = oneStory?.flagship && !(dataSource === IMPORTED_SOURCE && oneStory.yours) ? oneStory.flagship : null;
+  const progress = flagship
+    ? flagship.steps.filter((step) => step.done).length
+    : storyProgress(shownRun(oneStory, dataSource));
+  const progressTotal = flagship ? FLAGSHIP_STEPS : STORY_STEPS;
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -829,6 +837,7 @@ export function UserWorkspace({
               open={open}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
               progress={progress}
+              progressTotal={progressTotal}
               alerts={alerts}
             />
           </>
@@ -1072,7 +1081,13 @@ export function UserWorkspace({
                 {/* The ten-step walkthrough is the new navigation's one progress (0.10.87): no chapter banners there,
                     and on Home its own story banner stands in for the story bar. */}
                 {shell.chapterDone && trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
-                {shell.storyBar && trial?.is_trial && <StoryBar section={section} tab={shown ?? tab} />}
+                {shell.storyBar &&
+                  trial?.is_trial &&
+                  (story === "flagship" || story === "flagship-branch" ? (
+                    <FlagshipBar section={section} branch={story === "flagship-branch"} />
+                  ) : (
+                    <StoryBar section={section} tab={shown ?? tab} />
+                  ))}
                 {message && (
                   <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}
@@ -1133,6 +1148,7 @@ export function UserWorkspace({
             open={open}
             personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
             progress={progress}
+            progressTotal={progressTotal}
             alerts={alerts}
           />
         )}

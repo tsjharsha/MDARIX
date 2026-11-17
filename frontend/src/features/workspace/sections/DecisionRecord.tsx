@@ -23,6 +23,8 @@ import {
 } from "../afterDecision";
 import { CaseStoryLink } from "./CaseStoryLink";
 import { SignatureBasis } from "../../shared/Basis";
+import { decisionSummaryByIdPath, type DecisionSummary } from "../decisionSummary";
+import { DecisionRecordParts } from "./DecisionSummary";
 
 const record = (value: unknown): Record<string, any> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
@@ -57,6 +59,8 @@ export function DecisionRecordDrawer({
   // A supersede link opens that decision's record in the same drawer.
   const [shown, setShown] = useState(decisionId);
   const data = useResource<Record<string, unknown>>(decisionRecordPath(shown));
+  // E3: the formal decision record (question, evidence, AI, hypotheses, dates, linked actions) of the same decision.
+  const formal = useResource<DecisionSummary>(decisionSummaryByIdPath(shown));
   const body = data.data ?? {};
   const decision = record(body.decision);
   const brief = record(body.brief);
@@ -108,6 +112,12 @@ export function DecisionRecordDrawer({
               <p className="ac-muted">No verification checks reported.</p>
             )}
           </section>
+          {formal.data?.decision && (
+            <section className="ca-drawer-section" aria-label="Decision record">
+              <h3>Decision record</h3>
+              <DecisionRecordParts data={formal.data} />
+            </section>
+          )}
           <section className="ca-drawer-section" aria-label="Decision">
             <h3>Decision</h3>
             <dl className="ca-facts">

@@ -9,7 +9,9 @@ Decision Brief version, returning the brief without a signature, and the signed 
   administrator, the controlled-signature entitlement, the approved and unchanged brief version, the case state, the
   supersede rule, approval authority and segregation of duties, then the password and MFA);
 - ``POST /api/v1/investigations/{id}/decision/return`` (``decision.sign``): send the brief back without signing;
-- ``GET  /api/v1/decisions/{decision_id}/record``: the signed decision record with its verification.
+- ``GET  /api/v1/decisions/{decision_id}/record``: the signed decision record with its verification;
+- ``GET  /api/v1/investigations/{id}/decision/summary`` and ``GET /api/v1/decisions/{decision_id}/summary``: the
+  decision record and the decision-and-impact summary (summary.py).
 
 Everything is limited to the signed-in organization (another organization's case or decision is "not found"). The
 decision, its context snapshot, follow-ups, tasks and the case and brief changes are written in the tenant data plane
@@ -41,7 +43,7 @@ from backend.app.decision_brief import rules as brief_rules
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.inventory import error, load_case
 from backend.app.human_decision import rules
-from backend.app.human_decision import service
+from backend.app.human_decision import service, summary
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.role_codes import is_administrator_role, role_code
 from backend.app.sorting import sort_rows
@@ -1173,3 +1175,34 @@ def decision_record(
     if decision is None or decision.decision_kind != rules.DECISION_KIND:
         raise error(404, "DECISION_NOT_FOUND", "Decision is not available for this tenant")
     return service.record_view(control_db, data, decision)
+
+
+# ------------------------------------------------------------------------ the decision record and impact summary
+
+
+@router.get(CASE_BASE + "/summary")
+def case_decision_summary(
+    investigation_id: uuid.UUID,
+    data: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The decision record and the decision-and-impact summary of the case's current signed decision (E3 + W6);
+    ``decision`` is None while nothing is signed."""
+    case = load_case(data, _tenant_id(ctx), investigation_id)
+    return summary.for_case(control_db, data, case)
+
+
+@router.get(LIST_BASE + "/{decision_id}/summary")
+def decision_summary_of(
+    decision_id: uuid.UUID,
+    data: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The same for one signed decision on a brief, current or superseded."""
+    decision = data.query(Decision).filter(Decision.tenant_id == _tenant_id(ctx), Decision.id == decision_id).first()
+    if decision is None or decision.decision_kind != rules.DECISION_KIND:
+        raise error(404, "DECISION_NOT_FOUND", "Decision is not available for this tenant")
+    case = load_case(data, _tenant_id(ctx), decision.investigation_id)
+    return summary.summary(control_db, data, case, decision)

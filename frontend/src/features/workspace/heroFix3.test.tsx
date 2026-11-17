@@ -101,7 +101,7 @@ describe("F-A1: the trial AI-off line says why", () => {
     })!;
     expect(user.title).toBe("AI is not switched on for your account");
     const none = aiStatusBanner({ enabled: false, reason_code: "PROVIDER_UNAVAILABLE", trial: true })!;
-    expect(none.title).toBe("AI is off for free trials");
+    expect(none.title).toBe("AI is not switched on for this trial");
   });
 });
 
@@ -141,6 +141,8 @@ describe("F-E1 to F-E6: records an inspector can trust", () => {
     expect(html).toContain("Decision signed");
     expect(html).toContain("Asha Rao (fictional)");
     expect(html).toContain("Check the audit trail is intact");
+    // G-03: system events are hidden by the server unless asked for here.
+    expect(html).toContain("Show system events");
   });
 
   it("opens verification on the latest signed records, with signer, MFA and training", () => {

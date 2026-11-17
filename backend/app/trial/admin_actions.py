@@ -42,7 +42,7 @@ CONVERT_KINDS = {"PILOT": "PILOT", "PAID": "CUSTOMER"}
 # The states the list filters by. ACTIVE, ENDING_SOON and ENDED come from the trials overview (story.py).
 LIST_STATES = ("ACTIVE", "ENDING_SOON", "ENDED", "ENDED_EARLY", "DATA_DELETED", "CONVERTED")
 GONE_STATUSES = ("ARCHIVED", "PURGING")
-AI_OFF_LINE = "AI is off for this trial (trial terms)."
+AI_OFF_LINE = "AI is not switched on for this trial."
 
 
 def ai_by_tenant(db: Session, tenant_ids: list) -> dict:

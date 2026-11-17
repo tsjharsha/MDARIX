@@ -61,6 +61,8 @@ import {
  * button named "Step 3: Triage" and its status ("Completed", "Next", "Not needed"); the walkthrough is the region named
  * "Your sample walkthrough" or "Your data walkthrough", and the step's main button is its button that is neither a step
  * of the list nor a "Back to step" or "Then: step" link (0.10.87).
+ * W1: the flagship investigation now leads Getting started; on the sample these ten steps are folded under "More
+ * sample stories (optional)", which openStep and screenTicks open first (support/story.ts unfoldTenSteps).
  * Run it like trial-journeys.spec.ts (scripts/journey_api.py with E2E_MAIL_DIR).
  */
 

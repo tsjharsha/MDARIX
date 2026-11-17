@@ -71,7 +71,7 @@ export function AiOffNote({
   );
 }
 
-/** What "How MDARIX checks AI output" says while AI cannot run: "AI is off for free trials, so there is no AI output on
+/** What "How MDARIX checks AI output" says while AI cannot run: "AI is not switched on for this trial, so there is no AI output on
  * this case to check." (DEV-010). */
 export const noAiOutputText = (banner: Pick<AiBanner, "shortReason">) =>
   `${banner.shortReason}, so there is no AI output on this investigation to check.`;

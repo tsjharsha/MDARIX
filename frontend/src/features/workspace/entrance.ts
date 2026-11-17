@@ -190,17 +190,23 @@ const defaultTab = (section: string) => (section === "Complaint" || section === 
 const STORY_KEY = "mdarix.story";
 const SEEN_KEY = "mdarix.entrance.seen";
 
+/** The flagship story's bar keys (W1): its seven steps, and its optional branch on SAMPLE-RV-06. */
+export const FLAGSHIP_KEYS = ["flagship", "flagship-branch"] as const;
+type StoryKey = Scenario["key"] | (typeof FLAGSHIP_KEYS)[number];
+
 /** The story under way in this browser tab (sessionStorage: a convenience; the work itself is on the server). */
-export function savedStory(): Scenario["key"] | null {
+export function savedStory(): StoryKey | null {
   try {
     const key = window.sessionStorage.getItem(STORY_KEY);
-    return SCENARIOS.some((item) => item.key === key) ? (key as Scenario["key"]) : null;
+    return SCENARIOS.some((item) => item.key === key) || FLAGSHIP_KEYS.some((item) => item === key)
+      ? (key as StoryKey)
+      : null;
   } catch {
     return null;
   }
 }
 
-export function saveStory(key: Scenario["key"] | null): void {
+export function saveStory(key: StoryKey | null): void {
   try {
     if (key) window.sessionStorage.setItem(STORY_KEY, key);
     else window.sessionStorage.removeItem(STORY_KEY);

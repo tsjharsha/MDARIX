@@ -144,11 +144,34 @@ EU_PARTIES = (
 )
 
 
-def sample_eu_parties(tenant_id) -> list:
-    """The sample's EU parties as unsaved rows (``EU_PARTIES``), for the sample's EU report only."""
+# Review G-09: the same manufacturer for Great Britain, with its UK Responsible Person, so a GB MIR on a sample product
+# opens with its submitter block filled, as the EU MIR does. Held in memory only, as EU_PARTIES.
+GB_PARTIES = (
+    {**EU_PARTIES[0], "market": "GB", "srn": None},
+    {
+        "market": "GB",
+        "role": "UK_RESPONSIBLE_PERSON",
+        "organisation": "Sample UK Responsible Person (Sample)",
+        "address": "1 Example Street, London, EC1A 1AA, GB",
+        "street": "1 Example Street",
+        "city": "London",
+        "postcode": "EC1A 1AA",
+        "country_code": "GB",
+        "contact_name": "Jo Example",
+        "contact_first_name": "Jo",
+        "contact_last_name": "Example",
+        "contact_phone": "+44 20 0000 0000",
+        "contact_email": "vigilance@uk-rp-sample.invalid",
+    },
+)
+
+
+def sample_eu_parties(tenant_id, market: str = "EU") -> list:
+    """The sample's EU (or GB) parties as unsaved rows (``EU_PARTIES``, ``GB_PARTIES``), for a sample report only."""
     from backend.app.db.models.regulatory_reference import MarketResponsibleParty
 
-    return [MarketResponsibleParty(id=uuid.uuid4(), tenant_id=tenant_id, **party) for party in EU_PARTIES]
+    found = GB_PARTIES if market == "GB" else EU_PARTIES
+    return [MarketResponsibleParty(id=uuid.uuid4(), tenant_id=tenant_id, **party) for party in found]
 
 
 IN_ENTRIES = {

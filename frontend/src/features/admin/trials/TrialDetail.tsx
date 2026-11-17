@@ -32,7 +32,7 @@ type PlanOption = { id: string; code: string; name: string; status?: string | nu
 /**
  * The slot for part 4 of Trial organizations (AI and usage, and the per-user AI switches; spec TO-1 §3.6), which the
  * AI build provides as one self-contained panel. It gets the trial shown and a callback that reloads the page after a
- * change. Until it is passed, the slot shows the read-only line from the server ("AI is off for free trials").
+ * change. Until it is passed, the slot shows the read-only line from the server ("AI is not switched on for this trial.").
  */
 export type TrialAiPanel = (props: { detail: TrialDetail; onChanged: () => void }) => ReactNode;
 

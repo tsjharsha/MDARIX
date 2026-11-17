@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { Boxes, CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { displayId, safeText, sourceId } from "../../../app/displayId";
 import { lotsText } from "../signalAi";
-import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
+import { WorkspaceContext, useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import { productTab } from "../productHub";
 import {
   CHECK_RESULT,
@@ -466,6 +466,10 @@ export function CaseProgressLine({
   steps: ReturnType<typeof caseSteps>;
   onSection: (section: CaseSection, part?: string) => void;
 }) {
+  // On the flagship story the step's own action (Accept, Sign) is the screen's one main button; the story bar's Next
+  // link leads on, so this one steps back to secondary (W1 open item 3).
+  const story = useContext(WorkspaceContext)?.story;
+  const nextClass = story === "flagship" || story === "flagship-branch" ? "ac-secondary" : "ac-primary";
   // Its steps not read yet: say so (0.10.70: with none read, every section read "Done" and "Every step is done: the
   // decision is signed" on an investigation opened a moment ago).
   if (!steps.length)
@@ -502,7 +506,7 @@ export function CaseProgressLine({
       </ol>
       {next ? (
         <div>
-          <button type="button" className="ac-primary" onClick={() => onSection(next.section, next.part)}>
+          <button type="button" className={nextClass} onClick={() => onSection(next.section, next.part)}>
             Next: {next.label} <ChevronRight size={15} aria-hidden="true" />
           </button>
           <WhyAsked why={CASE_STEP_WHY[next.key]} />

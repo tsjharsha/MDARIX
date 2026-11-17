@@ -53,7 +53,9 @@ def test_the_real_register_loads_and_every_rule_carries_its_source_and_starter_m
         "CA-floor-1",
         "CA-floor-2",
         "EU-floor-1",
+        "EU-floor-2",  # G-10: question-6 skip wording (owner, 17 Nov 2026)
         "GB-floor-1",
+        "GB-floor-2",  # G-10
         "IN-floor-1",
         "IN-floor-2",
         "OTHER-floor-1",  # B9b: a country outside the five markets
@@ -269,3 +271,23 @@ def test_triage_provisional_deadlines_follow_the_floor_at_awareness(use, us1):
     assert after["US"] == (20, "2027-03-12") and after["US"][1] < before["US"][1]  # ED-11
     assert after["EU_NI"] == before["EU_NI"]  # ED-8
     assert register.floor_at("EU_NI", aware)["code"] == "EU-floor-1"
+
+
+def test_g10_version_2_says_a_risk_of_death_and_version_1_keeps_its_wording():
+    # Owner approval 17 Nov 2026 (G-10): only question 6's skip note changes; signed conclusions keep version 1.
+    new = "Not needed: death, or a risk of death, takes the 10-day report"
+    old = "Not needed: a death takes the 10-day report"
+    for market in ("GB", "EU"):
+        entries = register.load()
+        current = register.floor(market) or register.pick(f"{market}-floor")
+        assert current["code"] == f"{market}-floor-2"
+        assert new in str(current["content"]) and old not in str(current["content"])
+        assert old in str(entries[f"{market}-floor-1"]["content"])
+        assert current["change"] == {**current["change"], "kind": "CORRECTION", "corrects": f"{market}-floor-1"}
+        assert current["approval"]["approved_by"] == "Srinivas" and current["approval"]["approved_on"] == "2026-11-17"
+        v1, v2 = entries[f"{market}-floor-1"]["content"], current["content"]
+        assert (
+            v1["rules"] == v2["rules"]
+            and v1["type_rows"] == v2["type_rows"]
+            and v1["report_types"] == v2["report_types"]
+        )

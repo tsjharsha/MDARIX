@@ -277,10 +277,28 @@ def _hypothesis_rows(db: Session, tenant_id, case_id, *, include_retired=True, i
     ]
 
 
+def _recorded(db: Session, tenant_id, execution_ids) -> set[str]:
+    """The ids among these saved AI results that were recorded with the sample (provider ``sample-recorded``): no
+    model was called for them (W1). One lookup; none without ids."""
+    from backend.app.trial.sample_ai import PROVIDER as SAMPLE_PROVIDER
+
+    ids = {as_uuid(item) for item in execution_ids if item} - {None}
+    if not ids:
+        return set()
+    rows = db.query(AIExecution.id).filter(
+        AIExecution.tenant_id == tenant_id, AIExecution.id.in_(list(ids)), AIExecution.provider == SAMPLE_PROVIDER
+    )
+    return {str(row.id) for row in rows}
+
+
 def _hypothesis_items(
     db: Session, control_db: Session | None, tenant_id, case: Investigation, person: Person, rows: list[Hypothesis]
 ) -> list[dict]:
     ids = [row.id for row in rows]
+    # An AI hypothesis names the saved result it came from (source_identifier): recorded with the sample or not.
+    recorded = _recorded(
+        db, tenant_id, [row.source_identifier for row in rows if rules.origin_code(row.origin) != "HUMAN"]
+    )
     links = (
         db.query(HypothesisEvidence)
         .filter(HypothesisEvidence.tenant_id == tenant_id, HypothesisEvidence.hypothesis_id.in_(ids))
@@ -384,6 +402,8 @@ def _hypothesis_items(
                 "kind_label": rules.kind_label(
                     row.origin, row.human_status, created_by_name=created_by_name, judged_by_name=judged_by_name
                 ),
+                # W1: recorded with the sample, no model called ("Recorded with the sample · no model was called").
+                "recorded": str(row.source_identifier) in recorded,
                 "evidence": by_hypothesis[row.id],
                 "unknowns": unknowns_by_hypothesis[row.id],
                 "actions": {
@@ -1736,7 +1756,11 @@ def set_link_state(
 
 
 def _observation_view(
-    row: EvidenceObservation, evidence: dict, names: dict[str, str], reviewed: dict | None = None
+    row: EvidenceObservation,
+    evidence: dict,
+    names: dict[str, str],
+    reviewed: dict | None = None,
+    recorded: set[str] | frozenset = frozenset(),
 ) -> dict:
     from backend.app.ai_review import UNREVIEWED_LABEL
 
@@ -1765,6 +1789,8 @@ def _observation_view(
         "ai_review_state": state,
         "ai_execution_id": str(row.ai_execution_id) if row.ai_execution_id else None,
         "ai_label": UNREVIEWED_LABEL if not_reviewed else None,
+        # W1: a proposal recorded with the sample (no model was called), never a live one.
+        "recorded": str(row.ai_execution_id) in recorded,
     }
 
 
@@ -1790,7 +1816,8 @@ def _observation_views(db: Session, control_db: Session | None, tenant_id, rows)
 
     names = _names(control_db, tenant_id, [row.created_by for row in rows])
     reviewed = observation_reviews(db, tenant_id, rows)
-    return [_observation_view(row, evidence, names, reviewed) for row in rows]
+    recorded = _recorded(db, tenant_id, {row.ai_execution_id for row in rows})
+    return [_observation_view(row, evidence, names, reviewed, recorded) for row in rows]
 
 
 @router.get("/observations")

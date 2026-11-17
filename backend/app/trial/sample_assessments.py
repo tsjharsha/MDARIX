@@ -275,3 +275,70 @@ def stage_sample_assessments(db: Session, tenant_id, now: datetime | None = None
         logger.exception("Trial sample assessments could not be staged")
         return {"created": False, "why": "ERROR", "severities": severities}
     return {"created": True, "signed": 2, "saved": 1, "severities": severities}
+
+
+def has_canada_example(db: Session, tenant_id) -> bool:
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.reportability import markets
+
+    return (
+        db.query(ComplaintMarketAssessment.id)
+        .filter(
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.source_system == SAMPLE_SOURCE,
+            ComplaintMarketAssessment.market == markets.CA,
+        )
+        .first()
+        is not None
+    )
+
+
+def stage_canada_example(db: Session, tenant_id, now: datetime | None = None) -> dict:
+    """The signed Canada example on SAMPLE-RV-07 alone, for a trial whose sample answers were staged before it existed
+    (review B, G6): the sample author's Canada practice training and the assessment, as ``stage_sample_assessments``
+    writes them. ``{"created": False, ...}`` when it is there already or RV-07 is missing; a trial user's own Canada
+    assessment of RV-07 is left as it is."""
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.reportability import markets
+    from backend.app.signer_training import service as training
+    from backend.app.trial.sample_decision import sample_author
+
+    now = now or datetime.now(timezone.utc)
+    if has_canada_example(db, tenant_id):
+        return {"created": False, "why": "ALREADY_STAGED"}
+    complaint = _complaints(db, tenant_id).get("SAMPLE-RV-07")
+    if complaint is None:
+        return {"created": False, "why": "NO_STORY_COMPLAINTS"}
+    taken = (
+        db.query(ComplaintMarketAssessment.id)
+        .filter(
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.complaint_id == complaint.id,
+            ComplaintMarketAssessment.market == markets.CA,
+        )
+        .first()
+    )
+    if taken is not None:
+        return {"created": False, "why": "ASSESSED_BY_A_PERSON"}
+    savepoint = db.begin_nested()
+    try:
+        author_id = str(sample_author(db, tenant_id, now).id)
+        signed_at = now - timedelta(minutes=20)
+        for document in training.for_market(markets.CA):
+            training.acknowledge(
+                db,
+                tenant_id,
+                author_id,
+                document,
+                signed_at - timedelta(minutes=5),
+                trial=True,
+                source_system=SAMPLE_SOURCE,
+            )
+        _sign(db, tenant_id, complaint, markets.CA, CA_EXAMPLE, markets.NOT_REPORTABLE, author_id, signed_at)
+        db.flush()
+        savepoint.commit()
+    except Exception:
+        savepoint.rollback()
+        logger.exception("Trial sample Canada example could not be staged")
+        return {"created": False, "why": "ERROR"}
+    return {"created": True, "signed": 1}

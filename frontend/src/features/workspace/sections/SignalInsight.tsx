@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
-import { useCanRunAi, useWorkspace } from "../workspaceContext";
+import { useCan, useCanRunAi, useWorkspace } from "../workspaceContext";
+import { useAiOffReason } from "../useAiStatus";
 import {
   aiSummaryNote,
   insightPath,
@@ -28,6 +29,8 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
   const insight = useResource<SignalInsight>(insightPath(signalId));
   const { notify } = useWorkspace();
   const canRunAi = useCanRunAi();
+  const allowed = useCan("ai.run");
+  const off = useAiOffReason(canRunAi);
   const [ai, setAi] = useState<SignalSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -52,8 +55,9 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
       title={summary?.author === "AI" ? "AI summary" : "Summary from the records"}
       source={insight}
       action={
-        canRunAi ? (
-          <button type="button" className="ac-secondary ac-ai" disabled={busy} onClick={() => void write()}>
+        allowed ? (
+          // G-07: never hidden while AI cannot answer; disabled, with the reason below.
+          <button type="button" className="ac-secondary ac-ai" disabled={busy || !!off} onClick={() => void write()}>
             <Sparkles size={15} aria-hidden="true" /> {busy ? "Writing…" : ai ? "Write again" : "Write an AI summary"}
           </button>
         ) : undefined
@@ -64,6 +68,7 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
       ) : (
         summary && <SummaryView summary={summary} canReview={canRunAi} />
       )}
+      {allowed && off && !busy && <p className="ac-note">{off}. This summary comes from the records.</p>}
       <InlineError text={error} />
       {insight.data && <TrendLine trend={insight.data.trend} />}
     </Panel>

@@ -9,6 +9,7 @@ import {
   ConfirmedCausePareto,
   FishboneView,
   FiveWhysView,
+  EventVersions,
   OverviewView,
 } from "./sections/caseIntelligence/RootCause";
 import {
@@ -287,9 +288,32 @@ describe("screens", () => {
       <OverviewView investigationId="inv-1" caseLabel="INV-1" onView={() => undefined} methods />,
     );
     expect(html).toContain("HYP-1");
-    expect(html).toContain("Version unknown");
-    expect(html).toContain("Released by then: Rev A");
+    // G-12: the right plural, and no zero counts.
+    expect(html).toContain("<strong>1</strong> hypothesis</li>");
+    expect(html).not.toContain("hypothesiss");
+    expect(html).not.toContain("verified facts");
+    // W1: never filled in; the candidates are listed.
+    expect(html).toContain("Version not known (unverified)");
+    expect(html).toContain("Candidates released by then: Rev A");
     expect(html).toContain("Version released after the event: check");
+  });
+
+  it("folds complaints whose version reads the same, so a contrast shows (G-16)", () => {
+    const row = (id: string, version: string) => ({
+      complaint: { id, business_id: id },
+      anchor_label: "Event date",
+      version: { version_identifier: version },
+      version_label: "Named on the complaint",
+      candidate_versions: [],
+      components: [],
+      flags: [],
+    });
+    resources.data[rcaPath("inv-1", "event-versions")] = {
+      items: [row("CMP-1", "Rev B"), row("CMP-2", "Rev B"), row("CMP-3", "Rev B"), row("CMP-4", "Rev A")],
+    };
+    const html = render(api(["records.read"]), <EventVersions investigationId="inv-1" />);
+    expect(html).toContain("2 more complaints with a version already shown");
+    expect(html.indexOf("CMP-4")).toBeLessThan(html.indexOf("<details"));
   });
 
   it("the Pareto shows counts, never a rate", () => {

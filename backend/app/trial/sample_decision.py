@@ -23,6 +23,8 @@ from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
 
+from backend.app.trial.flagship import SIGNAL_TEXT
+
 logger = logging.getLogger("mdarix.trial.sample_decision")
 
 SAMPLE_CASE = "SAMPLE-INV-001"
@@ -38,8 +40,7 @@ EVIDENCE_RELATIONSHIPS = {
 
 NARRATIVE = {
     "problem_statement": (
-        "Pressure-alarm complaints on OrbitCare 300 rose from 0.8 a month in the 150 days before Rev B to 5.6 a month after Rev B, mostly "
-        "from lots 003 and 004."
+        f"Pressure-alarm complaints on OrbitCare 300 Rev B are at {SIGNAL_TEXT}, mostly from lots 003 and 004."
     ),
     "proposed_conclusion": (
         "The NovaSense pressure sensors fitted from Rev B, accepted with incoming inspection cut from 32 to 13 units "
@@ -51,6 +52,8 @@ NARRATIVE = {
         "Contain OrbitCare 300 lots 003 and 004",
         "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors",
         "Bench-test returned pumps from lots 003 and 004 at the upper pressure range",
+        # W1 (D8): new seeds and restarts only; a sealed brief is never edited.
+        "Reassess risk file entries SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor",
     ],
     "author_notes": (
         "Sample Decision Brief, written for the free trial: review it as the quality reviewer, then sign the decision."
@@ -512,8 +515,8 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
 # gate then refuses the sample brief, so a new material rule cannot slip through unanswered.
 SAMPLE_CHALLENGE_ANSWERS = {
     "C-1": (
-        "The Rev A pressure-alarm complaints came before the change, on the earlier supplier's sensors: they are the "
-        "base rate of 0.8 a month that the rise after Rev B is measured against. (Sample)"
+        "The Rev A pressure-alarm complaints came before the change, on the earlier supplier's sensors: they are part of "
+        "the earlier average that the rise after Rev B is measured against. (Sample)"
     ),
     "C-5": (
         "The bench test of returned pumps is still open. Containment of lots 003 and 004 and the restored inspection "

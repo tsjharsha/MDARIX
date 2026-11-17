@@ -544,15 +544,20 @@ export function GettingStartedSection({
     );
   return (
     <div className="uw-gs">
-      <OneStory heading={heading} />
-      <ExploreCards
-        owner={!!trial?.is_owner}
-        teamTab={!!personaTabs?.includes("team")}
-        onTeam={() => open("Team")}
-        onWorkflows={() => open("Getting started", OTHER_WORKFLOWS)}
-        onNextSteps={() => open("Next steps")}
-        chapters={chapters}
-        onDemoBooked={demo.reload}
+      {/* W1: the flagship leads; the explore cards fold under "More sample stories" with the ten-step story. */}
+      <OneStory
+        heading={heading}
+        more={
+          <ExploreCards
+            owner={!!trial?.is_owner}
+            teamTab={!!personaTabs?.includes("team")}
+            onTeam={() => open("Team")}
+            onWorkflows={() => open("Getting started", OTHER_WORKFLOWS)}
+            onNextSteps={() => open("Next steps")}
+            chapters={chapters}
+            onDemoBooked={demo.reload}
+          />
+        }
       />
       <TrialSettings
         trial={trial ?? null}

@@ -146,7 +146,7 @@ def _require_acknowledgement(switching_on: bool, acknowledgement: bool) -> None:
 
 FREE_TRIAL_AI_REFUSAL = {
     "code": "AI_OFF_FOR_FREE_TRIALS",
-    "message": "AI is not available for this free trial yet: MDARIX has not set up the free trial AI services. Once it "
+    "message": "AI is not switched on for this trial yet: MDARIX has not set up the free trial AI services. Once it "
     "has, AI can be switched on here and works on the sample data only, as the free trial agreement says.",
 }
 
@@ -473,8 +473,11 @@ def ai_ready(db: Session, tenant_id) -> bool:
         return False
 
 
-# A free trial runs without AI: its screens say so plainly instead of naming an administrator setting.
-TRIAL_AI_OFF_MESSAGE = "AI is off for free trials. Every step works by hand, and Ask MDARIX answers from your records."
+# A trial without AI services says so plainly instead of naming an administrator setting; never "off for free trials",
+# which is wrong for a trial that has AI (review G-07).
+TRIAL_AI_OFF_MESSAGE = (
+    "AI is not switched on for this trial. Every step works by hand, and Ask MDARIX answers from your records."
+)
 TRIAL_AI_ON_MESSAGE = (
     "AI in the free trial works on the sample data only. On your own data: AI available on paid plans. "
     "AI results are proposals: review them before relying on them."
@@ -485,7 +488,7 @@ USER_AI_INACTIVE_MESSAGE = "AI is not enabled for your account. Every step works
 @router.get("/ai/status")
 def ai_status(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """Whether AI may be used for the signed-in user's organization now, and why not (any signed-in user). ``trial``
-    is true for a free trial, whose AI is off."""
+    is true for a free trial, whose AI works on the sample data only once MDARIX switches it on."""
     from backend.app.trial.service import trial_subscription
 
     from genai.provider import GenAIProvider, trial_chain

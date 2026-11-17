@@ -221,6 +221,8 @@ export type IntelHypothesis = {
   status_changed_at?: string | null;
   created_by_name?: string | null;
   kind_label?: string | null;
+  /** Recorded with the sample: no model was called (W1). */
+  recorded?: boolean | null;
   evidence?: Partial<Record<Lowercase<Relation>, EvidenceLink[] | null>> | EvidenceLink[] | null;
   unknowns?: Array<{
     id: string;
@@ -850,6 +852,8 @@ export type Observation = {
   /** "AI proposal, not reviewed" while nobody accepted or edited the model's extraction, with its output id. */
   ai_label?: string | null;
   ai_execution_id?: string | null;
+  /** Recorded with the sample: no model was called (W1). */
+  recorded?: boolean | null;
 };
 
 export type ObservationFilter = { kind: string; origin: string };
@@ -995,7 +999,7 @@ const MANUAL_PATHS: AiBanner["manual"] = [
 ];
 
 const BANNER_TEXT: Record<
-  AiBanner["reason"] | "TRIAL" | "TRIAL_ORG_OFF" | "TRIAL_USER_OFF",
+  AiBanner["reason"] | "TRIAL" | "TRIAL_BUSY" | "TRIAL_ORG_OFF" | "TRIAL_USER_OFF",
   { title: string; message: string; disabled: string; short: string }
 > = {
   AI_DISABLED: {
@@ -1016,12 +1020,20 @@ const BANNER_TEXT: Record<
     disabled: "Your organization's AI allowance is used up.",
     short: "Your AI allowance is used up",
   },
-  // A free trial runs without AI: said plainly, without pointing at a setting nobody in the trial can change.
+  // A trial without AI services: said plainly, without pointing at a setting nobody in the trial can change. Never
+  // "off for free trials", which is wrong for a trial that has AI (review G-07).
   TRIAL: {
-    title: "AI is off for free trials",
+    title: "AI is not switched on for this trial",
     message: "Every step works by hand, and Ask MDARIX answers from your records.",
-    disabled: "AI is off for free trials.",
-    short: "AI is off for free trials",
+    disabled: "AI is not switched on for this trial.",
+    short: "AI is not switched on for this trial",
+  },
+  // The trial's AI services are set up and switched on, but none answers right now.
+  TRIAL_BUSY: {
+    title: "AI is busy",
+    message: "Try again in a minute. Every step works by hand meanwhile.",
+    disabled: "AI is busy right now.",
+    short: "AI is busy, try again in a minute",
   },
   // The trial's AI services are ready; the person who started the trial has not switched AI on yet.
   TRIAL_ORG_OFF: {
@@ -1065,7 +1077,9 @@ export function aiStatusBanner(status: AiStatus | null | undefined): AiBanner | 
           ? "TRIAL_USER_OFF"
           : status.sample_data_only === true && reason === "AI_DISABLED"
             ? "TRIAL_ORG_OFF"
-            : "TRIAL"
+            : status.sample_data_only === true && reason === "PROVIDER_UNAVAILABLE"
+              ? "TRIAL_BUSY"
+              : "TRIAL"
     ];
   const server = trial ? null : safeText(status.message);
   const offered = list<string>(status.manual_paths)
@@ -1095,4 +1109,132 @@ export function aiNoticeOf(payload: unknown): { message: string; manual: string 
   if (!isObject(payload) || !isObject(payload.ai_notice)) return null;
   const message = safeText(payload.ai_notice.message);
   return message ? { message, manual: safeText(payload.ai_notice.manual_alternative) } : null;
+}
+
+// ---------------------------------------------------------------------------------- At a glance (W1, flagship step 3)
+
+/** One line of "At a glance": what it says and the record it comes from. */
+export type GlanceItem = { label: string; sources: string[] };
+/** One dated record for the time order. */
+export type GlanceEvent = { date: string; label: string; source: string };
+export type EvidenceStates = {
+  known: GlanceItem[];
+  unknown: GlanceItem[];
+  contradicted: GlanceItem[];
+  missing: GlanceItem[];
+  timeline: GlanceEvent[];
+};
+type Row = Record<string, string | null | undefined>;
+
+/** What the version column says of a complaint (PV-1): from the complaint, from its lot, or not known, with the
+ * versions released by then listed as candidates and never filled in. */
+export function versionWords(item: {
+  version?: { version_identifier: string } | null;
+  version_source?: string | null;
+  candidate_versions?: { version_identifier: string }[] | null;
+}): { version: string; source: string; candidates: string[] } {
+  if (item.version)
+    return {
+      version: item.version.version_identifier,
+      source: item.version_source === "LOT" ? "From the lot" : "From the complaint",
+      candidates: [],
+    };
+  return {
+    version: "Version not known (unverified)",
+    source: "Neither the complaint nor its lot names a version",
+    candidates: (item.candidate_versions ?? []).map((row) => row.version_identifier),
+  };
+}
+
+const linksOf = (hypothesis: IntelHypothesis, relation: Lowercase<Relation>): EvidenceLink[] => {
+  const evidence = hypothesis.evidence;
+  const all = Array.isArray(evidence)
+    ? evidence.filter((link) => String(link.relation ?? "").toLowerCase() === relation)
+    : (evidence?.[relation] ?? []);
+  return all.filter((link) => !link.retracted);
+};
+const refOf = (evidence: LinkedEvidence | null | undefined) =>
+  safeText(evidence?.business_id) ?? safeText(evidence?.title);
+
+/**
+ * The case at a glance, from the records it already holds (pure): known (evidence a person linked in support), unknown
+ * (open questions), contradicted (explanations with evidence against them, AI ones included), missing (failure-chain
+ * links nobody has shown yet) and the time order of the dated records (changes, version releases, the complaints' lots,
+ * the complaints and the evidence).
+ */
+export function evidenceStates(input: {
+  hypotheses?: IntelHypothesis[] | null;
+  unknowns?: IntelUnknown[] | null;
+  chains?: StoredChain[] | null;
+  versions?: Array<{ anchor_date?: string | null; lot?: { identifier?: string | null } | null }> | null;
+  product?: {
+    changes?: Row[] | null;
+    versions?: Row[] | null;
+    lots?: Row[] | null;
+    evidence?: Row[] | null;
+  } | null;
+}): EvidenceStates {
+  const hypotheses = input.hypotheses ?? [];
+  const known = new Map<string, GlanceItem>();
+  for (const hypothesis of hypotheses) {
+    if (String(hypothesis.origin ?? "").toUpperCase() === "AI") continue;
+    for (const link of linksOf(hypothesis, "supporting")) {
+      const ref = refOf(link.evidence);
+      if (ref && !known.has(ref)) known.set(ref, { label: safeText(link.evidence?.title) ?? ref, sources: [ref] });
+    }
+  }
+  const unknown = (input.unknowns ?? [])
+    .filter((row) => ["open", "in_progress"].includes(String(row.status ?? "open").toLowerCase()))
+    .map((row) => ({
+      label: safeText(row.description) ?? "An open question",
+      sources: [safeText(row.business_id) ?? ""],
+    }));
+  const contradicted = hypotheses
+    .map((hypothesis) => ({
+      label: `${String(hypothesis.origin ?? "").toUpperCase() === "AI" ? "AI proposal: " : ""}${safeText(hypothesis.statement) ?? "A hypothesis"}`,
+      sources: [...new Set(linksOf(hypothesis, "contradicting").map((link) => refOf(link.evidence) ?? ""))].filter(
+        Boolean,
+      ),
+    }))
+    .filter((item) => item.sources.length > 0);
+  const missing = (input.chains ?? []).flatMap((chain) =>
+    (chain.links ?? [])
+      .filter((link) => linkStateOf(link.state) === "UNKNOWN")
+      .map((link) => ({
+        label: `${safeText(link.from_label) ?? "?"} → ${safeText(link.to_label) ?? "?"}`,
+        sources: [chainName(chain)],
+      })),
+  );
+  const timeline: GlanceEvent[] = [];
+  const add = (date: string | null | undefined, label: string, source: string) => {
+    if (date) timeline.push({ date, label, source });
+  };
+  const product = input.product ?? {};
+  for (const change of product.changes ?? [])
+    add(
+      change.event_timestamp ?? change.effective_timestamp,
+      safeText(change.description) ?? "A change",
+      change.change_identifier ?? "Change",
+    );
+  for (const version of product.versions ?? [])
+    add(version.release_timestamp, `${version.version_identifier} released`, version.version_identifier ?? "Version");
+  const lots = new Set((input.versions ?? []).map((row) => row.lot?.identifier).filter(Boolean));
+  for (const lot of product.lots ?? [])
+    if (lots.has(lot.lot_identifier))
+      add(lot.manufactured_timestamp, `Lot ${lot.lot_identifier} made`, `Lot ${lot.lot_identifier}`);
+  const dates = (input.versions ?? [])
+    .map((row) => row.anchor_date)
+    .filter((day): day is string => !!day)
+    .sort();
+  if (dates.length) {
+    add(dates[0], `First complaint in scope (${dates.length} in all)`, "Complaints");
+    if (dates.length > 1) add(dates[dates.length - 1], "Latest complaint in scope", "Complaints");
+  }
+  const cited = new Set([...known.keys(), ...contradicted.flatMap((item) => item.sources)]);
+  for (const row of product.evidence ?? []) {
+    const ref = [row.business_id, row.evidence_identifier].find((value) => !!value && cited.has(value));
+    if (ref) add(row.source_timestamp ?? row.created_at, safeText(row.title) ?? ref, ref);
+  }
+  timeline.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+  return { known: [...known.values()], unknown, contradicted, missing, timeline };
 }

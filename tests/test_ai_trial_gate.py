@@ -395,7 +395,7 @@ def test_a_trial_admin_switches_ai_on_only_with_the_trial_acknowledgement(trial,
     off = admin.get(f"{TRIALS}/{trial['tenant_id']}/users/ai-access").json()
     assert off["organization_on"] is False and off["organization_on_by"] is None and off["organization_on_at"] is None
     detail = admin.get(f"{TRIALS}/{trial['tenant_id']}").json()["ai"]
-    assert detail == {"enabled": False, "people_active": 0, "line": "AI is off for this trial (trial terms)."}
+    assert detail == {"enabled": False, "people_active": 0, "line": "AI is not switched on for this trial."}
     row = admin.get(TRIALS, params={"q": tenant_key(str(trial["tenant_id"]))}).json()["items"][0]
     assert row["ai_on"] is False and row["ai_people_active"] == 0
 

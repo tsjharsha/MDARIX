@@ -85,6 +85,7 @@ export async function ticksInOrder(page: Page, run: Run, expected?: number): Pro
 /** The ticks the screen shows, in the order listed: a ticked step's button reads "Completed", a step not needed
  * "Not needed". */
 export async function screenTicks(page: Page): Promise<(boolean | "skip")[]> {
+  await unfoldTenSteps(page);
   await expect(steps(page)).toBeVisible({ timeout: 60_000 });
   const shown: (boolean | "skip")[] = [];
   for (const name of STEPS)
@@ -113,9 +114,19 @@ export async function showYourData(page: Page) {
   else await item.click();
 }
 
+/** W1: while the flagship investigation leads Getting started, the ten-step story is folded under "More sample
+ * stories (optional)": opened when it is closed (nothing to do on your data, or with the sample removed). */
+export async function unfoldTenSteps(page: Page) {
+  const more = page.locator("details.uw-flagship-more");
+  await expect(steps(page).or(more)).toBeVisible({ timeout: 60_000 });
+  if ((await more.count()) && !(await more.evaluate((node) => (node as HTMLDetailsElement).open)))
+    await more.locator("summary").click();
+}
+
 /** Opens Getting started on ``run``, selects the step by its name and presses the step's own main button. */
 export async function openStep(page: Page, name: StepName, run: Run = "sample") {
   await page.goto("/app/getting-started");
+  if (run === "sample") await unfoldTenSteps(page);
   await expect(steps(page)).toBeVisible({ timeout: 60_000 });
   if (run === "yours") await showYourData(page);
   await stepButton(page, name).click();

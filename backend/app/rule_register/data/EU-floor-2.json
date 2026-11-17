@@ -1,0 +1,469 @@
+{
+  "code": "EU-floor-2",
+  "rule": "EU-floor",
+  "version": 2,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "EU_NI",
+  "held_as": "DATA",
+  "title": "EU and Northern Ireland vigilance: when a serious incident report is owed, which one, and by when",
+  "plain": "A serious incident (death, serious deterioration in health, or a serious public health threat) the device caused or may have caused: report in 2, 10 or 15 days.",
+  "source": [
+    {
+      "catalog": "MDR_2",
+      "clause": "EU MDR Art. 2(64)-(66)"
+    },
+    {
+      "catalog": "MDR_87",
+      "clause": "EU MDR Art. 87(1)-(5)"
+    },
+    {
+      "catalog": "MDCG_2023_3",
+      "clause": "MDCG 2023-3"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "EU MDR applies from 26 May 2021 (for your consultant to confirm)",
+  "change": {
+    "kind": "CORRECTION",
+    "corrects": "EU-floor-1",
+    "reason": "Wording only (review A gap G-10): question 6's skip note said \"a death takes the 10-day report\" whenever question 2 (\"led, or might have led, to death\") was Yes, even with no death recorded. Version 2 says \"death, or a risk of death, takes the 10-day report\". The questions, answers, outcomes, report types and periods are unchanged. A correction from the start: same period as version 1. Signed conclusions keep version 1 and its wording."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Srinivas",
+    "approved_by_account": "srinivas",
+    "approved_on": "2026-11-17",
+    "built_by": "Sriharsha",
+    "built_by_account": "sriharsha",
+    "release": "0.10.97",
+    "note": "Owner approval 17 Nov 2026 (G-10, WHIF review): new rule version with the corrected question-6 skip wording."
+  },
+  "content": {
+    "question_set": {
+      "version": "EU-starter-1",
+      "title": "EU and Northern Ireland vigilance (EU MDR Art. 87)",
+      "note": "Report when unsure: if you cannot tell whether the event is a serious incident, report it within the period (MDCG 2023-3).",
+      "basis": [
+        "MDR_2",
+        "MDR_87"
+      ],
+      "questions": [
+        {
+          "id": "EU1",
+          "text": "Is it an incident?",
+          "definition": "Incident (EU MDR Art. 2(64)–(66)): any malfunction or deterioration in the characteristics or performance of a device made available on the market, including use error due to ergonomic features, any inadequacy in the information supplied by the manufacturer, and any undesirable side-effect.",
+          "clause": "EU MDR Art. 2(64)–(66) (incident)",
+          "basis": [
+            "MDR_2",
+            "MDR_87"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "EU2",
+          "text": "Did it directly or indirectly lead, might it have led, or might it lead to the death of a patient, user or other person?",
+          "definition": "Serious incident (EU MDR Art. 2(64)–(66)): an incident that directly or indirectly led, might have led or might lead to a death, a temporary or permanent serious deterioration in health, or a serious public health threat.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident)",
+          "basis": [
+            "MDR_2",
+            "MDR_87"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3A",
+          "text": "Serious deterioration in health, criterion (a): did it lead, might it have led, or might it lead to a life-threatening illness or injury?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3B",
+          "text": "Serious deterioration in health, criterion (b): did it lead, might it have led, or might it lead to permanent impairment of a body structure or a body function?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3C",
+          "text": "Serious deterioration in health, criterion (c): did it lead, might it have led, or might it lead to hospitalisation, or prolonged hospitalisation, of a patient?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3D",
+          "text": "Serious deterioration in health, criterion (d): did it lead, might it have led, or might it lead to medical or surgical intervention to prevent a life-threatening illness or injury, or a permanent impairment?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3E",
+          "text": "Serious deterioration in health, criterion (e): did it lead, might it have led, or might it lead to a chronic disease?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU3F",
+          "text": "Serious deterioration in health, criterion (f): did it lead, might it have led, or might it lead to foetal distress, foetal death, or a congenital physical or mental impairment or birth defect?",
+          "definition": "A serious deterioration in the state of health (EU MDR Art. 2(64)–(66); MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious incident); MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU4",
+          "text": "Did it lead, might it have led, or might it lead to a serious public health threat?",
+          "definition": "Serious public health threat (EU MDR Art. 2(64)–(66)): an event that could result in imminent risk of death, serious deterioration in health or serious illness, that may require prompt remedial action and may cause significant morbidity or mortality, or that is unusual or unexpected for the place and time.",
+          "clause": "EU MDR Art. 2(64)–(66) (serious public health threat)",
+          "basis": [
+            "MDR_2",
+            "MDR_87"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "EU5",
+          "text": "Is a causal relationship between the device and the event established, or reasonably possible?",
+          "definition": "A causal relationship is established, or cannot be excluded on the information you have. When you cannot tell, it is reasonably possible.",
+          "clause": "EU MDR Art. 87; MDCG 2023-3",
+          "basis": [
+            "MDR_2",
+            "MDR_87",
+            "MDCG_2023_3"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "EU6",
+          "text": "Was a serious deterioration in health unanticipated?",
+          "definition": "Asked for the 10-day report: a serious deterioration that was not anticipated (for example not in the risk analysis or the information supplied with the device).",
+          "clause": "EU MDR Art. 87",
+          "basis": [
+            "MDR_2",
+            "MDR_87"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "EU_2_DAY": {
+        "label": "Serious public health threat: 2 days (EU MDR Art. 87(4))",
+        "days": 2,
+        "basis": "CALENDAR"
+      },
+      "EU_10_DAY": {
+        "label": "Death or unanticipated serious deterioration: 10 days (EU MDR Art. 87(5))",
+        "days": 10,
+        "basis": "CALENDAR"
+      },
+      "EU_15_DAY": {
+        "label": "Serious incident: 15 days (EU MDR Art. 87(3))",
+        "days": 15,
+        "basis": "CALENDAR"
+      }
+    },
+    "defs": {
+      "deterioration": {
+        "any": [
+          "EU3A",
+          "EU3B",
+          "EU3C",
+          "EU3D",
+          "EU3E",
+          "EU3F"
+        ]
+      },
+      "serious": {
+        "any": [
+          "EU2",
+          "EU3A",
+          "EU3B",
+          "EU3C",
+          "EU3D",
+          "EU3E",
+          "EU3F",
+          "EU4"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "id": "F-EU-1",
+        "if": {
+          "all": [
+            "EU1",
+            {
+              "ref": "serious"
+            },
+            "EU5"
+          ]
+        },
+        "cite": "EU MDR Art. 87(1)"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-EU-1",
+        "if": {
+          "maybe": "EU4"
+        },
+        "type": "EU_2_DAY"
+      },
+      {
+        "id": "T-EU-2",
+        "if": {
+          "any": [
+            {
+              "maybe": "EU2"
+            },
+            {
+              "all": [
+                {
+                  "maybe": {
+                    "ref": "deterioration"
+                  }
+                },
+                {
+                  "maybe": "EU6"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "EU_10_DAY"
+      },
+      {
+        "id": "T-EU-3",
+        "type": "EU_15_DAY"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "all": [
+            {
+              "type": "EU_2_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "EU4"
+            }
+          ]
+        },
+        "text": "Question 4 (serious public health threat) is Unknown: until it is answered, the 2-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 10 or 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "all": [
+            {
+              "type": "EU_10_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "EU2"
+            }
+          ]
+        },
+        "text": "Question 2 (death) is Unknown: until it is answered, the 10-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "all": [
+            {
+              "type": "EU_10_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_no": "EU2"
+            },
+            {
+              "is_unknown": "EU6"
+            }
+          ]
+        },
+        "text": "Question 6 (unanticipated) is Unknown: until it is answered, the 10-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "is_no": "EU1"
+        },
+        "fold": [
+          "EU2",
+          "EU3A",
+          "EU3B",
+          "EU3C",
+          "EU3D",
+          "EU3E",
+          "EU3F",
+          "EU4",
+          "EU5",
+          "EU6"
+        ],
+        "why": "Not asked: not an incident"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "serious"
+          }
+        },
+        "fold": [
+          "EU5"
+        ],
+        "why": "Not asked: no death, serious deterioration or public health threat"
+      },
+      {
+        "if": {
+          "any": [
+            {
+              "is_no": "EU5"
+            },
+            {
+              "is_no": {
+                "ref": "serious"
+              }
+            }
+          ]
+        },
+        "fold": [
+          "EU6"
+        ],
+        "why": "Not needed: not reportable on the answers above"
+      },
+      {
+        "if": {
+          "is_yes": "EU4"
+        },
+        "fold": [
+          "EU6"
+        ],
+        "why": "Not needed: a serious public health threat takes the 2-day report"
+      },
+      {
+        "if": {
+          "is_yes": "EU2"
+        },
+        "fold": [
+          "EU6"
+        ],
+        "why": "Not needed: death, or a risk of death, takes the 10-day report"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "deterioration"
+          }
+        },
+        "fold": [
+          "EU6"
+        ],
+        "why": "Not needed: no serious deterioration in health"
+      }
+    ],
+    "precedence": [
+      "EU_2_DAY",
+      "EU_10_DAY",
+      "EU_15_DAY"
+    ],
+    "prefill": {
+      "death": [],
+      "malfunction": [],
+      "injury_note": []
+    },
+    "counting": {
+      "authority_zone": "Europe/Brussels",
+      "awareness_is_day_one": false,
+      "words": "from the day after awareness; Brussels time or yours, whichever ends first; no weekend extension"
+    },
+    "provisional": {
+      "THREAT": [
+        2,
+        "CALENDAR",
+        "2 days (EU MDR Art. 87(4))"
+      ],
+      "FLAGGED": [
+        10,
+        "CALENDAR",
+        "10 days (EU MDR Art. 87(5))"
+      ],
+      "UNFLAGGED": [
+        15,
+        "CALENDAR",
+        "15 days (EU MDR Art. 87(3))"
+      ],
+      "remedial": null,
+      "ruled_out": "a public health threat is ruled out"
+    }
+  },
+  "content_hash": "sha256:92a74ba69cd88d6af43adf4bb32a61cd9d559fc62f341de15252a60507ef8345"
+}

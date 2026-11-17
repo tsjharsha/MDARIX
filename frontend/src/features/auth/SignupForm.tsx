@@ -382,11 +382,15 @@ export function SignupForm() {
               onChange={(e) => answer("jobTitle")(e.target.value)}
             />
           </label>
-          <label className="auth-field su-wide">
-            <span>
-              Work email <Req />
-            </span>
+          {/* The hint sits outside the label, so the field's name is "Work email" only (review G-21). */}
+          <div className="auth-field su-wide">
+            <label htmlFor="su-email">
+              <span>
+                Work email <Req />
+              </span>
+            </label>
             <input
+              id="su-email"
               required
               type="email"
               maxLength={254}
@@ -396,7 +400,7 @@ export function SignupForm() {
               onChange={(e) => setEmail(e.target.value)}
             />
             <small id="su-email-hint">{EMAIL_HINTS[approval]}</small>
-          </label>
+          </div>
           <ReviewedAddressNote kind={kind} approval={approval} />
           <label className="auth-field">
             <span>

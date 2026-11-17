@@ -1722,7 +1722,7 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
 
 def test_ask_mdarix_without_ai_answers_the_natural_trial_question_in_plain_words():
     """UX-23: with AI off in a trial, the natural question about lots and Rev B finds the sample case's evidence,
-    gets the fixed-rule answers about lots and the version, and says AI is off for free trials (never the operator's
+    gets the fixed-rule answers about lots and the version, and says AI is not switched on for this trial (never the operator's
     "provider is not configured")."""
     from backend.app.db.models.foundation import Investigation, ProductVersion
 
@@ -1768,11 +1768,11 @@ def test_ask_mdarix_without_ai_answers_the_natural_trial_question_in_plain_words
         [*map(str, response["limitations"]), str(body["structured"].get("ai_note")), *body["structured"]["limitations"]]
     )
     assert "not configured" not in shown.lower() and "Live GenAI" not in shown
-    assert "AI is off for free trials" in shown
+    assert "AI is not switched on for this trial" in shown and "AI is off for free trials" not in shown  # G-07
     assert not any("It does not count complaints" in text for text in body["structured"]["limitations"])
     # The AI status every screen reads says why the AI buttons are off (UX-02).
     status = user.get("/api/v1/ai/status").json()
-    assert status["trial"] is True and status["message"].startswith("AI is off for free trials")
+    assert status["trial"] is True and status["message"].startswith("AI is not switched on for this trial")
 
 
 def test_the_samples_ai_observations_are_not_counted_as_validated():

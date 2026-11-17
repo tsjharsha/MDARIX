@@ -59,11 +59,57 @@ export type StoryRun = {
 /** A sample Case offered under "More cases to try" (0.10.93), with its outcome as its record says; `complaint` marks
  * the routine sample complaint (B7a), which opens its Resolve and close drawer. */
 export type MoreCase = { id: string; ref: string; label: string; signed: boolean; complaint?: boolean };
-export type OneStory = { sample: StoryRun | null; yours: StoryRun | null; more_cases?: MoreCase[] };
+/**
+ * The flagship story (W1): one investigation (SAMPLE-INV-001), one product and one version (OrbitCare 300 Rev B), seven
+ * steps from the signal to the action (backend/app/trial/flagship.py). Steps 1 to 3 tick when their screen loads from
+ * the story; the others from the saved records (a review, the brief accepted, the signed decision, a planned check).
+ */
+export type FlagshipRun = {
+  run: "flagship";
+  product: {
+    id: string;
+    ref: string | null;
+    name: string | null;
+    /** The short name the bar reads ("OrbitCare 300"). */
+    label?: string | null;
+    version: string | null;
+    /** KNOWN: every complaint of the case on one version; MIXED: several, or some unverified; UNVERIFIED: none known. */
+    version_state: "KNOWN" | "MIXED" | "UNVERIFIED";
+    unverified: number;
+  };
+  investigation: { id: string; ref: string; question: string };
+  change: { ref: string; description: string } | null;
+  capa: { id: string; ref: string; title: string; check_planned: boolean; check_status: string | null } | null;
+  branch: { complaint_id: string; ref: string } | null;
+  ai_proposals: number;
+  mfa_verified: boolean | null;
+  steps: StoryRun["steps"];
+  current: number;
+  finished: boolean;
+};
+export type OneStory = {
+  sample: StoryRun | null;
+  yours: StoryRun | null;
+  flagship?: FlagshipRun | null;
+  more_cases?: MoreCase[];
+};
 
 export const STORY_STEPS = 10;
-/** The steps ticked when someone opens the step's screen from the story: it counts for the whole team (0.10.84, M6). */
-const MARKED: Record<number, string> = { 5: "form", 8: "records", 9: "trends" };
+export const FLAGSHIP_STEPS = 7;
+/** Why the trend's lot 005 is not in the case (W1 open item 2): it was built with the next sensor lot. */
+export const LOT_005_LINE =
+  "The trend also shows lot 005: a no-fault-found return and a free-flow report. Lot 005 was built with the next " +
+  "sensor lot (NS-SL-2533), so the investigation keeps to lots 003 and 004, which share sensor lot NS-SL-2417.";
+/** The steps ticked when someone opens the step's screen from the story: it counts for the whole team (0.10.84, M6);
+ * per run (W1: the flagship's first three). */
+const TEN_STEP_MARKS: Record<number, string> = { 5: "form", 8: "records", 9: "trends" };
+const MARKED: Record<string, Record<number, string>> = {
+  sample: TEN_STEP_MARKS,
+  yours: TEN_STEP_MARKS,
+  flagship: { 0: "signal", 1: "product", 2: "evidence" },
+};
+/** The screen whose load counts each mark (the flagship's signal is the trend check's load). */
+const VISIT_OF: Record<string, string> = { signal: "trends" };
 
 /** The story, read again after every saved change (0.10.84, M1): saving the triage moves the pill and Next step on. */
 export function useOneStory(on = true) {
@@ -144,15 +190,24 @@ export const takeMarkProblem = () => {
 
 /** A step opened from the story whose screen has not loaded yet (0.10.88, P0 of the review of 0.10.87): it counts
  * only once its own screen has read the right record successfully. */
-type PendingVisit = { run: string; step: string; complaintId: string; reportId: string | null; product: string | null };
+type PendingVisit = {
+  run: string;
+  step: string;
+  complaintId: string;
+  reportId: string | null;
+  product: string | null;
+  version?: string | null;
+};
 let pendingVisit: PendingVisit | null = null;
 
 /** What a destination loaded: the report (step 6), the finished record (step 9) or the trend check of a product
- * (step 10). */
+ * (step 10); for the flagship (W1), a product's version page and an investigation's evidence. */
 export type Visit =
   | { step: "form"; reportId: string | undefined }
   | { step: "records"; complaintId: string | undefined }
-  | { step: "trends"; product: string | undefined };
+  | { step: "trends"; product: string | undefined }
+  | { step: "product"; product: string | undefined; version: string | null | undefined }
+  | { step: "evidence"; investigationId: string | undefined };
 
 /** Open a step's screen at once (0.10.85: waiting read as a dead click). A step ticked by the visit itself (the
  * report, Records, Trends) is remembered, and its mark is saved by the screen once it has loaded (``visited``):
@@ -162,7 +217,7 @@ export async function openStep(
   index: number,
   open: (section: any, tab?: string) => void,
 ): Promise<void> {
-  const mark = MARKED[index];
+  const mark = MARKED[run.run][index];
   const place = stepPlace(run, index);
   pendingVisit =
     mark && !(index === 5 && !run.report_id)
@@ -181,13 +236,17 @@ export async function openStep(
  * the step opened, once; a refusal (STEP_NOT_YET, STORY_MOVED) is kept and shown on Getting started. */
 export async function visited(visit: Visit): Promise<void> {
   const pending = pendingVisit;
-  if (!pending || pending.step !== visit.step) return;
+  if (!pending || (VISIT_OF[pending.step] ?? pending.step) !== visit.step) return;
   const matches =
     visit.step === "form"
       ? !!visit.reportId && visit.reportId === pending.reportId
       : visit.step === "trends"
         ? !pending.product || visit.product === pending.product
-        : !!visit.complaintId && visit.complaintId === pending.complaintId;
+        : visit.step === "product"
+          ? visit.product === pending.product && visit.version === pending.version
+          : visit.step === "evidence"
+            ? visit.investigationId === pending.complaintId
+            : !!visit.complaintId && visit.complaintId === pending.complaintId;
   if (!matches) return;
   pendingVisit = null;
   try {
@@ -197,7 +256,8 @@ export async function visited(visit: Visit): Promise<void> {
       complaint_id: pending.complaintId,
     });
   } catch (reason) {
-    const index = Number(Object.keys(MARKED).find((key) => MARKED[Number(key)] === pending.step) ?? 0);
+    const marks = MARKED[pending.run] ?? {};
+    const index = Number(Object.keys(marks).find((key) => marks[Number(key)] === pending.step) ?? 0);
     markProblem = errorText(reason, `Step ${index + 1} was not saved. Open it again from Getting started.`);
   }
 }
@@ -209,6 +269,87 @@ export function useVisited(visit: Visit, loaded: boolean) {
     if (loaded) void visited(visit);
   }, [loaded, key]);
 }
+
+/** A flagship step's place: its screen, and the case to open first (steps 3 to 6) (W1). */
+export type FlagshipPlace = Place & { caseId?: string; productId?: string };
+
+/** The real screen each flagship step opens, with the record in place (W1, spec section 1). */
+export function flagshipPlace(run: FlagshipRun, index: number): FlagshipPlace {
+  const product = run.product.ref ?? "SAMPLE-ORBIT-300";
+  const inCase = (tab: string): FlagshipPlace => ({
+    section: "Investigations",
+    tab,
+    caseId: run.investigation.id,
+    productId: run.product.id,
+  });
+  if (index === 0) return { section: "Trends", tab: `Trend check?${new URLSearchParams({ product })}` };
+  if (index === 1) {
+    const place: Record<string, string> = { product, view: "Configuration", compare: "Rev A" };
+    if (run.product.version) place.version = run.product.version;
+    return { section: "Product 360", tab: `Product 360?${new URLSearchParams(place)}` };
+  }
+  if (index === 2) return inCase("Evidence?view=Overview&part=intelligence");
+  if (index === 3) return inCase("Evidence");
+  if (index === 4) return inCase("Decisions & actions?part=brief");
+  if (index === 5) return inCase("Decisions & actions?part=decision");
+  return run.capa
+    ? { section: "Records", tab: `Effectiveness checks?${new URLSearchParams({ capa: run.capa.id })}` }
+    : { section: "Records", tab: "Effectiveness checks" };
+}
+
+/** G-06: the flagship signal in the trend check's own number (the figure Home and Trends show), never a figure of
+ * its own; without a trend row for the product, the sentence has no number. */
+export function signalWhy(
+  items: ReadonlyArray<{ product: { id: string }; ratio: number | null }> | undefined,
+  productId: string | null | undefined,
+): string {
+  const ratios = (items ?? [])
+    .filter((row) => row.product.id === productId && typeof row.ratio === "number")
+    .map((row) => row.ratio as number);
+  const lead = ratios.length
+    ? `Pressure-alarm complaints on one pump are at ${Math.max(...ratios).toFixed(1)}× the earlier average after Rev B.`
+    : "Pressure-alarm complaints on one pump are rising after Rev B.";
+  return `${lead} A rise like this starts an investigation.`;
+}
+
+/** E3 + W6: the signed decision's summary and record, leading the case's Decisions & actions. */
+export const summaryPlace = (run: FlagshipRun): FlagshipPlace => ({
+  section: "Investigations",
+  tab: "Decisions & actions?part=summary",
+  caseId: run.investigation.id,
+  productId: run.product.id,
+});
+
+/** The optional branch (W1): is SAMPLE-RV-06 reportable in each market? Its US decision tree. */
+export const branchPlace = (run: FlagshipRun): Place | null =>
+  run.branch ? treePlace("US", run.branch.complaint_id) : null;
+
+/** Open a flagship step's screen at once; steps 1 to 3 are remembered and their mark saved once the screen loads. */
+export function openFlagshipStep(
+  run: FlagshipRun,
+  index: number,
+  open: (section: any, tab?: string) => void,
+  setCase?: (id: string, productId?: string | null) => void,
+): void {
+  const mark = MARKED.flagship[index];
+  const place = flagshipPlace(run, index);
+  pendingVisit = mark
+    ? {
+        run: "flagship",
+        step: mark,
+        complaintId: run.investigation.id,
+        reportId: null,
+        product: run.product.ref,
+        version: run.product.version,
+      }
+    : null;
+  if (place.caseId) setCase?.(place.caseId, place.productId);
+  open(place.section, place.tab);
+}
+
+/** "Step 4 of 7", or "All seven steps done" (W1). */
+export const flagshipCount = (run: FlagshipRun) =>
+  run.finished ? "All seven steps done" : `Step ${run.current + 1} of ${FLAGSHIP_STEPS}`;
 
 /** "Step 4 of 10", or "All ten steps done". */
 export const stepCount = (run: StoryRun) =>

@@ -24,7 +24,7 @@ describe("How MDARIX checks AI output, with AI off", () => {
   it("says there is no AI output to check, in the words of the AI-off banner", () => {
     const trial = aiStatusBanner({ enabled: false, trial: true });
     expect(trial && noAiOutputText(trial)).toBe(
-      "AI is off for free trials, so there is no AI output on this investigation to check.",
+      "AI is not switched on for this trial, so there is no AI output on this investigation to check.",
     );
     const off = aiStatusBanner({ enabled: false });
     expect(off && noAiOutputText(off)).toBe(
@@ -32,7 +32,9 @@ describe("How MDARIX checks AI output, with AI off", () => {
     );
     const html = summary(trial);
     expect(html).toContain("How MDARIX checks AI output");
-    expect(html).toContain("AI is off for free trials, so there is no AI output on this investigation to check.");
+    expect(html).toContain(
+      "AI is not switched on for this trial, so there is no AI output on this investigation to check.",
+    );
     expect(html).toContain("No AI output to check");
   });
 

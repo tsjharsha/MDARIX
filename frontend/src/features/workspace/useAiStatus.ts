@@ -24,6 +24,15 @@ export function useAiBanner(): AiBanner | null {
 }
 
 /**
+ * Why an AI button is disabled, or null when AI answers (review G-07: the button stays, with its state in words).
+ */
+export function useAiOffReason(canRun: boolean): string | null {
+  const banner = useAiBanner();
+  if (canRun) return null;
+  return banner?.shortReason ?? "Checking whether AI can answer";
+}
+
+/**
  * Whether AI really answers for the organization now (GET /api/v1/ai/status): true or false once known, null while
  * loading. A status that cannot be read counts as false, so nothing starts in the AI's name on a guess.
  */

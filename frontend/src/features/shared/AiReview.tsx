@@ -6,6 +6,13 @@ import { describeError, postJson } from "../../app/apiClient";
 /** The label on every AI output nobody accepted or edited yet (AI-R 4.4, owner decision AI-D7). */
 export const AI_UNREVIEWED_LABEL = "AI proposal, not reviewed";
 export const REVIEW_REASON_MIN = 5;
+/** The chip on an AI proposal recorded with the sample (W1): no model was called. Never on a live proposal. */
+export const RECORDED_LABEL = "Recorded with the sample · no model was called";
+
+/** The recorded chip, for a proposal the server marks ``recorded``; nothing otherwise. */
+export function RecordedChip({ recorded }: { recorded?: boolean | null }) {
+  return recorded ? <span className="ms-chip is-sample ai-recorded">{RECORDED_LABEL}</span> : null;
+}
 
 export type AiReviewDecision = "ACCEPTED" | "EDITED" | "REJECTED";
 /** What the server says about an output: one of the decisions, or not reviewed yet. */

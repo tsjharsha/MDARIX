@@ -692,6 +692,8 @@ def record_view(control_db: Session, db: Session, decision: Decision) -> dict:
                 "created_at": _iso(snapshot.created_at),
                 "evidence_set_hash": snapshot_data.get("evidence_set_hash"),
                 "scope_version": snapshot_data.get("scope_version"),
+                # The accepted root cause as the signer ticked it (bound into the signature); absent before RCA.
+                "root_cause": snapshot_data.get("root_cause"),
             }
             if snapshot is not None
             else None
