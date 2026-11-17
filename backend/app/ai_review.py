@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import AI_RUN, require_permission
@@ -189,6 +190,27 @@ def review_output(
     subject_type, session, call_id, original = _subject(db, control_db, tenant_id, output_id)
     now = datetime.now(timezone.utc)
     edited = payload.edited_text if payload.decision == "EDITED" else None
+    reason = (payload.reason or "").strip() or None
+    # A double click (review G12): the same person's same review again returns the one already written, since review
+    # rows and their audit events are append-only. The lock makes two clicks in flight wait for each other.
+    session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"ai-review:{tenant_id}:{output_id}"})
+    latest = (
+        session.query(AiOutputReview)
+        .filter(
+            AiOutputReview.tenant_id == tenant_id,
+            AiOutputReview.subject_type == subject_type,
+            AiOutputReview.subject_id == str(output_id),
+        )
+        .order_by(AiOutputReview.created_at.desc(), AiOutputReview.id.desc())
+        .first()
+    )
+    if latest is not None and (latest.reviewer, latest.decision, latest.edited_text, latest.reason) == (
+        str(ctx.user_id),
+        payload.decision,
+        edited,
+        reason,
+    ):
+        return _view(latest, _reviewers(control_db, tenant_id, [latest]))
     review = AiOutputReview(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -198,7 +220,7 @@ def review_output(
         decision=payload.decision,
         edited_text=edited,
         edited_text_sha256=sha256(edited) if edited is not None else None,
-        reason=(payload.reason or "").strip() or None,
+        reason=reason,
         reviewer=str(ctx.user_id),
         created_at=now,
     )

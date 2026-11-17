@@ -141,6 +141,29 @@ def test_a_rejected_result_is_never_used_and_reviews_are_append_only():
             db.flush()
 
 
+def test_a_double_click_on_accept_writes_one_review_and_one_audit_event():
+    """Review G12: the same person's same review twice in a row returns the first; a different one is written."""
+    client = authenticated_client()
+    row_id = _model_result("MODEL SUMMARY DOUBLE")
+    first = _review(client, row_id, decision="ACCEPTED")
+    second = _review(client, row_id, decision="ACCEPTED")
+    assert first.status_code == second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert _review(client, row_id, decision="EDITED", edited_text="Changed text", reason="Clearer").status_code == 200
+    assert _review(client, row_id, decision="EDITED", edited_text="Changed text", reason="Clearer").status_code == 200
+    assert _review(client, row_id, decision="ACCEPTED").status_code == 200  # a change of mind is a new review
+    with SessionLocal() as db:
+        bind_system(db, "test")
+        rows = db.query(AiOutputReview).filter(AiOutputReview.subject_id == str(row_id)).all()
+        assert sorted(row.decision for row in rows) == ["ACCEPTED", "ACCEPTED", "EDITED"]
+        events = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.action == "AI_OUTPUT_REVIEWED", AuditEvent.entity_id == row_id)
+            .count()
+        )
+        assert events == 3
+
+
 def _model_observations(row_id, count: int) -> tuple[uuid.UUID, list[tuple[uuid.UUID, str]]]:
     """``count`` observations one model extraction (``row_id``) proposed on the case's evidence."""
     from backend.app.db.models.evidence_intelligence import EvidenceObservation
