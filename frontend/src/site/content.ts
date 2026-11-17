@@ -366,8 +366,8 @@ export const AVAILABILITY: readonly Availability[] = ["Available today", "In a p
 /**
  * Where each Platform capability stands, from the roadmap (capabilityStatus) and the product as it runs: a free trial
  * always gets the MVP's screens (backend/app/feature_set.py, app/featureSet.ts), and what the MVP parks (the Products
- * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product, in a pilot. AI is off during
- * the trial, so every AI capability is "Planned" (after evaluation). `note` says what the label means in the product today. Nothing
+ * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product, in a pilot. In the trial AI
+ * works on the sample data only, so every AI capability on your own data is "Planned" (after evaluation). `note` says what the label means in the product today. Nothing
  * moves to "Available today" until it works in a trial workspace (WEB-14: the labels are the roadmap's three words).
  */
 export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; note: string }> = {
@@ -389,7 +389,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "ask-mdarix": {
     status: "Available today",
-    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI are planned, after evaluation.",
+    note: "In the free trial AI works on the sample data only, each answer labelled as an AI proposal; on your own data Ask MDARIX answers from your records by its rules and says so.",
   },
   investigation: {
     status: "Available today",
@@ -405,7 +405,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   challenger: {
     status: "Planned",
-    note: "Planned, after evaluation. AI is off during the trial; the AI challenge of a hypothesis is switched on only once it is evaluated.",
+    note: "Planned, after evaluation. In the trial AI works on the sample data only; the AI challenge of a hypothesis is switched on only once it is evaluated.",
   },
   unknowns: {
     status: "Available today",
@@ -429,11 +429,11 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "ai-assurance": {
     status: "Planned",
-    note: "Planned, after evaluation. AI is off during the trial; its assurance checks are evaluated before AI is switched on.",
+    note: "Planned, after evaluation. In the trial AI works on the sample data only; its assurance checks are evaluated before AI works on your own data.",
   },
   "ai-provenance": {
     status: "Planned",
-    note: "Planned, after evaluation. AI is off during the trial; each AI output will record its sources and model once AI is switched on.",
+    note: "Planned, after evaluation. In the trial AI works on the sample data only; each AI output will record its sources once AI works on your own data.",
   },
   "human-review": {
     status: "Available today",
@@ -486,8 +486,8 @@ const PLATFORM_PAGE_DEFS: Record<
   "Trust & Governance": {
     path: "/platform/trust",
     name: "Trust",
-    headline: "People decide, every step is recorded, and AI stays off until it is validated.",
-    copy: "Signed human review and a complete audit trail today; customer administration in a pilot; the AI safeguards are planned, after evaluation.",
+    headline: "People decide, every step is recorded, and AI only proposes.",
+    copy: "Signed human review and a complete audit trail today; customer administration in a pilot; in the trial AI works on the sample data only; the AI safeguards for your own data are planned, after evaluation.",
     blurb: "Human review, audit trail and AI safeguards",
   },
 };

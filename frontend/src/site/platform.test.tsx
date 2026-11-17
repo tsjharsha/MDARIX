@@ -26,7 +26,7 @@ describe("the Platform pages", () => {
   });
 
   it("do not claim what the free trial does not have", () => {
-    // The Product 360 screen is not in the trial, and AI is off during the trial.
+    // The Product 360 screen is not in the trial, and AI works on the sample data only in the trial.
     for (const slug of [
       "product-360",
       "reality-graph",
@@ -37,7 +37,7 @@ describe("the Platform pages", () => {
     ])
       expect(CAPABILITY_AVAILABILITY[slug].status, slug).not.toBe("Available today");
     for (const slug of ["challenger", "ai-assurance", "ai-provenance"])
-      expect(CAPABILITY_AVAILABILITY[slug].note, slug).toContain("AI is off during the trial");
+      expect(CAPABILITY_AVAILABILITY[slug].note, slug).toContain("In the trial AI works on the sample data only");
     const live = capabilityStatus[0].items.map((item) => item.title);
     expect(live).not.toContain("Product 360");
   });

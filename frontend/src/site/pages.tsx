@@ -337,7 +337,7 @@ const EXAMPLE_STEPS = [
   },
   {
     title: "Decide and sign",
-    text: "An authorized person decides and signs, and the audit trail keeps every step. AI is off in the free trial: every step works by hand.",
+    text: "An authorized person decides and signs, and the audit trail keeps every step. In the free trial AI works on the sample data only, and a person reviews every AI proposal.",
     href: "/platform/decisions#decision-center",
   },
 ];
@@ -469,7 +469,11 @@ export function HomePage() {
         <div className="ms-grid-4">
           {[
             [Lock, "Isolated data per customer", "The database itself enforces each organization's boundary."],
-            [ShieldCheck, "AI off in the trial", "Every step works by hand. AI stays advisory and cites its evidence."],
+            [
+              ShieldCheck,
+              "AI that only proposes",
+              "In the trial, AI works on the sample data only; a person reviews every proposal.",
+            ],
             [BadgeCheck, "Signed decisions", "Approval authority by role, re-authentication and no self-approval."],
             [ScrollText, "Complete audit trail", "Who did what, when and why, ready to export."],
           ].map(([Icon, title, text], index) => {
@@ -1068,8 +1072,8 @@ export function TrustPage() {
             <li>
               <Check size={16} aria-hidden="true" />
               <span>
-                AI is switched on per organization by its administrator. It is off in the free trial while it is
-                validated, and every step works by hand.
+                AI is switched on per organization by its administrator. In the free trial it works on the sample data
+                only, and every AI output is a proposal a person reviews.
               </span>
             </li>
           </ul>

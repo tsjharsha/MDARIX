@@ -885,7 +885,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
     # Trials start without AI: the chapter promises what the case page does without it.
     assert chapters["INVESTIGATE_WITH_AI"]["title"] == "Investigate with evidence you can trace"
-    assert "AI is off in the free trial" in chapters["INVESTIGATE_WITH_AI"]["promise"]
+    assert "AI works on the sample data only" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     # The decision chapter opens the guided investigation's waiting brief.
     assert (

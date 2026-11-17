@@ -588,7 +588,7 @@ export const capabilityStatus: {
         icon: "ai",
         title: "AI assistance that cites its evidence",
         detail:
-          "Planned, after evaluation: answers that name the records they rely on, switched on only once AI is evaluated with your team. AI is off in the free trial. People still make every decision.",
+          "Planned, after evaluation: answers that name the records they rely on, switched on for your own data only once AI is evaluated with your team. In the free trial AI works on the sample data only. People still make every decision.",
       },
       {
         icon: "sso",
@@ -611,7 +611,7 @@ export const trialIncludes: string[] = [
   "Sample data that tells the quality story in ten chapters",
   "Your own Excel or CSV exports, checked for problems and personal data before import",
   "Fourteen step-by-step videos",
-  "AI is off during the trial: every step works by hand",
+  "AI on the trial's sample data only, with outputs labelled as AI proposals that a person reviews",
 ];
 
 export const lifecycleContent: Record<string, { eyebrow: string; title: string; copy: string }> = {

@@ -155,7 +155,8 @@ WITHOUT_AI = {
     "INVESTIGATE_WITH_AI": (
         "Investigate with evidence you can trace",
         "The investigation brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
-        "cites the records it comes from; the investigator weighs each explanation. AI is off in the free trial.",
+        "cites the records it comes from; the investigator weighs each explanation. In the free trial AI works on the sample data only, once "
+        "it is switched on under Settings.",
         "Small teams with large backlogs; conclusions that cannot show their sources are not trusted.",
     )
 }

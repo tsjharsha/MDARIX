@@ -35,7 +35,10 @@ describe("website home", () => {
     const today = capabilityStatus.find((status) => status.label === "Available today")!;
     expect(today.items.map((item) => `${item.title} ${item.detail}`).join(" ")).not.toMatch(/\bAI\b/);
     expect(today.text).toContain("free trial");
-    expect(trialIncludes).toContain("AI is off during the trial: every step works by hand");
+    expect(trialIncludes).toContain(
+      "AI on the trial's sample data only, with outputs labelled as AI proposals that a person reviews",
+    );
+    expect(trialIncludes.join(" ")).not.toContain("AI is off");
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).toContain("In your free trial");
     expect(html).toContain("Up to 50 people and 5,000 uploaded rows");
