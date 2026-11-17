@@ -214,7 +214,7 @@ export function TrialRequestsWorkspace() {
         });
         setResult({
           tone: "good",
-          text: `Approving ${row.organization}: creating the workspace and its sample story�`,
+          text: `Approving ${row.organization}: creating the workspace and its sample story…`,
         });
         setConfirming(null);
         const done = await waitForApproval(row);

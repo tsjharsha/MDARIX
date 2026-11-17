@@ -98,7 +98,7 @@ export function LatestSignatures() {
             render: (row) => (
               <span className="cc-trial-org">
                 <strong>{row.decision_business_id ?? row.business_id ?? row.record_label ?? "Decision"}</strong>
-                <small>{[row.record_label, titleCase(String(row.decision ?? ""))].filter(Boolean).join(" � ")}</small>
+                <small>{[row.record_label, titleCase(String(row.decision ?? ""))].filter(Boolean).join(" · ")}</small>
               </span>
             ),
           },
