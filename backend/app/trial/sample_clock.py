@@ -65,6 +65,7 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     from backend.app.trial.sample_lot_impact import stage_sample_lot_impact
     from backend.app.trial.sample_supply import stage_sample_supply
     from backend.app.trial.sample_sources import stage_sample_sources
+    from backend.app.trial.sample_follow_up import stage as stage_follow_up
     from backend.app.trial.sample_oversight import stage_sample_oversight
     from backend.app.trial import reports_0_10_75
     from backend.app.trial.sample_reports import stage_sample_reports
@@ -102,6 +103,8 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     sample["supply"] = stage_sample_supply(db, tenant_id, now)
     # W5: the simulated PLM, ERP and eQMS runs behind OrbitCare 300's records (after the lot impact; adds no record).
     sample["sources"] = stage_sample_sources(db, tenant_id, now)
+    # W1d (D04): SAMPLE-CAPA-02's labelled synthetic follow-up (one evidence record; shown once its check is planned).
+    sample["follow_up"] = stage_follow_up(db, tenant_id, now)
     # The sample products' device categories and the lots' expiry dates (J32), after every sample lot exists.
     sample["product_facts"] = seed_product_facts(db, tenant_id)
     # Day 0 is calm: what the story does not need open is finished (sample_calm.py). Last: it reads the triage list.

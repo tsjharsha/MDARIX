@@ -296,7 +296,7 @@ describe("CAPA effectiveness", () => {
 
   it("checks a signature and sends the plan version read", () => {
     const form = { result: "EFFECTIVE" as const, summary: "No OCC complaints since", password: "secret", code: "" };
-    expect(signProblem({ ...form, result: "" })).toBe("Choose whether the action was effective");
+    expect(signProblem({ ...form, result: "" })).toBe("Choose the result: effective, not effective or inconclusive");
     expect(signProblem({ ...form, summary: "ok" })).toContain("what you found");
     expect(signProblem({ ...form, password: "" })).toBe("Enter your password to sign");
     expect(signProblem({ ...form, code: "12ab" })).toBe("The authenticator code is 6 to 8 digits");

@@ -28,6 +28,7 @@ import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { Entrance } from "./Entrance";
 import { MoreCasesCard, OneStory } from "./OneStory";
 import { ExploreCards, OTHER_WORKFLOWS, TrialSettings } from "./GettingStartedMore";
+import { SAMPLE_REGISTER, SampleRegisterPage } from "./SampleRegister";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { DISCUSS_PILOT } from "../../shared/HelpMenu";
@@ -227,6 +228,8 @@ export function GettingStartedSection({
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
+  // W1d (D08): the sample evidence register, opened from the flagship bar and the Getting started header.
+  if (focus?.split("?")[0] === SAMPLE_REGISTER) return <SampleRegisterPage heading={heading} />;
 
   const restarted = (text: string) => {
     notify(text);

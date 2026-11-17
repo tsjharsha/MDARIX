@@ -168,13 +168,15 @@ def board(
         "scheduled": states.count(rules.SCHEDULED),
         "effective": states.count(rules.EFFECTIVE),
         "not_effective": states.count(rules.NOT_EFFECTIVE),
+        "inconclusive": states.count(rules.INCONCLUSIVE),
         "date_from_source": sum(1 for item in items if item["plan_source"] == rules.SOURCE_SYSTEM),
     }
     chosen = {
         "attention": [
             item
             for item in items
-            if item["state"] in (rules.OVERDUE, rules.DUE_SOON, rules.NOT_PLANNED, rules.NOT_EFFECTIVE)
+            if item["state"]
+            in (rules.OVERDUE, rules.DUE_SOON, rules.NOT_PLANNED, rules.NOT_EFFECTIVE, rules.INCONCLUSIVE)
         ],
         "scheduled": [item for item in items if item["state"] == rules.SCHEDULED],
         "done": [item for item in items if item["state"] in rules.RESULTS],
@@ -290,6 +292,8 @@ def detail(db: Session, control_db: Session | None, tenant_id: uuid.UUID, capa_i
     codes = problem_codes(db, capa)
     start = current.measured_from if current is not None else suggested_start(capa, today)
     planned = _day(capa.effectiveness_check_at)
+    from backend.app.trial import sample_follow_up
+
     return {
         **item,
         "excluded": rules.is_excluded(capa.status),
@@ -302,4 +306,6 @@ def detail(db: Session, control_db: Session | None, tenant_id: uuid.UUID, capa_i
         },
         "can_plan": not rules.is_excluded(capa.status) and (current is None or current.status != rules.EFFECTIVE),
         "can_sign": current is not None and current.status == rules.PLANNED,
+        # W1d (D04): the sample CAPA's labelled synthetic follow-up, once its check is planned (None elsewhere).
+        "synthetic_follow_up": sample_follow_up.for_check(db, capa, current, today),
     }

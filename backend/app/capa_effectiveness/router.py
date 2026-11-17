@@ -76,7 +76,7 @@ class ResultRequest(BaseModel):
     def _known(cls, value: str) -> str:
         result = str(value or "").strip().upper()
         if result not in rules.RESULTS:
-            raise ValueError("result must be EFFECTIVE or NOT_EFFECTIVE")
+            raise ValueError("result must be EFFECTIVE, NOT_EFFECTIVE or INCONCLUSIVE")
         return result
 
     @field_validator("summary")
@@ -126,7 +126,7 @@ def plan_check(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Plan the CAPA's effectiveness check, or change the plan of the current round (with a reason). After a
-    NOT_EFFECTIVE result this plans the next round; after EFFECTIVE the check is done."""
+    NOT_EFFECTIVE or INCONCLUSIVE result this plans the next round; after EFFECTIVE the check is done."""
     tenant_id = uuid.UUID(ctx.tenant_id)
     today = service.today_utc()
     capa = service.load_capa(db, tenant_id, capa_id, lock=True)
@@ -271,7 +271,7 @@ def sign_result(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Sign the result of the current round: EFFECTIVE or NOT_EFFECTIVE, with what the person found. The recurrence
+    """Sign the result of the current round: EFFECTIVE, NOT_EFFECTIVE or INCONCLUSIVE, with what the person found. The recurrence
     shown at that moment is kept with the result and is part of what is signed."""
     from backend.app.governance_router import verify_signing_credentials
     from backend.app.human_decision.rules import fingerprint, signature_hash
@@ -322,6 +322,12 @@ def sign_result(
     if current is None or current.status != rules.PLANNED or current.plan_version != payload.plan_version:
         raise _error(409, "PLAN_CHANGED", "The check changed a moment ago; reload and read it again")
     evidence = service.measure(db, capa, current.measured_from, today)
+    from backend.app.trial import sample_follow_up
+
+    # W1d (D04): the sample's synthetic follow-up shown on the check is part of what is signed, labelled as such.
+    follow_up = sample_follow_up.for_check(db, capa, current, today)
+    if follow_up is not None:
+        evidence = {**evidence, "synthetic_follow_up": follow_up}
     material = rules.signature_material(
         capa_id=str(capa.id),
         capa_ref=ref,

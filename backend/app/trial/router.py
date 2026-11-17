@@ -576,6 +576,23 @@ def one_story(
     return story.progress(data, db, ctx, tenant_id, request)
 
 
+@router.get("/trial/sample-register")
+def sample_register(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """W1d (D08): the sample evidence register, one page that says where each number of the flagship story comes from
+    (backend/app/trial/sample_register.py). 404 SAMPLE_NOT_FOUND once the sample is removed."""
+    from backend.app.trial import sample_register as register
+
+    _require_trial(db, ctx)
+    found = register.register(data, uuid.UUID(str(ctx.tenant_id)), datetime.now(timezone.utc).date())
+    if found is None:
+        raise HTTPException(404, detail={"code": "SAMPLE_NOT_FOUND", "message": "The sample data is not in this trial"})
+    return found
+
+
 class OneStoryMark(BaseModel):
     run: str = Field(pattern="^(sample|yours|flagship)$")
     # 0.10.93: steps 1 and 2 read the Case's records; the "call" mark is no longer kept. W1: the flagship story's

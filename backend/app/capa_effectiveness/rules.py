@@ -3,7 +3,7 @@
 Why it matters: CAPA was cited in 9 of 17 device warning letters in Q1 2026 and 5 of 12 in Q2, and closing a CAPA without
 verifying that the action worked is a recurring finding. Each CAPA here gets a check: what will show the
 action worked (the criteria), the day to check, and the day the measurement starts; a reminder before the day; and a
-result a person signs (EFFECTIVE or NOT_EFFECTIVE) with what they saw. MDARIX shows the complaint recurrence on the
+result a person signs (EFFECTIVE, NOT_EFFECTIVE or INCONCLUSIVE) with what they saw. MDARIX shows the complaint recurrence on the
 CAPA's product and problem codes before and after the action as observed counts, never as a statistical verdict; the
 person judges against the criteria.
 """
@@ -13,10 +13,12 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 PLANNED, EFFECTIVE, NOT_EFFECTIVE = "PLANNED", "EFFECTIVE", "NOT_EFFECTIVE"
-RESULTS = (EFFECTIVE, NOT_EFFECTIVE)
+# W1d (D04, tr33): the evidence may not settle it either way; like NOT_EFFECTIVE, a next round can be planned.
+INCONCLUSIVE = "INCONCLUSIVE"
+RESULTS = (EFFECTIVE, NOT_EFFECTIVE, INCONCLUSIVE)
 # How a CAPA's check stands, most urgent first.
 OVERDUE, DUE_SOON, NOT_PLANNED, SCHEDULED = "OVERDUE", "DUE_SOON", "NOT_PLANNED", "SCHEDULED"
-STATE_ORDER = {OVERDUE: 0, DUE_SOON: 1, NOT_PLANNED: 2, NOT_EFFECTIVE: 3, SCHEDULED: 4, EFFECTIVE: 5}
+STATE_ORDER = {OVERDUE: 0, DUE_SOON: 1, NOT_PLANNED: 2, NOT_EFFECTIVE: 3, INCONCLUSIVE: 4, SCHEDULED: 5, EFFECTIVE: 6}
 # The plan was made in MDARIX, or only a date came from the customer's quality system (capas.effectiveness_check_at).
 MDARIX, SOURCE_SYSTEM = "MDARIX", "SOURCE_SYSTEM"
 
@@ -36,7 +38,7 @@ CLOSED_STATUSES = frozenset({"closed", "resolved", "completed", "complete", "don
 
 # The signature: what a person signs, and the codes the signature record keeps (12 characters at most).
 DECISION_TYPE = "CAPA_EFFECTIVENESS"
-SIGNATURE_CODES = {EFFECTIVE: "EFFECTIVE", NOT_EFFECTIVE: "INEFFECTIVE"}
+SIGNATURE_CODES = {EFFECTIVE: "EFFECTIVE", NOT_EFFECTIVE: "INEFFECTIVE", INCONCLUSIVE: "INCONCLUSIVE"}
 OBJECT_TYPE = "CapaEffectivenessCheck"
 
 
@@ -54,7 +56,7 @@ def is_closed(status: object) -> bool:
 
 def state_of(check_status: str | None, planned_on: date | None, today: date) -> str:
     """How a CAPA's current check stands: its signed result, or from its planned day (none: NOT_PLANNED)."""
-    if check_status in (EFFECTIVE, NOT_EFFECTIVE):
+    if check_status in RESULTS:
         return check_status
     if planned_on is None:
         return NOT_PLANNED
@@ -120,10 +122,13 @@ def default_criteria(product_name: str | None, problem_codes: list[str], days: i
 
 
 def signature_meaning(capa_ref: str, round_number: int, result: str) -> str:
-    verdict = "effective" if result == EFFECTIVE else "not effective"
+    if result == INCONCLUSIVE:
+        verdict = "that the evidence does not yet show whether the action was effective"
+    else:
+        verdict = f"that the action was {'effective' if result == EFFECTIVE else 'not effective'}"
     return (
         f"I have reviewed effectiveness check {round_number} of {capa_ref} against its criteria and the evidence shown, "
-        f"and record that the action was {verdict}."
+        f"and record {verdict}."
     )
 
 

@@ -2,8 +2,8 @@
 
 ``capa_effectiveness_checks``: the check of one CAPA, in rounds. A round is planned (what will show the action worked,
 the day to check, and the day the measurement starts), may be re-planned with a reason while it is PLANNED, and ends
-with a signed result: EFFECTIVE or NOT_EFFECTIVE, with the person's summary and the evidence they saw (the complaint
-recurrence before and after the action). After a NOT_EFFECTIVE result a new round can be planned. The signature itself
+with a signed result: EFFECTIVE, NOT_EFFECTIVE or INCONCLUSIVE (tr33), with the person's summary and the evidence they saw (the complaint
+recurrence before and after the action). After a NOT_EFFECTIVE or INCONCLUSIVE result a new round can be planned. The signature itself
 is a signed approval record in the control database (object type ``CapaEffectivenessCheck``), referenced here.
 """
 
@@ -30,7 +30,7 @@ from backend.app.db.base import Base
 
 __all__ = ["EFFECTIVENESS_STATUSES", "CapaEffectivenessCheck"]
 
-EFFECTIVENESS_STATUSES = ("PLANNED", "EFFECTIVE", "NOT_EFFECTIVE")
+EFFECTIVENESS_STATUSES = ("PLANNED", "EFFECTIVE", "NOT_EFFECTIVE", "INCONCLUSIVE")
 
 
 class CapaEffectivenessCheck(Base):
@@ -64,7 +64,7 @@ class CapaEffectivenessCheck(Base):
             name="fk_capa_effectiveness_checks_capa",
             ondelete="CASCADE",
         ),
-        CheckConstraint("status IN ('PLANNED', 'EFFECTIVE', 'NOT_EFFECTIVE')", name="status_known"),
+        CheckConstraint("status IN ('PLANNED', 'EFFECTIVE', 'NOT_EFFECTIVE', 'INCONCLUSIVE')", name="status_known"),
         CheckConstraint("round >= 1", name="round_positive"),
         CheckConstraint("measured_from <= planned_on", name="measured_before_check"),
         CheckConstraint(

@@ -176,7 +176,7 @@ def test_the_brief_ticks_on_acceptance_and_the_decision_on_its_signature_with_mf
             "brief_version_id": brief["id"],
             "brief_content_hash": brief["content_hash"],
             "outcome": "ACCEPT_CONCLUSION",
-            "rationale": "The NovaSense sensors accepted under reduced inspection explain the pressure alarms.",
+            "rationale": "The evidence shows a time and lot association after the supplier and inspection changes. We will start a CAPA and verify the supplier and inspection controls. The cause is not yet confirmed.",
             "root_cause_attribution": "DEVICE_RELATED",
             "root_cause_category": "MATERIAL",
             "residual_unknowns_acknowledged": True,

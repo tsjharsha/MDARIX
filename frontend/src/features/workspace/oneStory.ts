@@ -80,7 +80,15 @@ export type FlagshipRun = {
   };
   investigation: { id: string; ref: string; question: string };
   change: { ref: string; description: string } | null;
-  capa: { id: string; ref: string; title: string; check_planned: boolean; check_status: string | null } | null;
+  capa: {
+    id: string;
+    ref: string;
+    title: string;
+    check_planned: boolean;
+    check_status: string | null;
+    /** W1d: the synthetic follow-up is ready on the planned check. */
+    follow_up?: boolean;
+  } | null;
   branch: { complaint_id: string; ref: string } | null;
   ai_proposals: number;
   mfa_verified: boolean | null;
@@ -350,6 +358,30 @@ export function openFlagshipStep(
     : null;
   if (place.caseId) setCase?.(place.caseId, place.productId);
   open(place.section, place.tab);
+}
+
+const RESULT_WORDS: Record<string, string> = {
+  EFFECTIVE: "effective",
+  NOT_EFFECTIVE: "not effective",
+  INCONCLUSIVE: "inconclusive",
+};
+
+/** "Did it work?" from the records: the signed result, else too early (a person signs it, never MDARIX). */
+export function didItWorkLine(capa: FlagshipRun["capa"]): string {
+  const word = RESULT_WORDS[capa?.check_status ?? ""];
+  return word
+    ? `Did it work? Signed: ${word}`
+    : "Did it work? Too early: only a signed effectiveness check says an action worked";
+}
+
+/** W1d (D04): step 7's effectiveness journey, planned -> synthetic follow-up -> signed, each read from the records. */
+export function effectivenessStages(capa: FlagshipRun["capa"]): { label: string; done: boolean }[] {
+  const signed = RESULT_WORDS[capa?.check_status ?? ""];
+  return [
+    { label: "Check planned", done: !!capa?.check_planned },
+    { label: "Synthetic follow-up (sample) to review", done: !!capa?.follow_up || !!signed },
+    { label: signed ? `Signed by a person: ${signed}` : "Result signed by a person", done: !!signed },
+  ];
 }
 
 /** "Step 4 of 7", or "All seven steps done" (W1). */

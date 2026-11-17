@@ -1,6 +1,7 @@
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, ListChecks } from "lucide-react";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { LOT_005_LINE, flagshipCount, openFlagshipStep, useOneStory, type FlagshipRun } from "../oneStory";
+import { REGISTER_LINK, SAMPLE_REGISTER } from "./SampleRegister";
 
 /** The bar's words (exported for its test): product · version · case · step, or the optional branch. */
 export function flagshipBarParts(run: FlagshipRun, branch = false): string[] {
@@ -45,6 +46,11 @@ export function FlagshipBar({ section, branch = false }: { section: string; bran
               }
             >
               Next: {run.steps[run.current].label} <ChevronRight size={14} aria-hidden="true" />
+            </button>
+          )}
+          {!branch && (
+            <button type="button" className="ac-link" onClick={() => open("Getting started", SAMPLE_REGISTER)}>
+              <ListChecks size={14} aria-hidden="true" /> {REGISTER_LINK}
             </button>
           )}
           <button type="button" className="ac-link" onClick={() => open("Getting started")}>
