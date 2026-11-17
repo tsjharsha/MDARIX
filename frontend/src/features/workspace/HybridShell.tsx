@@ -600,10 +600,11 @@ export const sectionIcon = (section: string): LucideIcon =>
 
 /** The rail's groups (the hero design): the work, then the plan; Getting started heads it and Next steps is pinned at
  * its foot. */
+// Investigations before Reports: the work runs from investigation to the report (owner, 17 Nov 2026).
 export const RAIL_GROUPS: ReadonlyArray<{ label: string; tabs: readonly string[] }> = [
   {
     label: "Work",
-    tabs: ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records"],
+    tabs: ["home", "complaints", "trees", "investigations", "reports", "trends", "products", "records"],
   },
   { label: "Plan", tabs: ["team", "ahead"] },
 ];
