@@ -33,17 +33,17 @@ OBSERVATIONS = (
     (
         "SAMPLE-EV-002",
         "Two of 13 sampled sensors in lot 003 (about 15%) and one in lot 004 read 4-6% high at the upper pressure "
-        "range; the Precision Sensors lots 001-002 show none. (Sample AI proposal)",
+        "range; the Precision Sensors lots 001-002 show none. (Sample)",
     ),
     (
         "SAMPLE-EV-003",
         "Pressure-alarm complaints rose about sevenfold after Rev B (0.8 to 5.6 per month), mostly from lots 003 and "
-        "004. (Sample AI proposal)",
+        "004. (Sample)",
     ),
 )
 HYPOTHESIS = (
     "Cutting incoming inspection from 32 to 13 sensors per lot let out-of-range NovaSense sensors into lots 003 and "
-    "004: the inspection change, not only the new supplier, contributed to the alarms. (Sample AI proposal)"
+    "004: the inspection change, not only the new supplier, contributed to the alarms. (Sample)"
 )
 CATEGORY = "PROCESS"
 # (evidence, relation, why): for and against.

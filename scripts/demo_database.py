@@ -207,10 +207,11 @@ def reset(name: str) -> dict:
     finally:
         admin.dispose()
     copied_s = time.monotonic() - started
-    from backend.app.db.session import SessionLocal, engine
+    from backend.app.db.session import SessionLocal, engine, runtime_engine
     from backend.app.db.tenant_scope import bind_system
 
-    engine.dispose()  # pooled connections died with the old database
+    for pool in (engine, runtime_engine):
+        pool.dispose()  # pooled connections died with the old database
     db = SessionLocal()
     bind_system(db, "reset the WHIF demo database")
     try:
