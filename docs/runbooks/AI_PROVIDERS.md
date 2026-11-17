@@ -214,6 +214,48 @@ then restart the API. `tests/test_ai_r_zero_calls.py` proves each level gives ze
   terms, privacy policy and sub-processor list updated (they promise AI off in trials today); the production pause
   lifted for installing FreeLLMAPI beside MDARIX (loopback only, pinned version).
 
+## Trial AI gateways on the server
+
+FreeLLMAPI (3011) and OmniRoute (20128) run on the VM itself, bound to the host's `127.0.0.1`, and MDARIX calls them
+only at `http://127.0.0.1:3011` and `http://127.0.0.1:20128` (the staging and production loopback check is unchanged).
+Inside a container `127.0.0.1` is the container, so `docker-compose.prod.yml` adds three small forwarders
+(`scripts/ai_loopback_forwarder.py`, 64 MB each, no published ports):
+
+- `ai-loopback-api` and `ai-loopback-background` share the network namespace of `api` and `background` and listen on
+  their `127.0.0.1:3011` and `:20128` only.
+- They pass each connection to `10.99.211.1`, the gateway address of the `ai-host` network (`10.99.211.0/29`, host
+  bridge `mdarix-ai`), where `ai-host-bridge` (host network) listens, and only there, never on `0.0.0.0` or a public
+  address. It passes the connection on to the gateway on the host's `127.0.0.1`.
+- Without the gateways everything still starts: each call is closed at once (the forwarder logs "not reachable") and
+  the trial chain moves on. The gateways may start before or after the stack; nothing is cached between connections.
+
+Firewall: never open 3011 or 20128 on the VM's firewall or the cloud firewall. The host firewall must let the
+`mdarix-ai` bridge reach the forwarder (with `ufw`'s default deny the calls are dropped otherwise):
+
+```bash
+sudo ufw allow in on mdarix-ai to 10.99.211.1 port 3011,20128 proto tcp
+# Oracle images without ufw (STAGING_ORACLE.md section 3.1): above the REJECT line N, then save the rules as there
+sudo iptables -I INPUT N -i mdarix-ai -d 10.99.211.1 -p tcp -m multiport --dports 3011,20128 -j ACCEPT
+```
+
+Smoke check, from inside the API container (any HTTP status, 401 included, means the gateway answered):
+
+```bash
+docker compose exec api python -c "
+import urllib.error, urllib.request
+for port in (3011, 20128):
+    try:
+        status = urllib.request.urlopen(f'http://127.0.0.1:{port}/v1/models', timeout=5).status
+    except urllib.error.HTTPError as error:
+        status = error.code
+    print(port, status)"
+```
+
+If it fails: `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3011/v1/models` on the host (gateway running?);
+`docker compose logs ai-host-bridge ai-loopback-api` ("not reachable" names the hop that failed); the firewall rule
+above; `docker compose ps` shows `ai-loopback-*` unhealthy after `api` or `background` restarted on its own, then
+`docker compose up -d --force-recreate ai-loopback-api ai-loopback-background`. Repeat the check with `background`.
+
 ## Refusals people see
 
 When no model may answer, MDARIX answers from rules and says why with a stable code

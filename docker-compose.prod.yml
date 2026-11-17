@@ -45,6 +45,38 @@ x-app: &app
   networks: [internal]
   logging: *logging
 
+# The trial AI gateways (FreeLLMAPI 3011, OmniRoute 20128) run on the host, bound to its 127.0.0.1, and MDARIX calls
+# them only at 127.0.0.1 (genai/provider.py). scripts/ai_loopback_forwarder.py carries those two ports from the API's
+# and the background service's own 127.0.0.1 to the host's: ai-loopback-api and ai-loopback-background share each
+# container's network namespace, ai-host-bridge listens on the ai-host gateway address only (docs/runbooks/
+# AI_PROVIDERS.md, "Trial AI gateways on the server"). Without the gateways each call is refused and the chain moves on.
+x-ai-forwarder: &ai-forwarder
+  image: ${MDARIX_IMAGE_REPOSITORY:-mdarix}/api:${MDARIX_RELEASE:-latest}
+  restart: unless-stopped
+  read_only: true
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  mem_limit: 64m
+  cpus: 0.25
+  logging: *logging
+  command:
+    - python
+    - scripts/ai_loopback_forwarder.py
+    - --forward
+    - 3011=10.99.211.1:3011
+    - --forward
+    - 20128=10.99.211.1:20128
+  # The image's own check (the API on :8000) does not apply. A route to the ai-host gateway (no packet is sent) proves
+  # the namespace is still the app container's: when that container restarts, the sidecar keeps the old one and turns
+  # unhealthy until it is recreated (docker compose up -d --force-recreate ai-loopback-api ai-loopback-background).
+  healthcheck:
+    test: ["CMD", "python", "-c", "import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).connect(('10.99.211.1', 9))"]
+    interval: 30s
+    timeout: 5s
+    retries: 2
+
 services:
   web:
     build:
@@ -160,6 +192,7 @@ services:
 
   api:
     <<: *app
+    networks: [internal, ai-host]
     volumes:
       - objects:/var/lib/mdarix/objects
       - reports:/var/lib/mdarix/reports
@@ -187,6 +220,7 @@ services:
   background:
     <<: *app
     command: ["python", "scripts/run_background.py"]
+    networks: [internal, ai-host]
     volumes:
       - objects:/var/lib/mdarix/objects
       - reports:/var/lib/mdarix/reports
@@ -217,6 +251,39 @@ services:
     cpu_shares: 256
     depends_on:
       migrate: {condition: service_completed_successfully}
+
+  ai-loopback-api:
+    <<: *ai-forwarder
+    network_mode: "service:api"
+    depends_on:
+      api: {condition: service_started}
+
+  ai-loopback-background:
+    <<: *ai-forwarder
+    network_mode: "service:background"
+    depends_on:
+      background: {condition: service_started}
+
+  # In the host's network namespace: listens on the ai-host gateway address only (a private address on the host's own
+  # bridge, mdarix-ai) and passes each connection to the gateway on the host's 127.0.0.1. The host firewall must let
+  # mdarix-ai reach 10.99.211.1:3011 and :20128 and must never open those ports on a public interface.
+  ai-host-bridge:
+    <<: *ai-forwarder
+    network_mode: host
+    command:
+      - python
+      - scripts/ai_loopback_forwarder.py
+      - --listen
+      - 10.99.211.1
+      - --forward
+      - 3011=127.0.0.1:3011
+      - --forward
+      - 20128=127.0.0.1:20128
+    # The address exists once ai-host does; a process that exits is restarted (restart: unless-stopped).
+    healthcheck:
+      disable: true
+    depends_on:
+      api: {condition: service_started}
 
   # B7b e-mail intake (backend/app/mail_in/receiver.py): an SMTP receiver for the intake subdomain, inbound only (it
   # never sends). OFF until operations has opened inbound port 25, added the MX record and a certificate: it starts
@@ -301,6 +368,15 @@ services:
 
 networks:
   internal: {}
+  # Only for the trial AI gateways (ai-host-bridge). A fixed, unlikely private range outside Docker's default pools
+  # (172.17-31.x, 192.168.x) and the usual cloud VPC ranges; the bridge has a fixed name for the firewall rule.
+  ai-host:
+    driver_opts:
+      com.docker.network.bridge.name: mdarix-ai
+    ipam:
+      config:
+        - subnet: 10.99.211.0/29
+          gateway: 10.99.211.1
 
 volumes:
   caddy_data: {}

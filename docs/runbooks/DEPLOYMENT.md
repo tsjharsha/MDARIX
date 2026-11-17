@@ -64,6 +64,8 @@ sudo systemctl restart ssh
 # rules of section 1 as the outer layer, because Docker's port publishing bypasses ufw).
 sudo ufw default deny incoming && sudo ufw allow from <office/VPN CIDR> to any port 22 proto tcp
 sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw enable
+# Trial AI gateways only (AI_PROVIDERS.md, "Trial AI gateways on the server"); 3011/20128 are never opened publicly:
+sudo ufw allow in on mdarix-ai to 10.99.211.1 port 3011,20128 proto tcp
 sudo systemctl enable --now fail2ban chrony          # SSH brute-force bans; NTP (TOTP codes and TLS need the time)
 # 4 GB swap, so a memory spike slows a service down instead of the kernel killing it.
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
