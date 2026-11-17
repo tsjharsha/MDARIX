@@ -24,6 +24,12 @@ BUDGET = {
     "/api/v1/trial/one-story": 140,
     "/api/v1/trial/story": 125,
     "/api/v1/reports": 75,
+    # W5: the Product Lifecycle Twin's reads as whole requests (sign-in and session reads included; 32, 31, 23 and 18
+    # measured, plus about 10%). The reads' own budgets (spec 6: 30, 25, 12, 8) are in tests/test_w5_twin.py.
+    "/api/v1/products/SAMPLE-ORBIT-300/twin?version=Rev B": 36,
+    "/api/v1/products/SAMPLE-ORBIT-300/change-impact?change=SAMPLE-CHG-014": 34,
+    "/api/v1/field-scope?kind=COMPONENT_LOT&ref=SAMPLE-ORBIT-300-C1&lot=NS-SL-2417 (Sample)": 26,
+    "/api/v1/data/import/sources": 20,
 }
 
 
