@@ -60,9 +60,10 @@ export function errorMessageFrom(payload: unknown, status: number): string {
   const detail = (payload as { detail?: unknown } | null)?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
   if (Array.isArray(detail)) {
-    // Request validation (422): one line per field, named by the last part of its location.
+    // Request validation (422): one line per field; the server's plain-English `message` when it sends one.
     const lines = detail
       .map((item) => {
+        if (typeof item?.message === "string" && item.message.trim()) return item.message;
         const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : undefined;
         const text = typeof item?.msg === "string" ? item.msg : "";
         return text ? (typeof field === "string" ? `${field.replace(/_/g, " ")}: ${text}` : text) : "";
@@ -167,7 +168,11 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         const detail = (payload as { detail?: { code?: unknown } } | null)?.detail;
-        const code = detail && typeof detail === "object" && !Array.isArray(detail) ? detail.code : undefined;
+        // A 422 carries its code (INVALID_INPUT) beside the list of field errors.
+        const code =
+          detail && typeof detail === "object" && !Array.isArray(detail)
+            ? detail.code
+            : (payload as { code?: unknown } | null)?.code;
         const codeText = typeof code === "string" ? code : undefined;
         const error = new ApiError(
           errorMessageFrom(payload, response.status),

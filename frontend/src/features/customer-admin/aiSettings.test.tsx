@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MASKING_SUMMARY,
   aiAcknowledgement,
@@ -7,8 +7,9 @@ import {
   aiSettingsPayload,
   featureLock,
   providerLabel,
+  withLockVersion,
 } from "./aiSettings";
-import { AiFeatures } from "./sections/Security";
+import { AiFeatures, saveAiSettings } from "./sections/Security";
 import { ConfirmDialog } from "./shared";
 
 describe("AI processing switch", () => {
@@ -117,5 +118,37 @@ describe("re-authentication and per-feature switches (C6, C12)", () => {
     );
     expect(html).toContain("Off · Not offered");
     expect(html).toContain("Off · turn on");
+  });
+});
+
+describe("a change tied to the settings' version (D3)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("sends the version the screen read, and nothing for an older server", () => {
+    const change = aiSettingsPayload(false, "Pausing AI for the review", false);
+    expect(withLockVersion(change, 4)).toEqual({ ...change, lock_version: 4 });
+    expect(withLockVersion(change, null)).toEqual(change);
+    expect(withLockVersion(change, 0).lock_version).toBe(0);
+  });
+  it("loads the current settings and shows the server's words when someone changed them meanwhile (409)", async () => {
+    const body = { detail: { code: "STALE_RECORD", message: "Someone changed the AI settings since you opened them" } };
+    const fetch = vi.fn(async () => new Response(JSON.stringify(body), { status: 409 }));
+    vi.stubGlobal("window", {
+      location: { pathname: "/app/settings", search: "", replace: vi.fn() },
+      setTimeout,
+      clearTimeout,
+    });
+    vi.stubGlobal("fetch", fetch);
+    const reload = vi.fn();
+    await expect(
+      saveAiSettings({ ai_processing_allowed: false, reason: "Pausing AI", lock_version: 3 }, reload),
+    ).rejects.toMatchObject({ status: 409, code: "STALE_RECORD", message: body.detail.message });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse(
+        String((fetch.mock.calls[0] as unknown[])[1] && ((fetch.mock.calls[0] as unknown[])[1] as RequestInit).body),
+      ),
+    ).toMatchObject({
+      lock_version: 3,
+    });
   });
 });

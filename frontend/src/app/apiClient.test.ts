@@ -154,6 +154,23 @@ describe("error messages", () => {
         422,
       ),
     ).toBe("Check the form: summary: String should have at most 200 characters.");
+    // The server's plain-English message per error wins over pydantic's own text.
+    expect(
+      errorMessageFrom(
+        {
+          detail: [
+            {
+              loc: ["body", "summary"],
+              msg: "String should have at most 200 characters",
+              message: "summary: is too long (at most 200 characters)",
+            },
+          ],
+          code: "INVALID_INPUT",
+          message: "summary: is too long (at most 200 characters)",
+        },
+        422,
+      ),
+    ).toBe("Check the form: summary: is too long (at most 200 characters).");
     expect(errorMessageFrom(null, 500)).toBe("The request could not be completed (error 500).");
     expect(errorMessageFrom({ detail: { code: "ONLY_CODE" } }, 404)).toBe(
       "This item was not found in your organization.",

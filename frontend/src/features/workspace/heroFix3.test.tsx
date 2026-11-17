@@ -6,7 +6,7 @@ import { TRIAL_AI_TAB } from "./sections/TrialAi";
 import { aiStatusBanner } from "./intelligence";
 import { ConsentNotice } from "../shared/ConsentBanner";
 import { AuditTab, SignaturesView } from "./sections/AuditTab";
-import { EvidencePackCard, LatestSignatures, trainingWords } from "./sections/TrustRecords";
+import { EvidencePackCard, LatestSignatures, integrityBadge, trainingWords } from "./sections/TrustRecords";
 import { NEW_HEADS } from "./UserWorkspace";
 import { Tabs } from "../customer-admin/shared";
 import { SignupForm, TRIAL_AI_LINE } from "../auth/SignupForm";
@@ -168,6 +168,33 @@ describe("F-E1 to F-E6: records an inspector can trust", () => {
     expect(html).toContain("Authenticator code checked");
     expect(html).toContain("Trained · 1 current document");
     expect(trainingWords([{ code: "SOP-01", current: false }])).toBe("Training out of date: SOP-01");
+    // Every kind of signature is listed; only decisions are checked here (fingerprint_ok null for the others).
+    resources.data["/api/v1/governance/signed-records"] = {
+      items: [
+        {
+          signature_id: "s2",
+          business_id: "SIG-2",
+          object_type: "TriageRecord",
+          record_label: "Triage",
+          decision_id: null,
+          fingerprint_ok: null,
+        },
+        {
+          signature_id: "s3",
+          decision_business_id: "DEC000012",
+          object_type: "Decision",
+          record_label: "Decision",
+          fingerprint_ok: false,
+        },
+      ],
+    };
+    const mixed = render(api([]), <LatestSignatures />);
+    expect(mixed).toContain("1 changed since signing");
+    expect(mixed).toContain("SIG-2");
+    expect(mixed).toContain("Triage");
+    expect(mixed).toContain("Checked on its own record");
+    expect(integrityBadge(null).tone).toBe("neutral");
+    expect(integrityBadge(true).label).toBe("Unchanged");
     const one = renderToStaticMarkup(
       <SignaturesView
         verification={{

@@ -294,6 +294,10 @@ describe("the signature request", () => {
     expect(wrong).toEqual({ text: "The password is not correct.", reload: false, credentials: true });
     const code = signErrorView(new ApiError("That code didn't match.", 403, "SIGNATURE_CODE_INVALID"));
     expect(code).toEqual({ text: "That code didn't match.", reload: false, credentials: true });
+    // The code typed at sign-in, typed again: refused, not counted as a wrong guess; ask for the next code.
+    const reused = signErrorView(new ApiError("x", 403, "SIGNATURE_CODE_ALREADY_USED"));
+    expect(reused.credentials).toBe(true);
+    expect(reused.text).toMatch(/just used.*next code/);
     expect(signErrorView(new ApiError("x", 403, "SIGNATURE_MFA_NOT_SET_UP")).text).toMatch(/authenticator app/);
     expect(signErrorView(new Error("boom")).text).toBe("boom");
   });

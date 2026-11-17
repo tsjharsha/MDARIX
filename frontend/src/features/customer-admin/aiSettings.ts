@@ -13,6 +13,8 @@ export type AiSettingsChange = {
   features?: Record<string, boolean>;
   password?: string;
   mfa_code?: string;
+  /** The settings' version as read: a change by someone else since then is refused (409 STALE_RECORD). */
+  lock_version?: number;
 };
 
 /** Signature-grade re-authentication: the customer administrator's password and authenticator code (C6). */
@@ -40,6 +42,11 @@ export function aiSettingsPayload(
     ...(trial ? { trial_acknowledgement: true as const } : {}),
     ...proofOf(proof),
   };
+}
+
+/** The change, tied to the settings' version the screen read (older servers send none, so nothing is added). */
+export function withLockVersion(change: AiSettingsChange, lockVersion?: number | null): AiSettingsChange {
+  return typeof lockVersion === "number" ? { ...change, lock_version: lockVersion } : change;
 }
 
 /** One AI feature on or off; AI processing itself keeps its current state. Turning a feature on re-authenticates. */

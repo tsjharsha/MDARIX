@@ -7,8 +7,11 @@ import {
   aiSettingsPayload,
   featureLock,
   providerLabel,
+  withLockVersion,
   type AiFeature,
+  type AiSettingsChange,
 } from "../aiSettings";
+import { ApiError } from "../../../app/apiClient";
 import { BadgeCheck, Bot, Gauge } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { TwoFactorPanel } from "../../shared/TwoFactorSettings";
@@ -135,9 +138,23 @@ export type AiSettings = {
   /** Whether the switch can be moved now, and why not (a free trial before its AI services are set; newer servers). */
   can_change?: boolean;
   can_change_reason?: string | null;
+  /** The settings' version, sent back with a change (409 STALE_RECORD when someone changed them meanwhile). */
+  lock_version?: number | null;
 };
 
 export const AI_SETTINGS_PATH = "/api/v1/admin/ai-settings";
+
+/** Saves a change and shows the current settings; on 409 STALE_RECORD (changed by someone else meanwhile) the
+ * current settings are loaded too and the dialog shows the server's "refresh and try again". */
+export async function saveAiSettings(change: AiSettingsChange, reload: () => void) {
+  try {
+    await send(AI_SETTINGS_PATH, "PUT", change);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "STALE_RECORD") reload();
+    throw error;
+  }
+  reload();
+}
 // A free trial's AI goes through the trial's own services: named in general words, never by provider.
 const TRIAL_SERVICES = "the free trial AI services";
 
@@ -177,12 +194,13 @@ export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
           }),
       done: on ? "AI processing is off for your organization." : "AI processing is on for your organization.",
       run: async (reason, password, acknowledged, mfaCode) => {
-        await send(
-          "/api/v1/admin/ai-settings",
-          "PUT",
-          aiSettingsPayload(!on, reason, acknowledged, on ? undefined : { password, mfaCode }, trial),
+        await saveAiSettings(
+          withLockVersion(
+            aiSettingsPayload(!on, reason, acknowledged, on ? undefined : { password, mfaCode }, trial),
+            data?.lock_version,
+          ),
+          settings.reload,
         );
-        settings.reload();
       },
     });
   const switchFeature = (feature: AiFeature) =>
@@ -196,18 +214,19 @@ export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
       ...(feature.enabled ? {} : { password: true, mfaCode: true }),
       done: feature.enabled ? `${feature.label} is off.` : `${feature.label} is on.`,
       run: async (reason, password, _acknowledged, mfaCode) => {
-        await send(
-          "/api/v1/admin/ai-settings",
-          "PUT",
-          aiFeaturePayload(
-            on,
-            feature.key,
-            !feature.enabled,
-            reason,
-            feature.enabled ? undefined : { password, mfaCode },
+        await saveAiSettings(
+          withLockVersion(
+            aiFeaturePayload(
+              on,
+              feature.key,
+              !feature.enabled,
+              reason,
+              feature.enabled ? undefined : { password, mfaCode },
+            ),
+            data?.lock_version,
           ),
+          settings.reload,
         );
-        settings.reload();
       },
     });
   return (

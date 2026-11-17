@@ -100,6 +100,42 @@ const FILTERS: [string, string][] = [
 export const TRIAL_REQUEST_SORT_KEYS = ["business_id", "organization", "requester", "requested"] as const;
 
 /** The queue request for one tab's page: its status, page, order and search (company, requester, email, ID). */
+/**
+ * A background approval (POST approve?background=true answers 202 APPROVING at once): reads the request until it is no
+ * longer waiting for review. Returns the reviewed row, or null when it still waits after the last try: the approval
+ * failed and nothing was saved (the server logs why), so the request can be approved again.
+ */
+export async function waitForApproval(
+  row: { id: string; email: string },
+  read: (path: string) => Promise<{ items: TrialRequest[] }> = (path) => requestJson(path),
+  pause: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  tries = 30,
+): Promise<TrialRequest | null> {
+  const path = `/api/v1/platform-admin/trial-requests?${new URLSearchParams({ q: row.email })}`;
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    await pause(2000);
+    const found = (await read(path)).items.find((item) => item.id === row.id);
+    if (found && found.status !== "PENDING_REVIEW") return found;
+  }
+  return null;
+}
+
+/** What the reviewer sees once a background approval is done, from the approved request row. */
+export function approvedResult(row: TrialRequest): { tone: "good" | "bad"; text: string } {
+  const created = `Trial workspace ${row.tenant_key ?? ""} created for ${row.organization}. `;
+  if (row.invitation_delivery === "SENT")
+    return { tone: "good", text: `${created}Invitation emailed to ${row.email}.` };
+  if (row.invitation_delivery === "NOT_CONFIGURED")
+    return {
+      tone: "good",
+      text: `${created}Email is not configured on this server: use Resend invitation to get ${row.email}'s activation link.`,
+    };
+  return {
+    tone: "bad",
+    text: `${created}The invitation email to ${row.email} could not be sent. Fix the email settings, then use Resend invitation.`,
+  };
+}
+
 export function trialRequestsPath({
   status,
   page,
@@ -170,27 +206,51 @@ export function TrialRequestsWorkspace() {
     setBusy(row.id);
     setResult(null);
     try {
+      if (path === "approve") {
+        // The sample story is about a thousand rows: approve in the background and follow the request list.
+        await requestJson(`/api/v1/platform-admin/trial-requests/${row.id}/approve?background=true`, {
+          method: "POST",
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        });
+        setResult({
+          tone: "good",
+          text: `Approving ${row.organization}: creating the workspace and its sample story�`,
+        });
+        setConfirming(null);
+        const done = await waitForApproval(row);
+        setResult(
+          done === null
+            ? {
+                tone: "bad",
+                text: `The approval of ${row.organization} did not complete; nothing was saved. Try Approve again.`,
+              }
+            : done.status === "APPROVED"
+              ? approvedResult(done)
+              : { tone: "bad", text: `${row.organization} is now ${done.status.toLowerCase()}.` },
+        );
+        load();
+        return;
+      }
       const data = await requestJson<ReviewResult>(`/api/v1/platform-admin/trial-requests/${row.id}/${path}`, {
         method: "POST",
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       const link = data.activation_path ? `${window.location.origin}${data.activation_path}` : undefined;
       const sent = data.email_delivery === "SENT";
-      const created = path === "approve" ? `Trial workspace ${data.tenant_key} created for ${row.organization}. ` : "";
       setResult(
         path === "decline"
           ? { tone: "good", text: `Declined ${row.organization}.` }
           : sent
-            ? { tone: "good", text: `${created}Invitation emailed to ${row.email}.` }
+            ? { tone: "good", text: `Invitation emailed to ${row.email}.` }
             : link
               ? {
                   tone: "good",
-                  text: `${created}Email is not configured on this development server. Send ${row.email} this one-time activation link (valid 48 hours):`,
+                  text: `Email is not configured on this development server. Send ${row.email} this one-time activation link (valid 48 hours):`,
                   link,
                 }
               : {
                   tone: "bad",
-                  text: `${created}The invitation email to ${row.email} could not be sent${
+                  text: `The invitation email to ${row.email} could not be sent${
                     data.email_error ? `: ${data.email_error}` : "."
                   } Fix the email settings, then use Resend invitation.`,
                 },

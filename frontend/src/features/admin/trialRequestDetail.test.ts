@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { legalAcceptanceLines, requestLines, reviewLines } from "./TrialRequestsWorkspace";
+import {
+  approvedResult,
+  legalAcceptanceLines,
+  requestLines,
+  reviewLines,
+  waitForApproval,
+} from "./TrialRequestsWorkspace";
 
 // 0.10.41 (DEV-027): Platform Admin > Onboarding shows the acceptance time in UTC, each text's full fingerprint and
 // who approved the trial and when, from what the request already records.
@@ -57,5 +63,39 @@ describe("a trial request's review detail", () => {
       "Accepted",
       "Approved",
     ]);
+  });
+});
+
+describe("a background trial approval", () => {
+  const row = { id: "r1", email: "a@example.com" };
+  const base = { organization: "Acme", tenant_key: "acme", email: "a@example.com" };
+  it("follows the request list until it is approved", async () => {
+    const pages = [[{ ...base, id: "r1", status: "PENDING_REVIEW" }], [{ ...base, id: "r1", status: "APPROVED" }]];
+    const paths: string[] = [];
+    const done = await waitForApproval(
+      row,
+      async (path) => {
+        paths.push(path);
+        return { items: pages.shift() as never };
+      },
+      async () => {},
+    );
+    expect(done?.status).toBe("APPROVED");
+    expect(paths[0]).toContain("q=a%40example.com");
+  });
+  it("gives up when the request still waits for review (the approval failed, nothing saved)", async () => {
+    const done = await waitForApproval(
+      row,
+      async () => ({ items: [{ ...base, id: "r1", status: "PENDING_REVIEW" } as never] }),
+      async () => {},
+      3,
+    );
+    expect(done).toBeNull();
+  });
+  it("words the invitation outcome", () => {
+    const approved = { ...base, id: "r1", status: "APPROVED" } as never as Parameters<typeof approvedResult>[0];
+    expect(approvedResult({ ...approved, invitation_delivery: "SENT" }).text).toMatch(/Invitation emailed/);
+    expect(approvedResult({ ...approved, invitation_delivery: "NOT_CONFIGURED" }).text).toMatch(/Resend invitation/);
+    expect(approvedResult({ ...approved, invitation_delivery: "FAILED" }).tone).toBe("bad");
   });
 });

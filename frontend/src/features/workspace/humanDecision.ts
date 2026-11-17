@@ -755,7 +755,17 @@ export function signErrorView(error: unknown): { text: string; reload: boolean; 
   if (known && reloads[known]) return { text: reloads[known], reload: true, credentials: false };
   if (known && refusals[known]) return { text: refusals[known], reload: false, credentials: false };
   // A wrong password or code (401, or 403 about the second factor): the server's own words.
-  const credentials = status === 401 || known === "SIGNATURE_CODE_INVALID" || known === "INVALID_REAUTHENTICATION";
+  const credentials =
+    status === 401 ||
+    known === "SIGNATURE_CODE_INVALID" ||
+    known === "SIGNATURE_CODE_ALREADY_USED" ||
+    known === "INVALID_REAUTHENTICATION";
+  if (known === "SIGNATURE_CODE_ALREADY_USED")
+    return {
+      text: "This code was just used. Wait for the next code from your authenticator app, then sign again.",
+      reload: false,
+      credentials,
+    };
   return { text: describeError(error, "The decision was not signed."), reload: false, credentials };
 }
 

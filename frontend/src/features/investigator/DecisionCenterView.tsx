@@ -538,6 +538,8 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
           DUPLICATE_SIGNATURE: "This decision version has already been signed.",
           SOD_DENIED: "The decision creator cannot sign their own decision. Use a different authorized approver.",
           SIGNATURE_CODE_INVALID: "That code didn't match. Enter the current 6-digit code from your authenticator app.",
+          SIGNATURE_CODE_ALREADY_USED:
+            "This code was just used. Wait for the next code from your authenticator app, then sign again.",
           SIGNATURE_MFA_NOT_SET_UP:
             "Signing needs multi-factor authentication. Set up your authenticator app under My Account first.",
           SIGNATURE_TEMPORARILY_LOCKED: "Too many failed attempts. Signing is locked for 15 minutes for your account.",

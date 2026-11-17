@@ -40,6 +40,10 @@ export const signerProofColumns = [
 
 type SignedItem = {
   signature_id: string;
+  business_id?: string | null;
+  /** What was signed: Decision, TriageRecord, ReportSnapshot... and the same in words ("Triage"). */
+  object_type?: string | null;
+  record_label?: string | null;
   decision_business_id?: string | null;
   decision?: string | null;
   signer_name?: string | null;
@@ -48,15 +52,26 @@ type SignedItem = {
   signed_at?: string | null;
   mfa_verified?: boolean | null;
   training?: TrainingDoc[];
-  fingerprint_ok?: boolean;
+  /** Checked now for decisions; null for the other kinds, which their own screens verify. */
+  fingerprint_ok?: boolean | null;
 };
+
+/** A signature's integrity in words: only a decision is checked on this list (null: verified on its own screen). */
+export function integrityBadge(value: boolean | null | undefined): {
+  tone: "good" | "critical" | "neutral";
+  label: string;
+} {
+  if (value === true) return { tone: "good", label: "Unchanged" };
+  if (value === false) return { tone: "critical", label: "Changed since signing" };
+  return { tone: "neutral", label: "Checked on its own record" };
+}
 
 /** The organization's latest signatures, each checked now against what was signed (F-E2). */
 export function LatestSignatures() {
   const signed = useResource<{ items: SignedItem[] }>("/api/v1/governance/signed-records");
   const items = signed.data?.items ?? [];
   if (signed.state !== "ready" || !items.length) return null;
-  const changed = items.filter((item) => !item.fingerprint_ok).length;
+  const changed = items.filter((item) => item.fingerprint_ok === false).length;
   return (
     <Panel eyebrow="Checked now" title="Latest signed records">
       <p className="uw-seal" role="status">
@@ -75,15 +90,15 @@ export function LatestSignatures() {
         rowKey={(row) => row.signature_id}
         pageSize={10}
         pageNoun="signature"
-        empty={{ title: "No signed record yet", detail: "Signed decisions appear here." }}
+        empty={{ title: "No signed record yet", detail: "Signed records appear here." }}
         columns={[
           {
             key: "what",
             label: "Record",
             render: (row) => (
               <span className="cc-trial-org">
-                <strong>{row.decision_business_id ?? "Decision"}</strong>
-                <small>{titleCase(String(row.decision ?? ""))}</small>
+                <strong>{row.decision_business_id ?? row.business_id ?? row.record_label ?? "Decision"}</strong>
+                <small>{[row.record_label, titleCase(String(row.decision ?? ""))].filter(Boolean).join(" � ")}</small>
               </span>
             ),
           },
@@ -103,12 +118,7 @@ export function LatestSignatures() {
           {
             key: "valid",
             label: "Integrity",
-            render: (row) => (
-              <ToneBadge
-                tone={row.fingerprint_ok ? "good" : "critical"}
-                label={row.fingerprint_ok ? "Unchanged" : "Changed since signing"}
-              />
-            ),
+            render: (row) => <ToneBadge {...integrityBadge(row.fingerprint_ok)} />,
           },
         ]}
       />
