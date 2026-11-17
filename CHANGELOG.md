@@ -10,35 +10,6 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
-### Unreleased: WHIF push 2 (free-trial line `release/0.10`; release number to be set by the owner)
-
-Brings in the backend fix pass of the WHIF hero review, makes the screens match it, and fixes the release blockers of
-the independent backend/AI review (G1-G15). No new migration (one head, `tr32aiready`). The API, web and compose files
-change.
-
-- Production: the API and background containers reach the trial AI gateways (FreeLLMAPI, OmniRoute) at their own
-  127.0.0.1 through loopback forwarders and a private bridge `ai-host` (10.99.211.0/29); the loopback-only rule is
-  unchanged. Operators: add the firewall rule in `docs/runbooks/AI_PROVIDERS.md` ("Trial AI gateways on the server").
-- Trial AI works on every unedited sample record: the 28 sample complaints whose text is built at load time were
-  refused as "edited". Ask inside a case and the case advisory now list their records, so they reach the trial chain.
-- When every trial AI provider fails, the answer comes in seconds ("AI is busy right now ... try again in a minute"):
-  resting providers are skipped, each waits at most 15 s and the chain 20 s. A provider that is down alerts the
-  operators (at most hourly); `/health/ready` has a `trial_ai_chain` item; the startup check warns when the trial
-  chain is set but `MDARIX_AI_FEATURES` is empty.
-- A free trial's AI settings show the allowance that is enforced (200,000 tokens, not 2,000,000). A double click on
-  Accept writes one review. OpenRouter answers only with models on its vetted list (empty until the owner adds them).
-  The sample's pre-recorded AI observations are PROPOSED, not VALIDATED, until a person reviews them.
-- Password hashes: scrypt N=2^15, r=8, p=3 (an OWASP equivalent of N=2^17, r=8, p=1; owner decision P7), about two
-  thirds of the time; old hashes still verify and are re-hashed at the next sign-in.
-- E-mail: `MDARIX_EMAIL_DELIVERY=off` also stops Resend, even when a dotenv file supplies a key.
-- Screens: a re-typed signing code says "This code was just used"; trial approval runs in the background and the list
-  follows it; AI settings send `lock_version` and explain a 409; the signed-records list shows every kind of
-  signature; 422 answers show the server's plain-English message.
-- Legal texts updated for trial AI (owner-approved 17 Nov 2026).
-- Release runbook: migration `tr23compositetenantfks` (already on this line) adds and validates 41 composite
-  references in one transaction; writes to those tables wait until it ends. Take the backup first and run it with the
-  API stopped (`docs/runbooks/DEPLOYMENT.md`, section 3).
-
 ### Unreleased: AI ready
 
 AI built behind switches that are all off by default; off means zero model calls (owner approval of the AI-R spec,
@@ -186,6 +157,44 @@ only. No migration.
 - **Workflow scenario tests answer the challenge questions.** The end-to-end workflow scenarios
   (`tests/test_e2e_workflow_scenarios.py`) now answer the material challenge questions before "Submit for review", as
   an investigator does; the gate (owner decision B5-D3) is unchanged.
+
+## [0.11.05] - not released yet (WHIF release: trial AI, flagship story, decision record, review fixes)
+
+Brings in the backend fix pass of the WHIF hero review, makes the screens match it, and fixes the release blockers of
+the independent backend/AI review (G1-G15). No new migration (one head, `tr32aiready`). The API, web and compose files
+change.
+
+- Production: the API and background containers reach the trial AI gateways (FreeLLMAPI, OmniRoute) at their own
+  127.0.0.1 through loopback forwarders and a private bridge `ai-host` (10.99.211.0/29); the loopback-only rule is
+  unchanged. Operators: add the firewall rule in `docs/runbooks/AI_PROVIDERS.md` ("Trial AI gateways on the server").
+- Trial AI works on every unedited sample record: the 28 sample complaints whose text is built at load time were
+  refused as "edited". Ask inside a case and the case advisory now list their records, so they reach the trial chain.
+- When every trial AI provider fails, the answer comes in seconds ("AI is busy right now ... try again in a minute"):
+  resting providers are skipped, each waits at most 15 s and the chain 20 s. A provider that is down alerts the
+  operators (at most hourly); `/health/ready` has a `trial_ai_chain` item; the startup check warns when the trial
+  chain is set but `MDARIX_AI_FEATURES` is empty.
+- A free trial's AI settings show the allowance that is enforced (200,000 tokens, not 2,000,000). A double click on
+  Accept writes one review. OpenRouter answers only with models on its vetted list (empty until the owner adds them).
+  The sample's pre-recorded AI observations are PROPOSED, not VALIDATED, until a person reviews them.
+- Password hashes: scrypt N=2^15, r=8, p=3 (an OWASP equivalent of N=2^17, r=8, p=1; owner decision P7), about two
+  thirds of the time; old hashes still verify and are re-hashed at the next sign-in.
+- E-mail: `MDARIX_EMAIL_DELIVERY=off` also stops Resend, even when a dotenv file supplies a key.
+- Screens: a re-typed signing code says "This code was just used"; trial approval runs in the background and the list
+  follows it; AI settings send `lock_version` and explain a 409; the signed-records list shows every kind of
+  signature; 422 answers show the server's plain-English message.
+- Legal texts updated for trial AI (owner-approved 17 Nov 2026).
+- Release runbook: migration `tr23compositetenantfks` (already on this line) adds and validates 41 composite
+  references in one transaction; writes to those tables wait until it ends. Take the backup first and run it with the
+  API stopped (`docs/runbooks/DEPLOYMENT.md`, section 3).
+- Also in this release (merged on the free-trial line): the flagship story (OrbitCare 300 Rev B in seven steps, W1)
+  with Getting started leading to it; round 2 screen fixes (G-03 to G-21: business events first in the organization
+  trail, one main button per case screen, the top bar fits 1280x720, plural counts, sign-up wording); the decision
+  record and the decision-and-impact summary of a signed decision (E3, W6); an escalated case keeps its provisional
+  legal clock (G-05). No new migration.
+- Rules: EU-floor-2 and GB-floor-2 correct question 6's skip note ("death, or a risk of death, takes the 10-day
+  report"), from the start (G-10, owner approval 17 Nov 2026); signed conclusions keep version 1.
+- One trial AI wording: "AI is not switched on for this trial" while the trial has no AI services or its switch is
+  off, and "AI is busy" while its services are set up but none answers. Refusal codes are unchanged.
 
 ## [0.11.04] - not released yet
 
