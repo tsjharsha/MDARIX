@@ -10,6 +10,7 @@ import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
 import { renamed, useIsTrial, useWorkspace } from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
+import { useVisited } from "../oneStory";
 import {
   CASE_SECTIONS,
   caseState,
@@ -151,6 +152,11 @@ export function CaseSections({
     work.investigationId ? `/api/v1/investigations/${encodeURIComponent(work.investigationId)}/decision-brief` : null,
   );
   const steps = caseSteps(readiness.data);
+  // Flagship step 3 (W1) counts once the case's evidence overview has loaded.
+  useVisited(
+    { step: "evidence", investigationId: work.investigationId || undefined },
+    active === "Evidence" && !!selected && intelView === "Overview",
+  );
   const nextPart = nextCaseStep(steps)?.part;
   const checks = readinessChecks(readiness.data);
   // A part with nothing in it yet folds into one line, "Not started yet: …" (0.10.72, B2); the next step, the part a

@@ -127,6 +127,7 @@ import {
 import { ImportYourDataSection } from "./sections/YourData";
 import { ProductHubSection } from "./sections/ProductHub";
 import { StoryBar } from "./sections/Entrance";
+import { FlagshipBar } from "./sections/FlagshipBar";
 import { liveStory, savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
@@ -1072,7 +1073,13 @@ export function UserWorkspace({
                 {/* The ten-step walkthrough is the new navigation's one progress (0.10.87): no chapter banners there,
                     and on Home its own story banner stands in for the story bar. */}
                 {shell.chapterDone && trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
-                {shell.storyBar && trial?.is_trial && <StoryBar section={section} tab={shown ?? tab} />}
+                {shell.storyBar &&
+                  trial?.is_trial &&
+                  (story === "flagship" || story === "flagship-branch" ? (
+                    <FlagshipBar section={section} branch={story === "flagship-branch"} />
+                  ) : (
+                    <StoryBar section={section} tab={shown ?? tab} />
+                  ))}
                 {message && (
                   <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}

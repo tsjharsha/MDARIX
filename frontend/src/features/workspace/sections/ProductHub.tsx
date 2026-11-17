@@ -6,6 +6,7 @@ import { DeviceIcon, MonitorBand, StatusPill, deviceKind } from "../../shared/he
 import { formatDay } from "../../../app/dates";
 import { chooseCase, useClosedLoop, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
+import { useVisited } from "../oneStory";
 import { ChartOrTable } from "./WowCharts";
 import {
   HUB_TABS,
@@ -326,6 +327,8 @@ function ProductPage({
   const selected: Row | null = view?.selected_version ?? null;
   const versions: Row[] = view?.versions ?? [];
   const version = selected?.version_identifier ?? null;
+  // Flagship step 2 (W1) counts once this product's page has loaded on the story's version (Rev B).
+  useVisited({ step: "product", product: place.product ?? undefined, version }, light.state === "ready" && !!view);
   const links = useResource<Row>(
     view ? `/api/v1/products/${product}/links${version ? `?version=${encodeURIComponent(version)}` : ""}` : null,
   );
