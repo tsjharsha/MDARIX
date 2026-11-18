@@ -12,14 +12,14 @@ const Caption = () => <figcaption className="ms-fig-note">Illustrative · synthe
 /* ----------------------------------------------------------------- The product twin (home page hero) */
 
 // The free trial's sample story (backend/app/trial/sample_data.py): OrbitCare 300 Rev B moved its pressure sensor to a
-// new supplier (change CHG-014); pressure-alarm complaints rise afterwards.
+// new supplier (change SAMPLE-CHG-014); pressure-alarm complaints rise afterwards. Rev B lots are 003-008.
 const TWIN_NODES = [
   { key: "complaints", label: "Complaints", value: "Pressure alarms rising", hot: true },
   { key: "version", label: "Version at the event date", value: "Rev B", hot: true },
-  { key: "markets", label: "Markets", value: "US · EU · GB · CA · IN", hot: false },
+  { key: "markets", label: "Complaints from", value: "United States", hot: false },
   { key: "component", label: "Component", value: "Pressure sensor", hot: true },
   { key: "lots", label: "Lots built with it", value: "003–008", hot: true },
-  { key: "supplier", label: "Supplier", value: "Changed in CHG-014", hot: true },
+  { key: "supplier", label: "Supplier", value: "Changed in SAMPLE-CHG-014", hot: true },
 ] as const;
 
 export function ProductTwin() {
@@ -65,10 +65,10 @@ export function ProductTwin() {
 
 /* ------------------------------------------------------------------------------------------- 1. Signal */
 
-// One synthetic case told the same way on every page: 42 complaints in 26 weeks, 6 in the 13 weeks before Rev B
-// (about 2 a month) and 36 in the 13 weeks after (about 12 a month).
-const WEEKLY = [1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 2, 2, 3, 2, 3, 3, 3, 3, 4, 3, 3, 4];
-const RELEASE_WEEK = 13;
+// The sample's 19 OrbitCare pressure-alarm complaints by event week over the last 26 weeks (sample_data.py _PRODUCTS
+// days + 2, and SAMPLE-RT-04): 4 in the 15 weeks before Rev B (released 75 days ago, week 16), 15 in the 11 after.
+const WEEKLY = [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1];
+const RELEASE_WEEK = 16;
 /** The example's numbers, for its tests. */
 export const EXAMPLE_NUMBERS = { weekly: WEEKLY, releaseWeek: RELEASE_WEEK } as const;
 
@@ -76,7 +76,7 @@ export function SignalChart() {
   const width = 480;
   const height = 220;
   const pad = { left: 12, right: 12, top: 40, bottom: 36 };
-  const max = 4.5;
+  const max = 2.5;
   const x = (index: number) => pad.left + (index / (WEEKLY.length - 1)) * (width - pad.left - pad.right);
   const y = (value: number) => pad.top + (1 - value / max) * (height - pad.top - pad.bottom);
   const line = WEEKLY.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(
@@ -88,7 +88,7 @@ export function SignalChart() {
     <figure className="ms-fig">
       <svg className="ms-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="signal-chart-title">
         <title id="signal-chart-title">
-          Pressure-alarm complaints per week: about 2 a month before Rev B is released in week 13, about 12 a month
+          Pressure-alarm complaints per week: 4 in the 15 weeks before Rev B is released in week 16, 15 in the 11 weeks
           after
         </title>
         <rect
@@ -114,10 +114,13 @@ export function SignalChart() {
       </svg>
       <div className="ms-fig-stats">
         <span>
-          <strong>~2</strong> a month before
+          <strong>4</strong> in the 15 weeks before
         </span>
         <span className="is-hot">
-          <strong>~12</strong> a month after
+          <strong>15</strong> in the 11 weeks after
+        </span>
+        <span className="is-hot">
+          <strong>9.3×</strong> the expected count in the trend check
         </span>
       </div>
       <Caption />
@@ -128,7 +131,7 @@ export function SignalChart() {
 /* ---------------------------------------------------------------------------------- 2. Product reality */
 
 const REVISIONS = [
-  ["Pressure sensor supplier", "Original supplier", "New supplier (CHG-014)"],
+  ["Pressure sensor supplier", "Precision Sensors Ltd", "NovaSense Components (SAMPLE-CHG-014)"],
   ["Incoming inspection sample", "32 units", "13 units"],
   ["Finished lots", "001–002", "003–008"],
 ] as const;
@@ -165,11 +168,23 @@ export function RevisionCompare() {
 
 /* -------------------------------------------------------------------------------------- 3. Investigation */
 
-const RAIL = ["Signal", "Evidence", "Possible causes", "Brief", "Decision"] as const;
+// The investigation's six steps and the sample case's two hypotheses (sample_decision.py SAMPLE_HYPOTHESES).
+const RAIL = ["Signal", "Product reality", "Evidence", "Possible causes", "Brief", "Decision & action"] as const;
 const CAUSES = [
-  { cause: "New supplier's sensor drifts at low pressure", state: "Supported", tone: "good", support: 4, against: 1 },
-  { cause: "Alarm threshold set too tight in firmware", state: "Weakened", tone: "warn", support: 1, against: 3 },
-  { cause: "Set-up error at the bedside", state: "Open question", tone: "open", support: 1, against: 1 },
+  {
+    cause: "NovaSense pressure sensors read high at the upper pressure range",
+    state: "Partially supported",
+    tone: "warn",
+    support: 2,
+    against: 0,
+  },
+  {
+    cause: "Ward pressure-limit settings, not the pump, set off the alarms",
+    state: "Weakly supported",
+    tone: "open",
+    support: 0,
+    against: 2,
+  },
 ] as const;
 
 export function InvestigationRail() {
@@ -177,7 +192,7 @@ export function InvestigationRail() {
     <figure className="ms-fig">
       <ol className="ms-rail" aria-label="Investigation steps">
         {RAIL.map((step, index) => (
-          <li key={step} className={index === 2 ? "is-current" : index < 2 ? "is-done" : undefined}>
+          <li key={step} className={index === 3 ? "is-current" : index < 3 ? "is-done" : undefined}>
             {step}
           </li>
         ))}
@@ -205,12 +220,13 @@ export function InvestigationRail() {
 
 /* --------------------------------------------------------------------------- 4. Decision and reports */
 
-const MARKET_STATES: Record<string, { state: string; tone: string }> = {
-  "United States": { state: "Reportable · clock running", tone: "warn" },
-  "EU and Northern Ireland": { state: "Not reportable · reason kept", tone: "good" },
-  "Great Britain": { state: "Reportable · clock running", tone: "warn" },
-  Canada: { state: "Not reportable · reason kept", tone: "good" },
-  India: { state: "Not reportable · reason kept", tone: "good" },
+// One sample record per market, as the trial stages it (sample_reports.py, sample_assessments.py, sample_intake.py).
+const MARKET_STATES: Record<string, { state: string; tone: string; ref: string }> = {
+  "United States": { state: "Reportable · 3500A accepted", tone: "good", ref: "SAMPLE-RV-09" },
+  "EU and Northern Ireland": { state: "Reportable · 15-day report", tone: "warn", ref: "SAMPLE-RV-07" },
+  "Great Britain": { state: "Not known yet · questions open", tone: "open", ref: "SAMPLE-CALL-03" },
+  Canada: { state: "Not reportable · reason kept", tone: "good", ref: "SAMPLE-RV-07" },
+  India: { state: "Reportable · correction required", tone: "warn", ref: "SAMPLE-RV-10" },
 };
 
 export function MarketDecisions() {
@@ -222,9 +238,9 @@ export function MarketDecisions() {
             <span>
               <strong>{market.region}</strong>
               <small>
-                {basisOf(market.basis)
-                  .map((standard) => standard.short)
-                  .join(" · ")}
+                {[MARKET_STATES[market.region].ref, ...basisOf(market.basis).map((standard) => standard.short)].join(
+                  " · ",
+                )}
               </small>
             </span>
             <span className={`ms-pill is-${MARKET_STATES[market.region].tone}`}>
@@ -277,11 +293,13 @@ export function EffectivenessCheck() {
       <dl className="ms-check">
         <div>
           <dt>Action</dt>
-          <dd>CAPA-02: full incoming inspection of the pressure sensor restored</dd>
+          <dd>SAMPLE-CAPA-02: incoming inspection of NovaSense pressure sensors restored to 32 units per lot</dd>
         </div>
         <div>
           <dt>Criteria, set before the action</dt>
-          <dd>Pressure-alarm complaints on lots built after the fix fall back to the Rev A rate</dd>
+          <dd>
+            Fewer pressure-alarm complaints per unit in the field on lots built after the fix than on lots 003 and 004
+          </dd>
         </div>
         <div>
           <dt>Measured from</dt>
@@ -295,7 +313,10 @@ export function EffectivenessCheck() {
           </span>
         ))}
       </div>
-      <p className="ms-fig-read">Too early to tell is said plainly, not counted as a success.</p>
+      <p className="ms-fig-read">
+        The sample signs it Inconclusive: 90 days of synthetic follow-up are too early to tell, and that is not counted
+        as a success.
+      </p>
       <Caption />
     </figure>
   );

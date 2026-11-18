@@ -30,6 +30,14 @@ const textOf = (html: string) =>
     .replace(/\s+/g, " ");
 
 describe("the questions and answers", () => {
+  it("name every market whose reporting windows have templates, Canada included", () => {
+    const words = textOf(
+      renderToStaticMarkup(<QuestionPage question={questionAt("/questions/when-is-a-complaint-reportable")!} />),
+    );
+    expect(words).toContain("Templates for the US, EU/NI, GB, Canada and India keep their basis");
+    expect(words).toContain("Reporting windows for the US, EU/NI, GB, Canada and India");
+  });
+
   it("are an index and seven question pages, each with its own address, title and description", () => {
     expect(QUESTIONS).toHaveLength(7);
     expect(QUESTION_PATHS).toEqual(QUESTIONS.map((question) => question.path));

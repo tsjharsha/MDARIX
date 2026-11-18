@@ -62,9 +62,31 @@ describe("website home", () => {
   it("tells one story whose numbers add up", () => {
     const { weekly, releaseWeek } = EXAMPLE_NUMBERS;
     const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0);
-    // 42 complaints: 6 before Rev B and 36 after, over 13 weeks each (about 2 and 12 a month).
-    expect([sum(weekly.slice(0, releaseWeek)), sum(weekly.slice(releaseWeek))]).toEqual([6, 36]);
+    // The trial sample's 19 OrbitCare pressure-alarm complaints: 4 before Rev B (released in week 16), 15 after.
+    expect([sum(weekly.slice(0, releaseWeek - 1)), sum(weekly.slice(releaseWeek - 1))]).toEqual([4, 15]);
     expect(weekly).toHaveLength(26);
+  });
+
+  it("shows the trial sample's own records, not invented ones", () => {
+    const words = text(renderToStaticMarkup(<HomePage />));
+    // backend/app/trial: sample_data.py, sample_decision.py, sample_reports.py, sample_assessments.py, flagship.py.
+    for (const fact of [
+      "Changed in SAMPLE-CHG-014",
+      "Precision Sensors Ltd",
+      "NovaSense Components (SAMPLE-CHG-014)",
+      "32 units",
+      "13 units",
+      "003–008",
+      "9.3×",
+      "Partially supported",
+      "Weakly supported",
+      "SAMPLE-RV-09",
+      "SAMPLE-RV-10",
+      "SAMPLE-CAPA-02: incoming inspection of NovaSense pressure sensors restored to 32 units per lot",
+      "Inconclusive",
+    ])
+      expect(words).toContain(fact);
+    expect(words).not.toMatch(/a month (before|after)|drifts at low pressure|firmware/);
   });
 });
 

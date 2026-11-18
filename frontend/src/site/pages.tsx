@@ -296,13 +296,13 @@ export function PlatformPage() {
               <figure className="ms-fig">
                 <ul className="ms-today">
                   <li>
-                    <span className="ms-pill is-bad">Due today</span> Reply to the reporter · complaint 1042
+                    <span className="ms-pill is-bad">Due today</span> Triage within 24 hours · SAMPLE-RV-11
                   </li>
                   <li>
-                    <span className="ms-pill is-warn">Clock running</span> US reportability decision · 9 days left
+                    <span className="ms-pill is-warn">Clock running</span> US reportability decision · SAMPLE-RV-06
                   </li>
                   <li>
-                    <span className="ms-pill is-good">Next</span> Review the investigation brief
+                    <span className="ms-pill is-good">Next</span> Read the investigation brief · SAMPLE-INV-001
                   </li>
                 </ul>
                 <figcaption className="ms-fig-note">Illustrative · synthetic sample data</figcaption>
