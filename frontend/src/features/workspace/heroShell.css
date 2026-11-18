@@ -537,6 +537,11 @@
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
   }
+  /* The privacy notice sits above the bar (62 px tabs and its border), never over the destinations: pinned at the
+     foot, it covered all of them until acknowledged (UX3). */
+  body:has(.uw-phonebar) .consent-banner {
+    bottom: calc(63px + 12px + env(safe-area-inset-bottom, 0px));
+  }
   .uw-phonebar-in {
     display: grid;
     grid-auto-columns: minmax(0, 1fr);

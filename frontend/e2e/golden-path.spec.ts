@@ -140,6 +140,24 @@ test.describe("demo golden path (read only)", () => {
     expect(problems).toEqual([]);
   });
 
+  test("on a phone the privacy notice sits above the bottom bar, never over its destinations", async ({ page }) => {
+    test.setTimeout(90_000);
+    // Signed in without acknowledging the notice, as on a first visit.
+    await page.goto("/signin");
+    await page.getByLabel("Work email").fill(TRIAGE_EMAIL);
+    await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
+    const bar = page.locator('nav.uw-phonebar[aria-label="Destinations"]');
+    const notice = page.getByRole("dialog", { name: "Privacy and data-use notice" });
+    await expect(notice).toBeVisible({ timeout: 20_000 });
+    test.skip(!(await bar.isVisible()), "The bottom bar is shown on phones only.");
+    const [noticeBox, barBox] = [await notice.boundingBox(), await bar.boundingBox()];
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(barBox!.y);
+    // The destinations answer while the notice is still open.
+    await bar.getByRole("button", { name: /^Cases/ }).click({ timeout: 5000 });
+  });
+
   test("the investigator reads the case's record and timeline", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     const problems = watchErrors(page);
