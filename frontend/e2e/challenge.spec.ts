@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { rmSync } from "node:fs";
-import { MAIL_DIR, openFromMenu, person, shot, watch, type Person } from "./support/journey";
+import { MAIL_DIR, person, shot, watch, type Person } from "./support/journey";
 import { signedUpOwner } from "./support/story";
 
 /*
@@ -30,13 +30,12 @@ test.describe("B5a: Challenge on the sample investigation, desktop", () => {
     test.setTimeout(300_000);
     const page = await signedUpOwner(browser, owner, `Challenge Devices ${RUN.toUpperCase()}`);
     const problems = watch(page);
-    await openFromMenu(page, /^Getting started$/);
-    await page.getByRole("button", { name: "Review and sign the sample decision" }).first().click();
-    await expect(page.getByRole("heading", { level: 1, name: "Investigations" })).toBeVisible({ timeout: 20_000 });
-
-    await page.getByRole("tab", { name: "Intelligence", exact: true }).click();
+    // The sample investigation's cockpit (UX3): Possible causes holds the Challenge as one of its named tools.
+    await page.goto("/app/investigations?case=SAMPLE-INV-001");
+    const steps = page.getByRole("navigation", { name: "Investigation steps" });
+    await steps.getByRole("button", { name: /Possible causes/ }).click();
     const read = page.waitForResponse((r) => /\/challenge$/.test(r.url()) && r.request().method() === "GET");
-    await page.getByRole("tab", { name: "Challenge", exact: true }).click();
+    await page.getByText("Challenge: questions drawn from the records").click();
     expect((await read).status()).toBe(200);
     await expect(page.getByText("Drafted by rule H-1 (version 1)")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Drafted by rule H-2 (version 1)")).toBeVisible();
@@ -53,7 +52,7 @@ test.describe("B5a: Challenge on the sample investigation, desktop", () => {
     await drawer.getByRole("button", { name: "Dismiss" }).click();
     await expect(h2.getByText("Dismissed: The two lots share no component lot.")).toBeVisible({ timeout: 20_000 });
 
-    await page.getByRole("tab", { name: "Decision Brief", exact: true }).click();
+    await steps.getByRole("button", { name: /Brief/ }).click();
     const sources = page.getByRole("region", { name: "Sources" });
     await expect(page.getByRole("region", { name: "Challenge" })).toContainText("Drafted by rule H-1 (version 1)", {
       timeout: 20_000,

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { rmSync } from "node:fs";
-import { MAIL_DIR, openFromMenu, person, shot, watch, type Person } from "./support/journey";
+import { MAIL_DIR, person, shot, watch, type Person } from "./support/journey";
 import { signedUpOwner } from "./support/story";
 
 /*
@@ -23,18 +23,20 @@ test.describe("B5b: Did it work? on the sample investigation, desktop", () => {
   test.skip(!MAIL_DIR, "Set E2E_MAIL_DIR to the journey API's mail folder (scripts/journey_api.py).");
   test.afterAll(() => rmSync(owner.state, { force: true }));
 
-  test("the block under Decisions & actions, words not verdicts, and its limits", async ({ browser }) => {
+  test("the block under Decision & action, words not verdicts, and its limits", async ({ browser }) => {
     test.setTimeout(300_000);
     const page = await signedUpOwner(browser, owner, `Loop Devices ${RUN.toUpperCase()}`);
     const problems = watch(page);
-    await openFromMenu(page, /^Getting started$/);
-    await page.getByRole("button", { name: "Review and sign the sample decision" }).first().click();
-    await expect(page.getByRole("heading", { level: 1, name: "Investigations" })).toBeVisible({ timeout: 20_000 });
+    // The sample investigation's cockpit (UX3): Did it work? sits in its last step, Decision & action.
+    await page.goto("/app/investigations?case=SAMPLE-INV-001");
+    await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
+      timeout: 20_000,
+    });
 
     const read = page.waitForResponse((r) => /\/did-it-work$/.test(r.url()) && r.request().method() === "GET");
     await page
-      .getByRole("navigation", { name: "Where this investigation stands" })
-      .getByRole("button", { name: /Decisions & actions/ })
+      .getByRole("navigation", { name: "Investigation steps" })
+      .getByRole("button", { name: /Decision & action/ })
       .click();
     expect((await read).status()).toBe(200);
     const block = page.locator(".ac-panel", { has: page.getByRole("heading", { name: "Did it work?" }) });

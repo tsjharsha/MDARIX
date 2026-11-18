@@ -457,17 +457,9 @@ test.describe("free trial journey", () => {
     test.setTimeout(150_000);
     const page = await ownerPage(browser);
     const problems = watchErrors(page);
-    await openSection(page, "Getting started");
-    await page.getByRole("button", { name: "Review and sign the sample decision" }).first().click();
-    await expect(page.getByRole("heading", { level: 1, name: "Investigations" })).toBeVisible({ timeout: 20_000 });
-
-    const review = panel(page, "Review of this brief");
-    await expect(review).toBeVisible({ timeout: 20_000 });
-    const start = review.getByRole("button", { name: "Start review" });
-    if (await start.isVisible()) await start.click();
-    await review.getByLabel("Your review").selectOption({ label: "Accept for decision" });
-    await review.getByRole("button", { name: "Record review" }).click();
-    await expect(review.getByRole("list", { name: "Review history" })).toContainText("Accepted for decision", {
+    // The sample brief was accepted for decision by the sample reviewer (UX1): the owner opens the cockpit and signs.
+    await page.goto("/app/investigations?case=SAMPLE-INV-001");
+    await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
       timeout: 20_000,
     });
 
