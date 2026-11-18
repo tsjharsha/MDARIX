@@ -168,7 +168,8 @@ def check_state(row) -> dict[str, Any]:
         signed = row.get("signed_by")
         return {
             "state": status,
-            "label": label + (f", signed by {signed}" if signed else ""),
+            # The signer is an account reference, never shown as a name here (the check itself names them).
+            "label": label + (", signed" if signed else ""),
             "round": row.get("round"),
             "signed_by": signed,
             "signed_at": str(row["signed_at"]) if row.get("signed_at") else None,
