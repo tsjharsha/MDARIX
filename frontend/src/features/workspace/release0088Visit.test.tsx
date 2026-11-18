@@ -234,4 +234,14 @@ describe("a loaded screen of another record ticks nothing", () => {
     expect(marks()).toHaveLength(1);
     expect(takeMarkProblem()).toContain("Finish step 8 first.");
   });
+
+  it("keeps a ten-step refusal for the walkthrough: the flagship card above it does not take it (UX3)", async () => {
+    fetch.mockImplementation(async () =>
+      Response.json({ detail: { code: "STEP_NOT_YET", message: "Finish step 8 first." } }, { status: 409 }),
+    );
+    await openStep(run(8), 8, vi.fn());
+    await visited({ step: "records", complaintId: "c-rv11" });
+    expect(takeMarkProblem("flagship")).toBeNull();
+    expect(takeMarkProblem()).toContain("Finish step 8 first.");
+  });
 });

@@ -191,10 +191,13 @@ export function stepPlace(run: StoryRun, index: number): Place {
 /** Records on the record one story finished: its decision record leads (Records reads ``complaint``). */
 export const recordsTab = (ref: string) => `Decision records?${new URLSearchParams({ complaint: ref })}`;
 
-/** Why the last step the person opened was not saved (shown once on Getting started), or null. */
-let markProblem: string | null = null;
-export const takeMarkProblem = () => {
-  const found = markProblem;
+/** Why the last step the person opened was not saved (shown once on Getting started), or null. With ``run``, only
+ * that story's problem is taken: the flagship card and the ten-step walkthrough under it are on one page, and the
+ * walkthrough's refusal must not be taken (and lost) by the flagship card. */
+let markProblem: { run: string; text: string } | null = null;
+export const takeMarkProblem = (run?: string) => {
+  if (!markProblem || (run !== undefined && markProblem.run !== run)) return null;
+  const found = markProblem.text;
   markProblem = null;
   return found;
 };
@@ -270,7 +273,10 @@ export async function visited(visit: Visit): Promise<void> {
   } catch (reason) {
     const marks = MARKED[pending.run] ?? {};
     const index = Number(Object.keys(marks).find((key) => marks[Number(key)] === pending.step) ?? 0);
-    markProblem = errorText(reason, `Step ${index + 1} was not saved. Open it again from Getting started.`);
+    markProblem = {
+      run: pending.run,
+      text: errorText(reason, `Step ${index + 1} was not saved. Open it again from Getting started.`),
+    };
   }
 }
 

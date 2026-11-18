@@ -368,7 +368,7 @@ export function StoryView({
 }) {
   const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
-  const [problem] = useState(takeMarkProblem);
+  const [problem] = useState(() => takeMarkProblem());
   const run = shownRun(story, dataSource);
   const sample = run?.run === "sample";
   // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).
@@ -979,7 +979,7 @@ export function FlagshipView({
   const isTrial = useIsTrial();
   const aiReady = useAiReady();
   const [picked, setPicked] = useState<number | null>(null);
-  const [problem] = useState(takeMarkProblem);
+  const [problem] = useState(() => takeMarkProblem("flagship"));
   const [folded, setFolded] = useState(true);
   const [busy, setBusy] = useState(false);
   const done = run.steps.filter((step) => step.done).length;
