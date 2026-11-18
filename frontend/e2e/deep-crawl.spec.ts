@@ -147,7 +147,8 @@ async function openNavigation(page: Page) {
 }
 
 async function crawl(page: Page, persona: any) {
-  const nav = page.getByRole("navigation", { name: NAV_LABEL[persona.console] }).first();
+  // The workspace's rail and the phone's bottom bar are both "Destinations": the one shown.
+  const nav = page.locator(`nav[aria-label="${NAV_LABEL[persona.console]}"]:visible`).first();
   await expect(nav).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
   const items = await nav.locator("button").count();
@@ -246,7 +247,7 @@ test.describe("deep crawl of every screen", () => {
     await page.getByRole("button", { name: /send invitation/i }).click();
     await expect(page.locator("main")).toContainText(/invit/i, { timeout: 15_000 });
     // The new person is listed in the Users table, as the administrator sees it.
-    await expect(page.locator("main").getByText(email)).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("main").getByText(email).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("flow: an Investigator opens an investigation from the list, on its cockpit", async ({ page }) => {
@@ -255,7 +256,7 @@ test.describe("deep crawl of every screen", () => {
     watch(page, investigator.name, () => "open-investigation flow");
     await signIn(page, investigator);
     await page.goto("/app");
-    const nav = page.getByRole("navigation", { name: NAV_LABEL.workspace }).first();
+    const nav = page.locator(`nav[aria-label="${NAV_LABEL.workspace}"]:visible`).first();
     await expect(nav).toBeAttached({ timeout: 20_000 });
     await openNavigation(page);
     await nav.getByRole("button", { name: /^Investigations/ }).click();

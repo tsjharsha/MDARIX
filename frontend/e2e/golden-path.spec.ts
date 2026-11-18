@@ -44,7 +44,8 @@ function watchErrors(page: Page) {
 
 /** Opens a work area from the rail (the phone opens the menu first). */
 async function openArea(page: Page, name: string) {
-  const rail = page.getByRole("navigation", { name: "Destinations" }).first();
+  // The rail on a wide screen, the phone's bottom bar on a phone: both are "Destinations"; the one shown.
+  const rail = page.locator('nav[aria-label="Destinations"]:visible').first();
   await expect(rail).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
   if (await toggle.isVisible()) await toggle.click();
