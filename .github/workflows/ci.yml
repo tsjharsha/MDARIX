@@ -728,6 +728,20 @@ jobs:
           docker build -f Dockerfile.api -t mdarix/api:ci .
           docker build -f Dockerfile.web -t mdarix/web:ci .
           docker build -f infrastructure/docker/backup/Dockerfile -t mdarix/backup:ci .
+      # 0.11.05 failed to start in production because a module the API imports needed a test-only package. The built
+      # image (no dev packages) must import the API, the background service and its two children, and mail-in.
+      # Placeholder database settings only: nothing connects (no network).
+      - name: The production API image starts (its entry points import)
+        shell: bash
+        run: |
+          set -euo pipefail
+          check() {
+            docker run --rm --network none -e POSTGRES_USER=check -e POSTGRES_PASSWORD=check -e POSTGRES_DB=check \
+              mdarix/api:ci python -c "$1"
+          }
+          check "import backend.app.main"
+          check "import runpy; [runpy.run_path(f'scripts/{n}.py', run_name='import_check') for n in ('run_background', 'run_outbox_worker', 'run_scheduler')]"
+          check "import backend.app.mail_in.receiver"
       # Every high or critical finding fails the job, fixable or not, except the reviewed ones in .trivyignore.yaml
       # (each with its reason and an expiry date, after which it fails again until reviewed).
       - name: Download the vulnerability database with bounded retries

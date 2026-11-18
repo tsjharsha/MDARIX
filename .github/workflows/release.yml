@@ -40,6 +40,20 @@ jobs:
           docker build -f Dockerfile.api -t "$REPOSITORY/api:$GITHUB_REF_NAME" .
           docker build -f Dockerfile.web -t "$REPOSITORY/web:$GITHUB_REF_NAME" .
           docker build -f infrastructure/docker/backup/Dockerfile -t "$REPOSITORY/backup:$GITHUB_REF_NAME" .
+      # As in ci.yml's image scan: the built API image imports its entry points (0.11.05 did not start).
+      - name: The production API image starts (its entry points import)
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.names.outputs.repository }}
+        run: |
+          set -euo pipefail
+          check() {
+            docker run --rm --network none -e POSTGRES_USER=check -e POSTGRES_PASSWORD=check -e POSTGRES_DB=check \
+              "$REPOSITORY/api:$GITHUB_REF_NAME" python -c "$1"
+          }
+          check "import backend.app.main"
+          check "import runpy; [runpy.run_path(f'scripts/{n}.py', run_name='import_check') for n in ('run_background', 'run_outbox_worker', 'run_scheduler')]"
+          check "import backend.app.mail_in.receiver"
       - name: Scan the images (high and critical findings stop the release unless reviewed in .trivyignore.yaml)
         env:
           REPOSITORY: ${{ steps.names.outputs.repository }}

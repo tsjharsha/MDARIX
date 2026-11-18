@@ -194,9 +194,11 @@ git -c advice.detachedHead=false checkout -q v0.11.05 && cat VERSION            
 sed -i 's|^MDARIX_RELEASE=.*|MDARIX_RELEASE=v0.11.05|' .env.production
 (dc build && dc --profile backup build backup) > ~/build-01105.log 2>&1; echo BUILD=$?; tail -n 5 ~/build-01105.log
 dc run --rm --no-deps api python -m backend.app.config_check --offline; echo CONFIG=$?           # prints nothing, 0
+dc run --rm --no-deps api python -c "import backend.app.main"; echo IMPORT=$?                  # the API starts: 0
 ```
 
-If the build or the offline check fails, follow rollback **A**. The old release keeps serving.
+If the build, the offline check or the import fails, follow rollback **A** (0.11.05's first build passed the offline
+check but its API did not start: the offline check does not import the API). The old release keeps serving.
 
 ## 5. Migrations (STOP: the OWNER says go; CLAUDE runs; WRITES the database)
 
