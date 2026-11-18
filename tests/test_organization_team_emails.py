@@ -193,7 +193,10 @@ def test_a_role_change_says_before_and_after_and_an_administrator_role_tells_the
     deliver_team_notices(tenant)
     to_person = mail[0]
     assert to_person["to"] == org["v"]["email"]
-    assert "Role before: Viewer" in to_person["text"] and "Role now: Customer Administrator" in to_person["text"]
+    assert (
+        "Role before: Executive (view only)" in to_person["text"]
+        and "Role now: Customer Administrator" in to_person["text"]
+    )
     assert sorted(message["to"] for message in mail[1:]) == sorted([org["b"]["email"], org["c"]["email"]])
     assert all(
         message["subject"] == f"Ada Admin made Vic Viewer a Customer Administrator of {org['organization']}"

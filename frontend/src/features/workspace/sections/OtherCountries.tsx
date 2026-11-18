@@ -114,7 +114,7 @@ export function OtherCountryPicker({
           </button>
         </form>
       ) : (
-        <p className="ac-muted">Your role reads the assessments. A Regulatory Leader or Quality Leader starts one.</p>
+        <p className="ac-muted">Your role reads the assessments. A Regulatory Reviewer or Quality Leader starts one.</p>
       )}
       {list.data && list.data.not_offered.length > 0 && (
         <details className="dt-rule">
@@ -366,7 +366,7 @@ export function OtherReportPage({
           )}
           {canWrite && detail.can.close && <CloseForm detail={detail} action={action} />}
           {canWrite && detail.can.cancel && <CloseForm detail={detail} action={action} cancel />}
-          {!canWrite && <p className="ac-muted">You can read this report; a Regulatory Leader works on it.</p>}
+          {!canWrite && <p className="ac-muted">You can read this report; a Regulatory Reviewer works on it.</p>}
           <InlineError text={error} />
         </div>
         <aside className="uw-rail" aria-label="About this report">

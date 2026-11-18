@@ -179,10 +179,8 @@ describe("Getting started leads with the flagship", () => {
 
   it("says the brief came before the AI proposal, and step 7's three honest lines", () => {
     const brief = render(<FlagshipView story={story(flagship(4))} run={flagship(4)} />);
-    expect(brief).toContain(
-      "Written by the sample author before the AI proposal; your accepted proposal is on the case.",
-    );
-    expect(brief).toContain("Review the brief");
+    expect(brief).toContain("Written by the sample author before the AI proposal and accepted for decision");
+    expect(brief).toContain("Read the brief");
     const action = render(<FlagshipView story={story(flagship(6))} run={flagship(6)} />);
     expect(action).toContain("CAPA SAMPLE-CAPA-02: Restore incoming inspection");
     expect(action).toContain("Did it work? Too early");
@@ -202,7 +200,7 @@ describe("each step opens its real screen", () => {
     });
     const inCase = { section: "Investigations", caseId: "inv-1", productId: "p-orbit" };
     expect(flagshipPlace(run, 2)).toEqual({ ...inCase, tab: "Evidence?view=Overview&part=intelligence" });
-    expect(flagshipPlace(run, 3)).toEqual({ ...inCase, tab: "Evidence" });
+    expect(flagshipPlace(run, 3)).toEqual({ ...inCase, tab: "Evidence?part=ai-proposals" });
     expect(flagshipPlace(run, 4)).toEqual({ ...inCase, tab: "Decisions & actions?part=brief" });
     expect(flagshipPlace(run, 5)).toEqual({ ...inCase, tab: "Decisions & actions?part=decision" });
     expect(flagshipPlace(run, 6)).toEqual({ section: "Records", tab: "Effectiveness checks?capa=capa-2" });

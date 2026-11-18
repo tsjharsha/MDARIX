@@ -83,7 +83,7 @@ def test_a_person_starts_with_their_account_role_only(world):
     response = world["admin"].get(f"/api/v1/admin/identity/users/{world['investigator_id']}/roles")
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["account_role"] == {"code": "INVESTIGATOR", "label": "Quality Investigator"}
+    assert body["account_role"] == {"code": "INVESTIGATOR", "label": "Investigator"}
     assert body["additional_roles"] == []
     available = [item["code"] for item in body["available_roles"]]
     assert available == ["TRIAGE_LEAD", "RISK_REVIEWER", "REGULATORY_REVIEWER", "REVIEWER", "APPROVER", "LEADER"]
@@ -100,7 +100,7 @@ def test_granting_and_revoking_roles_is_audited_and_changes_the_session(world):
     roles = granted.json()["additional_roles"]
     assert [(role["code"], role["label"]) for role in roles] == [
         ("RISK_REVIEWER", "Risk Reviewer"),
-        ("APPROVER", "Authorized Decision Maker"),
+        ("APPROVER", "Decision Maker"),
     ]
     assert all(role["granted_by_name"] == "roles-admin" and role["granted_at"] for role in roles)
     assert _rows(world["investigator_id"]) == {"RISK_REVIEWER": "ACTIVE", "APPROVER": "ACTIVE"}
@@ -109,9 +109,9 @@ def test_granting_and_revoking_roles_is_audited_and_changes_the_session(world):
     session = world["investigator"].get("/api/v1/session/context").json()
     assert session["active_role"] == single["active_role"]  # the account role is unchanged
     assert session["roles"] == [
-        {"code": "INVESTIGATOR", "label": "Quality Investigator", "source": "account"},
+        {"code": "INVESTIGATOR", "label": "Investigator", "source": "account"},
         {"code": "RISK_REVIEWER", "label": "Risk Reviewer", "source": "additional"},
-        {"code": "APPROVER", "label": "Authorized Decision Maker", "source": "additional"},
+        {"code": "APPROVER", "label": "Decision Maker", "source": "additional"},
     ]
     assert session["business_permissions"] == sorted(
         permissions_for_roles(["Investigator", "RISK_REVIEWER", "APPROVER"])
@@ -202,7 +202,7 @@ def test_the_user_list_shows_role_labels(world):
     listed = world["admin"].get("/api/v1/admin/identity/users").json()
     row = next(item for item in listed if item["id"] == world["investigator_id"])
     # The stored role is canonicalised by the database (md25), so compare the code, not its spelling.
-    assert row["role"].upper() == "INVESTIGATOR" and row["role_label"] == "Quality Investigator"
+    assert row["role"].upper() == "INVESTIGATOR" and row["role_label"] == "Investigator"
 
 
 def test_erasure_removes_the_persons_additional_roles(world):

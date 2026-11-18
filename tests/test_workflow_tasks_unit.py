@@ -72,8 +72,8 @@ def test_task_permissions_are_real_permissions():
 
 
 def test_role_labels_and_queue_roles():
-    assert role_label("APPROVER") == "Authorized Decision Maker"
-    assert role_label("Investigator") == "Quality Investigator"
+    assert role_label("APPROVER") == "Decision Maker"
+    assert role_label("Investigator") == "Investigator"
     assert role_label(None) is None
     assert all(known_role(item.queue_role) for item in TASK_TYPES.values())
     # Administrators never hold case work, so no task queue belongs to them.

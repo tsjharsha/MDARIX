@@ -165,6 +165,8 @@ export type SessionContext = {
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
   sample_only?: boolean;
+  /** The person who started the free trial (UX1): what the server shows only to them is asked for only by them. */
+  trial_owner?: boolean;
   /** "Viewing as" (0.10.73): the persona the workspace opens on, whether only the server's role sets it (anyone but
    * the trial owner), its tabs, and every persona for the switch (access_control/personas.py). */
   persona?: string;

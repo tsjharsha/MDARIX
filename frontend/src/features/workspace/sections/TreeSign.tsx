@@ -227,7 +227,7 @@ export function SignCard({
         </p>
       )}
       {!signed && !canDecide && (
-        <p className="ac-muted">Your role reads this tree. A Regulatory Leader or Quality Leader signs it.</p>
+        <p className="ac-muted">Your role reads this tree. A Regulatory Reviewer or Quality Leader signs it.</p>
       )}
       {!signed && canDecide && (
         <form

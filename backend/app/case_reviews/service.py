@@ -504,6 +504,8 @@ def serialize_reviews(db: Session, control_db: Session | None, person, rows: lis
                     {
                         "id": str(case.id),
                         "business_id": case.business_id,
+                        # The reference people read (SAMPLE-INV-001), beside the system ID (UX1: Home names it).
+                        "identifier": case.investigation_identifier,
                         "question": case.investigation_question,
                         "workflow_state": states.case_state(case),
                         "product": (

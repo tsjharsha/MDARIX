@@ -3,10 +3,10 @@ import { ROLE_LABELS, WORKFLOW_ROLE_CODES, roleLabel, roleLabels, rolesSummary }
 
 describe("role labels", () => {
   it("prefers the server's label, then the known label for the code", () => {
-    expect(roleLabel("INVESTIGATOR", "Quality Investigator (EU)")).toBe("Quality Investigator (EU)");
-    expect(roleLabel("INVESTIGATOR")).toBe("Quality Investigator");
-    expect(roleLabel("triage_lead")).toBe("PMS / Signal Triage Lead");
-    expect(roleLabel("APPROVER", "  ")).toBe("Authorized Decision Maker");
+    expect(roleLabel("INVESTIGATOR", "Investigator (EU)")).toBe("Investigator (EU)");
+    expect(roleLabel("INVESTIGATOR")).toBe("Investigator");
+    expect(roleLabel("triage_lead")).toBe("Complaint Handler");
+    expect(roleLabel("APPROVER", "  ")).toBe("Decision Maker");
   });
 
   it("never shows a raw code, and keeps an organization's own role name as it is", () => {
@@ -18,7 +18,7 @@ describe("role labels", () => {
   it("names every Phase 1 role", () => {
     for (const code of [...WORKFLOW_ROLE_CODES, "VIEWER", "CUSTOMER_ADMIN", "PLATFORM_ADMIN"])
       expect(ROLE_LABELS[code]).toBeTruthy();
-    expect(ROLE_LABELS.LEADER).toBe("Leader (Quality Manager)");
+    expect(ROLE_LABELS.LEADER).toBe("Quality Leader");
     expect(ROLE_LABELS.REVIEWER).toBe("Quality Reviewer");
   });
 });
@@ -28,18 +28,18 @@ describe("the roles a person holds", () => {
     const session = {
       active_role: "INVESTIGATOR",
       roles: [
-        { code: "INVESTIGATOR", label: "Quality Investigator", source: "account" },
+        { code: "INVESTIGATOR", label: "Investigator", source: "account" },
         { code: "RISK_REVIEWER", label: "Risk Reviewer", source: "additional" },
-        { code: "INVESTIGATOR", label: "Quality Investigator", source: "additional" },
+        { code: "INVESTIGATOR", label: "Investigator", source: "additional" },
       ],
     };
-    expect(roleLabels(session)).toEqual(["Quality Investigator", "Risk Reviewer"]);
-    expect(rolesSummary(session)).toBe("Quality Investigator + Risk Reviewer");
+    expect(roleLabels(session)).toEqual(["Investigator", "Risk Reviewer"]);
+    expect(rolesSummary(session)).toBe("Investigator + Risk Reviewer");
   });
 
   it("falls back to the active role's label for an older session, and says when there is none", () => {
-    expect(rolesSummary({ active_role: "APPROVER" })).toBe("Authorized Decision Maker");
-    expect(rolesSummary({ active_role: "APPROVER", roles: [] })).toBe("Authorized Decision Maker");
+    expect(rolesSummary({ active_role: "APPROVER" })).toBe("Decision Maker");
+    expect(rolesSummary({ active_role: "APPROVER", roles: [] })).toBe("Decision Maker");
     expect(rolesSummary({})).toBe("No active role");
     expect(rolesSummary(null)).toBe("No active role");
   });

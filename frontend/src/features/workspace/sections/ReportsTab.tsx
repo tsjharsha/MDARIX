@@ -699,7 +699,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               </button>
             )}
             {!canWrite && detail.stage !== "APPROVED" && detail.state !== "CANCELLED" && (
-              <p className="ac-muted">You can read this report; a Regulatory Leader or Quality Leader works on it.</p>
+              <p className="ac-muted">You can read this report; a Regulatory Reviewer or Quality Leader works on it.</p>
             )}
             <InlineError text={action.error || pdfError} />
             {/* B6a navigation review: once nothing more is owed here, the complaint's own next step (as the drawer). */}

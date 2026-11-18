@@ -597,7 +597,7 @@ class OneStoryMark(BaseModel):
     run: str = Field(pattern="^(sample|yours|flagship)$")
     # 0.10.93: steps 1 and 2 read the Case's records; the "call" mark is no longer kept. W1: the flagship story's
     # first three steps (signal, product, evidence) are marks too.
-    step: str = Field(pattern="^(form|records|trends|signal|product|evidence)$")
+    step: str = Field(pattern="^(form|records|trends|signal|product|evidence|brief)$")
     # The complaint the person's screen showed: the story's complaint can move (a new urgent import), and a mark
     # must never land on a complaint the person did not open. For the flagship run, the investigation's id.
     complaint_id: uuid.UUID

@@ -178,9 +178,8 @@ def _sign_decision(user) -> None:
     from tests.test_free_trial import PASSWORD
 
     case_id = _flag(user)["investigation"]["id"]
-    base = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
-    _ok(user.post(f"{base}/start-review", json={}))
-    brief = _ok(user.post(f"{base}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence holds."}))
+    # UX1: the sample reviewer has accepted the brief for decision; a person signs it.
+    brief = _ok(user.get(f"/api/v1/investigations/{case_id}/decision"))["brief"]
     _ok(
         user.post(
             f"/api/v1/investigations/{case_id}/decision/sign",

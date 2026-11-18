@@ -101,14 +101,15 @@ SOURCE_LABELS: dict[str, str] = {
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).
 _FALLBACK_ROLE_LABELS: dict[str, str] = {
-    "TRIAGE_LEAD": "PMS / Signal Triage Lead",
-    "INVESTIGATOR": "Quality Investigator",
+    "SERVICE_DESK": "Service Desk",
+    "TRIAGE_LEAD": "Complaint Handler",
+    "INVESTIGATOR": "Investigator",
     "RISK_REVIEWER": "Risk Reviewer",
     "REGULATORY_REVIEWER": "Regulatory Reviewer",
     "REVIEWER": "Quality Reviewer",
-    "APPROVER": "Authorized Decision Maker",
-    "LEADER": "Leader (Quality Manager)",
-    "VIEWER": "Viewer",
+    "APPROVER": "Decision Maker",
+    "LEADER": "Quality Leader",
+    "VIEWER": "Executive (view only)",
 }
 
 

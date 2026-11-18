@@ -50,11 +50,16 @@ export function ComplaintViews({ tab }: { tab?: string }) {
   // Who may import, by the Import data screen's rule; a trial's button opens its own import, as Help › Try your own
   // data does (0.10.79; until then a trial had it only under Help).
   const canImport = canImportOwnData(session);
-  const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
+  // Every hook runs on every render (never behind ||); the Service Desk logs with case.log, its one own right (UX1).
+  const logs = useCan("case.log");
+  const triages = useCan("signal.triage");
+  const opens = useCan("investigation.create");
+  const reviews = useCan("quality.review");
+  const canLog = logs || triages || opens || reviews;
   const complaint = tabParam(carried, "complaint");
   // "Log a call" opens in place (0.10.85, D3.10): the Calls to check view, with the log open beside it. It opened
-  // Home › Queues before (U-21).
-  const [logged, setLogged] = useState(0);
+  // Home › Queues before (U-21). Home's "Log a call" arrives as Calls to check?log=1 with the log already open (UX1).
+  const [logged, setLogged] = useState(() => (tabParam(carried, "log") ? 1 : 0));
   const server = SERVER_VIEWS[view];
   return (
     <>
@@ -89,7 +94,8 @@ export function ComplaintViews({ tab }: { tab?: string }) {
         )}
       </div>
       {server && <ComplaintList key={view} eyebrow="" countTitle view={{ name: view, code: server.code }} />}
-      {view === "To triage" && <Triage onOpenTab={go} />}
+      {/* The header's "Log a case" is the one log button here (UX1): the triage hero has none of its own. */}
+      {view === "To triage" && <Triage onOpenTab={go} logButton={false} />}
       {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
       {view === "Past target" && <Backlog initial="past_target" fixed />}

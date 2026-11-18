@@ -2,21 +2,16 @@ import type { RefObject } from "react";
 import {
   AlertCircle,
   CalendarClock,
-  Check,
   ChevronRight,
   Clock,
   FileText,
-  GitFork,
   MessageCircle,
-  PenLine,
   Phone,
   SearchCheck,
-  Send,
   Stethoscope,
   TrendingUp,
-  type LucideIcon,
 } from "lucide-react";
-import { DeviceIcon, MonitorBand, ProgressArc, deviceKind } from "../../shared/hero/HeroVisuals";
+import { DeviceIcon, MonitorBand, deviceKind } from "../../shared/hero/HeroVisuals";
 import { DeadlineRuler, ringOf } from "../heroBits";
 import { DeadlineChip } from "../../../app/chips";
 import { formatDateTime, formatDay, zoneName, zoneless } from "../../../app/dates";
@@ -47,12 +42,13 @@ import { openStep, shownRun, STORY_STEPS, useOneStory, type OneStory } from "../
 import { TrendBars } from "./OneStory";
 import { MyWorkMore } from "./MyWork";
 import { RemindersPanel } from "./Reminders";
+import { ApprovalsCard, FlagshipLead, OWN_LEAD, PersonaLead, RiskReviewsCard } from "./HomeWork";
 
 /**
  * Home (0.10.73, Release C part C1; My work's place on the new navigation): what needs attention within the first
  * screen, for the persona the person views as. Overdue · Due this week · At risk from the organization's own dated
  * items and trend check; the next actions most urgent first, each with its reason, owner and deadline; one sentence
- * per rising trend; the Regulatory Leader's legal clocks; the Executive's readiness line. Admin's (and the Quality
+ * per rising trend; the Regulatory Reviewer's legal clocks; the Executive's readiness line. Admin's (and the Quality
  * Leader's) Home keeps Release A's one-event card and the short story. All of My work stays one click below.
  */
 export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject<HTMLHeadingElement | null> }) {
@@ -72,10 +68,16 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
   // The complaint the hero names is always in the list, first among those due at the same time.
   const hero = shownRun(story.data, dataSource);
   const actions = nextActions(items, 5, hero?.run === "yours" ? hero.complaint.id : null);
-  // The Regulatory Leader's legal clocks, and the administrator's (the trial's owner sees every clock; 0.10.92, A9).
+  // The Regulatory Reviewer's legal clocks, and the administrator's (the trial's owner sees every clock; 0.10.92, A9).
   const showsClocks = persona === "regulatory" || persona === "admin";
   const clocks = showsClocks ? legalClocks(items) : [];
   const name = (session?.display_name ?? "").split(/\s+/)[0];
+  // UX1: one onboarding story, the 7-step flagship, led by the trial owner and the Quality Leader; every other persona
+  // leads with its own first piece of work. Your data keeps its own hero (your most urgent imported complaint).
+  const yours = isTrial && hero?.run === "yours" ? hero : null;
+  const flagship = isTrial && !OWN_LEAD.includes(persona) ? (story.data?.flagship ?? null) : null;
+  const ownLead = !yours && OWN_LEAD.includes(persona);
+  const nearestClock = clocks.find((item) => item.opens);
   const go = (item: OversightItem) => {
     if (!item.opens) return;
     const place = placeOf(item.opens);
@@ -103,10 +105,16 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
       </header>
 
       {/* The hero design's monitor band (0.10.90): the story beside the three readouts. */}
-      <MonitorBand className={`uw-home-band${isTrial && hero ? "" : " is-stats-only"}`}>
-        {/* The story (0.10.82, D1.6): a slim banner on the sample, the hero of your most urgent complaint on your data,
-          "Story complete" once its ten steps are done. Never a second retelling of Getting started. */}
-        {isTrial && <HomeStory story={story} />}
+      <MonitorBand className={`uw-home-band${yours || flagship || ownLead ? "" : " is-stats-only"}`}>
+        {/* The story (0.10.82, D1.6) on your data: the hero of your most urgent complaint. On the sample (UX1): the
+          flagship Getting started tells, or the persona's own first piece of work, never a second story. */}
+        {yours ? (
+          <HomeStory story={story} />
+        ) : flagship ? (
+          <FlagshipLead run={flagship} />
+        ) : ownLead ? (
+          <PersonaLead clock={nearestClock ? () => go(nearestClock) : undefined} />
+        ) : null}
 
         {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
         <section className="uw-home-stats" aria-label="What needs attention">
@@ -155,54 +163,58 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
       </MonitorBand>
 
       <div className="uw-home-grid">
-        {persona === "executive" ? (
-          <ReadinessLine data={readiness.data} onOpen={() => open("Records", "Inspection readiness")} />
-        ) : (
-          <section className="uw-card" aria-labelledby="home-next">
-            <div className="uw-card-head">
-              <h2 id="home-next">Your next actions</h2>
-              <span className="ac-muted">Most urgent first</span>
-            </div>
-            {reading ? (
-              <p className="ac-muted uw-card-pad" role="status">
-                Reading what needs attention…
-              </p>
-            ) : actions.length ? (
-              <>
-                <DeadlineRuler items={actions} />
-                <ul className="uw-home-list">
-                  {actions.map((item) => (
-                    <li key={item.key}>
-                      <button
-                        type="button"
-                        className={`uw-home-row is-${ringOf(item).status}`}
-                        onClick={() => go(item)}
-                        disabled={!item.opens}
-                      >
-                        <ActionIcon item={item} />
-                        <DeadlineChip item={item} />
-                        <span className="uw-home-what">
-                          <b>
-                            {item.ref ? `${item.ref} · ` : ""}
-                            {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
-                            {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
-                          </b>
-                          <small>
-                            {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
-                            {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
-                          </small>
-                        </span>
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="ac-muted uw-card-pad">Nothing waits for this persona. New work appears here first.</p>
-            )}
-          </section>
-        )}
+        <div className="uw-home-main">
+          {persona === "decision" && <ApprovalsCard />}
+          {persona === "risk" && <RiskReviewsCard />}
+          {persona === "executive" ? (
+            <ReadinessLine data={readiness.data} onOpen={() => open("Records", "Inspection readiness")} />
+          ) : (
+            <section className="uw-card" aria-labelledby="home-next">
+              <div className="uw-card-head">
+                <h2 id="home-next">Your next actions</h2>
+                <span className="ac-muted">Most urgent first</span>
+              </div>
+              {reading ? (
+                <p className="ac-muted uw-card-pad" role="status">
+                  Reading what needs attention…
+                </p>
+              ) : actions.length ? (
+                <>
+                  <DeadlineRuler items={actions} />
+                  <ul className="uw-home-list">
+                    {actions.map((item) => (
+                      <li key={item.key}>
+                        <button
+                          type="button"
+                          className={`uw-home-row is-${ringOf(item).status}`}
+                          onClick={() => go(item)}
+                          disabled={!item.opens}
+                        >
+                          <ActionIcon item={item} />
+                          <DeadlineChip item={item} />
+                          <span className="uw-home-what">
+                            <b>
+                              {item.ref ? `${item.ref} · ` : ""}
+                              {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
+                              {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
+                            </b>
+                            <small>
+                              {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
+                              {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
+                            </small>
+                          </span>
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="ac-muted uw-card-pad">Nothing waits for this persona. New work appears here first.</p>
+              )}
+            </section>
+          )}
+        </div>
         <div className="uw-home-side">
           {showsClocks && <LegalClocks clocks={clocks} onOpen={go} reading={reading} />}
           {(persona === "investigator" || persona === "risk") && <OpenInvestigations />}
@@ -297,10 +309,9 @@ function Stat({
 }
 
 /**
- * The story on Home (0.10.82, D1.6), read from the same saved records as Getting started:
- * - on the sample, a slim "Continue the story" banner (never a second retelling of the story);
- * - on your data, the hero of your most urgent imported complaint and what the file did not say;
- * - once its ten steps are done, a "Story complete" card.
+ * The story on Home (0.10.82, D1.6), read from the same saved records as Getting started: on your data, the hero of
+ * your most urgent imported complaint and what the file did not say; once its ten steps are done, a "Story complete"
+ * card. On the sample, Home leads with the flagship or the persona's own work instead (UX1, HomeWork.tsx).
  */
 export function HomeStory({ story }: { story: Resource<OneStory> }) {
   const { open, dataSource, chooseDataSource, startStory, session } = useWorkspace();
@@ -311,26 +322,6 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
     startStory?.(null);
     void openStep(run, Math.min(run.current, STORY_STEPS - 1), (section, tab) => open(section, tab));
   };
-  if (run.run === "sample" && !run.finished)
-    return (
-      <section className="uw-card uw-home-banner" aria-label="The sample story">
-        <ProgressArc done={run.steps.filter((step) => step.done || step.skipped).length} size={56} decorative />
-        <span>
-          <span className="ms-chip is-sample">Sample story</span>{" "}
-          <b>
-            Step {run.current + 1} of {STORY_STEPS}: {run.steps[run.current].label}
-          </b>{" "}
-          {/* The reference on its own line, never a line that starts with its separator (F-H3). */}
-          <span className="ac-muted uw-home-ref">
-            {/* Steps 1 and 2 work on the call: the same reference as Getting started says (F-H7). */}
-            {run.case && run.current < 2 ? `${run.case.ref}, the call behind ${run.complaint.ref}` : run.complaint.ref}
-          </span>
-        </span>
-        <button type="button" className="ac-primary" onClick={go}>
-          Continue the story <ChevronRight size={15} aria-hidden="true" />
-        </button>
-      </section>
-    );
   if (run.finished)
     return (
       <section className="uw-card uw-home-hero" aria-labelledby="home-story-title">
@@ -359,7 +350,6 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
               </button>
             )}
           </div>
-          {run.run === "sample" && <StoryTrack />}
         </div>
       </section>
     );
@@ -419,33 +409,6 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
   );
 }
 
-/** The finished sample story's five moments, all done (the hero design's story track). */
-const TRACK: ReadonlyArray<[LucideIcon, string]> = [
-  [Phone, "The call"],
-  [GitFork, "Decision tree"],
-  [PenLine, "Signed"],
-  [Send, "Recorded"],
-  [TrendingUp, "Trend check"],
-];
-
-function StoryTrack() {
-  return (
-    <ol className="uw-strack" aria-label="Story steps, all done">
-      {TRACK.map(([Icon, label]) => (
-        <li key={label}>
-          <span className="uw-strack-n">
-            <Icon size={18} aria-hidden="true" />
-            <span className="uw-strack-ok">
-              <Check size={11} strokeWidth={3} aria-hidden="true" />
-            </span>
-          </span>
-          {label}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /** A next action's kind as an icon in its deadline's colour: a reply, a triage, a report, an investigation. */
 function ActionIcon({ item }: { item: OversightItem }) {
   const kind = `${item.category} ${item.category_label}`;
@@ -471,7 +434,7 @@ function ActionIcon({ item }: { item: OversightItem }) {
 export const dueDay = (item: { due_label?: string; due_at: string }) =>
   (item.due_label ?? formatDay(item.due_at)).split(",")[0].replace(/ \d{4}$/, "");
 
-/** The Regulatory Leader's legal clocks: each market's deadline, soonest first, with how much time is used. */
+/** The Regulatory Reviewer's legal clocks: each market's deadline, soonest first, with how much time is used. */
 export function LegalClocks({
   clocks,
   onOpen,

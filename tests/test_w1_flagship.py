@@ -99,6 +99,7 @@ def test_marks_count_in_order_for_the_whole_team_and_never_on_a_moved_story(tria
     user = trial["user"]
     assert _mark(user, "product", 409)["detail"]["code"] == "STEP_NOT_YET"
     assert _mark(user, "evidence", 409)["detail"]["code"] == "STEP_NOT_YET"
+    assert _mark(user, "brief", 409)["detail"]["code"] == "STEP_NOT_YET"
     assert _mark(user, "signal", 409, subject=str(uuid.uuid4()))["detail"]["code"] == "STORY_MOVED"
     # A ten-step mark on the flagship run, or a flagship mark on the ten-step run, is no step of that story.
     assert _mark(user, "trends", 422)["detail"]["code"] == "NOT_A_STORY_STEP"
@@ -156,15 +157,17 @@ def test_the_ai_step_ticks_only_on_a_persons_review_and_the_recorded_flag_says_s
 # 4 ------------------------------------------------------------------------------------- the brief and the decision
 
 
-def test_the_brief_ticks_on_acceptance_and_the_decision_on_its_signature_with_mfa(trial, monkeypatch):
+def test_the_brief_ticks_when_read_and_the_decision_on_its_signature_with_mfa(trial, monkeypatch):
     from auth import totp
 
     user = trial["user"]
     case_id = _flag(user)["investigation"]["id"]
-    base = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
-    _ok(user.post(f"{base}/start-review", json={}))
-    brief = _ok(user.post(f"{base}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence holds."}))
+    # UX1: the sample reviewer accepted the brief for decision; the step ticks when the person reads it.
+    brief = _ok(user.get(f"/api/v1/investigations/{case_id}/decision"))["brief"]
+    assert brief["status"] == "APPROVED_FOR_DECISION" and brief["quality_reviewer_name"] == "MDARIX sample reviewer"
     run = _flag(user)
+    assert not run["steps"][4]["done"] and run["current"] == 4
+    run = _mark(user, "brief")["flagship"]
     assert run["steps"][4]["done"] and run["current"] == 5
     # MFA required for signing (D11): the trial user enrols, then signs with the code.
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
@@ -270,8 +273,9 @@ def test_the_sample_is_consistent_and_the_brief_passes_its_gate_with_the_fourth_
             bind_tenant(db, tenant_id)
             case = find_case(db, tenant_id)
             brief = db.query(DecisionBriefVersion).filter(DecisionBriefVersion.investigation_id == case.id).one()
-            # Staged only when the gate passes: the fourth action is in the submitted brief.
-            assert brief.status == "READY_FOR_REVIEW"
+            # Staged only when the gate passes: the fourth action is in the submitted brief, which the sample reviewer
+            # accepted for decision (UX1).
+            assert brief.status == "APPROVED_FOR_DECISION"
             assert "SAMPLE-RSK-01" in str(brief.narrative) or "SAMPLE-RSK-01" in str(brief.content)
             rows = (
                 db.query(

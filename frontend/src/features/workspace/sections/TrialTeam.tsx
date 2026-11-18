@@ -86,7 +86,7 @@ export function mfaResetConfirmation(member: TeamMember, onDone: () => void): Co
   };
 }
 
-/** "Regulatory Leader + Decision Maker". */
+/** "Regulatory Reviewer + Decision Maker". */
 export const personaList = (personas: ReadonlyArray<{ label: string }>) =>
   personas.map((item) => item.label).join(" + ");
 

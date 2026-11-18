@@ -49,7 +49,7 @@ describe("follow-up actions", () => {
     expect(followUpStatusView({ status: "IN_PROGRESS" })).toEqual({ label: "In progress", tone: "warning" });
     expect(followUpStatusView({ status: "DONE" }).tone).toBe("good");
     expect(followUpAssignee({ assignee: { id: UUID, name: "Ana Silva" } })).toBe("Ana Silva");
-    expect(followUpAssignee({ assignee: null, assigned_role: "INVESTIGATOR" })).toBe("Quality Investigator (role)");
+    expect(followUpAssignee({ assignee: null, assigned_role: "INVESTIGATOR" })).toBe("Investigator (role)");
     expect(followUpAssignee({ assigned_role: "X", assigned_role_label: "Site lead" })).toBe("Site lead (role)");
     expect(followUpAssignee({ assignee: UUID })).toBe("Unassigned");
   });

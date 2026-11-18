@@ -248,6 +248,8 @@ def _queue(data: Session, control_db: Session, tenant_id) -> list[dict]:
                 "investigation": {
                     "id": str(case.id),
                     "business_id": case.business_id,
+                    # The reference people read (SAMPLE-INV-001), beside the system ID (UX1: Home names it).
+                    "identifier": case.investigation_identifier,
                     "question": case.investigation_question,
                     "priority": case.priority,
                     "due_at": _iso(case.due_at),

@@ -387,6 +387,9 @@ def persona_state(db: Session, user) -> dict:
         "persona": persona.code,
         "persona_label": persona.label,
         "persona_locked": mine is not None and len(mine) < 2,
+        # The person who started the free trial (its own administrator): what only they are shown is asked for only
+        # by them, never probed by everyone (UX1). The server still decides each route (admin_or_trial_owner).
+        "trial_owner": owner,
         "persona_tabs": list(persona.tabs),
         "persona_options": [
             {"code": item.code, "label": item.label, "sub": item.sub, "tabs": list(item.tabs)} for item in options

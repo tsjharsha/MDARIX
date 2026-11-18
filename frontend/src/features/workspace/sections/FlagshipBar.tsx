@@ -1,10 +1,21 @@
 import { ArrowLeft, ChevronRight, ListChecks } from "lucide-react";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { LOT_005_LINE, flagshipCount, openFlagshipStep, useOneStory, type FlagshipRun } from "../oneStory";
+import {
+  FLAGSHIP_STEPS,
+  LOT_005_LINE,
+  flagshipCount,
+  flagshipNextLabel,
+  flagshipStepOn,
+  openFlagshipStep,
+  useOneStory,
+  type FlagshipRun,
+} from "../oneStory";
+import { useAiReady } from "../useAiStatus";
 import { REGISTER_LINK, registerTab, type RegisterPart } from "./SampleRegister";
 
-/** The bar's words (exported for its test): product · version · case · step, or the optional branch. */
-export function flagshipBarParts(run: FlagshipRun, branch = false): string[] {
+/** The bar's words (exported for its test): product · version · case · step, or the optional branch. ``on``: the step
+ * the screen shows (UX1), else the step to do now. */
+export function flagshipBarParts(run: FlagshipRun, branch = false, on: number | null = null): string[] {
   if (branch) return ["Optional branch", run.branch?.ref ?? "SAMPLE-RV-06"];
   const version =
     run.product.version_state === "UNVERIFIED" || !run.product.version ? "Version not verified" : run.product.version;
@@ -12,7 +23,7 @@ export function flagshipBarParts(run: FlagshipRun, branch = false): string[] {
     run.product.label ?? run.product.name ?? run.product.ref ?? "Product",
     version,
     run.investigation.ref,
-    flagshipCount(run),
+    on === null || run.finished ? flagshipCount(run) : `Step ${on + 1} of ${FLAGSHIP_STEPS}`,
   ];
 }
 
@@ -31,14 +42,19 @@ const SECTION_PART: Record<string, RegisterPart> = {
  * branch: "Optional branch · SAMPLE-RV-06". Its step is the server's (the saved records), never this screen's.
  */
 export function FlagshipBar({ section, branch = false }: { section: string; branch?: boolean }) {
-  const { open, work } = useWorkspace();
+  const { open, work, shownTab } = useWorkspace();
   const run = useOneStory(section !== "Getting started").data?.flagship ?? null;
+  // Asked only while step 4 is next: its link says what happens with AI on or off.
+  const aiReady = useAiReady(run?.current === 3);
   if (!run || section === "Getting started") return null;
+  // The evidence page is where step 4's proposals are reviewed: on it, while step 4 is next, the bar says step 4.
+  const at = flagshipStepOn(section, shownTab);
+  const on = at === 2 && run.current === 3 ? 3 : at;
   return (
     <>
       <nav className="uw-story-bar uw-flagship-bar" aria-label="The sample investigation">
         <span className="uw-story-title">
-          {flagshipBarParts(run, branch).map((part, index) => (
+          {flagshipBarParts(run, branch, on).map((part, index) => (
             <span key={part}>
               {index > 0 && " · "}
               {index === 0 ? <b>{part}</b> : part}
@@ -54,7 +70,7 @@ export function FlagshipBar({ section, branch = false }: { section: string; bran
                 openFlagshipStep(run, run.current, (s, t) => open(s as WorkspaceSection, t), work.setInvestigationId)
               }
             >
-              Next: {run.steps[run.current].label} <ChevronRight size={14} aria-hidden="true" />
+              {flagshipNextLabel(run, aiReady)} <ChevronRight size={14} aria-hidden="true" />
             </button>
           )}
           {!branch && (

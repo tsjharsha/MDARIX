@@ -87,7 +87,7 @@ WORKSPACE_PERSONAS = (
     ),
     WorkspacePersona(
         "regulatory",
-        "Regulatory Leader",
+        "Regulatory Reviewer",
         "Reportability, legal clocks, authority reports",
         "REGULATORY_REVIEWER",
         ("home", "complaints", "decisions"),
@@ -122,8 +122,8 @@ WORKSPACE_PERSONAS = (
     ),
     WorkspacePersona(
         "executive",
-        "Executive",
-        "View only: what needs attention",
+        "Executive (view only)",
+        "What needs attention, in one minute",
         "VIEWER",
         ("home", "investigations", "products", "decisions"),
     ),

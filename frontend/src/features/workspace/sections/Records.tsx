@@ -94,8 +94,11 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   const { session } = useWorkspace();
   const menu = (section: "Trust & Audit" | "Intelligence" | "Decisions") =>
     sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only);
-  // Validation evidence (E2) is offered to whom the server shows it: an administrator or the trial's owner.
-  const validation = useResource(VALIDATION_EVIDENCE_PATH).state === "ready";
+  // Validation evidence (E2) is offered to whom the server shows it: an administrator or the trial's owner. Only they
+  // ask for it (UX1): every other role's Records page caused a 403 in the background.
+  const mayValidate =
+    !!session?.trial_owner || !!session?.allowed_menu?.some((item) => item === "customer-admin" || item === "admin");
+  const validation = useResource(mayValidate ? VALIDATION_EVIDENCE_PATH : null).state === "ready";
   const tabs = NEW_RECORDS_TABS.filter(
     (item) =>
       (item !== "Audit trail" || menu("Trust & Audit")) &&

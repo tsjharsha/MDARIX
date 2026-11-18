@@ -57,6 +57,7 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
         seed_sample_workspace,
         seed_story_examples,
     )
+    from backend.app.trial import sample_persona_work
     from backend.app.trial.sample_decision import stage_sample_decision
     from backend.app.trial.sample_dispositions import seed_routine_examples
     from backend.app.trial.sample_guides import stage_sample_guides
@@ -78,6 +79,8 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     sample["lot_quantities"] = seed_lot_quantities(db, tenant_id)
     # The guided investigation's Decision Brief, written by a sample author and submitted for quality review.
     sample["decision"] = stage_sample_decision(db, tenant_id, now)
+    # UX1: that brief accepted for decision by a sample reviewer (waiting for a signature) and a risk review requested.
+    sample["persona_work"] = sample_persona_work.stage(db, tenant_id, now)
     # Pre-recorded AI proposals on the guided investigation (no model called), waiting for a person's review.
     sample["ai"] = stage_sample_ai(db, tenant_id, now)
     # Signed EU/NI and Canada assessments of one event, and a pending US draft.

@@ -63,6 +63,8 @@ export const useConsole = () => useContext(ConsoleContext);
 /** Roles a Customer Administrator may give. Platform roles are never offered and are rejected by the server. */
 export const ASSIGNABLE_ROLES = [
   { value: "VIEWER", label: ROLE_LABELS.VIEWER },
+  // UX1: a pilot can invite its Service Desk too (it logs and checks calls).
+  { value: "SERVICE_DESK", label: ROLE_LABELS.SERVICE_DESK },
   { value: "TRIAGE_LEAD", label: ROLE_LABELS.TRIAGE_LEAD },
   { value: "INVESTIGATOR", label: ROLE_LABELS.INVESTIGATOR },
   { value: "RISK_REVIEWER", label: ROLE_LABELS.RISK_REVIEWER },

@@ -3,15 +3,17 @@
  * too; a screen shows the label, never the raw code. These labels match the server's own (session context `roles`,
  * the user list's `role_label`), so a screen that has only a code still shows the same words.
  */
+// UX1: one list, the same names as the workspace personas (Team, the invite form, "Viewing as").
 export const ROLE_LABELS: Record<string, string> = {
-  TRIAGE_LEAD: "PMS / Signal Triage Lead",
-  INVESTIGATOR: "Quality Investigator",
+  SERVICE_DESK: "Service Desk",
+  TRIAGE_LEAD: "Complaint Handler",
+  INVESTIGATOR: "Investigator",
   RISK_REVIEWER: "Risk Reviewer",
   REGULATORY_REVIEWER: "Regulatory Reviewer",
   REVIEWER: "Quality Reviewer",
-  APPROVER: "Authorized Decision Maker",
-  LEADER: "Leader (Quality Manager)",
-  VIEWER: "Viewer",
+  APPROVER: "Decision Maker",
+  LEADER: "Quality Leader",
+  VIEWER: "Executive (view only)",
   CUSTOMER_ADMIN: "Customer Administrator",
   PLATFORM_ADMIN: "Platform Administrator",
 };

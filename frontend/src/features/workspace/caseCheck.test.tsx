@@ -263,3 +263,19 @@ describe("B7 on the Case check drawer (G18, G19, RT-30)", () => {
     expect(plain).not.toContain("may not be English");
   });
 });
+
+describe("UX1: a view-only person reads the Case check and sees no action", () => {
+  it("says view only and offers no answer, fact correction, file or duplicate action", () => {
+    const html = render(<CheckBody item={item()} guide={guide} onChanged={vi.fn()} />, []);
+    expect(html).toContain("View only: you can read this case.");
+    for (const text of [
+      "Add what they said later",
+      "Correct a fact",
+      "Save the answers",
+      "Link into one event",
+      "Add a file",
+    ])
+      expect(html).not.toContain(text);
+    expect(render(<CheckBody item={item()} guide={guide} onChanged={vi.fn()} />, ALL)).not.toContain("View only");
+  });
+});

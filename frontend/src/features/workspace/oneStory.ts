@@ -115,7 +115,8 @@ const TEN_STEP_MARKS: Record<number, string> = { 5: "form", 8: "records", 9: "tr
 const MARKED: Record<string, Record<number, string>> = {
   sample: TEN_STEP_MARKS,
   yours: TEN_STEP_MARKS,
-  flagship: { 0: "signal", 1: "product", 2: "evidence" },
+  // UX1: step 5 too, the brief the sample reviewer accepted for decision, read before it is signed.
+  flagship: { 0: "signal", 1: "product", 2: "evidence", 4: "brief" },
 };
 /** The screen whose load counts each mark (the flagship's signal is the trend check's load). */
 const VISIT_OF: Record<string, string> = { signal: "trends" };
@@ -216,7 +217,8 @@ export type Visit =
   | { step: "records"; complaintId: string | undefined }
   | { step: "trends"; product: string | undefined }
   | { step: "product"; product: string | undefined; version: string | null | undefined }
-  | { step: "evidence"; investigationId: string | undefined };
+  | { step: "evidence"; investigationId: string | undefined }
+  | { step: "brief"; investigationId: string | undefined };
 
 /** Open a step's screen at once (0.10.85: waiting read as a dead click). A step ticked by the visit itself (the
  * report, Records, Trends) is remembered, and its mark is saved by the screen once it has loaded (``visited``):
@@ -253,7 +255,7 @@ export async function visited(visit: Visit): Promise<void> {
         ? !pending.product || visit.product === pending.product
         : visit.step === "product"
           ? visit.product === pending.product && visit.version === pending.version
-          : visit.step === "evidence"
+          : visit.step === "evidence" || visit.step === "brief"
             ? visit.investigationId === pending.complaintId
             : !!visit.complaintId && visit.complaintId === pending.complaintId;
   if (!matches) return;
@@ -298,7 +300,8 @@ export function flagshipPlace(run: FlagshipRun, index: number): FlagshipPlace {
     return { section: "Product 360", tab: `Product 360?${new URLSearchParams(place)}` };
   }
   if (index === 2) return inCase("Evidence?view=Overview&part=intelligence");
-  if (index === 3) return inCase("Evidence");
+  // The proposals waiting for a person, scrolled to (UX1): "Evidence" alone reloaded the evidence page in place.
+  if (index === 3) return inCase(`Evidence?part=${AI_PROPOSALS_PART}`);
   if (index === 4) return inCase("Decisions & actions?part=brief");
   if (index === 5) return inCase("Decisions & actions?part=decision");
   return run.capa
@@ -383,6 +386,27 @@ export function effectivenessStages(capa: FlagshipRun["capa"]): { label: string;
     { label: signed ? `Signed by a person: ${signed}` : "Result signed by a person", done: !!signed },
   ];
 }
+
+/** The part of the Evidence section that holds the AI proposals waiting for a person (UX1). */
+export const AI_PROPOSALS_PART = "ai-proposals";
+
+/** The flagship step a screen shows (UX1): the bar says the step you are on, not the steps done plus one. Null for a
+ * screen that is no step's own. ``tab`` is the screen's tab with its parameters ("Decisions & actions?part=brief"). */
+export function flagshipStepOn(section: string, tab: string | null | undefined): number | null {
+  const [name, query = ""] = (tab ?? "").split("?");
+  const part = new URLSearchParams(query).get("part");
+  if (section === "Trends") return 0;
+  if (section === "Product 360") return 1;
+  if (section === "Records") return 6;
+  if (section !== "Investigations") return null;
+  if (name === "Evidence") return part === AI_PROPOSALS_PART || part === "advanced" ? 3 : 2;
+  if (name === "Decisions & actions") return part === "decision" ? 5 : part === "brief" ? 4 : null;
+  return null;
+}
+
+/** The bar's link to the step to do now (UX1): with AI off, step 4 reviews the proposals recorded with the sample. */
+export const flagshipNextLabel = (run: FlagshipRun, aiReady: boolean | null) =>
+  run.current === 3 && aiReady !== true ? "Review the recorded proposals" : `Next: ${run.steps[run.current].label}`;
 
 /** "Step 4 of 7", or "All seven steps done" (W1). */
 export const flagshipCount = (run: FlagshipRun) =>

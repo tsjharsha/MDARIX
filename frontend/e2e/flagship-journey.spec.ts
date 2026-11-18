@@ -122,6 +122,7 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
 
     // 2. Product reality: Rev B against Rev A, the supplier change.
     await next(page, /Compare Rev B with Rev A/);
+    await expect(page.getByRole("navigation", { name: "The sample investigation" })).toContainText("Step 2 of 7");
     await expect(page.getByText(/NovaSense/).first()).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Precision Sensors/).first()).toBeVisible();
     await ticked(page, 2);
@@ -139,6 +140,9 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
 
     // 4. AI proposals (AI off: recorded with the sample, no model called); the tick waits for the person's review.
     await next(page, /Review the AI proposals/);
+    // UX1: the bar names the step on screen, and its link goes to the recorded proposals (AI off).
+    await expect(page.getByRole("navigation", { name: "The sample investigation" })).toContainText("Step 4 of 7");
+    await expect(page.getByRole("button", { name: /Review the recorded proposals/ })).toBeVisible();
     await page.getByRole("button", { name: /^Review \d+ observations?$/ }).click();
     await expect(page.getByText("Recorded with the sample · no model was called").first()).toBeVisible({
       timeout: 60_000,
@@ -150,16 +154,10 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     await ticked(page, 4);
     await shot(page, "fs-4-ai");
 
-    // 5. The brief: start the review and accept it for decision.
-    await next(page, /Review the brief/);
-    const review = page
-      .locator("section.ac-panel")
-      .filter({ has: page.getByRole("heading", { level: 2, name: "Review of this brief", exact: true }) });
-    await expect(review).toBeVisible({ timeout: 60_000 });
-    const start = review.getByRole("button", { name: "Start review" });
-    if (await start.isVisible()) await start.click();
-    await review.getByLabel("Your review").selectOption({ label: "Accept for decision" });
-    await review.getByRole("button", { name: "Record review" }).click();
+    // 5. The brief (UX1): accepted for decision by the sample reviewer, a second person; the step ticks when it is read.
+    await next(page, /Read the brief/);
+    await expect(page.getByText(/MDARIX sample reviewer/).first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("navigation", { name: "The sample investigation" })).toContainText("Step 5 of 7");
     await ticked(page, 5);
     await shot(page, "fs-5-brief");
 

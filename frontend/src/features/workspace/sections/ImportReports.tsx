@@ -729,7 +729,7 @@ export function registrationText(item: Registration): string {
 }
 
 /** Products with their regulatory identity (G2a; 0.10.77 adds the Basic UDI-DI, the EMDN code and each market's
- * registration with its risk class), set here by people who may change records and by the Regulatory Leader. */
+ * registration with its risk class), set here by people who may change records and by the Regulatory Reviewer. */
 export function ProductIdentityPanel({
   products,
   onOpenReport,
@@ -755,7 +755,7 @@ export function ProductIdentityPanel({
 }
 
 /** Who changes a product's identity, its registrations and the responsible parties: whoever changes records, and the
- * Regulatory Leader (regulatory.review, 0.10.79). The server checks the same (regulatory_reference_router.py). */
+ * Regulatory Reviewer (regulatory.review, 0.10.79). The server checks the same (regulatory_reference_router.py). */
 export const PRODUCT_EDITORS: readonly BusinessPermission[] = ["records.write", "regulatory.review"];
 function useCanEditProducts() {
   const write = useCan("records.write");

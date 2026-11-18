@@ -67,12 +67,16 @@ test.describe("a solo owner, desktop", () => {
     await activate(page, owner, await linkFromMail(owner.email, /activate/i, ACTIVATION));
     expect(owner.key, "an owner sets up the authenticator at activation").not.toBe("");
     await expect(page).toHaveURL(/\/app\/my-work/, { timeout: 30_000 });
-    await expect(page.getByRole("button", { name: /Continue the story/ })).toBeVisible({ timeout: 30_000 });
+    // UX1: Home leads with the one onboarding story, the 7-step flagship that Getting started tells.
+    await expect(page.getByRole("region", { name: "The sample investigation" })).toContainText("Step 1 of 7", {
+      timeout: 30_000,
+    });
     await accessible(page, "Home");
     await shot(page, "01-home");
     await openFromMenu(page, /^Getting started/);
     await expect(page.getByRole("heading", { level: 1, name: "Getting started" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Walkthrough steps" })).toBeVisible({ timeout: 60_000 });
+    // W1: Getting started leads with the flagship investigation (the ten-step list is folded below it).
+    await expect(page.getByRole("region", { name: "The sample investigation" })).toBeVisible({ timeout: 60_000 });
     await accessible(page, "Getting started");
     await shot(page, "02-getting-started");
     expect(problems).toEqual([]);
@@ -140,7 +144,7 @@ test.describe("a team on its own uploaded data, phone", () => {
     await page.getByRole("textbox", { name: "Colleague's name" }).fill(colleague.name);
     await page.getByRole("textbox", { name: "Work email" }).fill(colleague.email);
     const personas = page.getByRole("group", { name: /^Personas/ });
-    await personas.getByRole("checkbox", { name: /^Regulatory Leader/ }).check();
+    await personas.getByRole("checkbox", { name: /^Regulatory Reviewer/ }).check();
     await personas.getByRole("checkbox", { name: /^Decision Maker/ }).check();
     // Every message waits 20 s at the provider: the owner is told it was sent, and nobody is invited twice.
     provider({ delay: 20 });

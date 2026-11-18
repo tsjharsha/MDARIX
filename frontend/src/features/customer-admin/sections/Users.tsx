@@ -233,12 +233,9 @@ function UserDrawer({
   const { confirm, notify } = useConsole();
   const access = useResource<any>(`/api/v1/admin/identity/users/${user.id}/effective-access`);
   const roles = useResource<any[]>("/api/v1/admin/identity/roles");
-  const personas = useResource<any[]>("/api/v1/admin/identity/personas");
   const roleAssignments = useResource<any[]>("/api/v1/admin/identity/role-assignments");
-  const personaAssignments = useResource<any[]>("/api/v1/admin/identity/persona-assignments");
   const [baseRole, setBaseRole] = useState(String(user.role ?? "VIEWER").toUpperCase());
   const [roleId, setRoleId] = useState("");
-  const [personaCode, setPersonaCode] = useState("");
   const status = String(user.status ?? "").toUpperCase();
   const name = user.display_name ?? user.email ?? "this user";
   const managedByMdarix = isPlatformRole(user.role);
@@ -247,14 +244,10 @@ function UserDrawer({
   const myRoleAssignments = listOf(roleAssignments.data).filter(
     (row) => row.user_id === user.id && String(row.status).toUpperCase() === "ACTIVE",
   );
-  const myPersonaAssignments = listOf(personaAssignments.data).filter(
-    (row) => row.user_id === user.id && String(row.status).toUpperCase() === "ACTIVE",
-  );
   const roleName = (id: string) => listOf(roles.data).find((role) => role.id === id)?.name ?? "Role";
   const refreshAccess = () => {
     access.reload();
     roleAssignments.reload();
-    personaAssignments.reload();
   };
 
   const setStatus = (next: "ACTIVE" | "SUSPENDED" | "OFFBOARDED", verb: string, body: string) =>
@@ -333,12 +326,7 @@ function UserDrawer({
             {listOf(access.data?.roles).map((role) => (
               <li key={role.id}>Role · {role.name}</li>
             ))}
-            {listOf(access.data?.personas).map((persona) => (
-              <li key={persona.code}>Persona · {readable(persona.code)}</li>
-            ))}
-            {!listOf(access.data?.roles).length && !listOf(access.data?.personas).length && (
-              <li className="ac-muted">Their base role only. No extra roles or personas.</li>
-            )}
+            {!listOf(access.data?.roles).length && <li className="ac-muted">Their base role only. No extra roles.</li>}
           </ul>
         ) : (
           <p className="ac-muted">
@@ -458,68 +446,12 @@ function UserDrawer({
             )}
           </section>
 
+          {/* UX1: one access concept, the role. The R1 "Personas" panel said it shaped the workspace; it never did. */}
           <section className="ca-drawer-section">
-            <h3>Personas</h3>
-            <p className="ac-muted">Personas shape the user's workspace. They do not grant permissions.</p>
-            <ul className="ca-assignment-list">
-              {myPersonaAssignments.map((row) => (
-                <li key={row.id}>
-                  <span>{readable(row.persona_code)}</span>
-                  <button
-                    type="button"
-                    className="ac-link"
-                    onClick={async () => {
-                      try {
-                        await send(`/api/v1/admin/identity/persona-assignments/${row.id}/status`, "PATCH", {
-                          status: "RETIRED",
-                        });
-                        notify("Persona removed.");
-                        refreshAccess();
-                      } catch (reason) {
-                        notify(errorText(reason, "Persona could not be removed."), "critical");
-                      }
-                    }}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-              {!myPersonaAssignments.length && <li className="ac-muted">None assigned.</li>}
-            </ul>
-            <div className="ca-inline-form">
-              <select
-                aria-label="Persona to assign"
-                value={personaCode}
-                onChange={(event) => setPersonaCode(event.target.value)}
-              >
-                <option value="">Choose a persona</option>
-                {listOf(personas.data).map((persona) => (
-                  <option key={persona.code} value={persona.code}>
-                    {persona.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="ac-secondary"
-                disabled={!personaCode}
-                onClick={async () => {
-                  try {
-                    await send("/api/v1/admin/identity/persona-assignments", "POST", {
-                      user_id: user.id,
-                      persona_code: personaCode,
-                    });
-                    notify("Persona assigned.");
-                    setPersonaCode("");
-                    refreshAccess();
-                  } catch (reason) {
-                    notify(errorText(reason, "Persona could not be assigned."), "critical");
-                  }
-                }}
-              >
-                Assign
-              </button>
-            </div>
+            <h3>Workspace</h3>
+            <p className="ac-muted">
+              What they see first follows their base role: the role decides both their screens and what they may do.
+            </p>
           </section>
 
           <section className="ca-drawer-section">

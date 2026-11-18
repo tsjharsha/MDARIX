@@ -154,7 +154,7 @@ describe("how an event reads", () => {
   it("names the actor and role, or AI / MDARIX when no person is recorded", () => {
     expect(eventActor({ actor: { name: "Dana Lee", role_label: "APPROVER" } })).toEqual({
       name: "Dana Lee",
-      role: "Authorized Decision Maker",
+      role: "Decision Maker",
     });
     expect(eventActor({ actor: { name: "Dana Lee", role_label: "Quality lead" } }).role).toBe("Quality lead");
     expect(eventActor({ actor: null, origin: "AI" }).name).toBe("AI");

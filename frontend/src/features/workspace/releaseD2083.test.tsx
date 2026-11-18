@@ -403,7 +403,7 @@ describe("D2.4: signing in about four actions", () => {
     expect(executive).toContain("Sign as Asha Menon");
     const reader = show(READY, api(["records.read"], "regulatory"));
     expect(reader).not.toContain("Sign as");
-    expect(reader).toContain("Your role reads this tree. A Regulatory Leader or Quality Leader signs it.");
+    expect(reader).toContain("Your role reads this tree. A Regulatory Reviewer or Quality Leader signs it.");
   });
 
   it("turns each answer into text with its reason once signed, with who signed, when and what it means", () => {

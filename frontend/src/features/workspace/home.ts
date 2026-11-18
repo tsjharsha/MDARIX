@@ -21,6 +21,7 @@ export const PERSONA_GREETING: Readonly<Record<string, string>> = {
   admin: "Everything in your workspace, in one place.",
   quality: "What Quality must decide this week.",
   regulatory: "Which reports are due, in which market, and by when.",
+  servicedesk: "Calls to log and check, handed on to the complaint handler.",
   handler: "Calls to check and complaints to triage.",
   investigator: "Your investigations and what blocks each decision.",
   risk: "Risk reviews requested from you.",

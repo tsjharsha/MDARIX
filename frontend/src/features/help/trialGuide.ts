@@ -70,7 +70,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     actions: [
       "In Getting started, open the Team tab below the story.",
       "Enter your colleague's name and work email, choose their persona (it is their role), then choose Send the invitation.",
-      "Repeat for the second colleague: for example a Regulatory Leader, who may approve the reports you prepare.",
+      "Repeat for the second colleague: for example a Regulatory Reviewer, who may approve the reports you prepare.",
       "If an invitation is not found, choose Resend invitation beside the colleague's name.",
     ],
     result:

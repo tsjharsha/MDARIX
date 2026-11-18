@@ -209,7 +209,7 @@ def test_the_queue_the_dashboard_and_the_decision_screen(org):
     assert len(body["follow_up_options"]) == 5
     # The exact words signed, naming the person who would sign and the role they sign under.
     assert body["outcomes"][0]["signature_meaning"] == (
-        f"I, Approver Brief, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        f"I, Approver Brief, Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
         "and decide: Accept the conclusion"
     )
     assert item["investigation"]["product"]["id"] and (
@@ -290,13 +290,13 @@ def test_signing_a_decision_records_everything_and_verifies(org):
     assert signature["business_id"] and signature["status"] == "SIGNED"
     assert signature["signer_name"] == "Approver Brief"
     assert signature["signature_meaning"] == (
-        f"I, Approver Brief, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        f"I, Approver Brief, Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
         "and decide: Accept with conditions"
     )
     # The rules enforced at signing are read back on the record: approval authority and segregation of duties.
     checks = {item["key"]: item for item in record["verification"]["checks"]}
     assert checks["authority"]["ok"] and checks["authority"]["detail"] == (
-        "The signer held approval authority as Authorized Decision Maker when signing"
+        "The signer held approval authority as Decision Maker when signing"
     )
     assert checks["separation"]["ok"] and checks["separation"]["label"] == "Segregation of duties"
     assert len(signature["fingerprint_full"]) == 64 and "…" in signature["fingerprint"]

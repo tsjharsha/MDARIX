@@ -99,23 +99,13 @@ describe("Home for every persona (D1.6)", () => {
   const home = (persona = "admin", extra: Partial<WorkspaceApi> = {}) =>
     render(<HomeSection heading={{ current: null }} />, api({ persona, ...extra }));
 
-  it("on the sample shows a slim Continue-the-story banner, not a second retelling of the story", () => {
+  it("on the sample never retells the ten-step story: UX1 leads with the flagship or the persona's own work", () => {
     resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
     for (const persona of ["admin", "regulatory", "handler", "executive"]) {
       const html = home(persona);
-      expect(html).toContain('class="uw-card uw-home-banner"');
-      expect(html).toContain("Step 4 of 10: Tree");
-      expect(html).toContain("Continue the story");
-      expect(html).not.toContain("Review this sample event");
+      expect(html).not.toContain("Step 4 of 10");
+      expect(html).not.toContain("Continue the story");
     }
-    // Hero review 2 (F-H3, F-H7): the reference on its own line, and on steps 1-2 the call Getting started names.
-    expect(home()).toContain('<span class="ac-muted uw-home-ref">SAMPLE-RV-11</span>');
-    resources.data[ONE_STORY_PATH] = {
-      sample: { ...run(0), case: { id: "c11", ref: "SAMPLE-CASE-11", classification: null, state: "OPEN" } },
-      yours: null,
-    };
-    expect(home()).toContain("SAMPLE-CASE-11, the call behind SAMPLE-RV-11");
-    resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
   });
 
   it("on your data leads with the most urgent complaint and what the file did not say", () => {
@@ -134,11 +124,6 @@ describe("Home for every persona (D1.6)", () => {
     expect(html).toContain("Incident country");
     expect(html).toContain("Asked on the complaint page: 21 CFR 803");
     expect(html).toContain("Walk it through · step 2 of 10");
-  });
-
-  it("shows a Story complete card once the ten steps are done", () => {
-    resources.data[ONE_STORY_PATH] = { sample: run(10), yours: null };
-    expect(home()).toContain("Story complete · SAMPLE-RV-11");
   });
 
   it("draws the trend card with observed and expected bars, and each tile opens its own list", () => {

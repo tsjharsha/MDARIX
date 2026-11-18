@@ -111,7 +111,7 @@ def test_a_fresh_trial_owner_opens_on_admin_and_the_choice_persists_across_sign_
     assert switched["persona"] == "regulatory" and switched["persona_tabs"] == MOCKUP_TABS["regulatory"]
     # A new sign-in (another device) opens on it.
     again = _ok(_sign_in(email).get("/api/v1/session/context"))
-    assert again["persona"] == "regulatory" and again["persona_label"] == "Regulatory Leader"
+    assert again["persona"] == "regulatory" and again["persona_label"] == "Regulatory Reviewer"
     # The view changed; the role did not.
     assert again["active_role"] == context["active_role"]
     assert again["business_permissions"] == context["business_permissions"]
