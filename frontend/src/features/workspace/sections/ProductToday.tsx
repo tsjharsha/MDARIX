@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { ArrowLeftRight, ChevronRight } from "lucide-react";
+import { ArrowLeftRight, Boxes, ChevronRight, GitCompareArrows, TrendingUp } from "lucide-react";
 import { listOf, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
 import { greeting, inData, PERSONA_GREETING } from "../home";
@@ -84,6 +84,9 @@ export function ProductToday({ heading }: { heading: RefObject<HTMLHeadingElemen
             <ul className="uw-home-list" aria-label="What the rise rests on">
               <li>
                 <button type="button" className="uw-home-row" onClick={() => at("Changes")}>
+                  <span className="uw-home-aic" aria-hidden="true">
+                    <GitCompareArrows size={18} />
+                  </span>
                   <span className="uw-home-what">
                     <b>What changed: {change ? change.title : "no change recorded on its parts"}</b>
                     <small>
@@ -97,6 +100,9 @@ export function ProductToday({ heading }: { heading: RefObject<HTMLHeadingElemen
               </li>
               <li>
                 <button type="button" className="uw-home-row" onClick={() => at("Lots")}>
+                  <span className="uw-home-aic" aria-hidden="true">
+                    <Boxes size={18} />
+                  </span>
                   <span className="uw-home-what">
                     <b>Lots with recent complaints: {lots.length ? lotRange(lots) : "none recorded"}</b>
                     <small>The lots of the complaints the trend check counted in its recent window</small>
@@ -112,6 +118,9 @@ export function ProductToday({ heading }: { heading: RefObject<HTMLHeadingElemen
                     open("Trends", `Trend check?${new URLSearchParams({ product: top.product.identifier ?? "" })}`)
                   }
                 >
+                  <span className="uw-home-aic" aria-hidden="true">
+                    <TrendingUp size={18} />
+                  </span>
                   <span className="uw-home-what">
                     <b>
                       Complaints: {top.recent} against {top.expected} expected
