@@ -7,7 +7,7 @@ import { StoryBar } from "./sections/Entrance";
 import { ProblemCode, problemCodeText } from "./sections/ProblemCode";
 import { attentionText } from "./sections/ComplaintPage";
 import { caseVersion, chosenInvestigation } from "./useWorkContext";
-import { CaseProgressLine } from "./sections/CaseHeader";
+import { Cockpit } from "./sections/Cockpit";
 import { caseSteps } from "./caseWorkflow";
 import { Panel } from "../admin/console/charts";
 
@@ -134,7 +134,7 @@ describe("items 9 and 10: the investigation's context comes from the record bein
 
 describe("item 10: an investigation opened a moment ago never claims more than it has read", () => {
   it("says it is reading its steps, not that every step is done", () => {
-    const html = renderToStaticMarkup(<CaseProgressLine steps={[]} onSection={vi.fn()} />);
+    const html = renderToStaticMarkup(<Cockpit investigationId="i1" steps={[]} readiness={null} onSection={vi.fn()} />);
     expect(html).toContain("Reading where this investigation stands…");
     expect(html).not.toContain("Every step is done");
   });
@@ -143,7 +143,7 @@ describe("item 10: an investigation opened a moment ago never claims more than i
     const line = (story: string | null) =>
       renderToStaticMarkup(
         <WorkspaceContext.Provider value={api(story)}>
-          <CaseProgressLine steps={steps} onSection={vi.fn()} />
+          <Cockpit investigationId="i1" steps={steps} readiness={null} onSection={vi.fn()} />
         </WorkspaceContext.Provider>,
       );
     expect(line(null)).toMatch(/class="ac-primary"[^>]*>Next: /);

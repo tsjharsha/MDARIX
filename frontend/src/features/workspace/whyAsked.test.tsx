@@ -56,7 +56,7 @@ describe("Why am I asked? (8.2)", () => {
 
   it("is shown on each screen that asks", () => {
     expect(source("ComplaintPage")).toContain("<WhyAsked why={COMPLAINT_STEP_WHY[item.code]}");
-    expect(source("CaseHeader")).toContain("<WhyAsked why={CASE_STEP_WHY[next.key]}");
+    expect(source("Cockpit")).toContain("<WhyAsked why={CASE_STEP_WHY[next.key]}");
     expect(source("FirstContact")).toContain("<WhyAsked why={FIRST_CONTACT_WHY[question.id]}");
     expect(source("Dispositions")).toContain("<WhyAsked why={DISPOSITION_WHY[number]}");
     expect(source("Triage")).toContain("<WhyAsked why={TRIAGE_WHY.awareness}");

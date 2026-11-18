@@ -26,7 +26,6 @@ export function CaseIntelligencePanel({
   adding = false,
   onAddingShown,
   readOnly = false,
-  only,
 }: {
   investigationId: string;
   caseLabel: string;
@@ -37,8 +36,6 @@ export function CaseIntelligencePanel({
   onAddingShown?: () => void;
   /** A closed or cancelled case: its intelligence can be read, not changed. */
   readOnly?: boolean;
-  /** W1b: only these views (the case screen shows the main ones itself and folds the rest under this panel). */
-  only?: readonly IntelligenceView[];
 }) {
   const challenge = useChallenge();
   const methods = useRcaMethods();
@@ -48,7 +45,7 @@ export function CaseIntelligencePanel({
     ...(methods ? [] : ["Fishbone", "5 Whys"]),
     ...(overview ? [] : ["Overview"]),
   ]);
-  const views = INTELLIGENCE_VIEWS.filter((item) => !hidden.has(item) && (!only || only.includes(item)));
+  const views = INTELLIGENCE_VIEWS.filter((item) => !hidden.has(item));
   const view = shownIntelligenceView(views, requested);
   return (
     <>

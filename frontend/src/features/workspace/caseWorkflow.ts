@@ -450,55 +450,115 @@ export function rankMyCases(cases: MyCase[] | null | undefined, now = new Date()
     .map((item) => item.row);
 }
 
-/** The investigation's four sections on the new navigation (stage 8), the same as one complaint's page. */
-export const CASE_SECTIONS = ["Summary", "Evidence", "Decisions & actions", "History"] as const;
+/**
+ * The investigation cockpit's six steps (UX3, Persona Blueprint wave C): one rail, Signal · Product reality · Evidence ·
+ * Possible causes · Brief · Decision & action, instead of four sections, six questions and two tab lists. Each step
+ * answers one question; the advanced tools sit in the step they serve.
+ */
+export const CASE_SECTIONS = [
+  "Signal",
+  "Product reality",
+  "Evidence",
+  "Possible causes",
+  "Brief",
+  "Decision & action",
+] as const;
 export type CaseSection = (typeof CASE_SECTIONS)[number];
 
-/** Where each of the case's steps is done on the new navigation: its section, and the part of it to scroll to. */
-export const STEP_PLACE: Readonly<Record<string, { section: CaseSection; part: string }>> = {
-  overview: { section: "Summary", part: "summary" },
-  scope: { section: "Summary", part: "scope" },
-  evidence: { section: "Evidence", part: "evidence" },
-  analysis: { section: "Evidence", part: "analysis" },
-  hypotheses: { section: "Evidence", part: "causes" },
-  gaps: { section: "Evidence", part: "unknowns" },
-  risk_regulatory: { section: "Decisions & actions", part: "reviews" },
-  brief: { section: "Decisions & actions", part: "brief" },
-  human_review: { section: "Decisions & actions", part: "decision" },
+/** The question each step answers: its heading on the page. */
+export const STEP_QUESTION: Readonly<Record<CaseSection, string>> = {
+  Signal: "What happened?",
+  "Product reality": "What changed in the product?",
+  Evidence: "What do we know, and what not?",
+  "Possible causes": "What could have caused it?",
+  Brief: "What should we decide?",
+  "Decision & action": "What was decided, and did it work?",
 };
 
+/** Where each of the case's steps is done on the new navigation: its cockpit step, and the part of it to scroll to. */
+export const STEP_PLACE: Readonly<Record<string, { section: CaseSection; part: string }>> = {
+  overview: { section: "Signal", part: "scope" },
+  scope: { section: "Signal", part: "scope" },
+  evidence: { section: "Evidence", part: "evidence" },
+  analysis: { section: "Possible causes", part: "analysis" },
+  hypotheses: { section: "Possible causes", part: "causes" },
+  gaps: { section: "Evidence", part: "unknowns" },
+  risk_regulatory: { section: "Brief", part: "reviews" },
+  brief: { section: "Brief", part: "brief" },
+  human_review: { section: "Decision & action", part: "decision" },
+};
+
+/** The step a part of the page belongs to, whatever step the address names (each part is in one step only). */
+const PART_STEP: Readonly<Record<string, CaseSection>> = {
+  scope: "Signal",
+  "lot-impact": "Product reality",
+  glance: "Evidence",
+  evidence: "Evidence",
+  unknowns: "Evidence",
+  ask: "Evidence",
+  causes: "Possible causes",
+  "ai-proposals": "Possible causes",
+  advanced: "Possible causes",
+  analysis: "Possible causes",
+  board: "Brief",
+  reviews: "Brief",
+  brief: "Brief",
+  summary: "Decision & action",
+  record: "Decision & action",
+  decision: "Decision & action",
+  "did-it-work": "Decision & action",
+  history: "Decision & action",
+  trust: "Decision & action",
+};
+/** The intelligence views shown in the Evidence step; every other view is a cause tool (Possible causes). */
+const EVIDENCE_VIEWS = ["Overview", "Unknowns", "Contradictions"];
+
 /**
- * W1b: the six questions an investigation answers, in the order the case screen leads the reader through them, each
- * with the section and part that answers it. The advanced tools (challenges, failure chains, observations, the RCA
- * methods, the trust details) sit folded below these.
+ * Where an address opens in the cockpit (UX3): its part's step, else the step it names. The four former sections stay
+ * addresses (e-mails, bookmarks, the link table): Summary opens Signal, Evidence its step, Decisions & actions the
+ * Decision & action step and History the record folded into it. Null when the address names no step.
  */
-export const INVESTIGATION_QUESTIONS: ReadonlyArray<{ question: string; section: CaseSection; part: string }> = [
-  { question: "What happened?", section: "Summary", part: "scope" },
-  { question: "What evidence do we have?", section: "Evidence", part: "glance" },
-  { question: "What could have caused it?", section: "Evidence", part: "causes" },
-  { question: "What do we still not know?", section: "Evidence", part: "unknowns" },
-  { question: "What should we decide?", section: "Decisions & actions", part: "brief" },
-  { question: "What action should we take?", section: "Decisions & actions", part: "decision" },
-];
+export function cockpitStep(
+  name: string | null | undefined,
+  part: string | null | undefined,
+  view?: string | null,
+): { section: CaseSection; part: string | null } | null {
+  if (part === "intelligence")
+    return EVIDENCE_VIEWS.includes(view || "Overview")
+      ? { section: "Evidence", part: !view || view === "Overview" ? "glance" : "unknowns" }
+      : { section: "Possible causes", part: "advanced" };
+  if (part && PART_STEP[part]) return { section: PART_STEP[part], part };
+  if ((CASE_SECTIONS as readonly string[]).includes(name ?? "")) return { section: name as CaseSection, part: null };
+  if (name === "Summary") return { section: "Signal", part: null };
+  if (name === "Decisions & actions") return { section: "Decision & action", part: null };
+  if (name === "History") return { section: "Decision & action", part: "history" };
+  return null;
+}
 
 // A step that is finished, or that the organization cannot record yet, is not work anyone owes.
 const SETTLED: readonly StepStatus[] = ["DONE", "NOT_AVAILABLE"];
 
-export type SectionProgress = { section: CaseSection; state: "DONE" | "CURRENT" | "OPEN"; done: number; total: number };
+export type SectionProgress = {
+  section: CaseSection;
+  state: "DONE" | "CURRENT" | "OPEN" | "READ";
+  done: number;
+  total: number;
+};
 
 /**
- * The one progress line (stage 8): each section with how many of its steps are done, the first unfinished one
- * current. History holds no step: it is done once the decision is signed (human review done).
+ * The cockpit's rail (UX3): each step with how many of its recorded steps are done, the first unfinished one current.
+ * Product reality records nothing of its own (it reads the product's versions, changes and lots): "READ", never
+ * "Done". The AI analysis is never owed (nextCaseStep), and once the decision is signed every step is done.
  */
 export function caseProgress(steps: CaseStep[]): SectionProgress[] {
   const decided = steps.some((step) => step.key === "human_review" && step.status === "DONE");
   let current = false;
   return CASE_SECTIONS.map((section) => {
-    const own = steps.filter((step) => STEP_PLACE[step.key]?.section === section);
-    const done = own.filter((step) => SETTLED.includes(step.status)).length;
-    const finished = section === "History" ? decided : done === own.length;
-    const state = finished ? "DONE" : current ? "OPEN" : ((current = true), "CURRENT");
-    return { section, state, done: section === "History" ? Number(decided) : done, total: own.length || 1 };
+    const own = steps.filter((step) => STEP_PLACE[step.key]?.section === section && step.key !== "analysis");
+    if (!own.length) return { section, state: "READ", done: 0, total: 0 };
+    const done = decided ? own.length : own.filter((step) => SETTLED.includes(step.status)).length;
+    const state = done === own.length ? "DONE" : current ? "OPEN" : ((current = true), "CURRENT");
+    return { section, state, done, total: own.length };
   });
 }
 

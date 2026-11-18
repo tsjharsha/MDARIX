@@ -430,7 +430,18 @@
     },
     "Investigations": {
       "path": "/app/investigations",
-      "tabs": ["Summary", "Evidence", "Decisions & actions", "History", "All investigations"]
+      "tabs": [
+        "Signal",
+        "Product reality",
+        "Evidence",
+        "Possible causes",
+        "Brief",
+        "Decision & action",
+        "All investigations",
+        "Summary",
+        "Decisions & actions",
+        "History"
+      ]
     },
     "Import data": {
       "path": "/app/import-data",

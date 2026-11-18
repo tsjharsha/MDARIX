@@ -27,10 +27,10 @@ import { flagshipCopy } from "./OneStory";
  */
 
 /** The investigation's place for a decision or a review, opened in one click from Home. */
-export const DECISION_PLACE = "Decisions & actions?part=decision";
+export const DECISION_PLACE = "Decision & action?part=decision";
 /** The review opens in its own drawer: its address is the panel's (panel=review:<id>, CaseReviews.tsx). */
 export const reviewPlace = (reviewId: string) =>
-  `Decisions & actions?${new URLSearchParams({ part: "reviews", panel: `review:${reviewId}` })}`;
+  `Brief?${new URLSearchParams({ part: "reviews", panel: `review:${reviewId}` })}`;
 
 /** The reference people read (SAMPLE-INV-001), else the system ID. */
 const ref = (row: { identifier?: string | null; business_id?: string | null }) => row.identifier ?? row.business_id;

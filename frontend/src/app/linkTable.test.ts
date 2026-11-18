@@ -477,13 +477,19 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
   });
 
   it("maps every former investigation tab to its section and part (stage 8, 8.1)", () => {
-    // The four sections, and the tab's own list of every investigation (0.10.74, C2).
+    // The cockpit's six steps (UX3), the tab's own list of every investigation (0.10.74, C2), and the four former
+    // sections, still addresses the cockpit opens (caseWorkflow.ts cockpitStep).
     expect(NEW_PLACES.Investigations.tabs).toEqual([
-      "Summary",
+      "Signal",
+      "Product reality",
       "Evidence",
+      "Possible causes",
+      "Brief",
+      "Decision & action",
+      "All investigations",
+      "Summary",
       "Decisions & actions",
       "History",
-      "All investigations",
     ]);
     const homes: Array<[string, string]> = [
       ["Workspace", "Summary"],

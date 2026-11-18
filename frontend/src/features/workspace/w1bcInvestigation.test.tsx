@@ -1,11 +1,11 @@
-// W1b: the investigation screen in the order of its six questions, the advanced tools folded. W1c: the Investigation
+// UX3: the investigation cockpit (W1b's six questions became its six steps; the advanced tools named folds). W1c: the Investigation
 // Brief as one page, every part present or "Not recorded", never guessed.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { ADVANCED_VIEWS, CaseSections } from "./sections/CaseSections";
 import { InvestigationBriefPage } from "./sections/InvestigationBriefPage";
-import { INVESTIGATION_QUESTIONS, STEP_PLACE } from "./caseWorkflow";
+import { CASE_SECTIONS, STEP_PLACE, cockpitStep } from "./caseWorkflow";
 import { VERSION_NOT_KNOWN, briefPage } from "./investigationBrief";
 import type { DecisionSummary } from "./decisionSummary";
 import type { LotImpactView } from "./lotImpact";
@@ -24,10 +24,16 @@ const { part } = vi.hoisted(() => ({ part: (name: string) => () => <div data-par
 vi.mock("./sections/CaseHeader", () => ({ CaseHeader: () => <header />, ownerText: () => "" }));
 vi.mock("./sections/CaseScope", () => ({ CaseScopePanel: part("scope") }));
 vi.mock("./sections/CaseEvidence", () => ({ CaseEvidencePanel: part("evidence-table") }));
-vi.mock("./sections/CaseIntelligence", () => ({
-  CaseIntelligencePanel: ({ only }: { only?: string[] }) => <div data-part="advanced" data-views={only?.join("|")} />,
+vi.mock("./sections/caseIntelligence/RootCause", () => ({
+  OverviewView: part("glance"),
+  FishboneView: part("fishbone"),
+  FiveWhysView: part("five-whys"),
 }));
-vi.mock("./sections/caseIntelligence/RootCause", () => ({ OverviewView: part("glance") }));
+vi.mock("./sections/caseIntelligence/FailureChain", () => ({ FailureChainView: part("failure-chain") }));
+vi.mock("./sections/caseIntelligence/Observations", () => ({ ObservationsView: part("observations") }));
+vi.mock("./sections/caseIntelligence/Challenge", () => ({ ChallengeView: part("challenge") }));
+vi.mock("./sections/caseIntelligence/History", () => ({ HistoryView: part("judgements") }));
+vi.mock("./sections/VersionCompare", () => ({ VersionCompareCard: part("version-compare") }));
 vi.mock("./sections/caseIntelligence/Hypotheses", () => ({ HypothesesView: part("hypotheses") }));
 vi.mock("./sections/caseIntelligence/Unknowns", () => ({ UnknownsView: part("unknowns") }));
 vi.mock("./sections/caseIntelligence/Contradictions", () => ({ ContradictionsView: part("contradictions") }));
@@ -59,86 +65,72 @@ const order = (html: string, marks: string[]) => marks.map((mark) => html.indexO
 const ascending = (values: number[]) =>
   values.every((value, index) => value >= 0 && (!index || value > values[index - 1]));
 
-describe("W1b: the investigation in six questions", () => {
-  it("names the six questions in order, each in the section and part that answers it", () => {
-    expect(INVESTIGATION_QUESTIONS.map((item) => item.question)).toEqual([
-      "What happened?",
-      "What evidence do we have?",
-      "What could have caused it?",
-      "What do we still not know?",
-      "What should we decide?",
-      "What action should we take?",
+describe("UX3: the investigation cockpit, one 6-step rail (W1b's six questions folded into it)", () => {
+  it("names six steps in order, and each recorded step lands on its own", () => {
+    expect([...CASE_SECTIONS]).toEqual([
+      "Signal",
+      "Product reality",
+      "Evidence",
+      "Possible causes",
+      "Brief",
+      "Decision & action",
     ]);
-    expect(INVESTIGATION_QUESTIONS.map((item) => item.section)).toEqual([
-      "Summary",
-      "Evidence",
-      "Evidence",
-      "Evidence",
-      "Decisions & actions",
-      "Decisions & actions",
-    ]);
-    // The case's next step lands on its question.
-    expect(STEP_PLACE.hypotheses.part).toBe("causes");
-    expect(STEP_PLACE.gaps.part).toBe("unknowns");
+    expect(STEP_PLACE.hypotheses).toEqual({ section: "Possible causes", part: "causes" });
+    expect(STEP_PLACE.gaps).toEqual({ section: "Evidence", part: "unknowns" });
+    expect(STEP_PLACE.brief).toEqual({ section: "Brief", part: "brief" });
+    expect(STEP_PLACE.human_review).toEqual({ section: "Decision & action", part: "decision" });
   });
 
-  it("shows the six-question guide on every section, with no main button of its own", () => {
-    const html = render("Summary");
-    expect(html).toContain('aria-label="The investigation in six questions"');
-    expect(
-      ascending(
-        order(
-          html,
-          INVESTIGATION_QUESTIONS.map((item) => item.question),
-        ),
-      ),
-    ).toBe(true);
-    const guide = html.slice(html.indexOf("uw-question-guide"), html.indexOf("</nav>"));
-    expect(guide).not.toContain("ac-primary");
+  it("has no six-question guide and no tab list on any step", () => {
+    for (const step of CASE_SECTIONS) {
+      const html = render(step);
+      expect(html).not.toContain("six questions");
+      expect(html).not.toContain('role="tablist"');
+      expect(html).toContain(`aria-label="Investigation step: ${step.replace("&", "&amp;")}"`);
+    }
   });
 
-  it("Summary answers question 1 first", () => {
-    const html = render("Summary");
-    const body = html.slice(html.indexOf("uw-case-body"));
+  it("Signal answers What happened? with the complaints in scope", () => {
+    const body = render("Signal").slice(render("Signal").indexOf("uw-case-body"));
     expect(body.indexOf("What happened?")).toBeLessThan(body.indexOf('data-part="scope"'));
-    expect(body.indexOf('data-part="scope"')).toBeLessThan(body.indexOf("What the decision rests on"));
   });
 
-  it("Evidence answers questions 2, 3 and 4 in order, then the advanced tools", () => {
+  it("Evidence: what is known and what not, the records, then the unknowns and contradictions; no causes", () => {
     const html = render("Evidence").slice(render("Evidence").indexOf("uw-case-body"));
     expect(
       ascending(
         order(html, [
-          "What evidence do we have?",
+          "What do we know, and what not?",
           'data-part="glance"',
           'data-part="evidence-table"',
-          "What could have caused it?",
-          'data-part="hypotheses"',
-          "What do we still not know?",
           'data-part="unknowns"',
           'data-part="contradictions"',
-          'data-part="advanced"',
         ]),
       ),
     ).toBe(true);
+    expect(html).not.toContain('data-part="hypotheses"');
   });
 
-  it("folds the advanced parts, closed by default: challenges, failure chains, observations, RCA tools", () => {
-    const html = render("Evidence");
-    expect(html).toMatch(/<details class="uw-more uw-case-part" id="case-part-advanced">/);
+  it("Possible causes: the hypotheses, then each cause tool as a named fold, closed and not read until opened", () => {
+    const html = render("Possible causes");
+    expect(ascending(order(html, ["What could have caused it?", 'data-part="hypotheses"', "Fishbone: causes"]))).toBe(
+      true,
+    );
     expect(ADVANCED_VIEWS).toEqual(["Fishbone", "5 Whys", "Failure chain", "Observations", "Challenge", "History"]);
-    expect(html).toContain('data-views="Fishbone|5 Whys|Failure chain|Observations|Challenge|History"');
-    // The trust details fold on History.
-    expect(render("History")).toMatch(/<details class="uw-more uw-case-part" id="case-part-trust">/);
+    for (const label of ["5 Whys", "Failure chains: how a cause leads", "Observations", "Judgement history"])
+      expect(html).toContain(label);
+    expect(html).toContain("The AI analysis workspace");
+    // Closed folds draw nothing (no read on the server, nothing hidden in the accessibility tree).
+    expect(html).not.toContain('data-part="fishbone"');
+    expect(html).not.toContain('data-part="workspace"');
   });
 
-  it("opens the advanced parts when a link asks for one of their views; a main view opens its question", () => {
-    expect(render("Evidence?view=Failure chain&part=intelligence")).toMatch(
-      /<details class="uw-more uw-case-part" id="case-part-advanced" open="">/,
-    );
-    expect(render("Evidence?view=Unknowns&part=intelligence")).toMatch(
-      /<details class="uw-more uw-case-part" id="case-part-advanced">/,
-    );
+  it("a former link to a cause tool opens Possible causes with that tool open; a main view opens its step", () => {
+    const html = render("Evidence?view=Failure chain&part=intelligence");
+    expect(html).toContain('aria-label="Investigation step: Possible causes"');
+    expect(html).toContain('data-part="failure-chain"');
+    expect(html).not.toContain('data-part="fishbone"');
+    expect(render("Evidence?view=Unknowns&part=intelligence")).toContain('aria-label="Investigation step: Evidence"');
   });
 
   it("opens the evidence records when the read-only overview is switched off", () => {
@@ -146,18 +138,69 @@ describe("W1b: the investigation in six questions", () => {
     expect(render("Evidence")).toMatch(/<details class="uw-more" id="case-part-evidence">/);
   });
 
-  it("Decisions & actions answers 5 (brief) before 6 (decision)", () => {
-    const html = render("Decisions & actions");
+  it("Brief: what the decision rests on, the reviews, then the brief", () => {
+    const html = render("Brief");
     expect(
       ascending(
         order(html.slice(html.indexOf("uw-case-body")), [
           "What should we decide?",
+          "What the decision rests on",
+          'data-part="reviews"',
           'data-part="brief"',
-          "What action should we take?",
-          'data-part="decision"',
         ]),
       ),
     ).toBe(true);
+  });
+
+  it("Decision & action: the signed summary, the decision, did it work, then the record folded", () => {
+    const html = render("Decision & action");
+    expect(
+      ascending(
+        order(html.slice(html.indexOf("uw-case-body")), [
+          "What was decided, and did it work?",
+          'data-part="summary"',
+          'data-part="decision"',
+          'data-part="did-it-work"',
+          "The record: download, history and trust details",
+        ]),
+      ),
+    ).toBe(true);
+    expect(html).not.toContain('data-part="timeline"');
+  });
+
+  it("every former section address still opens its step (e-mails, bookmarks, the link table)", () => {
+    expect(render("Summary")).toContain('aria-label="Investigation step: Signal"');
+    expect(render("Summary?part=lot-impact")).toContain('aria-label="Investigation step: Product reality"');
+    expect(render("Decisions & actions?part=brief")).toContain('aria-label="Investigation step: Brief"');
+    expect(render("Decisions & actions?part=decision")).toContain(
+      'aria-label="Investigation step: Decision &amp; action"',
+    );
+    const history = render("History");
+    expect(history).toContain('aria-label="Investigation step: Decision &amp; action"');
+    expect(history).toContain('data-part="timeline"');
+    expect(history).toMatch(/<details class="uw-more uw-case-part" id="case-part-trust">/);
+    expect(render("History?part=trust")).toMatch(/<details class="uw-more uw-case-part" id="case-part-trust" open="">/);
+  });
+});
+
+describe("UX3: where an address opens in the cockpit", () => {
+  it("reads a part first, then the step or the former section", () => {
+    expect(cockpitStep("Evidence", "causes")).toEqual({ section: "Possible causes", part: "causes" });
+    expect(cockpitStep("Evidence", "ai-proposals")).toEqual({ section: "Possible causes", part: "ai-proposals" });
+    expect(cockpitStep("Evidence", "intelligence", "Overview")).toEqual({ section: "Evidence", part: "glance" });
+    expect(cockpitStep("Evidence", "intelligence", "Contradictions")).toEqual({
+      section: "Evidence",
+      part: "unknowns",
+    });
+    expect(cockpitStep("Evidence", "intelligence", "5 Whys")).toEqual({ section: "Possible causes", part: "advanced" });
+    expect(cockpitStep("Decisions & actions", "reviews")).toEqual({ section: "Brief", part: "reviews" });
+    expect(cockpitStep("Decisions & actions", "did-it-work")).toEqual({
+      section: "Decision & action",
+      part: "did-it-work",
+    });
+    expect(cockpitStep("History", null)).toEqual({ section: "Decision & action", part: "history" });
+    expect(cockpitStep("Brief", null)).toEqual({ section: "Brief", part: null });
+    expect(cockpitStep("All investigations", null)).toBeNull();
   });
 });
 

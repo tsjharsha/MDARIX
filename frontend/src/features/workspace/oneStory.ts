@@ -5,6 +5,7 @@ import { reportPlace } from "./authorityReports";
 import { treePlace } from "./sections/DecisionTrees";
 import { IMPORTED_SOURCE } from "./complaintList";
 import { monthlyRates, monthlyText } from "./signalAi";
+import { cockpitStep } from "./caseWorkflow";
 
 /**
  * One story, from the first contact to the submission (0.10.82, D1; Part 1 in 0.10.93, B2 spec 4.8): ten steps on one
@@ -299,11 +300,11 @@ export function flagshipPlace(run: FlagshipRun, index: number): FlagshipPlace {
     if (run.product.version) place.version = run.product.version;
     return { section: "Product 360", tab: `Product 360?${new URLSearchParams(place)}` };
   }
-  if (index === 2) return inCase("Evidence?view=Overview&part=intelligence");
+  if (index === 2) return inCase("Evidence?part=glance");
   // The proposals waiting for a person, scrolled to (UX1): "Evidence" alone reloaded the evidence page in place.
-  if (index === 3) return inCase(`Evidence?part=${AI_PROPOSALS_PART}`);
-  if (index === 4) return inCase("Decisions & actions?part=brief");
-  if (index === 5) return inCase("Decisions & actions?part=decision");
+  if (index === 3) return inCase(`Possible causes?part=${AI_PROPOSALS_PART}`);
+  if (index === 4) return inCase("Brief?part=brief");
+  if (index === 5) return inCase("Decision & action?part=decision");
   return run.capa
     ? { section: "Records", tab: `Effectiveness checks?${new URLSearchParams({ capa: run.capa.id })}` }
     : { section: "Records", tab: "Effectiveness checks" };
@@ -328,10 +329,10 @@ export function signalWhy(
   return `${lead} A rise like this starts an investigation.`;
 }
 
-/** E3 + W6: the signed decision's summary and record, leading the case's Decisions & actions. */
+/** E3 + W6: the signed decision's summary and record, leading the cockpit's Decision & action step. */
 export const summaryPlace = (run: FlagshipRun): FlagshipPlace => ({
   section: "Investigations",
-  tab: "Decisions & actions?part=summary",
+  tab: "Decision & action?part=summary",
   caseId: run.investigation.id,
   productId: run.product.id,
 });
@@ -387,20 +388,24 @@ export function effectivenessStages(capa: FlagshipRun["capa"]): { label: string;
   ];
 }
 
-/** The part of the Evidence section that holds the AI proposals waiting for a person (UX1). */
+/** The part of the cockpit's Possible causes step that holds the AI proposals waiting for a person (UX1, UX3). */
 export const AI_PROPOSALS_PART = "ai-proposals";
 
 /** The flagship step a screen shows (UX1): the bar says the step you are on, not the steps done plus one. Null for a
- * screen that is no step's own. ``tab`` is the screen's tab with its parameters ("Decisions & actions?part=brief"). */
+ * screen that is no step's own. ``tab`` is the screen's tab with its parameters ("Brief?part=brief"); a former
+ * section's address reads as the cockpit step it opens (cockpitStep, UX3). */
 export function flagshipStepOn(section: string, tab: string | null | undefined): number | null {
   const [name, query = ""] = (tab ?? "").split("?");
-  const part = new URLSearchParams(query).get("part");
+  const params = new URLSearchParams(query);
   if (section === "Trends") return 0;
   if (section === "Product 360") return 1;
   if (section === "Records") return 6;
   if (section !== "Investigations") return null;
-  if (name === "Evidence") return part === AI_PROPOSALS_PART || part === "advanced" ? 3 : 2;
-  if (name === "Decisions & actions") return part === "decision" ? 5 : part === "brief" ? 4 : null;
+  const place = cockpitStep(name, params.get("part"), params.get("view"));
+  if (place?.section === "Evidence") return 2;
+  if (place?.section === "Possible causes") return 3;
+  if (place?.section === "Brief") return place.part === "brief" ? 4 : null;
+  if (place?.section === "Decision & action") return place.part === "decision" ? 5 : null;
   return null;
 }
 

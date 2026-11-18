@@ -314,8 +314,9 @@ describe("the record page: highlights, path, Details · Related · Activity, and
       /Investigation · INV000001 · <button type="button" class="ac-link">OrbitCare 300[^<]* · Rev B<\/button>/,
     );
     expect(html).toContain("INV000001");
-    for (const field of ["Owner", "Complaints in scope", "Lots in scope", "Blocking the decision"])
-      expect(html).toContain(`<dt>${field}</dt>`);
+    for (const field of ["Owner", "Complaints in scope", "Lots in scope"]) expect(html).toContain(`<dt>${field}</dt>`);
+    // What blocks the decision is the cockpit strip's figure (UX3), once.
+    expect(html.split("Blocking the decision").length - 1).toBe(1);
     expect(html).toContain("uw-highlights");
   });
 });

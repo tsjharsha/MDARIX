@@ -15,8 +15,8 @@ describe("the next step, always", () => {
       expect(source(screen), screen).toContain("<ComplaintNextStep");
     // A triaged complaint opens its page, whose main button is its next action.
     expect(source("Triage")).toContain('open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`)');
-    // The investigation's progress line names its next step.
-    expect(source("CaseHeader")).toContain("Next: {next.label}");
+    // The investigation cockpit's strip names its next step (UX3).
+    expect(source("Cockpit")).toContain("Next: {next.label}");
   });
 
   it("asks for India next in the flagship story once the US is signed", () => {

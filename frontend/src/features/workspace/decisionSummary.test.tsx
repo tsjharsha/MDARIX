@@ -297,7 +297,7 @@ describe("G-06 and the flagship's way to the summary", () => {
     expect(render(<FlagshipView story={story(run(5))} run={run(5)} />)).not.toContain(SUMMARY_LINE);
     expect(summaryPlace(run(6))).toEqual({
       section: "Investigations",
-      tab: "Decisions & actions?part=summary",
+      tab: "Decision & action?part=summary",
       caseId: "inv-1",
       productId: "p-orbit",
     });

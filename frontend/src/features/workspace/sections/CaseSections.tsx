@@ -3,19 +3,24 @@ import { Empty, Panel } from "../../admin/console/charts";
 import { useResource } from "../../customer-admin/shared";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { displayId } from "../../../app/displayId";
-import { offeredTab } from "../../../app/featureSet";
 import { tabParts } from "../../../app/linkTable";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
-import { renamed, useIsTrial, useRcaIntelligence, useRcaMethods, useWorkspace } from "../workspaceContext";
+import {
+  renamed,
+  useChallenge,
+  useIsTrial,
+  useRcaIntelligence,
+  useRcaMethods,
+  useWorkspace,
+} from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
 import { AI_PROPOSALS_PART, useVisited } from "../oneStory";
 import {
-  CASE_SECTIONS,
-  INVESTIGATION_QUESTIONS,
   caseState,
   caseSteps,
+  cockpitStep,
   nextCaseStep,
   readinessChecks,
   readinessPath,
@@ -40,12 +45,15 @@ import { Sparkles } from "lucide-react";
 import { HypothesesView } from "./caseIntelligence/Hypotheses";
 import { UnknownsView } from "./caseIntelligence/Unknowns";
 import { ContradictionsView } from "./caseIntelligence/Contradictions";
-import { OverviewView } from "./caseIntelligence/RootCause";
+import { FishboneView, FiveWhysView, OverviewView } from "./caseIntelligence/RootCause";
+import { ChallengeView } from "./caseIntelligence/Challenge";
+import { FailureChainView } from "./caseIntelligence/FailureChain";
+import { ObservationsView } from "./caseIntelligence/Observations";
+import { HistoryView } from "./caseIntelligence/History";
 import { CaseHeader, ownerText } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
 import { LotImpactPanel } from "./LotImpact";
 import { CaseEvidencePanel } from "./CaseEvidence";
-import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
 import { CaseDecisionPanel } from "./CaseDecision";
@@ -53,67 +61,42 @@ import { DecisionSummaryView } from "./DecisionSummary";
 import { DidItWorkView } from "./DidItWork";
 import { CaseIntegrity, CaseTimeline } from "./CaseAudit";
 import { Embedded } from "./common";
+import { Fold, StepHeading } from "./Cockpit";
+import { VersionCompareCard } from "./VersionCompare";
 
-/** The Decisions & actions parts that fold into "Not started yet" while empty, with their step and checks. */
-const QUIET_PARTS = [
+/** The parts that fold into "Not started yet" while empty, with their cockpit step, recorded step and checks. */
+const QUIET_PARTS: ReadonlyArray<{ part: string; in: CaseSection; step: string; checks: string[]; label: string }> = [
   {
     part: "reviews",
+    in: "Brief",
     step: "risk_regulatory",
     checks: ["risk_review", "regulatory_review"],
     label: "Risk and regulatory reviews",
   },
-  { part: "brief", step: "brief", checks: [], label: "Investigation brief" },
-  { part: "decision", step: "human_review", checks: [], label: "Decision and follow-ups" },
+  { part: "brief", in: "Brief", step: "brief", checks: [], label: "Investigation brief" },
+  { part: "decision", in: "Decision & action", step: "human_review", checks: [], label: "Decision and follow-ups" },
 ];
 
-/** A part of a section, for a link or the next step to scroll to (`part=brief`). */
+/** A part of a step, for a link or the next step to scroll to (`part=brief`). */
 const partId = (part: string) => `case-part-${part}`;
 
-/** W1b: the intelligence views the Evidence section shows open, each under its question's part; the rest fold. */
-const MAIN_VIEW_PART: Partial<Record<IntelligenceView, string>> = {
-  Overview: "glance",
-  Hypotheses: "causes",
-  Unknowns: "unknowns",
-  Contradictions: "unknowns",
+/** The intelligence views a step shows open (W1b); every other view is one of Possible causes' named tools (UX3). */
+const MAIN_VIEW_PLACE: Partial<Record<IntelligenceView, { section: CaseSection; part: string }>> = {
+  Overview: { section: "Evidence", part: "glance" },
+  Hypotheses: { section: "Possible causes", part: "causes" },
+  Unknowns: { section: "Evidence", part: "unknowns" },
+  Contradictions: { section: "Evidence", part: "unknowns" },
 };
-export const ADVANCED_VIEWS = INTELLIGENCE_VIEWS.filter((view) => !MAIN_VIEW_PART[view]);
-const viewPart = (view: IntelligenceView) => MAIN_VIEW_PART[view] ?? "advanced";
-
-/** One question's heading (W1b), numbered in the order of INVESTIGATION_QUESTIONS. */
-function Question({ n }: { n: number }) {
-  return (
-    <h2 className="uw-question">
-      <span className="uw-num">{n}</span> {INVESTIGATION_QUESTIONS[n - 1].question}
-    </h2>
-  );
-}
-
-/** The six questions in order (W1b), each opening the section and part that answers it. Never the main button. */
-export function QuestionGuide({
-  active,
-  onGo,
-}: {
-  active: CaseSection;
-  onGo: (section: CaseSection, part: string) => void;
-}) {
-  return (
-    <nav className="uw-question-guide" aria-label="The investigation in six questions">
-      <ol>
-        {INVESTIGATION_QUESTIONS.map((item, index) => (
-          <li key={item.part}>
-            <button
-              type="button"
-              aria-current={item.section === active ? "location" : undefined}
-              onClick={() => onGo(item.section, item.part)}
-            >
-              <span className="uw-num">{index + 1}</span> {item.question}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
+export const ADVANCED_VIEWS = INTELLIGENCE_VIEWS.filter((view) => !MAIN_VIEW_PLACE[view]);
+/** Each cause tool's name on its fold. */
+const TOOL_LABEL: Partial<Record<IntelligenceView, string>> = {
+  Fishbone: "Fishbone: causes by category",
+  "5 Whys": "5 Whys",
+  "Failure chain": "Failure chains: how a cause leads to the failure",
+  Observations: "Observations",
+  Challenge: "Challenge: questions drawn from the records",
+  History: "Judgement history: who changed what, and why",
+};
 
 /**
  * The AI proposals waiting for a person, at the top of the Evidence step (hero review 2, F-A2): the observations still
@@ -159,14 +142,17 @@ export function AiProposalsCard({
 }
 
 /**
- * One investigation on the new navigation (stage 8, 8.1): the same four sections as one complaint's page, under one
- * progress line, instead of eleven tabs and a nine-step stepper.
- * - Summary: the question, the scope, lot impact and the state.
- * - Evidence: the case's evidence and its reviews, the open unknowns, hypotheses and failure chain, the analysis.
- * - Decisions & actions: the risk and regulatory reviews, the Decision Brief, the decision, the CAPA recorded for the
- *   QMS and what follows the decision.
- * - History: the audit trail, the versions and the signatures.
- * Every former tab's address opens its section and part (linkTable.json newHomes). Classic keeps the tabs.
+ * One investigation on the new navigation: the investigation cockpit (UX3, Persona Blueprint wave C). A summary strip
+ * and one 6-step rail (Cockpit.tsx) over the step shown:
+ * - Signal: the question and the complaints in scope.
+ * - Product reality: the version the complaints carry beside the one before it, and the lots that share the part.
+ * - Evidence: what is known and what is not, the evidence records, the open unknowns and contradictions, Ask MDARIX.
+ * - Possible causes: the AI proposals waiting for a person, the hypotheses, and the cause tools (fishbone, 5 Whys,
+ *   failure chains, observations, challenges, judgement history, the AI analysis workspace), each a named fold.
+ * - Brief: what the decision rests on, the risk and regulatory reviews, the Investigation Brief.
+ * - Decision & action: the signed decision, its CAPA and follow-ups, did it work, and the record with its history.
+ * Every former address (the four sections and their parts, linkTable.json newHomes) opens its step (cockpitStep).
+ * Classic keeps the tabs.
  */
 export function CaseSections({
   tab: requested,
@@ -179,16 +165,16 @@ export function CaseSections({
 }) {
   const { work, open, reportStep, shownTab } = useWorkspace();
   const isTrial = useIsTrial();
-  const [active, setActive] = useState<CaseSection>(() => offeredTab(requested, CASE_SECTIONS, "Summary"));
   const view = tabParam(requested, "view");
-  // A former Intelligence link (part=intelligence&view=Unknowns) opens the view's own question (W1b).
-  const [part, setPart] = useState<string | null>(() => {
-    const asked = tabParam(requested, "part");
-    return asked === "intelligence" && isIntelligenceView(view) ? viewPart(view) : asked;
-  });
-  const [intelView, setIntelView] = useState<IntelligenceView>(isIntelligenceView(view) ? view : "Overview");
+  const [first] = useState(() => cockpitStep(tabParts(requested).name, tabParam(requested, "part"), view));
+  const [active, setActive] = useState<CaseSection>(first?.section ?? "Signal");
+  const [part, setPart] = useState<string | null>(first?.part ?? null);
+  const [intelView, setIntelView] = useState<IntelligenceView | null>(
+    isIntelligenceView(view) && !MAIN_VIEW_PLACE[view] ? view : null,
+  );
   const methods = useRcaMethods();
   const overview = useRcaIntelligence();
+  const challenge = useChallenge();
   // What a link carried: a review to open, a follow-up or an assessment of the decision (the former tabs' own forms).
   const [requestedReview] = useState(() => parseReviewsTab(renamed(requested, "Reviews")));
   const [requestedDecision] = useState(() => parseDecisionTab(renamed(requested, "Decision")));
@@ -218,18 +204,19 @@ export function CaseSections({
   // Flagship step 5 (UX1) counts once the brief, accepted for decision by the sample reviewer, has loaded.
   useVisited(
     { step: "brief", investigationId: work.investigationId || undefined },
-    active === "Decisions & actions" && part === "brief" && brief.state === "ready" && !!brief.data?.current,
+    active === "Brief" && part === "brief" && brief.state === "ready" && !!brief.data?.current,
   );
   // A link to another part of this investigation while it is open (the flagship's Next) moves there (UX1): the part
   // was read only when the page opened, so the link reloaded the page in place.
   const askedPart = tabParam(requested, "part");
   const askedSection = tabParts(requested).name;
   useEffect(() => {
-    if (!askedPart || askedPart === "intelligence") return;
-    if (askedSection && (CASE_SECTIONS as readonly string[]).includes(askedSection))
-      setActive(askedSection as CaseSection);
-    setPart(askedPart);
-    document.getElementById(partId(askedPart))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!askedPart) return;
+    const place = cockpitStep(askedSection, askedPart, tabParam(requested, "view"));
+    if (!place) return;
+    setActive(place.section);
+    setPart(place.part);
+    if (place.part) document.getElementById(partId(place.part))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [askedPart, askedSection]);
   const nextPart = nextCaseStep(steps)?.part;
   const checks = readinessChecks(readiness.data);
@@ -246,14 +233,23 @@ export function CaseSections({
         })
       : [];
   const isQuiet = (name: string) => quiet.some((item) => item.part === name);
+  const quietIn = (step: CaseSection) => {
+    const here = quiet.filter((item) => item.in === step);
+    return here.length ? (
+      <p className="uw-cr-meta uw-not-started">
+        Not started yet: {here.map((item) => item.label).join(", ")} ·{" "}
+        <button type="button" className="ac-link" onClick={() => setShowQuiet(true)}>
+          Show
+        </button>
+      </p>
+    ) : null;
+  };
   const caseLabel = selected ? displayId(selected, "investigation_identifier") : "this investigation";
   const readOnly =
     ["CLOSED", "CANCELLED"].includes(caseState(selected) ?? "") || /^closed$/i.test(String(selected?.status ?? ""));
-  // The section is part of the screen's address; the first report keeps what the link carried.
+  // The step is part of the screen's address; the first report keeps what the link carried, under the step's name.
   useEffect(() => {
-    // A link without a section ("?part=lot-impact") keeps what it carries on the section it opens.
-    const name = tabParts(requested).name;
-    reportStep?.(requested && (!name || name === active) ? renamed(requested, active) : active, "replace");
+    reportStep?.(requested ? renamed(requested, active) : active, "replace");
   }, []);
   const go = (next: CaseSection, nextPart?: string) => {
     setActive(next);
@@ -261,10 +257,12 @@ export function CaseSections({
     if (next !== active || tabParts(shownTab).name !== next) reportStep?.(next);
     if (!nextPart) window.scrollTo({ top: 0 });
   };
-  // An intelligence view opens under its question; an advanced one opens the folded tools on it.
+  // An intelligence view opens in its own step; a cause tool opens its fold in Possible causes.
   const showView = (next: IntelligenceView) => {
+    const main = MAIN_VIEW_PLACE[next];
+    if (main) return go(main.section, main.part);
     setIntelView(next);
-    go("Evidence", viewPart(next));
+    go("Possible causes", "advanced");
   };
   useEffect(() => {
     if (part) document.getElementById(partId(part))?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -304,6 +302,10 @@ export function CaseSections({
         </p>
       </Panel>
     );
+  const product = work.products.find((item) => item.id === String(selected.product_id ?? work.productId ?? ""));
+  const tools = ADVANCED_VIEWS.filter(
+    (item) => (challenge || item !== "Challenge") && (methods || (item !== "Fishbone" && item !== "5 Whys")),
+  );
   return (
     <div className="uw-case-sections">
       <CaseHeader
@@ -313,25 +315,32 @@ export function CaseSections({
         onManage={onManage && selected ? () => onManage(selected) : undefined}
         onStep={() => undefined}
         onSection={go}
+        active={active}
         onChanged={onChanged}
       />
-      <QuestionGuide active={active} onGo={go} />
-      {/* One set of section controls: the progress line above (0.10.72, B2: the tabs repeated it). */}
-      <section className="uw-case-body" aria-label={`Investigation section: ${active}`}>
-        {active === "Summary" && (
+      <section className="uw-case-body" aria-label={`Investigation step: ${active}`}>
+        <StepHeading step={active} />
+        {active === "Signal" && (
+          <div className="uw-case-part" id={partId("scope")}>
+            <CaseScopePanel
+              key={`scope:${id}:${scopeRound}`}
+              investigationId={id}
+              caseQuestion={selected?.investigation_question ?? undefined}
+              onChanged={() => setLotRound((value) => value + 1)}
+            />
+          </div>
+        )}
+        {active === "Product reality" && (
           <>
-            <div className="uw-case-part" id={partId("scope")}>
-              <Question n={1} />
-              <CaseScopePanel
-                key={`scope:${id}:${scopeRound}`}
-                investigationId={id}
-                caseQuestion={selected?.investigation_question ?? undefined}
-                onChanged={() => setLotRound((value) => value + 1)}
-              />
-            </div>
+            {/* The product's version beside the one before it, in one click (the Product Lifecycle Twin). */}
+            <VersionCompareCard
+              product={(product?.product_identifier as string | undefined) ?? null}
+              productName={(product?.name as string | undefined) ?? null}
+              version={(selected.version_identifier as string | undefined) ?? null}
+            />
             {isTrial && (
-              <details className="uw-more uw-case-part" id={partId("lot-impact")} open={part === "lot-impact"}>
-                <summary>Lot impact: which other lots share the suspect part</summary>
+              <div className="uw-case-part" id={partId("lot-impact")}>
+                <h3>Lot impact: which other lots share the suspect part</h3>
                 <LotImpactPanel
                   key={`lot:${id}:${lotRound}`}
                   investigationId={id}
@@ -339,16 +348,13 @@ export function CaseSections({
                   focus={part === "lot-impact"}
                   onChanged={() => setScopeRound((value) => value + 1)}
                 />
-              </details>
+              </div>
             )}
-            {/* Where the case stands on the later questions: the leading explanation, for and against, and blocks. */}
-            <DecisionBoard row={selected} readiness={readiness.data} content={brief.data?.current?.content} />
           </>
         )}
         {active === "Evidence" && (
           <>
-            {/* Hero review 2: Ask leads when asked for (F-A3); the method tabs come first and the evidence table is
-                folded under them (F-R1), so the root-cause tools are on the first screen. */}
+            {/* Hero review 2: Ask leads when asked for (F-A3). */}
             {part === "ask" && (
               <div className="uw-case-part" id={partId("ask")}>
                 <Embedded>
@@ -359,90 +365,97 @@ export function CaseSections({
                 </Embedded>
               </div>
             )}
-            {/* W1b: questions 2 to 4 in order, open; the advanced tools folded below them. */}
-            <div className="uw-case-questions" id={partId("intelligence")}>
-              <p className="ac-note">Every statement shows its kind and its author. AI suggestions are never facts.</p>
-              {readOnly && (
-                <p className="ac-message tone-warning" role="note">
-                  This investigation is closed: its intelligence can be read but not changed.
-                </p>
+            <p className="ac-note">Every statement shows its kind and its author. AI suggestions are never facts.</p>
+            {readOnly && (
+              <p className="ac-message tone-warning" role="note">
+                This investigation is closed: its intelligence can be read but not changed.
+              </p>
+            )}
+            <div className="uw-case-part" id={partId("glance")}>
+              {overview && (
+                <OverviewView investigationId={id} caseLabel={caseLabel} onView={showView} methods={methods} />
               )}
-              <div className="uw-case-part" id={partId("glance")}>
-                <Question n={2} />
-                {overview && (
-                  <OverviewView investigationId={id} caseLabel={caseLabel} onView={showView} methods={methods} />
-                )}
-                <details className="uw-more" id={partId("evidence")} open={part === "evidence" || !overview}>
-                  <summary>The evidence records</summary>
-                  <CaseEvidencePanel key={id} investigationId={id} caseLabel={caseLabel} />
-                </details>
-              </div>
-              <div className="uw-case-part" id={partId("causes")}>
-                <Question n={3} />
-                <AiProposalsCard investigationId={id} onOpen={showView} />
-                <HypothesesView key={id} investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
-              </div>
-              <div className="uw-case-part" id={partId("unknowns")}>
-                <Question n={4} />
-                <UnknownsView key={id} investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
-                <ContradictionsView investigationId={id} caseLabel={caseLabel} onView={showView} />
-              </div>
+              <details className="uw-more" id={partId("evidence")} open={part === "evidence" || !overview}>
+                <summary>The evidence records</summary>
+                <CaseEvidencePanel key={id} investigationId={id} caseLabel={caseLabel} />
+              </details>
             </div>
-            <details className="uw-more uw-case-part" id={partId("advanced")} open={part === "advanced"}>
-              <summary>Advanced: challenges, failure chains, observations, root-cause tools and history</summary>
-              <CaseIntelligencePanel
-                key={id}
-                investigationId={id}
-                caseLabel={caseLabel}
-                view={intelView}
-                onView={showView}
-                readOnly={readOnly}
-                only={ADVANCED_VIEWS}
-              />
-            </details>
-            <details className="uw-more uw-case-part" id={partId("analysis")} open={part === "analysis"}>
-              <summary>{part === "ask" ? "The analysis workspace" : "The analysis workspace and Ask MDARIX"}</summary>
-              <Embedded>
-                <InvestigationWorkspacePanel
-                  key={id}
-                  investigationId={id}
-                  temporalMode={work.mode}
-                  asOf={work.asOf}
-                  onOpenDecision={() => go("Decisions & actions", "decision")}
-                  onOpenIntelligence={showView}
-                  onOpenBrief={() => go("Decisions & actions", "brief")}
-                />
-              </Embedded>
-              {part !== "ask" && (
+            <div className="uw-case-part" id={partId("unknowns")}>
+              <h3>What we still do not know</h3>
+              <UnknownsView key={id} investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
+              <ContradictionsView investigationId={id} caseLabel={caseLabel} onView={showView} />
+            </div>
+            {part !== "ask" && (
+              <Fold summary="Ask MDARIX about this investigation">
                 <Embedded>
                   <AskMdarixPage
                     investigationId={id}
                     productVersionId={(work.view?.selected_version?.id as string | undefined) ?? undefined}
                   />
                 </Embedded>
-              )}
-            </details>
+              </Fold>
+            )}
           </>
         )}
-        {active === "Decisions & actions" && (
+        {active === "Possible causes" && (
           <>
-            {/* E3 + W6: once signed, the decision and its impact lead the section, on one screen. */}
-            <div className="uw-case-part" id={partId(part === "record" ? "record" : "summary")}>
-              <DecisionSummaryView
-                key={`${id}:${briefRound}:${signedRound}`}
-                investigationId={id}
-                recordOpen={part === "record"}
-              />
+            <div className="uw-case-part" id={partId("causes")}>
+              <AiProposalsCard investigationId={id} onOpen={showView} />
+              <HypothesesView key={id} investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
             </div>
-            <Question n={5} />
-            {quiet.length > 0 && (
-              <p className="uw-cr-meta uw-not-started">
-                Not started yet: {quiet.map((item) => item.label).join(", ")} ·{" "}
-                <button type="button" className="ac-link" onClick={() => setShowQuiet(true)}>
-                  Show
-                </button>
-              </p>
-            )}
+            {/* The cause tools, each a named fold (the Advanced drawer and its tab list before UX3). */}
+            <div className="uw-case-part" id={partId("advanced")}>
+              <h3>More ways to test a cause</h3>
+              {tools.map((tool) => {
+                const opened = part === "advanced" && intelView === tool;
+                return (
+                  <Fold key={`${tool}:${opened}`} summary={TOOL_LABEL[tool] ?? tool} initiallyOpen={opened}>
+                    {tool === "Fishbone" && (
+                      <FishboneView investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
+                    )}
+                    {tool === "5 Whys" && (
+                      <FiveWhysView investigationId={id} caseLabel={caseLabel} readOnly={readOnly} onView={showView} />
+                    )}
+                    {tool === "Failure chain" && (
+                      <FailureChainView investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
+                    )}
+                    {tool === "Observations" && (
+                      <ObservationsView investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
+                    )}
+                    {tool === "Challenge" && (
+                      <ChallengeView investigationId={id} caseLabel={caseLabel} readOnly={readOnly} />
+                    )}
+                    {tool === "History" && <HistoryView investigationId={id} caseLabel={caseLabel} />}
+                  </Fold>
+                );
+              })}
+              <Fold
+                key={`analysis:${part === "analysis"}`}
+                id={partId("analysis")}
+                summary="The AI analysis workspace: run the analysis, hypotheses and a brief draft"
+                initiallyOpen={part === "analysis"}
+              >
+                <Embedded>
+                  <InvestigationWorkspacePanel
+                    key={id}
+                    investigationId={id}
+                    temporalMode={work.mode}
+                    asOf={work.asOf}
+                    onOpenDecision={() => go("Decision & action", "decision")}
+                    onOpenIntelligence={showView}
+                    onOpenBrief={() => go("Brief", "brief")}
+                  />
+                </Embedded>
+              </Fold>
+            </div>
+          </>
+        )}
+        {active === "Brief" && (
+          <>
+            <div className="uw-case-part" id={partId("board")}>
+              <DecisionBoard row={selected} readiness={readiness.data} content={brief.data?.current?.content} />
+            </div>
+            {quietIn("Brief")}
             <div className="uw-case-part" id={partId("reviews")} hidden={isQuiet("reviews")}>
               <CaseReviewsPanel
                 key={id}
@@ -459,7 +472,7 @@ export function CaseSections({
                 caseLabel={caseLabel}
                 readOnly={readOnly}
                 focusReview={reviewFocus}
-                onOpenDecision={() => go("Decisions & actions", "decision")}
+                onOpenDecision={() => go("Decision & action", "decision")}
                 onChanged={() => {
                   setBriefRound((round) => round + 1);
                   readiness.reload();
@@ -468,7 +481,19 @@ export function CaseSections({
                 }}
               />
             </div>
-            <Question n={6} />
+          </>
+        )}
+        {active === "Decision & action" && (
+          <>
+            {/* E3 + W6: once signed, the decision and its impact lead the step, on one screen. */}
+            <div className="uw-case-part" id={partId(part === "record" ? "record" : "summary")}>
+              <DecisionSummaryView
+                key={`${id}:${briefRound}:${signedRound}`}
+                investigationId={id}
+                recordOpen={part === "record"}
+              />
+            </div>
+            {quietIn("Decision & action")}
             <div className="uw-case-part" id={partId("decision")} hidden={isQuiet("decision")}>
               <CaseDecisionPanel
                 key={`${id}:${briefRound}`}
@@ -482,7 +507,7 @@ export function CaseSections({
                 }}
                 onReviewBrief={() => {
                   setReviewFocus(true);
-                  go("Decisions & actions", "brief");
+                  go("Brief", "brief");
                 }}
               />
             </div>
@@ -498,30 +523,34 @@ export function CaseSections({
                 refreshKey={String(scope.data.current.version)}
               />
             )}
-          </>
-        )}
-        {active === "History" && (
-          <>
-            <Panel eyebrow="History" title={`The record of ${caseLabel}`}>
-              <p className="ac-muted">
-                Everything this investigation holds, from its question and evidence to its reviews, decision and audit
-                trail, in one record you can hand an inspector.
-              </p>
-              <CaseRecordDownload investigationId={id} label={caseLabel} />
-            </Panel>
-            <CaseTimeline
-              investigationId={id}
-              caseLabel={caseLabel}
-              onOpenDecision={() => go("Decisions & actions", "decision")}
-            />
-            <details className="uw-more uw-case-part" id={partId("trust")} open={part === "trust"}>
-              <summary>Trust details: the integrity checks of this record</summary>
-              <CaseIntegrity
+            {/* The record and its history (the History section before UX3), folded at the end of the story. */}
+            <Fold
+              key={`history:${part === "history" || part === "trust"}`}
+              id={partId("history")}
+              summary="The record: download, history and trust details"
+              initiallyOpen={part === "history" || part === "trust"}
+            >
+              <Panel eyebrow="History" title={`The record of ${caseLabel}`}>
+                <p className="ac-muted">
+                  Everything this investigation holds, from its question and evidence to its reviews, decision and audit
+                  trail, in one record you can hand an inspector.
+                </p>
+                <CaseRecordDownload investigationId={id} label={caseLabel} />
+              </Panel>
+              <CaseTimeline
                 investigationId={id}
                 caseLabel={caseLabel}
-                onOpenDecision={() => go("Decisions & actions", "decision")}
+                onOpenDecision={() => go("Decision & action", "decision")}
               />
-            </details>
+              <details className="uw-more uw-case-part" id={partId("trust")} open={part === "trust"}>
+                <summary>Trust details: the integrity checks of this record</summary>
+                <CaseIntegrity
+                  investigationId={id}
+                  caseLabel={caseLabel}
+                  onOpenDecision={() => go("Decision & action", "decision")}
+                />
+              </details>
+            </Fold>
           </>
         )}
       </section>

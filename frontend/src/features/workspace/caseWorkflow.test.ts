@@ -254,7 +254,7 @@ describe("my investigations", () => {
   });
 });
 
-describe("the investigation's one progress line (stage 8)", () => {
+describe("the investigation cockpit's rail (UX3)", () => {
   const step = (key: string, status: StepStatus) => ({ key, label: key, status, detail: null, destination: null });
   it("counts each section's steps and names the first unfinished step as the next one", () => {
     const steps = [
@@ -269,16 +269,20 @@ describe("the investigation's one progress line (stage 8)", () => {
       step("human_review", "NOT_STARTED"),
     ];
     expect(caseProgress(steps)).toEqual([
-      { section: "Summary", state: "DONE", done: 2, total: 2 },
-      { section: "Evidence", state: "CURRENT", done: 3, total: 4 },
-      { section: "Decisions & actions", state: "OPEN", done: 0, total: 3 },
-      { section: "History", state: "OPEN", done: 0, total: 1 },
+      { section: "Signal", state: "DONE", done: 2, total: 2 },
+      // Product reality records nothing of its own: it is read, never "Done".
+      { section: "Product reality", state: "READ", done: 0, total: 0 },
+      { section: "Evidence", state: "CURRENT", done: 1, total: 2 },
+      // The AI analysis is never owed (AI off): Possible causes counts the hypotheses only.
+      { section: "Possible causes", state: "DONE", done: 1, total: 1 },
+      { section: "Brief", state: "OPEN", done: 0, total: 2 },
+      { section: "Decision & action", state: "OPEN", done: 0, total: 1 },
     ]);
     expect(nextCaseStep(steps)).toEqual({ key: "gaps", label: "gaps", section: "Evidence", part: "unknowns" });
   });
   it("is done, with no next step, once the decision is signed", () => {
     const steps = Object.keys(STEP_PLACE).map((key) => step(key, "DONE"));
-    expect(caseProgress(steps).every((item) => item.state === "DONE")).toBe(true);
+    expect(caseProgress(steps).every((item) => item.state === "DONE" || item.state === "READ")).toBe(true);
     expect(nextCaseStep(steps)).toBeNull();
     // An analysis never run (AI off) is no step left once the decision is signed.
     const decided = steps.map((step) => (step.key === "analysis" ? { ...step, status: "NOT_STARTED" as const } : step));

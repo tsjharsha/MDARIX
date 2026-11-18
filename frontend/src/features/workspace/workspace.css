@@ -9568,3 +9568,89 @@ details.uw-team-change[open] {
 .uw-reg-list small {
   color: var(--ms-muted);
 }
+
+/* UX3: the investigation cockpit. A summary strip (four figures, the last the one next step) over a 6-step rail. */
+.uw-cockpit {
+  display: grid;
+  gap: var(--ms-space-3);
+  margin-top: var(--ms-space-3);
+}
+.uw-cockpit-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.1fr);
+  gap: var(--ms-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-cockpit-figure {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: var(--ms-space-2) var(--ms-space-3);
+  border: 1px solid var(--ms-line);
+  border-radius: 6px;
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-cockpit-figure strong {
+  font-size: var(--ms-fs-16);
+  font-variant-numeric: tabular-nums;
+}
+.uw-cockpit-figure small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  line-height: 1.35;
+}
+.uw-cockpit-figure:hover,
+.uw-cockpit-figure:focus-visible {
+  border-color: var(--ms-navy);
+}
+.uw-cockpit-next {
+  display: grid;
+  align-content: center;
+  gap: var(--ms-space-1);
+}
+.uw-cockpit-next > button {
+  justify-self: start;
+}
+.uw-case-progress.uw-cockpit-rail {
+  margin: 0;
+  padding: var(--ms-space-2);
+}
+.uw-cockpit-rail ol {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.uw-cockpit-rail li button[aria-current="step"] {
+  border-color: var(--ms-navy);
+  border-top-color: var(--ms-navy);
+  background: var(--ms-navy-fill);
+}
+.uw-cockpit-rail li.state-read button {
+  border-top-style: dashed;
+}
+.uw-version-compare h3 {
+  margin: 0 0 var(--ms-space-2);
+}
+.uw-version-changes {
+  margin: 0 0 var(--ms-space-3);
+  padding-left: var(--ms-space-4);
+}
+@media (max-width: 1100px) {
+  .uw-cockpit-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .uw-cockpit-rail ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .uw-cockpit-strip,
+  .uw-cockpit-rail ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

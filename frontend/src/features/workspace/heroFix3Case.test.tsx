@@ -17,7 +17,6 @@ vi.mock("../customer-admin/shared", async (original) => ({
 }));
 vi.mock("./sections/CaseHeader", () => ({ CaseHeader: () => <header />, ownerText: () => "" }));
 vi.mock("./sections/CaseEvidence", () => ({ CaseEvidencePanel: () => <div data-part="evidence-table" /> }));
-vi.mock("./sections/CaseIntelligence", () => ({ CaseIntelligencePanel: () => <div data-part="method-tabs" /> }));
 vi.mock("../investigator/InvestigationWorkspacePanel", () => ({
   InvestigationWorkspacePanel: () => <div data-part="workspace" />,
 }));
@@ -41,22 +40,24 @@ const render = (tab: string) =>
     </WorkspaceContext.Provider>,
   );
 
-describe("the Evidence step (F-A3, F-R1)", () => {
-  it("folds the evidence table under question 2 and the method tabs under the advanced tools (W1b)", () => {
+describe("the Evidence step (F-A3, F-R1; UX3 cockpit)", () => {
+  it("folds the evidence table and Ask MDARIX; the cause tools are Possible causes' (UX3)", () => {
     const html = render("Evidence");
-    expect(html.indexOf('data-part="evidence-table"')).toBeLessThan(html.indexOf('data-part="method-tabs"'));
     expect(html).toContain('<details class="uw-more" id="case-part-evidence"');
-    expect(html).toMatch(/<details class="uw-more uw-case-part" id="case-part-advanced">/);
+    expect(html).toContain("Ask MDARIX about this investigation");
+    // A closed fold draws nothing.
+    expect(html).not.toContain('data-part="ask"');
+    expect(html).not.toContain("More ways to test a cause");
   });
 
   it("leads with Ask when Ask was asked for, once", () => {
     const html = render("Evidence?part=ask");
-    expect(html.indexOf('data-part="ask"')).toBeLessThan(html.indexOf('data-part="method-tabs"'));
+    expect(html.indexOf('data-part="ask"')).toBeLessThan(html.indexOf('data-part="evidence-table"'));
     expect(html.split('data-part="ask"').length - 1).toBe(1);
   });
 });
 
-describe("F-A2: the AI proposals lead the Evidence step", () => {
+describe("F-A2: the AI proposals lead the Possible causes step (UX3)", () => {
   it("counts the unreviewed AI observations and hypotheses, each opening its view", () => {
     const base = "/api/v1/investigations/i1/intelligence";
     expect(renderToStaticMarkup(<AiProposalsCard investigationId="i1" onOpen={() => undefined} />)).toBe("");
@@ -77,6 +78,8 @@ describe("F-A2: the AI proposals lead the Evidence step", () => {
     expect(html).toContain("AI proposals · 3 waiting for your review");
     expect(html).toContain("Review 2 observations");
     expect(html).toContain("Review 1 hypothesis");
-    expect(render("Evidence").indexOf("AI proposals ·")).toBeLessThan(render("Evidence").indexOf("method-tabs"));
+    const causes = render("Possible causes");
+    expect(causes.indexOf("AI proposals ·")).toBeGreaterThan(-1);
+    expect(causes.indexOf("AI proposals ·")).toBeLessThan(causes.indexOf("More ways to test a cause"));
   });
 });

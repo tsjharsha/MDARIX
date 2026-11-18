@@ -1,10 +1,10 @@
-import { useContext, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Boxes, CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { displayId, safeText, sourceId } from "../../../app/displayId";
 import { lotsText } from "../signalAi";
-import { WorkspaceContext, useCan, usePanelState, useWorkspace } from "../workspaceContext";
+import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import { productTab } from "../productHub";
 import {
   CHECK_RESULT,
@@ -14,10 +14,8 @@ import {
   casePriorityLabel,
   caseStateLabel,
   caseStateTone,
-  caseProgress,
   caseSteps,
   caseTransitions,
-  nextCaseStep,
   readinessChecks,
   readinessHeadline,
   readinessPath,
@@ -33,6 +31,7 @@ import {
 import { priorityTone } from "../tasks";
 import { StatusBadge } from "./common";
 import { WhyAsked } from "../../shared/Basis";
+import { Cockpit } from "./Cockpit";
 import { CASE_STEP_WHY } from "../whyAsked";
 
 /** A case's state: its workflow state's label when the server sends one, else its plain status as before. */
@@ -75,6 +74,7 @@ export function CaseHeader({
   onLotImpact,
   onStep,
   onSection,
+  active,
   onChanged,
 }: {
   investigationId: string;
@@ -84,9 +84,11 @@ export function CaseHeader({
   /** Opens the case's Lot impact (a free trial, T-G5); absent where it is not offered. */
   onLotImpact?: () => void;
   onStep: (destination: StepDestination) => void;
-  /** The new navigation (stage 8): one progress line over the four sections instead of the stepper, and the next
-   * step as the main button; it opens the section and the part where the step is done. */
+  /** The new navigation: the investigation cockpit's strip and 6-step rail (UX3) instead of the stepper, and the next
+   * step as the main button; it opens the step and the part where the step is done. */
   onSection?: (section: CaseSection, part?: string) => void;
+  /** The cockpit step shown, marked on the rail. */
+  active?: CaseSection;
   onChanged: () => void;
 }) {
   const canWork = useCan("investigation.work");
@@ -110,11 +112,10 @@ export function CaseHeader({
     <>
       {onSection ? (
         // The record page's highlights (0.10.74, Release C part C2): the reference, its product, the question, the
-        // chips (state, priority, due), the owner, the complaints and lots in scope and what blocks the decision.
+        // chips (state, priority, due), the owner, the complaints and lots in scope; then the cockpit (UX3).
         <CaseHighlights
           row={current}
           label={label}
-          readiness={readiness.data}
           actions={
             (transitions.length > 0 || onManage || onLotImpact) && (
               <div className="ca-action-row">
@@ -142,7 +143,13 @@ export function CaseHeader({
             )
           }
         >
-          <CaseProgressLine steps={readiness.data ? steps : []} onSection={onSection} />
+          <Cockpit
+            investigationId={investigationId}
+            steps={readiness.data ? steps : []}
+            readiness={readiness.data}
+            active={active}
+            onSection={onSection}
+          />
         </CaseHighlights>
       ) : (
         <Panel eyebrow="Investigation" title={label} action={<CaseStateBadge row={current} />}>
@@ -358,13 +365,11 @@ function TransitionDrawer({
 function CaseHighlights({
   row,
   label,
-  readiness,
   actions,
   children,
 }: {
   row: Record<string, any>;
   label: string;
-  readiness: CaseReadiness | null | undefined;
   actions: ReactNode;
   children: ReactNode;
 }) {
@@ -382,9 +387,7 @@ function CaseHighlights({
   // tooltip (0.10.85, D3.9).
   const lots =
     lotNames.length > 3 ? `${lotNames.length} lots` : lotsText(lotNames as string[]).replace(/ and /g, " · ");
-  const blocking = readinessChecks(readiness).filter(
-    (check) => (check.result === "BLOCKED" || check.result === "PENDING") && check.key !== "decision",
-  );
+  // What blocks the decision is the cockpit strip's (UX3).
   return (
     <header className="uw-card uw-highlights" aria-label="The investigation at a glance">
       <div className="uw-hl-top">
@@ -435,10 +438,6 @@ function CaseHighlights({
             {lots || "—"}
           </dd>
         </div>
-        <div>
-          <dt>Blocking the decision</dt>
-          <dd>{readiness ? (blocking.length ? blocking[0].label : "Nothing") : "…"}</dd>
-        </div>
       </dl>
       {actions}
       {children}
@@ -452,69 +451,6 @@ export function OpenCaseLink({ label, onClick }: { label: string; onClick: () =>
     <button type="button" className="ac-link" onClick={onClick}>
       {label} <ChevronRight size={14} aria-hidden="true" />
     </button>
-  );
-}
-
-/**
- * The investigation's one progress line (stage 8): Summary · Evidence · Decisions & actions · History, each with how
- * many of its steps are done, and the next step as the screen's main button (8.7). Each section opens on a click.
- */
-export function CaseProgressLine({
-  steps,
-  onSection,
-}: {
-  steps: ReturnType<typeof caseSteps>;
-  onSection: (section: CaseSection, part?: string) => void;
-}) {
-  // On the flagship story the step's own action (Accept, Sign) is the screen's one main button; the story bar's Next
-  // link leads on, so this one steps back to secondary (W1 open item 3).
-  const story = useContext(WorkspaceContext)?.story;
-  const nextClass = story === "flagship" || story === "flagship-branch" ? "ac-secondary" : "ac-primary";
-  // Its steps not read yet: say so (0.10.70: with none read, every section read "Done" and "Every step is done: the
-  // decision is signed" on an investigation opened a moment ago).
-  if (!steps.length)
-    return (
-      <nav className="uw-case-progress" aria-label="Where this investigation stands">
-        <p className="ac-muted" role="status">
-          Reading where this investigation stands…
-        </p>
-      </nav>
-    );
-  const progress = caseProgress(steps);
-  const next = nextCaseStep(steps);
-  return (
-    <nav className="uw-case-progress" aria-label="Where this investigation stands">
-      <ol>
-        {progress.map((item) => (
-          <li key={item.section} className={`state-${item.state.toLowerCase()}`}>
-            <button
-              type="button"
-              aria-current={item.state === "CURRENT" ? "step" : undefined}
-              onClick={() => onSection(item.section)}
-            >
-              <strong>{item.section}</strong>
-              <small>
-                {item.state === "DONE"
-                  ? "Done"
-                  : item.section === "History"
-                    ? "Once the decision is signed"
-                    : `${item.done} of ${item.total} done`}
-              </small>
-            </button>
-          </li>
-        ))}
-      </ol>
-      {next ? (
-        <div>
-          <button type="button" className={nextClass} onClick={() => onSection(next.section, next.part)}>
-            Next: {next.label} <ChevronRight size={15} aria-hidden="true" />
-          </button>
-          <WhyAsked why={CASE_STEP_WHY[next.key]} />
-        </div>
-      ) : (
-        <p className="ac-muted">Every step is done: the decision is signed. Its record is in History.</p>
-      )}
-    </nav>
   );
 }
 

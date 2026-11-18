@@ -201,11 +201,16 @@ describe("the flagship bar names the step on screen, and step 4 works with AI of
     expect(flagshipStepOn("Investigations", `Evidence?part=${AI_PROPOSALS_PART}`)).toBe(3);
     expect(flagshipStepOn("Investigations", "Decisions & actions?part=brief")).toBe(4);
     expect(flagshipStepOn("Investigations", "Decisions & actions?part=decision")).toBe(5);
+    // The cockpit's own steps (UX3).
+    expect(flagshipStepOn("Investigations", "Evidence?part=glance")).toBe(2);
+    expect(flagshipStepOn("Investigations", `Possible causes?part=${AI_PROPOSALS_PART}`)).toBe(3);
+    expect(flagshipStepOn("Investigations", "Brief?part=brief")).toBe(4);
+    expect(flagshipStepOn("Investigations", "Decision & action?part=decision")).toBe(5);
   });
 
   it("sends step 4 to the recorded proposals, labelled for AI off", () => {
     const run = flagship(3);
-    expect(flagshipPlace(run, 3).tab).toBe(`Evidence?part=${AI_PROPOSALS_PART}`);
+    expect(flagshipPlace(run, 3).tab).toBe(`Possible causes?part=${AI_PROPOSALS_PART}`);
     expect(flagshipNextLabel(run, false)).toBe("Review the recorded proposals");
     expect(flagshipNextLabel(run, true)).toBe("Next: AI investigation");
     expect(flagshipNextLabel(flagship(4), false)).toBe("Next: Investigation Brief");

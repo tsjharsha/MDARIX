@@ -199,10 +199,10 @@ describe("each step opens its real screen", () => {
       tab: "Product 360?product=SAMPLE-ORBIT-300&view=Configuration&compare=Rev+A&version=Rev+B",
     });
     const inCase = { section: "Investigations", caseId: "inv-1", productId: "p-orbit" };
-    expect(flagshipPlace(run, 2)).toEqual({ ...inCase, tab: "Evidence?view=Overview&part=intelligence" });
-    expect(flagshipPlace(run, 3)).toEqual({ ...inCase, tab: "Evidence?part=ai-proposals" });
-    expect(flagshipPlace(run, 4)).toEqual({ ...inCase, tab: "Decisions & actions?part=brief" });
-    expect(flagshipPlace(run, 5)).toEqual({ ...inCase, tab: "Decisions & actions?part=decision" });
+    expect(flagshipPlace(run, 2)).toEqual({ ...inCase, tab: "Evidence?part=glance" });
+    expect(flagshipPlace(run, 3)).toEqual({ ...inCase, tab: "Possible causes?part=ai-proposals" });
+    expect(flagshipPlace(run, 4)).toEqual({ ...inCase, tab: "Brief?part=brief" });
+    expect(flagshipPlace(run, 5)).toEqual({ ...inCase, tab: "Decision & action?part=decision" });
     expect(flagshipPlace(run, 6)).toEqual({ section: "Records", tab: "Effectiveness checks?capa=capa-2" });
     expect(branchPlace(run)?.section).toBeTruthy();
   });
