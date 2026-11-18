@@ -75,7 +75,8 @@ test.describe("a solo owner, desktop", () => {
     await shot(page, "01-home");
     await openFromMenu(page, /^Getting started/);
     await expect(page.getByRole("heading", { level: 1, name: "Getting started" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Walkthrough steps" })).toBeVisible({ timeout: 60_000 });
+    // W1: Getting started leads with the flagship investigation (the ten-step list is folded below it).
+    await expect(page.getByRole("region", { name: "The sample investigation" })).toBeVisible({ timeout: 60_000 });
     await accessible(page, "Getting started");
     await shot(page, "02-getting-started");
     expect(problems).toEqual([]);
