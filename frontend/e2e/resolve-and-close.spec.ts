@@ -22,7 +22,7 @@ const WORDS =
   "phone cleared it. No patient harm.";
 
 async function logRoutineCase(page: Page): Promise<string> {
-  await openFromMenu(page, /^Complaints$/);
+  await openFromMenu(page, /^Cases/);
   await page.getByRole("button", { name: "Log a case" }).first().click();
   const form = page.getByRole("dialog", { name: "Log a case" });
   await form.getByLabel("The reporter's words, as they said them").fill(WORDS);

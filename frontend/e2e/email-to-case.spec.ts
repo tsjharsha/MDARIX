@@ -29,7 +29,7 @@ test.describe("B7b: an e-mail becomes a Case, desktop", () => {
     const page = await signedUpOwner(browser, owner, `Mail Devices ${RUN.toUpperCase()}`);
     const problems = watch(page);
 
-    await openFromMenu(page, /^Complaints$/);
+    await openFromMenu(page, /^Cases/);
     const card = page.getByRole("listitem", { name: /^E-mail received/ }).filter({ hasText: "SAMPLE" });
     await expect(card).toBeVisible({ timeout: 60_000 });
     await expect(card.getByText("(unverified)")).toBeVisible();
