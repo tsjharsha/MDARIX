@@ -285,3 +285,27 @@
   --ms-series: #6aa8f0;
   --ms-series-dark: #9cc6f5;
 }
+
+/*
+ * The application's palette (0.11.07, visual direction of 19 Nov 2026): ink navy, brand teal (#0b7a85, 5.1:1 on white,
+ * 4.7:1 on the ground) and a cool page ground, while the application's shell (.uw-hybrid) is on screen in the light
+ * theme. The website and the classic navigation keep the set above; the dark theme keeps its own.
+ */
+:root:not([data-theme="dark"]):has(.uw-hybrid) {
+  --ms-ground: #f4f7fb;
+  --ms-subtle: #f7f9fc;
+  --ms-line: #dce3ec;
+  --ms-teal: #0b7a85;
+  --ms-teal-dark: #086570;
+  --ms-mint: #e8f6f7;
+  --ms-focus: #0b7a85;
+  --ms-navy: #0a1a2f;
+  --ms-rail: #0a1a2f;
+  --ms-rail-2: #1e3350;
+  --ms-hero: #0a1a2f;
+  --ms-hero-2: #0f2e4a;
+  --ms-glow: #22b8c4;
+  --ms-h-good: #10b981;
+  --ms-series: #0b7a85;
+  --ms-series-dark: #086570;
+}

@@ -36,6 +36,7 @@ import "../customer-admin/customer-admin.css";
 import "./workspace.css";
 import "./heroShell.css";
 import "./heroPages.css";
+import "./appLook.css";
 import { ThemeMenu, useTheme } from "./theme";
 import { FLAGSHIP_STEPS, STORY_STEPS, shownRun, useOneStory } from "./oneStory";
 import { IMPORTED_SOURCE } from "./complaintList";
@@ -88,7 +89,7 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { setDisplayZone, zoneName } from "../../app/dates";
 import { useResource } from "../customer-admin/shared";
-import { OVERDUE_PATH, inData, withSource } from "./home";
+import { OVERDUE_PATH, OVERDUE_VIEW, inData, withSource } from "./home";
 import { trendPath, type TrendBoard } from "./signalAi";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
@@ -418,6 +419,61 @@ const navText = (section: WorkspaceSection, mvp: boolean, fresh = false) =>
  * old -> new link table, app/linkTable.json). */
 export const VIEW_TO_SECTION = OLD_VIEWS as Record<string, [WorkspaceSection, string?]>;
 
+/** A figure that counts up once, from 0 to its value in 0.6 s; at once with prefers-reduced-motion. */
+export function CountUp({ value }: { value: number }) {
+  const [shown, setShown] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? value : 0,
+  );
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || value <= 0) {
+      setShown(value);
+      return;
+    }
+    const start = performance.now();
+    let frame = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / 600);
+      setShown(Math.round(value * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{shown}</>;
+}
+
+/** The page head's key figures (visual direction 0.11.07): each says what it counts and opens those records. They are
+ * the rail's own reads (overdue complaints, products rising), so no screen asks the server twice; "…" until read. */
+function HeadFigures({
+  section,
+  overdue,
+  rising,
+  open,
+}: {
+  section: WorkspaceSection;
+  overdue?: number;
+  rising?: number;
+  open: (section: WorkspaceSection, tab?: string) => void;
+}) {
+  const figures =
+    section === "Complaints"
+      ? [{ value: overdue, label: "complaints overdue", go: () => open("Complaints", OVERDUE_VIEW) }]
+      : section === "Product 360" || section === "Trends"
+        ? [{ value: rising, label: "products rising against their history", go: () => open("Trends", "Trend check") }]
+        : [];
+  if (!figures.length) return null;
+  return (
+    <div className="uw-head-figs">
+      {figures.map((figure) => (
+        <button type="button" key={figure.label} className="uw-head-fig" onClick={figure.go}>
+          <b>{figure.value === undefined ? "…" : <CountUp value={figure.value} />}</b>
+          <span>{figure.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function HeadIcon({ section }: { section: string }) {
   const Icon = sectionIcon(section);
   return <Icon size={34} />;
@@ -746,13 +802,13 @@ export function UserWorkspace({
   // The rail's dots (owner, 5 Nov 2026): the overdue count and the trend check, read with the ring, after the page.
   const overdueRead = useResource<{ total: number }>(fresh && ringRead ? withSource(OVERDUE_PATH, dataSource) : null);
   const trendRead = useResource<TrendBoard>(fresh && ringRead ? trendPath("version") : null);
-  const alerts = railAlerts(
-    overdueRead.data?.total,
-    (trendRead.data?.items ?? []).filter(
-      (row) =>
-        (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
-    ).length,
-  );
+  const rising = trendRead.data
+    ? (trendRead.data.items ?? []).filter(
+        (row) =>
+          (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
+      ).length
+    : undefined;
+  const alerts = railAlerts(overdueRead.data?.total, rising);
   const oneStory = useOneStory(fresh && !!trial?.is_trial && ringRead).data;
   // W1: the flagship investigation's seven steps while it leads Getting started (as OneStory.tsx chooses).
   const flagship = oneStory?.flagship && !(dataSource === IMPORTED_SOURCE && oneStory.yours) ? oneStory.flagship : null;
@@ -1074,6 +1130,7 @@ export function UserWorkspace({
                             <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
                           )}
                         </div>
+                        <HeadFigures section={section} overdue={overdueRead.data?.total} rising={rising} open={open} />
                         {/* The page's emblem (0.10.90, the hero design): its destination's icon on the monitor's navy. */}
                         <span className="uw-head-art" aria-hidden="true">
                           <HeadIcon section={section} />

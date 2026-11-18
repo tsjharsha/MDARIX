@@ -602,6 +602,15 @@ const AVATAR_SCREENS: ReadonlyArray<{ section: WorkspaceSection; label: string; 
   { section: "Import data", label: "Import data", icon: Upload },
 ];
 
+/** What happens in each work area: the story the rail tells, under each name (visual direction 0.11.07). */
+export const TAB_STORY: Record<string, string> = {
+  home: "Your work today",
+  complaints: "The signal",
+  investigations: "Why it happened",
+  products: "What changed",
+  decisions: "Decide, report, prove",
+};
+
 /** Each destination's icon on the rail and the phone's bar (0.10.90, the hero design). */
 const TAB_ICON: Record<string, LucideIcon> = {
   home: House,
@@ -706,6 +715,12 @@ function TabButton({
     >
       <Icon size={20} aria-hidden="true" />
       <span className="uw-tab-label">{label}</span>
+      {/* The story line is the rail's picture; the name alone is the button's name. */}
+      {TAB_STORY[tab] && (
+        <small className="uw-tab-sub" aria-hidden="true">
+          {TAB_STORY[tab]}
+        </small>
+      )}
       {alert && <AlertDot />}
       {tab === extra && <span className="sr-only"> (opened from Getting started; not one of your tabs)</span>}
     </button>

@@ -1,0 +1,349 @@
+/* ------------------------------------------------------------------------------------------------------------------
+ * The application's look for 0.11.07 (owner, 19 Nov 2026: "a lot of space on the right side"; "the application should
+ * look very good"; whif-demo/ux-review/visual-direction-0.11.07.md). Scoped to the application's shell (.uw-hybrid):
+ * the website and the classic navigation keep tokens.css as it is.
+ *   1. One palette: ink navy, brand teal, a cool page ground (light theme only; the dark theme keeps its own set).
+ *   2. The work canvas uses the room: fluid to 1680 px, centred beside the rail, balanced gutters.
+ *   3. The rail tells the story: Today > Cases > Investigations > Products > Decisions & Reports, joined by a line.
+ *   4. Each page opens on a compact ink-to-teal hero band.
+ *   5. Calm motion, once per screen; none with prefers-reduced-motion.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+/* 1. The palette: tokens.css, "The application's palette (0.11.07)". */
+.uw-hybrid {
+  --uw-brand-400: #22b8c4;
+  --uw-signal-400: #38bdf8;
+  --uw-hero-band: linear-gradient(135deg, #0a1a2f 0%, #0f2e4a 55%, #0b5560 100%);
+}
+
+/* 2. The work canvas: fluid to 1680 px and centred in the room beside the rail, so a 1920 screen has no empty band on
+   the right (it was capped at 1340 px and pinned left). Gutters grow with the screen, the same on both sides. */
+.uw-hybrid .ac-main {
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 2.6vw, 48px);
+}
+/* Screens that capped themselves narrower follow the canvas. */
+.uw-hybrid .ac-main .uw-gs {
+  max-width: none;
+}
+
+/* 3. The story rail. Each area is a step: its icon in a ring on one line, its name, and what happens there. The line
+   fills up to the open area. */
+.uw-navrail .uw-navrail-group {
+  --uw-step-h: 54px;
+  --uw-step: -1;
+  position: relative;
+  gap: 0;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(1)[aria-current="page"]) {
+  --uw-step: 0;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(2)[aria-current="page"]) {
+  --uw-step: 1;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(3)[aria-current="page"]) {
+  --uw-step: 2;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(4)[aria-current="page"]) {
+  --uw-step: 3;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(5)[aria-current="page"]) {
+  --uw-step: 4;
+}
+.uw-navrail-group:has(> .uw-tab:nth-of-type(6)[aria-current="page"]) {
+  --uw-step: 5;
+}
+/* The track, from the first ring to the last, and its filled part, up to the open area. */
+.uw-navrail-group::before,
+.uw-navrail-group::after {
+  content: "";
+  position: absolute;
+  top: calc(31px + var(--uw-step-h) / 2);
+  left: 26px;
+  width: 2px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.uw-navrail-group::before {
+  bottom: calc(var(--uw-step-h) / 2);
+  background: rgb(160 190 230 / 16%);
+}
+.uw-navrail-group::after {
+  height: calc(max(var(--uw-step), 0) * var(--uw-step-h));
+  background: linear-gradient(180deg, var(--uw-brand-400), var(--uw-signal-400));
+  box-shadow: 0 0 10px rgb(34 184 196 / 45%);
+  transition: height 400ms ease-out;
+}
+.uw-navrail .uw-navrail-group > .uw-tab {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  grid-template-areas: "icon label dot" "icon sub dot";
+  gap: 1px 12px;
+  align-content: center;
+  height: var(--uw-step-h);
+  padding: 0 10px 0 5px;
+  white-space: normal;
+}
+.uw-navrail .uw-navrail-group > .uw-tab > svg {
+  z-index: 1;
+  grid-area: icon;
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  padding: 6px;
+  border: 1px solid rgb(160 190 230 / 22%);
+  border-radius: 50%;
+  background: var(--ms-rail);
+  transition:
+    background 200ms ease-out,
+    border-color 200ms ease-out,
+    box-shadow 200ms ease-out;
+}
+.uw-navrail .uw-navrail-group > .uw-tab .uw-tab-label {
+  grid-area: label;
+  align-self: end;
+  line-height: 1.25;
+}
+.uw-navrail .uw-tab-sub {
+  grid-area: sub;
+  align-self: start;
+  color: var(--ms-rail-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-regular);
+  line-height: 1.3;
+}
+.uw-navrail .uw-navrail-group > .uw-tab .uw-tab-dot {
+  grid-area: dot;
+  align-self: center;
+}
+/* Areas the story has passed, and the open one. */
+.uw-navrail .uw-navrail-group > .uw-tab:has(~ .uw-tab[aria-current="page"]) > svg {
+  border-color: rgb(34 184 196 / 60%);
+  color: var(--uw-brand-400);
+}
+.uw-navrail .uw-navrail-group > .uw-tab[aria-current="page"] > svg {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--uw-brand-400), #0b7a85);
+  box-shadow: 0 0 0 4px rgb(34 184 196 / 18%);
+  color: var(--ms-white);
+}
+.uw-navrail .uw-navrail-group > .uw-tab[aria-current="page"] .uw-tab-sub {
+  color: var(--ms-rail-fg);
+}
+.uw-navrail .uw-navrail-group > .uw-tab[aria-current="page"]::before {
+  top: 14px;
+  bottom: 14px;
+}
+/* Folded (on request, and below 1240 px): rings only, the line between them. */
+.uw-navrail.is-folded .uw-tab-sub {
+  display: none;
+}
+.uw-navrail.is-folded .uw-navrail-group > .uw-tab {
+  grid-template-columns: 32px;
+  grid-template-areas: "icon";
+  justify-content: center;
+  justify-items: center;
+}
+.uw-navrail.is-folded .uw-navrail-group::before,
+.uw-navrail.is-folded .uw-navrail-group::after {
+  left: 50%;
+  margin-left: -1px;
+}
+@media (max-width: 1240px) {
+  .uw-navrail .uw-tab-sub {
+    display: none;
+  }
+  .uw-navrail .uw-navrail-group > .uw-tab {
+    grid-template-columns: 32px;
+    grid-template-areas: "icon";
+    justify-content: center;
+    justify-items: center;
+  }
+  .uw-navrail-group::before,
+  .uw-navrail-group::after {
+    left: 50%;
+    margin-left: -1px;
+  }
+}
+/* The phone's bar: the same icons, the open one in the brand ring. */
+@media (max-width: 640px) {
+  .uw-phonebar .uw-tab > svg {
+    box-sizing: content-box;
+    padding: 4px 12px;
+    border-radius: var(--ms-radius-pill);
+    transition: background 200ms ease-out;
+  }
+  .uw-phonebar .uw-tab[aria-current="page"] > svg,
+  .uw-phonebar .uw-tab.is-within > svg {
+    background: var(--ms-mint);
+    color: var(--ms-teal);
+  }
+  .uw-phonebar .uw-tab-sub {
+    display: none;
+  }
+}
+
+/* 4. The page's hero band: the area, its question and what happens there, on the ink-to-teal gradient with a soft
+   grid and a brand glow. Compact, so work starts above the fold at 1280x720. */
+.uw-hybrid .ac-main > .ac-page-head {
+  position: relative;
+  overflow: hidden;
+  align-items: center;
+  margin-bottom: var(--ms-space-5);
+  padding: 16px clamp(18px, 2vw, 28px);
+  border-radius: var(--ms-radius-xl);
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgb(34 184 196 / 22%), transparent 60%),
+    linear-gradient(rgb(160 190 230 / 6%) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgb(160 190 230 / 6%) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--uw-hero-band);
+  box-shadow: var(--ms-shadow-hero);
+  color: var(--ms-white);
+}
+.uw-hybrid .ac-main > .ac-page-head h1 {
+  color: var(--ms-white);
+  font-size: var(--ms-fs-26);
+}
+.uw-hybrid .ac-main > .ac-page-head .ac-eyebrow {
+  color: var(--uw-brand-400);
+}
+.uw-hybrid .ac-main > .ac-page-head p {
+  max-width: 88ch;
+  color: var(--ms-on-dark-muted);
+}
+.uw-hybrid .ac-main > .ac-page-head .uw-head-art {
+  border: 1px solid rgb(160 190 230 / 22%);
+  background: rgb(255 255 255 / 6%);
+  color: var(--uw-brand-400);
+  box-shadow: 0 0 32px rgb(34 184 196 / 25%);
+}
+.uw-hybrid .ac-main > .ac-page-head :focus-visible {
+  outline-color: var(--uw-brand-400);
+}
+@media (max-width: 640px) {
+  .uw-hybrid .ac-main > .ac-page-head {
+    padding: 18px;
+    border-radius: var(--ms-radius);
+  }
+  .uw-hybrid .ac-main > .ac-page-head h1 {
+    font-size: var(--ms-fs-26);
+  }
+}
+
+/* 5. Motion: calm, once. A new screen's blocks rise in (staggered 40 ms), big figures roll in, tiles lift on hover.
+   Transform and opacity only, so nothing moves the layout. */
+@keyframes uw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes uw-roll {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .uw-hybrid .ac-main > * {
+    animation: uw-rise 320ms ease-out both;
+  }
+  .uw-hybrid .ac-main > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .uw-hybrid .ac-main > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .uw-hybrid .ac-main > :nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .uw-hybrid .ac-main > :nth-child(5) {
+    animation-delay: 160ms;
+  }
+  .uw-hybrid .ac-main > :nth-child(n + 6) {
+    animation-delay: 200ms;
+  }
+  .uw-hybrid .ac-main :is(.uw-home-num, .uw-fig-num, .ms-kpi-value) {
+    display: inline-block;
+    animation: uw-roll 480ms 120ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .uw-hybrid .ac-main :is(button, a):is(.uw-card, .uw-gs-card, [class*="-tile"]) {
+    transition:
+      transform 200ms ease-out,
+      box-shadow 200ms ease-out;
+  }
+  .uw-hybrid .ac-main :is(button, a):is(.uw-card, .uw-gs-card, [class*="-tile"]):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ms-shadow-2);
+  }
+}
+
+/* Grids fill the wider canvas: the product cards take the row instead of leaving empty tracks on the right. */
+.uw-hybrid .ac-main .uw-ph-cards {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+/* A form keeps a comfortable width in a wide panel (the evidence pack's period and downloads). */
+.uw-hybrid .ac-main .ac-panel .uw-rd-download {
+  max-width: 560px;
+}
+/* A table's own scroll box holds everything in it: a screen-reader-only label in a cell (position: absolute) took the
+   page as its box and made a phone's Cases page scroll 343 px sideways. */
+.uw-hybrid .uw-tr-scroll {
+  position: relative;
+}
+
+/* The head's key figures: a fixed size, so the number arriving moves nothing. */
+.uw-hybrid .ac-main > .ac-page-head > .uw-head-figs {
+  display: flex;
+  flex: none;
+  gap: var(--ms-space-3);
+}
+.uw-hybrid .ac-main .uw-head-fig {
+  display: grid;
+  align-content: center;
+  width: 176px;
+  min-height: 76px;
+  padding: 10px 14px;
+  border: 1px solid rgb(160 190 230 / 22%);
+  border-radius: var(--ms-radius-md);
+  background: rgb(255 255 255 / 7%);
+  color: var(--ms-on-dark-muted);
+  font: inherit;
+  font-size: var(--ms-fs-13);
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 200ms ease-out,
+    border-color 200ms ease-out;
+}
+.uw-hybrid .ac-main .uw-head-fig:hover {
+  border-color: var(--uw-brand-400);
+  background: rgb(255 255 255 / 12%);
+}
+.uw-hybrid .ac-main .uw-head-fig b {
+  color: var(--ms-white);
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-26);
+  font-weight: var(--ms-fw-display);
+  line-height: 1.1;
+}
+@media (max-width: 900px) {
+  .uw-hybrid .ac-main > .ac-page-head {
+    flex-wrap: wrap;
+  }
+  .uw-hybrid .ac-main > .ac-page-head .uw-head-art {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-navrail-group::after,
+  .uw-navrail .uw-navrail-group > .uw-tab > svg,
+  .uw-phonebar .uw-tab > svg,
+  .uw-hybrid .ac-main .uw-head-fig {
+    transition: none;
+  }
+}
