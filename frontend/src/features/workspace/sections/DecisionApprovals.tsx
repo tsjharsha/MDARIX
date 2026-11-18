@@ -120,7 +120,7 @@ export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) 
               render: (row) => (
                 <span className="ca-person">
                   <strong>
-                    {row.caseId}
+                    {row.reference}
                     {row.critical && (
                       <>
                         {" "}
@@ -189,7 +189,7 @@ export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) 
                     <button
                       type="button"
                       className="ac-link"
-                      aria-label={`Open the decision of ${row.caseId}`}
+                      aria-label={`Open the decision of ${row.reference}`}
                       onClick={() => onOpen(row)}
                     >
                       Open <ChevronRight size={14} aria-hidden="true" />
@@ -291,7 +291,7 @@ function DecisionsDashboard() {
                   <li key={row.key}>
                     <span>
                       <strong>
-                        {row.caseId}
+                        {row.reference}
                         {row.briefId ? ` · ${row.briefId}` : ""}
                         {row.version ? ` · version ${row.version}` : ""}
                       </strong>
@@ -311,7 +311,7 @@ function DecisionsDashboard() {
                       <button
                         type="button"
                         className="ac-link"
-                        aria-label={`Open the decision of ${row.caseId}`}
+                        aria-label={`Open the decision of ${row.reference}`}
                         onClick={() => openCase(row)}
                       >
                         Open <ChevronRight size={14} aria-hidden="true" />

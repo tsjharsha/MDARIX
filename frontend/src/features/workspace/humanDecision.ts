@@ -802,6 +802,8 @@ export type QueueRow = {
   investigationId: string | null;
   productId: string | null;
   caseId: string;
+  /** The reference people read (SAMPLE-INV-001), else the system ID: Today's Approvals card shows the same (UX3). */
+  reference: string;
   question: string | null;
   product: string | null;
   priority: string | null;
@@ -845,15 +847,17 @@ export function queueRow(value: DecisionQueueItem | Record<string, unknown> | nu
   const id = idText(investigation.id) ?? idText(item.investigation_id);
   const version = brief.version ?? item.version;
   const dueAt = safeText(investigation.due_at) ?? safeText(item.due_at);
+  const caseId =
+    safeText(investigation.business_id) ??
+    safeText(item.investigation_business_id) ??
+    safeText(item.case_business_id) ??
+    "Investigation";
   return {
     key: `${index}:${id ?? ""}`,
     investigationId: id,
     productId: idText(product.id) ?? idText(investigation.product_id) ?? idText(item.product_id),
-    caseId:
-      safeText(investigation.business_id) ??
-      safeText(item.investigation_business_id) ??
-      safeText(item.case_business_id) ??
-      "Investigation",
+    caseId,
+    reference: safeText(investigation.identifier) ?? caseId,
     question: safeText(investigation.question) ?? safeText(item.question),
     product: safeText(product.name) ?? safeText(product.business_id),
     priority: safeText(investigation.priority) ?? safeText(item.priority),

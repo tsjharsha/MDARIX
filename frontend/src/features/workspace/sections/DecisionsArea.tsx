@@ -3,6 +3,7 @@ import { chooseCase, useWorkspace } from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
 import type { QueueRow } from "../humanDecision";
 import { ApprovalsPanel } from "./DecisionApprovals";
+import { ApprovalsCard, DECISION_PLACE } from "./HomeWork";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { ReportsSection } from "./ReportsTab";
 
@@ -15,7 +16,8 @@ import { ReportsSection } from "./ReportsTab";
 
 /** Approvals, /app/approvals: the briefs waiting for this person's signature; a row opens the investigation's decision.
  * Shown to whoever may sign a decision or approve a report (workspaceContext SECTION_PERMISSIONS); the queue's read
- * and the signature check again on the server. */
+ * and the signature check again on the server. Its first brief's one-page summary is Today's Approvals card (UX1),
+ * read from the same queue (GET /api/v1/decisions/queue), so Today and Approvals show the same waiting items (UX3). */
 export function ApprovalsSection() {
   const { work, open, notify } = useWorkspace();
   const openApproval = async (row: QueueRow) => {
@@ -28,9 +30,14 @@ export function ApprovalsSection() {
       );
       return;
     }
-    open("Investigations", "Decision");
+    open("Investigations", DECISION_PLACE);
   };
-  return <ApprovalsPanel onOpen={openApproval} />;
+  return (
+    <>
+      <ApprovalsCard />
+      <ApprovalsPanel onOpen={openApproval} />
+    </>
+  );
 }
 
 /** Reports, /app/reports: every authority report and, as Complaints › Reporting showed, the reportability watch (a
