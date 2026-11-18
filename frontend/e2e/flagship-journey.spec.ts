@@ -11,7 +11,9 @@ import { at, signedUpOwner } from "./support/story";
  * has never seen MDARIX walks the seven steps from Getting started's one main button: the trend, Rev B against Rev A,
  * the evidence at a glance, the AI proposals (recorded with the sample: AI is off in this run, so no model is called),
  * the brief accepted for decision, the decision signed with password and authenticator code, and the effectiveness
- * check planned. Then the optional branch (SAMPLE-RV-06's US tree) changes no tick.
+ * check planned. Then SAMPLE-CAPA-02's synthetic follow-up: its figures, the result signed inconclusive with password and
+ * authenticator code, and after a reload the signed result and the follow-up it was signed on (W1d, W1e). Then the
+ * optional branch (SAMPLE-RV-06's US tree) changes no tick.
  *
  * Every tick is read from the API (the saved records), in order; no page error and no 5xx; a screenshot per step and
  * a trace are kept (playwright config: trace on). The person's time is measured: the walk must take 7 to 12 minutes of
@@ -130,7 +132,7 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     const glance = page.locator("section.rca-glance");
     await expect(glance).toBeVisible({ timeout: 60_000 });
     for (const group of ["Known", "Unknown", "Contradicted", "Missing"])
-      await expect(glance.getByRole("region", { name: group })).toBeVisible();
+      await expect(glance.getByRole("region", { name: group, exact: true })).toBeVisible();
     await expect(glance.getByRole("list", { name: "In time order" })).toBeVisible();
     await ticked(page, 3);
     await shot(page, "fs-3-evidence");
@@ -179,6 +181,11 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
       .getByRole("group", { name: "Root-cause attribution" })
       .getByRole("radio", { name: "Device-related" })
       .check();
+    // D03: the cause is not yet confirmed, so the person records it as not determined, with the reason.
+    await decide.getByLabel("Cause category").selectOption({ label: "Not determined" });
+    await decide
+      .getByLabel("Why the cause cannot be determined")
+      .fill("The sensor and inspection link is an association; the bench test of returned pumps is still open.");
     await decide.getByRole("button", { name: "Continue to sign" }).click();
     const sign = page.getByRole("dialog", { name: "Sign the decision" });
     await sign.getByLabel("Your password").fill(owner.password);
@@ -191,7 +198,7 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     // 7. Action and impact: plan the effectiveness check (its form is open while no check exists); "Did it work?" stays
     // too early.
     await page.goto("/app/getting-started");
-    await expect(card(page)).toContainText("Did it work? Too early");
+    await expect(card(page)).toContainText("Did it work? Too early", { timeout: 60_000 });
     await next(page, /Plan the effectiveness check/);
     await page
       .getByLabel("What will show the action worked")
@@ -199,9 +206,9 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     await page.getByRole("button", { name: "Save the plan" }).click();
     await ticked(page, 7);
     await page.goto("/app/getting-started");
-    await expect(card(page)).toContainText("The sample investigation is complete");
+    await expect(card(page)).toContainText("The sample investigation is complete", { timeout: 60_000 });
     await expect(main(page)).toHaveText(/Do the same with your data/);
-    await expect(page.getByText(/it worked/i)).toHaveCount(0);
+    await expect(page.getByText(/(?<!can say that )it worked/i)).toHaveCount(0);
     await shot(page, "fs-7-done");
 
     // W1d (D04): planned -> synthetic follow-up -> signed. The person opens the check, reads the follow-up labelled
@@ -215,16 +222,34 @@ test.describe("The flagship investigation, seven steps, desktop", () => {
     const follow = page.getByRole("region", { name: "Synthetic follow-up (sample)" });
     await expect(follow).toBeVisible({ timeout: 60_000 });
     await expect(follow).toContainText("Synthetic, not real history");
+    // The figures the person judges: the synthetic lots after the fix and the rate before and after.
+    await expect(follow.getByRole("table", { name: "Lots built after the fix (synthetic)" })).toBeVisible();
+    await expect(follow).toContainText("1 complaint in 750 unit-months (1.3 per 1,000)");
+    await shot(page, "fs-7-follow-up");
     await page.getByRole("radio", { name: /Inconclusive/ }).check();
     await page.getByLabel("What you found").fill("One complaint in 750 unit-months on a short synthetic follow-up.");
     await page.getByLabel("Your password").fill(owner.password);
     await page.getByLabel("Authenticator code").fill(await freshCode(page, owner));
     await page.getByRole("button", { name: "Sign the result" }).click();
     await expect.poll(async () => (await flagship(page)).capa?.check_status, { timeout: 60_000 }).toBe("INCONCLUSIVE");
+    // W1e: after a reload the check still shows the signed result, its signer and the follow-up it was signed on.
+    await page.reload();
+    await settle(page);
+    const check = page.getByRole("dialog", { name: /effectiveness/ });
+    const kept = check.getByRole("region", { name: "Synthetic follow-up (sample)" });
+    await expect(kept).toBeVisible({ timeout: 60_000 });
+    await expect(kept).toContainText("1 complaint in 750 unit-months (1.3 per 1,000)");
+    await expect(check.getByText("Round 1: inconclusive")).toBeVisible();
+    await expect(
+      check.getByText(/Signed by .*One complaint in 750 unit-months on a short synthetic follow-up\./),
+    ).toBeVisible();
+    await expect(check.getByRole("button", { name: "Sign the result" })).toHaveCount(0);
+    await shot(page, "fs-7-signed-reloaded");
     await page.goto("/app/getting-started");
     await card(page).getByRole("button", { name: "Step 7: Action and impact" }).click();
     await expect(card(page)).toContainText("Did it work? Signed: inconclusive");
-    await expect(page.getByText(/it worked/i)).toHaveCount(0);
+    // No claim that it worked ("Only a signed effectiveness check can say that it worked" is the opposite).
+    await expect(page.getByText(/(?<!can say that )it worked/i)).toHaveCount(0);
     await shot(page, "fs-7-signed");
 
     // The person's time: the step budgets fit 7 to 12 minutes; the machine's own run is recorded for the trace.

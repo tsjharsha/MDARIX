@@ -230,6 +230,8 @@ export async function signUp(page: Page, owner: Person, organization: string) {
   await page.getByLabel(/^Country/).selectOption("India");
   await page.getByLabel(/^Phone/).fill("+91 98765 43210");
   await page.getByRole("button", { name: "Continue" }).click();
+  // The optional answers sit folded under "Tell us more (optional)": open it first, as a person would.
+  await page.getByText("Tell us more (optional)").click();
   for (const name of [
     "Company size",
     "Highest device class",
