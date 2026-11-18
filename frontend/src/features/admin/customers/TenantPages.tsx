@@ -442,7 +442,9 @@ export function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => 
                   ? titleCase(tenant[key])
                   : tenant[key] || "—"}
               {key === "navigation" && (
-                <small className="ac-muted cc-detail-note">“Viewing as” personas need New.</small>
+                <small className="ac-muted cc-detail-note">
+                  New is every organization's navigation. Classic is a fallback for one release only, then retired.
+                </small>
               )}
             </dd>
           </div>

@@ -124,19 +124,17 @@ export function MvpRequestsWorkspace() {
         </div>
       </div>
 
-      <div className="trial-queue-filters" role="tablist" aria-label="Pilot request status">
-        {FILTERS.map(([value, label]) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={filter === value}
-            className={filter === value ? "is-active" : ""}
-            onClick={() => setFilter(value)}
-          >
-            {label} <span>{counts[value] ?? 0}</span>
-          </button>
-        ))}
-      </div>
+      {/* A choice, not a third row of tabs under the trial section's own (UX2). */}
+      <label className="trial-queue-show">
+        <span>Show</span>
+        <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+          {FILTERS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label} ({counts[value] ?? 0})
+            </option>
+          ))}
+        </select>
+      </label>
 
       {result && (
         <div className={`trial-queue-result is-${result.tone}`} role="status">

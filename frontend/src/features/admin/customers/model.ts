@@ -316,7 +316,8 @@ export const CUSTOMER_FIELD_GROUPS: FieldGroup[] = [
 
 /** The tenant details a platform administrator maintains (the tenant key and IDs are not editable). */
 export const TENANT_TYPES = ["STANDARD", "ENTERPRISE", "PRIVATE_DEPLOYMENT"] as const;
-/** An organization's navigation (tenants.navigation): classic (today's menu) or new. */
+/** An organization's navigation (tenants.navigation): new (everyone's, the default since UX2) or classic (a fallback
+ * for one release, then retired). */
 export const NAVIGATIONS = ["classic", "new"] as const;
 export const TENANT_FIELD_GROUPS: FieldGroup[] = [
   {
@@ -327,7 +328,7 @@ export const TENANT_FIELD_GROUPS: FieldGroup[] = [
       { key: "tenant_type", label: "Tenant type", required: true },
       { key: "deployment_model", label: "Deployment", required: true },
       { key: "configuration_version", label: "Configuration version" },
-      // Which menu the organization's people see (0.10.68): today's (classic) or the new one. Platform admins only.
+      // Which menu the organization's people see: new (the default) or the classic fallback. Platform admins only.
       { key: "navigation", label: "Navigation", required: true },
     ],
   },
