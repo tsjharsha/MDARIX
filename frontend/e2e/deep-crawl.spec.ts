@@ -151,10 +151,11 @@ async function crawl(page: Page, persona: any) {
   const nav = page.locator(`nav[aria-label="${NAV_LABEL[persona.console]}"]:visible`).first();
   await expect(nav).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
-  const items = await nav.locator("button").count();
+  // Only the buttons shown (the phone bar keeps some of its items folded).
+  const items = await nav.locator("button:visible").count();
   for (let index = 0; index < items; index += 1) {
     if (await toggle.isVisible().catch(() => false)) await toggle.click();
-    const item = nav.locator("button").nth(index);
+    const item = nav.locator("button:visible").nth(index);
     const name = (
       (await item
         .locator("strong")
