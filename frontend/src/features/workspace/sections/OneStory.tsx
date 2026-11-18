@@ -1228,9 +1228,9 @@ export function FlagshipView({
     return (
       <div className="uw-os">
         {header}
-        <section className="uw-wt uw-flagship-card uw-gs-calm" aria-labelledby="uw-wt-title">
+        <section className="uw-wt uw-flagship-card uw-gs-calm" aria-labelledby="uw-flagship-title">
           <div className="uw-wt-head">
-            <h2 id="uw-wt-title">The sample investigation</h2>
+            <h2 id="uw-flagship-title">The sample investigation</h2>
             <h3 className="uw-os-part">{run.investigation.question}</h3>
             <span className="ms-chip is-sample">Sample data</span>
             <span className="uw-wt-count uw-num">{flagshipBarParts(run).join(" · ")}</span>
@@ -1253,9 +1253,9 @@ export function FlagshipView({
   return (
     <div className="uw-os">
       {header}
-      <section className="uw-wt uw-flagship-card" aria-labelledby="uw-wt-title">
+      <section className="uw-wt uw-flagship-card" aria-labelledby="uw-flagship-title">
         <div className="uw-wt-head">
-          <h2 id="uw-wt-title">The sample investigation</h2>
+          <h2 id="uw-flagship-title">The sample investigation</h2>
           <h3 className="uw-os-part">{run.investigation.question}</h3>
           <span className="ms-chip is-sample">Sample data</span>
           <span className="uw-wt-count uw-num">{flagshipBarParts(run).join(" · ")}</span>

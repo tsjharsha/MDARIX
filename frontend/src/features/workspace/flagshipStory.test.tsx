@@ -158,6 +158,14 @@ describe("Getting started leads with the flagship", () => {
     expect(html).not.toContain("<dt>Why</dt>");
   });
 
+  it("names the flagship card by its own title, never the ten-step walkthrough's (both show once the fold opens)", () => {
+    const html = render(<FlagshipView story={story(flagship(), 4)} run={flagship()} more={<p>Explore cards</p>} />);
+    expect(html).toContain('aria-labelledby="uw-flagship-title"');
+    expect(html).toContain('<h2 id="uw-flagship-title">The sample investigation</h2>');
+    // "uw-wt-title" belongs to "Your sample walkthrough": a second element with it would rename that region.
+    expect(html).not.toContain("uw-wt-title");
+  });
+
   it("keeps the PulseWatch story inside the closed fold, with a line to continue it", () => {
     const html = render(<FlagshipView story={story(flagship(), 4)} run={flagship()} more={<p>Explore cards</p>} />);
     expect(html).toContain("<summary>More sample stories (optional)</summary>");
