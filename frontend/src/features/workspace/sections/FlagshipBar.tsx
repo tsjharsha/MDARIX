@@ -1,7 +1,7 @@
 import { ArrowLeft, ChevronRight, ListChecks } from "lucide-react";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { LOT_005_LINE, flagshipCount, openFlagshipStep, useOneStory, type FlagshipRun } from "../oneStory";
-import { REGISTER_LINK, SAMPLE_REGISTER } from "./SampleRegister";
+import { REGISTER_LINK, registerTab, type RegisterPart } from "./SampleRegister";
 
 /** The bar's words (exported for its test): product · version · case · step, or the optional branch. */
 export function flagshipBarParts(run: FlagshipRun, branch = false): string[] {
@@ -15,6 +15,15 @@ export function flagshipBarParts(run: FlagshipRun, branch = false): string[] {
     flagshipCount(run),
   ];
 }
+
+/** W1e: the register section that answers the figures on each flagship screen (the trend, Rev B against Rev A, the
+ * evidence, the effectiveness check). */
+const SECTION_PART: Record<string, RegisterPart> = {
+  Trends: "trend",
+  "Product 360": "change",
+  Investigations: "evidence",
+  Records: "follow-up",
+};
 
 /**
  * The flagship story's bar (W1), in the legacy story bar's slot while the flagship is under way: "OrbitCare 300 · Rev B ·
@@ -49,7 +58,11 @@ export function FlagshipBar({ section, branch = false }: { section: string; bran
             </button>
           )}
           {!branch && (
-            <button type="button" className="ac-link" onClick={() => open("Getting started", SAMPLE_REGISTER)}>
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => open("Getting started", registerTab(SECTION_PART[section]))}
+            >
               <ListChecks size={14} aria-hidden="true" /> {REGISTER_LINK}
             </button>
           )}

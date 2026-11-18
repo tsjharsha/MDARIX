@@ -30,7 +30,7 @@ import { chanceText, runPath, trendCountText, trendPath, trendResultLabel, type 
 import { useAiReady } from "../useAiStatus";
 import { RecordedChip } from "../../shared/AiReview";
 import { flagshipBarParts } from "./FlagshipBar";
-import { REGISTER_LINK, SAMPLE_REGISTER } from "./SampleRegister";
+import { REGISTER_LINK, SAMPLE_REGISTER, STEP_REGISTER_PART, registerTab } from "./SampleRegister";
 
 /** W1d (D07): the six views of the sample investigation, named under Getting started's one main button. */
 export const SIX_VIEWS = [
@@ -1154,7 +1154,18 @@ export function FlagshipView({
           </div>
           <div>
             <dt>Evidence</dt>
-            <dd>{info.evidence}</dd>
+            <dd>
+              {info.evidence}{" "}
+              {isTrial && (
+                <button
+                  type="button"
+                  className="ac-link uw-os-source"
+                  onClick={() => go("Getting started", registerTab(STEP_REGISTER_PART[selected]))}
+                >
+                  <ListChecks size={14} aria-hidden="true" /> {REGISTER_LINK}
+                </button>
+              )}
+            </dd>
           </div>
         </dl>
         {step.done ? (

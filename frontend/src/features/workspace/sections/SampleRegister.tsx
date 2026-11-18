@@ -5,7 +5,7 @@
  * Trends and Home), the inspection changes, the evidence for, against and missing with dates and sources, the
  * synthetic follow-up (labelled) and the sample's limits. Plain English, flat (G-2), readable on a projector.
  */
-import type { RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { useResource } from "../../customer-admin/shared";
@@ -17,6 +17,37 @@ import { FlatTable } from "./ProductHub";
 export const SAMPLE_REGISTER = "Sample evidence register";
 export const REGISTER_LINK = "Where do the numbers come from?";
 export const SAMPLE_REGISTER_PATH = "/api/v1/trial/sample-register";
+
+/** W1e: the register's sections a step or screen can land on (each is a panel with the id ``reg-<part>``). */
+export const REGISTER_PARTS = [
+  "versions",
+  "change",
+  "lots",
+  "trend",
+  "inspection",
+  "evidence",
+  "follow-up",
+  "limits",
+] as const;
+export type RegisterPart = (typeof REGISTER_PARTS)[number];
+/** Getting started's tab that opens the register at ``part`` ("Sample evidence register?part=trend"). */
+export const registerTab = (part?: RegisterPart | null) =>
+  part ? `${SAMPLE_REGISTER}?${new URLSearchParams({ part })}` : SAMPLE_REGISTER;
+/** The part a tab names, if it is one of the register's. */
+export function registerPart(tab: string | null | undefined): RegisterPart | null {
+  const part = new URLSearchParams(String(tab ?? "").split("?")[1] ?? "").get("part");
+  return (REGISTER_PARTS as readonly string[]).includes(part ?? "") ? (part as RegisterPart) : null;
+}
+/** Which section answers each flagship step's figures and claims (steps 1 to 7). */
+export const STEP_REGISTER_PART: readonly RegisterPart[] = [
+  "trend",
+  "change",
+  "evidence",
+  "evidence",
+  "evidence",
+  "evidence",
+  "follow-up",
+];
 
 type Link = { evidence: string; hypothesis: string; why: string | null };
 export type SampleRegisterData = {
@@ -87,10 +118,27 @@ function LinkList({ items, empty }: { items: Link[]; empty: string }) {
   );
 }
 
-export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadingElement | null> }) {
+export function SampleRegisterPage({
+  heading,
+  part = null,
+}: {
+  heading?: RefObject<HTMLHeadingElement | null>;
+  part?: RegisterPart | null;
+}) {
   const { open, work } = useWorkspace();
   const resource = useResource<SampleRegisterData>(SAMPLE_REGISTER_PATH);
   const data = resource.data;
+  // W1e: land on the section the link named once the figures are there; its heading takes the focus (keyboard users).
+  useEffect(() => {
+    if (!part || !data) return;
+    const section = document.getElementById(`reg-${part}`);
+    section?.scrollIntoView?.({ block: "start" });
+    const title = section?.querySelector<HTMLElement>("h2");
+    if (title) {
+      title.tabIndex = -1;
+      title.focus({ preventScroll: true });
+    }
+  }, [part, data]);
   const go = (section: string, tab?: string) => open(section as WorkspaceSection, tab);
   const openCase = (tab: string) => {
     if (!data?.case) return;
@@ -109,7 +157,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
         </h1>
         <p>Where each number in the sample investigation comes from, read from the sample&apos;s own records.</p>
       </div>
-      <Panel title="The product and its versions" source={resource}>
+      <Panel id="reg-versions" title="The product and its versions" source={resource}>
         {data && (
           <>
             <p>
@@ -129,7 +177,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
       </Panel>
       {data && (
         <>
-          <Panel title="Supplier and component change">
+          <Panel id="reg-change" title="Supplier and component change">
             {data.change ? (
               <p>
                 <b>{data.change.ref}</b> ({day(data.change.on)}): {data.change.description}
@@ -147,7 +195,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               ))}
             </FlatTable>
           </Panel>
-          <Panel title="Lots">
+          <Panel id="reg-lots" title="Lots">
             <FlatTable
               caption="Lots"
               head={["Lot", "Version", "Built", "Units", "Complaints", "Pressure alarm", "In the investigation"]}
@@ -165,7 +213,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               ))}
             </FlatTable>
           </Panel>
-          <Panel title="Complaint counts and monthly rates">
+          <Panel id="reg-trend" title="Complaint counts and monthly rates">
             <p>
               {data.complaints.on_product} complaints on the product, {data.complaints.pressure_alarm} of them pressure
               alarms; {data.complaints.in_case} are in the investigation.
@@ -196,7 +244,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               </button>
             </p>
           </Panel>
-          <Panel title="Incoming inspection of the pressure sensor">
+          <Panel id="reg-inspection" title="Incoming inspection of the pressure sensor">
             <FlatTable caption="Inspection" head={["When", "Sensors inspected per lot", "Source"]}>
               {data.inspection.map((row) => (
                 <tr key={row.when}>
@@ -207,7 +255,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               ))}
             </FlatTable>
           </Panel>
-          <Panel title="Evidence for, against and missing">
+          <Panel id="reg-evidence" title="Evidence for, against and missing">
             <FlatTable caption="Evidence records" head={["Record", "Title", "Recorded", "Source"]}>
               {data.evidence.records.map((row) => (
                 <tr key={row.ref}>
@@ -245,7 +293,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               </p>
             )}
           </Panel>
-          <Panel title={data.follow_up.label}>
+          <Panel id="reg-follow-up" title={data.follow_up.label}>
             <p className="ac-note">{data.follow_up.notice}</p>
             <p>
               {data.follow_up.after.complaints} pressure-alarm complaint in {data.follow_up.after.unit_months}{" "}
@@ -272,7 +320,7 @@ export function SampleRegisterPage({ heading }: { heading?: RefObject<HTMLHeadin
               )}
             </p>
           </Panel>
-          <Panel title="Limits of the sample dataset">
+          <Panel id="reg-limits" title="Limits of the sample dataset">
             <ul className="uw-reg-list">
               {data.limits.map((limit) => (
                 <li key={limit}>{limit}</li>

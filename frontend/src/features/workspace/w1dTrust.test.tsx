@@ -8,8 +8,13 @@ import { FlagshipBar } from "./sections/FlagshipBar";
 import { CheckBody } from "./sections/Records";
 import {
   REGISTER_LINK,
+  REGISTER_PARTS,
+  SAMPLE_REGISTER,
   SAMPLE_REGISTER_PATH,
+  STEP_REGISTER_PART,
   SampleRegisterPage,
+  registerPart,
+  registerTab,
   type SampleRegisterData,
 } from "./sections/SampleRegister";
 import { ONE_STORY_PATH, didItWorkLine, effectivenessStages, type FlagshipRun } from "./oneStory";
@@ -373,5 +378,41 @@ describe("D08: the sample evidence register", () => {
     expect(html).toContain("once it is planned");
     expect(html).toContain("OrbitCare 300 is not a real device");
     expect(primaries(html)).toHaveLength(0);
+  });
+});
+
+describe("W1e: every flagship step says where its numbers come from", () => {
+  it("each step's card links to the register section that holds its figures", () => {
+    expect(STEP_REGISTER_PART).toEqual([
+      "trend",
+      "change",
+      "evidence",
+      "evidence",
+      "evidence",
+      "evidence",
+      "follow-up",
+    ]);
+    // Step 1's card shows once the story has started (before that, the calm screen's header has the link).
+    for (let index = 1; index < 7; index += 1) {
+      const html = render(<FlagshipView story={{ sample: null, yours: null }} run={run(index)} />);
+      const evidence = html.slice(html.indexOf("<dt>Evidence</dt>"), html.indexOf("</dl>"));
+      expect(evidence).toContain(REGISTER_LINK);
+      expect(primaries(html)).toHaveLength(1);
+    }
+  });
+
+  it("the address names the section, and only a known one", () => {
+    expect(registerTab("trend")).toBe(`${SAMPLE_REGISTER}?part=trend`);
+    expect(registerTab(null)).toBe(SAMPLE_REGISTER);
+    expect(registerPart(registerTab("follow-up"))).toBe("follow-up");
+    expect(registerPart(`${SAMPLE_REGISTER}?part=nonsense`)).toBeNull();
+    expect(registerPart(SAMPLE_REGISTER)).toBeNull();
+  });
+
+  it("every register section a link can land on is there, with its id", () => {
+    reads.data[SAMPLE_REGISTER_PATH] = register;
+    const html = render(<SampleRegisterPage part="trend" />);
+    for (const part of REGISTER_PARTS) expect(html).toContain(`id="reg-${part}"`);
+    expect(html.indexOf('id="reg-trend"')).toBeLessThan(html.indexOf("9.3×"));
   });
 });
