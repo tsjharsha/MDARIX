@@ -76,7 +76,7 @@ export const AVAILABILITY = [
       "Complaint signals: a count rule and a trend check per product version",
       "Investigations with evidence, possible causes and open questions",
       "Reportability per market, counted from the day you became aware",
-      "FDA 3500A and India MvPI worksheets filled from your records",
+      "Authority report forms filled from your records: FDA 3500A with its eMDR file, EU and GB MIR, Health Canada problem report, India MvPI",
       "Signed decisions, CAPA effectiveness checks and an inspector summary",
       "Lot impact for a confirmed signal",
       "Authenticator-app MFA and a complete audit trail",
