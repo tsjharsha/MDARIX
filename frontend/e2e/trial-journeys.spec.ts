@@ -190,7 +190,8 @@ test.describe("a team on its own uploaded data, phone", () => {
     const problems = watch(page);
     await activate(page, colleague, await linkFromMail(colleague.email, /invited you/i, ACTIVATION));
     await page.goto("/app/getting-started");
-    await expect(page.getByRole("list", { name: "Walkthrough steps" })).toBeVisible({ timeout: 30_000 });
+    // The flagship leads Getting started (W1); the ten-step list is folded under "More sample stories (optional)".
+    await expect(page.getByRole("region", { name: "The sample investigation" })).toBeVisible({ timeout: 30_000 });
     await accessible(page, "Getting started as the colleague (phone)");
     await shot(page, "08-colleague-story");
     await page.goto("/app/getting-started?tab=Your+trial");
