@@ -793,6 +793,7 @@ STANDARD_ROLES = frozenset(
         "SERVICE_DESK",
         "TRIAGE_LEAD",
         "INVESTIGATOR",
+        "PRODUCT_QUALITY_ENGINEER",
         "RISK_REVIEWER",
         "REGULATORY_REVIEWER",
         "REVIEWER",

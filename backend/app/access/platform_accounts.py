@@ -242,6 +242,11 @@ ROLE_TEXT: dict[str, tuple[str, str]] = {
         "Workspace",
         "Owns investigations: scope, evidence, hypotheses and unknowns, and writes the Decision Brief.",
     ),
+    "PRODUCT_QUALITY_ENGINEER": (
+        "Workspace",
+        "Follows products, versions, suppliers and lots; adds engineering evidence and judges causes on investigations. "
+        "Changes no records and never signs a decision.",
+    ),
     "RISK_REVIEWER": (
         "Workspace",
         "Records the risk review of an investigation. Reads and asks for evidence; changes no records.",

@@ -8,6 +8,8 @@ export const ROLE_LABELS: Record<string, string> = {
   SERVICE_DESK: "Service Desk",
   TRIAGE_LEAD: "Complaint Handler",
   INVESTIGATOR: "Investigator",
+  // UX3 (Persona Blueprint wave C): Today is the Product Lifecycle Twin.
+  PRODUCT_QUALITY_ENGINEER: "Product Quality Engineer",
   RISK_REVIEWER: "Risk Reviewer",
   REGULATORY_REVIEWER: "Regulatory Reviewer",
   REVIEWER: "Quality Reviewer",
@@ -22,6 +24,7 @@ export const ROLE_LABELS: Record<string, string> = {
 export const WORKFLOW_ROLE_CODES = [
   "TRIAGE_LEAD",
   "INVESTIGATOR",
+  "PRODUCT_QUALITY_ENGINEER",
   "RISK_REVIEWER",
   "REGULATORY_REVIEWER",
   "REVIEWER",

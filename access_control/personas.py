@@ -106,6 +106,14 @@ WORKSPACE_PERSONAS = (
         "INVESTIGATOR",
         ("home", "complaints", "investigations", "products"),
     ),
+    # UX3 (Persona Blueprint wave C): the Product / Design Quality Engineer; Today is the Product Lifecycle Twin.
+    WorkspacePersona(
+        "pqe",
+        "Product Quality Engineer",
+        "Products, versions, suppliers and lots",
+        "PRODUCT_QUALITY_ENGINEER",
+        ("home", "investigations", "products"),
+    ),
     WorkspacePersona(
         "risk",
         "Risk Reviewer",
@@ -140,6 +148,7 @@ _ROLE_PERSONA = {
     "SERVICE_DESK": "servicedesk",
     "TRIAGE_LEAD": "handler",
     "INVESTIGATOR": "investigator",
+    "PRODUCT_QUALITY_ENGINEER": "pqe",
     "RISK_REVIEWER": "risk",
     "APPROVER": "decision",
     "VIEWER": "executive",

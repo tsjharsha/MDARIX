@@ -86,7 +86,15 @@ def test_a_person_starts_with_their_account_role_only(world):
     assert body["account_role"] == {"code": "INVESTIGATOR", "label": "Investigator"}
     assert body["additional_roles"] == []
     available = [item["code"] for item in body["available_roles"]]
-    assert available == ["TRIAGE_LEAD", "RISK_REVIEWER", "REGULATORY_REVIEWER", "REVIEWER", "APPROVER", "LEADER"]
+    assert available == [
+        "TRIAGE_LEAD",
+        "PRODUCT_QUALITY_ENGINEER",
+        "RISK_REVIEWER",
+        "REGULATORY_REVIEWER",
+        "REVIEWER",
+        "APPROVER",
+        "LEADER",
+    ]
     assert "CUSTOMER_ADMIN" not in available and "PLATFORM_ADMIN" not in available
 
 

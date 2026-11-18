@@ -31,6 +31,7 @@ MOCKUP_TABS = {
     "servicedesk": ["home", "complaints"],  # 0.10.93 (B2, spec 6.2)
     "handler": ["home", "complaints"],
     "investigator": ["home", "complaints", "investigations", "products"],
+    "pqe": ["home", "investigations", "products"],  # UX3 (Persona Blueprint wave C)
     "risk": ["home", "investigations", "products"],
     "decision": ["home", "complaints", "investigations", "decisions"],
     "executive": ["home", "investigations", "products", "decisions"],
@@ -89,6 +90,7 @@ def test_the_personas_match_the_approved_design_and_each_persona_is_a_real_role(
         "servicedesk": "SERVICE_DESK",
         "handler": "TRIAGE_LEAD",
         "investigator": "INVESTIGATOR",
+        "pqe": "PRODUCT_QUALITY_ENGINEER",
         "risk": "RISK_REVIEWER",
         "decision": "APPROVER",
         "executive": "VIEWER",

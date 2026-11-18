@@ -104,6 +104,7 @@ _FALLBACK_ROLE_LABELS: dict[str, str] = {
     "SERVICE_DESK": "Service Desk",
     "TRIAGE_LEAD": "Complaint Handler",
     "INVESTIGATOR": "Investigator",
+    "PRODUCT_QUALITY_ENGINEER": "Product Quality Engineer",
     "RISK_REVIEWER": "Risk Reviewer",
     "REGULATORY_REVIEWER": "Regulatory Reviewer",
     "REVIEWER": "Quality Reviewer",

@@ -82,6 +82,11 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "TRIAGE_LEAD": _WORK | _CASES | {SIGNAL_TRIAGE, INVESTIGATION_CREATE, INVESTIGATION_ASSIGN, COMPLAINT_TRIAGE},
     # B2 (OD-4): an Investigator logs a Case but no longer classifies or triages one.
     "INVESTIGATOR": _WORK | _EVIDENCE | {INVESTIGATION_CREATE, INVESTIGATION_WORK, CASE_LOG},
+    # UX3: the Product Quality Engineer reads products, versions, changes, suppliers and lots (every signed-in person
+    # may read them) and contributes to investigations: judges hypotheses and adds intelligence, reviews and asks for
+    # evidence, exports. It changes no product or complaint records (no records.write), never triages, approves a
+    # regulatory document or signs a decision (no decision.sign, and no approval authority).
+    "PRODUCT_QUALITY_ENGINEER": frozenset({INVESTIGATION_WORK, DATA_EXPORT}) | _EVIDENCE,
     # Reviewers of risk and regulatory content read, ask and export; they do not change case records.
     "RISK_REVIEWER": frozenset({AI_RUN, DATA_EXPORT, RISK_REVIEW}) | _EVIDENCE,
     # B2 (OD-4, T-D10): a Regulatory Reviewer triages.

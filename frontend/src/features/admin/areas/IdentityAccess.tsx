@@ -14,6 +14,7 @@ import {
 } from "../../customer-admin/shared";
 import { isPlatformAdminRole } from "../../../app/navigationPolicy";
 import { sortParams, useServerSort } from "../../../app/tableSort";
+import { ROLE_LABELS } from "../../../app/roles";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { CustomerAdmins } from "../customers/CustomerAdmins";
@@ -218,17 +219,20 @@ function CustomerAdministrators() {
   );
 }
 
-/** The roles customer users can hold, for the filter (Customer Administrators have their own list). */
+/** The roles customer users can hold, for the filter (Customer Administrators have their own list), with the one
+ * set of names (UX1, app/roles.ts). */
 const CUSTOMER_ROLES: [string, string][] = [
-  ["VIEWER", "Viewer"],
-  ["TRIAGE_LEAD", "PMS / Signal Triage Lead"],
-  ["INVESTIGATOR", "Quality Investigator"],
-  ["RISK_REVIEWER", "Risk Reviewer"],
-  ["REGULATORY_REVIEWER", "Regulatory Reviewer"],
-  ["REVIEWER", "Quality Reviewer"],
-  ["APPROVER", "Authorized Decision Maker"],
-  ["LEADER", "Leader (Quality Manager)"],
-];
+  "VIEWER",
+  "SERVICE_DESK",
+  "TRIAGE_LEAD",
+  "INVESTIGATOR",
+  "PRODUCT_QUALITY_ENGINEER",
+  "RISK_REVIEWER",
+  "REGULATORY_REVIEWER",
+  "REVIEWER",
+  "APPROVER",
+  "LEADER",
+].map((code) => [code, ROLE_LABELS[code]]);
 
 type TenantOption = {
   id: string;

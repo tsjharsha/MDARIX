@@ -59,6 +59,8 @@ DEMO_FEATURES = ("ASK_MDARIX", "DECISION_CENTER_SIGNATURES")
 DEMO_TEAM = (
     ("TRIAGE_LEAD", "triage@acmecare-demo.invalid", "Tara Triage"),
     ("Investigator", "investigator@acmecare-demo.invalid", "Ines Investigator"),
+    # UX3: the Product Quality Engineer (its Today is the Product Lifecycle Twin).
+    ("PRODUCT_QUALITY_ENGINEER", "pqe@acmecare-demo.invalid", "Priya Product Quality"),
     ("RISK_REVIEWER", "risk@acmecare-demo.invalid", "Rita Risk"),
     ("REGULATORY_REVIEWER", "regulatory@acmecare-demo.invalid", "Rory Regulatory"),
     ("Reviewer", "reviewer@acmecare-demo.invalid", "Ravi Reviewer"),

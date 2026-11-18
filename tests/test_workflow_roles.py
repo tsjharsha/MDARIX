@@ -52,6 +52,7 @@ def test_the_new_roles_are_standard_roles_with_labels():
     assert WORKFLOW_ROLES == (
         "TRIAGE_LEAD",
         "INVESTIGATOR",
+        "PRODUCT_QUALITY_ENGINEER",
         "RISK_REVIEWER",
         "REGULATORY_REVIEWER",
         "REVIEWER",

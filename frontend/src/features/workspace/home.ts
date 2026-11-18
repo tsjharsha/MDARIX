@@ -12,6 +12,7 @@ export const PERSONA_CATEGORIES: Readonly<Record<string, readonly string[] | nul
   regulatory: ["REPORTING", "OBLIGATION"],
   handler: ["TRIAGE", "COMMUNICATION"],
   investigator: ["TASK", "CAPA"],
+  pqe: ["TASK", "CAPA"],
   risk: ["TASK"],
   decision: ["OBLIGATION", "GUIDE", "TASK", "CAPA"],
 };
@@ -24,6 +25,7 @@ export const PERSONA_GREETING: Readonly<Record<string, string>> = {
   servicedesk: "Calls to log and check, handed on to the complaint handler.",
   handler: "Calls to check and complaints to triage.",
   investigator: "Your investigations and what blocks each decision.",
+  pqe: "Your products: what changed, in which versions and lots, and what the complaints say.",
   risk: "Risk reviews requested from you.",
   decision: "Decisions and approvals waiting for your signature.",
   executive: "What needs attention today, in one minute.",

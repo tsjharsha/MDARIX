@@ -99,6 +99,7 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { HomeSection } from "./sections/Home";
 import { ApprovalsSection, ReportingSection } from "./sections/DecisionsArea";
 import { PortfolioToday } from "./sections/Portfolio";
+import { ProductToday } from "./sections/ProductToday";
 import { AreaNav } from "./AreaNav";
 import { areaEntry } from "./areas";
 import { CustomerAdminControlPlane } from "../customer-admin/CustomerAdminControlPlane";
@@ -1144,6 +1145,9 @@ export function UserWorkspace({
                         ) : persona === "executive" ? (
                           // The Executive's Today is the portfolio (UX2): exposure per product, read-only.
                           <PortfolioToday heading={heading} />
+                        ) : persona === "pqe" ? (
+                          // The Product Quality Engineer's Today is the Product Lifecycle Twin (UX3).
+                          <ProductToday heading={heading} />
                         ) : (
                           <HomeSection tab={tab} heading={heading} />
                         ))}

@@ -17,6 +17,7 @@ CANONICAL_SYSTEM_ROLES = frozenset(
         "SERVICE_DESK",
         "TRIAGE_LEAD",
         "INVESTIGATOR",
+        "PRODUCT_QUALITY_ENGINEER",
         "RISK_REVIEWER",
         "REGULATORY_REVIEWER",
         "REVIEWER",
@@ -33,6 +34,8 @@ ROLE_LABELS: dict[str, str] = {
     "SERVICE_DESK": "Service Desk",
     "TRIAGE_LEAD": "Complaint Handler",
     "INVESTIGATOR": "Investigator",
+    # UX3 (Persona Blueprint wave C): the product and design quality engineer, whose Today is the Product Twin.
+    "PRODUCT_QUALITY_ENGINEER": "Product Quality Engineer",
     "RISK_REVIEWER": "Risk Reviewer",
     "REGULATORY_REVIEWER": "Regulatory Reviewer",
     "REVIEWER": "Quality Reviewer",
@@ -47,6 +50,7 @@ ROLE_LABELS: dict[str, str] = {
 WORKFLOW_ROLES = (
     "TRIAGE_LEAD",
     "INVESTIGATOR",
+    "PRODUCT_QUALITY_ENGINEER",
     "RISK_REVIEWER",
     "REGULATORY_REVIEWER",
     "REVIEWER",
