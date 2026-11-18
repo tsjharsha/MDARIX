@@ -322,6 +322,7 @@ export function OneStory({ heading, more }: { heading?: RefObject<HTMLHeadingEle
   return (
     <>
       <StoryView
+        key={story.data ? "read" : "reading"}
         story={story.data}
         state={story.state}
         onRetry={story.reload}
@@ -369,7 +370,8 @@ export function StoryView({
 }) {
   const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
-  const [problem] = useState(() => takeMarkProblem());
+  // Taken only with the story read: the loading card would otherwise take it and lose it when the flagship replaces it.
+  const [problem] = useState(() => (story ? takeMarkProblem() : null));
   const run = shownRun(story, dataSource);
   const sample = run?.run === "sample";
   // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).

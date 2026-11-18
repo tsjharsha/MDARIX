@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { ReportPage } from "./sections/ReportsTab";
+import { StoryView } from "./sections/OneStory";
 import { FinishedRecord } from "./sections/Records";
 import { TrendCheck } from "./sections/TrendCheck";
 import {
@@ -251,6 +252,9 @@ describe("a loaded screen of another record ticks nothing", () => {
     await visited({ step: "records", complaintId: "c-rv11" });
     expect(takeMarkProblem("flagship")).toBeNull();
     // Getting started opens the ten steps' fold while their refusal waits, then the walkthrough takes it.
+    expect(markProblemRun()).toBe("sample");
+    // The card shown while the story loads leaves it for the walkthrough that follows.
+    render(<StoryView story={null} state="loading" />);
     expect(markProblemRun()).toBe("sample");
     expect(takeMarkProblem()).toContain("Finish step 8 first.");
     expect(markProblemRun()).toBeNull();
