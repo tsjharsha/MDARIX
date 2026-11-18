@@ -9654,3 +9654,6 @@ details.uw-team-change[open] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+.uw-version-compare .ac-eyebrow {
+  margin-top: var(--ms-space-3);
+}

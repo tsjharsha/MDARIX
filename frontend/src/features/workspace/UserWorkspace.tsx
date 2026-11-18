@@ -371,7 +371,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   Investigations: {
     description: "One investigation, from its question to its decision",
     guide:
-      "Every investigation in one list; each opens in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
+      "Every investigation in one list; each opens on one rail of six steps, from the signal to the decision and its action. The main button names the next step.",
   },
 };
 

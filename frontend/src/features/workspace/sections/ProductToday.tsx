@@ -1,11 +1,11 @@
 import type { RefObject } from "react";
-import { ChevronRight } from "lucide-react";
-import { useResource } from "../../customer-admin/shared";
+import { ArrowLeftRight, ChevronRight } from "lucide-react";
+import { listOf, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
 import { greeting, inData, PERSONA_GREETING } from "../home";
 import { hubTab } from "../productHub";
 import { trendPath, type TrendBoard, type TrendItem } from "../signalAi";
-import { VersionCompareCard } from "./VersionCompare";
+import { VersionCompareCard, compareTab, earlierVersion } from "./VersionCompare";
 
 /** The version rising most against what was expected (pure, for its test): the PQE's Today opens on it. */
 export function risingVersion(items: readonly TrendItem[] | null | undefined): TrendItem | null {
@@ -36,6 +36,15 @@ export function ProductToday({ heading }: { heading: RefObject<HTMLHeadingElemen
   const name = (session?.display_name ?? "").split(/\s+/)[0];
   const at = (view: string) =>
     product && open("Product 360", hubTab({ tab: "Product 360", product, version, view: view as never }));
+  // The version before the rising one, for the one main button (the same read as the twin card below).
+  const view = useResource<{ versions?: unknown[] }>(
+    product
+      ? `/api/v1/products/${encodeURIComponent(product)}/product-360?light=1${
+          version ? `&version_id=${encodeURIComponent(version)}` : ""
+        }`
+      : null,
+  );
+  const earlier = earlierVersion(listOf(view.data?.versions) as Record<string, any>[], version);
   const change = top?.changes?.[0];
   const lots = top?.lots ?? [];
   return (
@@ -117,8 +126,19 @@ export function ProductToday({ heading }: { heading: RefObject<HTMLHeadingElemen
                 </button>
               </li>
             </ul>
+            {earlier && version && product && (
+              <div className="ca-action-row">
+                <button
+                  type="button"
+                  className="ac-primary"
+                  onClick={() => open("Product 360", compareTab(product, version, earlier.version_identifier))}
+                >
+                  <ArrowLeftRight size={15} aria-hidden="true" /> Compare {earlier.version_identifier} and {version}
+                </button>
+              </div>
+            )}
           </section>
-          <VersionCompareCard product={product} productName={top.product.name} version={version} primary />
+          <VersionCompareCard product={product} productName={top.product.name} version={version} compare={false} />
         </>
       )}
     </div>

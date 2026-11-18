@@ -72,6 +72,11 @@ export type TrialFigures = {
 };
 
 /** The Free trials tile's line under the number: what needs a person, in plain words. */
+/** Where the Free trials tile opens (UX3): the requests while one waits for review (approving it is the platform's
+ * first job, two clicks from the dashboard to the approval), else the trials. */
+export const trialTileItem = (trials: TrialFigures | null | undefined) =>
+  trials?.waiting_for_review ? "Requests" : "Trials";
+
 export const trialTileDetail = (trials: TrialFigures | null | undefined) =>
   trials
     ? `${trials.ending_soon} ending within 7 days · ${trials.waiting_for_review} waiting for review · ${trials.converted_this_month} converted this month`
@@ -429,7 +434,7 @@ export function AdminOverview({
           icon={<Hourglass size={18} />}
           series={model.trialStarts.map((point) => point.primary)}
           seriesLabel={`New free trials per day, last ${days} days`}
-          onOpen={() => onOpen({ domain: "Trial organizations", item: "Trials" })}
+          onOpen={() => onOpen({ domain: "Trial organizations", item: trialTileItem(trends?.trials) })}
         />
         <KpiTile
           label="Seats in use"

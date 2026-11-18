@@ -28,12 +28,15 @@ export function VersionCompareCard({
   productName,
   version,
   primary = false,
+  compare = true,
 }: {
   product: string | null;
   productName?: string | null;
   version: string | null;
   /** On Today the comparison is the screen's one main button. */
   primary?: boolean;
+  /** False where the screen offers the comparison itself (Today's first card). */
+  compare?: boolean;
 }) {
   const { open } = useWorkspace();
   const view = useResource<Row>(
@@ -107,7 +110,7 @@ export function VersionCompareCard({
             <p className="ac-muted">No change recorded for this product.</p>
           )}
           <div className="ca-action-row">
-            {earlier && shown && (
+            {compare && earlier && shown && (
               <button
                 type="button"
                 className={primary ? "ac-primary" : "ac-secondary"}

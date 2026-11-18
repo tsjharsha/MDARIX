@@ -294,3 +294,12 @@ describe("run 2: grace period and the AI slot", () => {
     expect(html).toContain("Owner asked for more time");
   });
 });
+
+describe("the dashboard's Free trials tile (UX3)", () => {
+  it("opens the requests while one waits for review, else the trials", async () => {
+    const { trialTileItem } = await import("../console/AdminOverview");
+    expect(trialTileItem({ waiting_for_review: 1 } as never)).toBe("Requests");
+    expect(trialTileItem({ waiting_for_review: 0 } as never)).toBe("Trials");
+    expect(trialTileItem(null)).toBe("Trials");
+  });
+});
