@@ -13,9 +13,14 @@ const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "r1-user-06
 // A full page load on the Vite dev server (the CI browser job) fetches over a thousand modules one by one, and a cold
 // screen can take well over the default five seconds before the session check even starts.
 const SESSION_CHECK_MS = 30_000;
+// Where the old Ask MDARIX address lands: the assistant itself, or (the one navigation) the investigations it is part of.
+const ASK_REACHED = /Ask MDARIX|authorized|human review|Why is it happening\?/i;
 
 async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
+  // The privacy notice acknowledged up front (as deep-crawl.spec.ts does): on a busy server it mounts after the short
+  // wait below and, until acknowledged, covers the foot of the screen (the phone's admin drawer).
+  await page.addInitScript(() => localStorage.setItem("mdarix-compliance-consent", "accepted"));
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -189,6 +194,8 @@ test.describe("MDARIX browser evidence", () => {
       delete areas["Data & Integrations"];
       for (const parked of ["Renewals", "Reminders"]) delete areas["Plans & Licensing"][parked];
       for (const parked of ["Tenant cells", "Developer API"]) delete areas.Operations[parked];
+      // The agent catalog is the full product's; the MVP's section leads with the automatic trust check.
+      areas["AI Control Center"]["Agents & guardrails"] = "Automatic trust check";
     }
     for (const [domain, sections] of Object.entries(areas)) {
       await openAdminNavigation(page);
@@ -335,9 +342,11 @@ test.describe("MDARIX browser evidence", () => {
     test.setTimeout(90_000);
     // Investigation workflows belong to business users; a platform admin is returned to the admin console.
     await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
+    // The one navigation: Ask MDARIX is a step of an investigation's cockpit, and its old address opens Investigations
+    // (src/app/linkTable.ts), where each investigation's AI proposals wait for a person's review.
     await page.goto("/app/ask");
     await expect(page.locator("body")).not.toBeEmpty();
-    await expect(page.locator("body")).toContainText(/Ask MDARIX|authorized|human review/i);
+    await expect(page.locator("body")).toContainText(ASK_REACHED, { timeout: 20_000 });
     // A page wider than a phone screen pushes fixed panels (the privacy notice) out of reach.
     const sidewaysOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -354,10 +363,12 @@ test.describe("MDARIX browser evidence", () => {
     test.setTimeout(90_000);
     await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
     const workflows = [
-      ["/app/ask", /ask mdarix|authorized|human review/i, "ask"],
+      ["/app/ask", ASK_REACHED, "ask"],
       ["/app/investigations", /investigat|hypothes|evidence|review/i, "investigation"],
-      ["/app/evidence", /evidence|provenance|source/i, "evidence"],
-      ["/app/decision", /decision|review|human/i, "decision"],
+      // The one navigation: evidence and the decision are steps of an investigation; their old addresses open
+      // Investigations (src/app/linkTable.ts).
+      ["/app/evidence", /evidence|provenance|source|Why is it happening\?/i, "evidence"],
+      ["/app/decision", /decision|review|human|Why is it happening\?/i, "decision"],
       ["/app/assurance", /assurance|ai|human review|trust/i, "assurance"],
       ["/app/audit", /audit|activity|recorded/i, "audit"],
     ] as const;
@@ -434,15 +445,21 @@ test.describe("MDARIX browser evidence", () => {
         .click({ timeout: 10_000 })
         .catch(() => {});
     }
-    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Finvestigations/, { timeout: 20_000 });
-    await expect(page.getByRole("status")).toContainText(/session has ended/i);
+    // Back to the page the person was on when the check failed: Investigations, or Today when the click got there
+    // first.
+    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2F(investigations|my-work)/, {
+      timeout: 20_000,
+    });
+    const returnTo = new URL(page.url()).searchParams.get("returnTo") ?? "";
+    await expect(page.getByRole("status").filter({ hasText: /\S/ })).toContainText(/session has ended/i);
     await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
     await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
-    await expect(page).toHaveURL(/\/app\/investigations$/, { timeout: 20_000 });
-    await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 20_000 }).toBe(returnTo.split("?")[0]);
+    if (returnTo === "/app/investigations")
+      await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
+        timeout: 20_000,
+      });
   });
 
   test("Help menu: Report a problem opens a form that reaches the MDARIX team", async ({ page }) => {
@@ -481,8 +498,8 @@ test.describe("MDARIX browser evidence", () => {
       .getByRole("menuitem", { name: /^Import data/ })
       .click();
     await expect(page.getByRole("heading", { level: 1, name: "Import data" })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: "Upload a CSV file" })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByLabel("Dates in the file")).toBeVisible();
+    // The upload panel is "Upload your export"; the date order is asked once a file is read.
+    await expect(page.getByRole("heading", { name: "Upload your export" }).first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("link", { name: /download products\.csv/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-import-data.png`, fullPage: true });
     // And back to administration, in the same shell.

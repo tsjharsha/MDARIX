@@ -19,6 +19,9 @@ const DEMO_CASE = process.env.E2E_DEMO_CASE ?? "ACD-INV-401";
 test.skip(!DEMO_PASSWORD, "Set E2E_DEMO_PASSWORD (and load the demo workspace) to walk the demo golden path.");
 
 async function signIn(page: Page, email: string) {
+  // The privacy notice acknowledged up front (as deep-crawl.spec.ts does): on a busy server it mounts after any short
+  // wait and, until acknowledged, covers the foot of the page. The notice itself is checked by the phone test below.
+  await page.addInitScript(() => localStorage.setItem("mdarix-compliance-consent", "accepted"));
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);

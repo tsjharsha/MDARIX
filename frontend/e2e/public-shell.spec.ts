@@ -34,7 +34,7 @@ test.describe("public MDARIX shell", () => {
   });
 
   test("verifies every public header and footer link resolves to a nonblank route", async ({ page }) => {
-    // Visits every header, menu and footer link (about 100 pages).
+    // Visits every header, menu and footer link.
     test.setTimeout(240_000);
     await page.goto("/");
     const hrefs = new Set<string>();
@@ -64,39 +64,28 @@ test.describe("public MDARIX shell", () => {
       await expect(page.locator("body")).toContainText(/MDARIX|Sign in|Create account/i);
       await expect(page.getByRole("heading", { name: "Page not found" })).toHaveCount(0);
     }
-    expect(hrefs.size).toBeGreaterThan(20);
+    // The refreshed website (feat/site-refresh, 18 Nov 2026) has 20 pages and no mega menus: about 20 links, all visited.
+    expect(hrefs.size).toBeGreaterThanOrEqual(15);
   });
-  test("opens a header menu with the keyboard and moves through it in order (WEB-10)", async ({ page }) => {
-    // The desktop header; on a phone the menus sit behind the menu button.
+  test("moves through the header's links with the keyboard, in order (WEB-10)", async ({ page }) => {
+    // The desktop header; on a phone the links sit behind the menu button. The refreshed website (18 Nov 2026) has
+    // no header menus: each item is a link, then Sign in and Start free trial.
     test.skip(test.info().project.name !== "chromium", "desktop header only");
     await page.goto("/");
-    const platform = page.locator("#public-navigation > button", { hasText: "Platform" });
-    await platform.focus();
-    await page.keyboard.press("Enter");
-    await expect(platform).toHaveAttribute("aria-expanded", "true");
-    await expect(platform).toHaveAttribute("aria-controls", "ms-menu-platform");
-    const panel = page.locator("#ms-menu-platform");
-    await expect(panel).toBeVisible();
-    // Tab goes into the open menu, to its first link.
-    await page.keyboard.press("Tab");
-    await expect(panel.locator("a").first()).toBeFocused();
-    // Shift+Tab goes back to the button; Escape closes the menu and keeps the focus there.
-    await page.keyboard.press("Shift+Tab");
-    await expect(platform).toBeFocused();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Escape");
-    await expect(panel).toHaveCount(0);
-    await expect(platform).toBeFocused();
-    await expect(platform).toHaveAttribute("aria-expanded", "false");
-    await expect(platform).not.toHaveAttribute("aria-controls", /.+/);
-    // Tab past the last link closes the menu and goes on to the next header item.
-    await page.keyboard.press("Enter");
-    const links = panel.locator("a");
+    const links = page.locator("#public-navigation a");
     const count = await links.count();
-    for (let index = 0; index < count; index += 1) await page.keyboard.press("Tab");
-    await expect(links.last()).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(panel).toHaveCount(0);
-    await expect(page.locator("#public-navigation > button", { hasText: "Solutions" })).toBeFocused();
+    expect(count).toBeGreaterThan(3);
+    await links.first().focus();
+    for (let index = 1; index < count; index += 1) {
+      await page.keyboard.press("Tab");
+      await expect(links.nth(index)).toBeFocused();
+    }
+    await expect(links.nth(count - 2)).toHaveText("Sign in");
+    await expect(links.last()).toHaveAttribute("href", "/signup");
+    // Enter follows the focused link.
+    await links.first().focus();
+    const target = await links.first().getAttribute("href");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(`${target}$`));
   });
 });
