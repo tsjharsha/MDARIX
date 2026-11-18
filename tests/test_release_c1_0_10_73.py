@@ -24,15 +24,16 @@ pytestmark = pytest.mark.db
 
 TEAM = "/api/v1/trial/team"
 MOCKUP_TABS = {
-    "admin": ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"],
-    "quality": ["home", "complaints", "reports", "investigations", "trends", "products", "records"],
-    "regulatory": ["home", "complaints", "trees", "reports", "records"],
+    # UX2 (Persona Blueprint wave D): the five work areas, each persona only the areas holding its work.
+    "admin": ["home", "complaints", "investigations", "products", "decisions"],
+    "quality": ["home", "complaints", "investigations", "products", "decisions"],
+    "regulatory": ["home", "complaints", "decisions"],
     "servicedesk": ["home", "complaints"],  # 0.10.93 (B2, spec 6.2)
     "handler": ["home", "complaints"],
-    "investigator": ["home", "investigations", "trends", "products"],
-    "risk": ["home", "investigations", "products", "records"],
-    "decision": ["home", "complaints", "reports", "records"],
-    "executive": ["home", "trends", "products", "records"],
+    "investigator": ["home", "complaints", "investigations", "products"],
+    "risk": ["home", "investigations", "products"],
+    "decision": ["home", "complaints", "investigations", "decisions"],
+    "executive": ["home", "investigations", "products", "decisions"],
 }
 
 
@@ -94,8 +95,9 @@ def test_the_personas_match_the_approved_design_and_each_persona_is_a_real_role(
     }
     # Each colleague persona's role reads back as that persona (Admin is the owner's own: Leader reads as Quality).
     assert all(persona_for_role(role) == code for code, role in roles.items() if code not in ("admin",))
-    # Only Admin has the Team tab.
-    assert [code for code, tabs in MOCKUP_TABS.items() if "team" in tabs] == ["admin"]
+    # UX2: Team, Records and Settings are in the avatar menu, never a work area; every persona has Today.
+    areas = {"home", "complaints", "investigations", "products", "decisions"}
+    assert all(tabs[0] == "home" and set(tabs) <= areas for tabs in MOCKUP_TABS.values())
 
 
 def test_a_fresh_trial_owner_opens_on_admin_and_the_choice_persists_across_sign_in():

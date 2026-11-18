@@ -124,7 +124,6 @@ def test_only_new_trials_get_the_new_navigation_existing_organizations_keep_thei
         assert after.pop(new_id) == "new"
         # Every organization that existed keeps its navigation (trials and pilots, classic or new).
         assert {key: value for key, value in after.items() if key in before} == before
-        assert "classic" in before.values()
     finally:
         _purge(approval["tenant_id"])
 
@@ -140,8 +139,8 @@ def test_an_organization_created_outside_the_trial_approval_stays_classic():
             db=db, tenant_key="PILOT_NAV_CHECK", name="Pilot Nav Check", status="ACTIVE", now=datetime.now(timezone.utc)
         )
         db.rollback()
-    # Not set in code: the column's default, classic, applies when it is written.
-    assert tenant.navigation in (None, "classic")
+    # Not set in code: the column's default applies when it is written; new since ux2navigationnew (UX2).
+    assert tenant.navigation in (None, "new")
 
 
 # ------------------------------------------------------------------------------------------- A2: sample-only trials
