@@ -40,7 +40,7 @@ test.describe("B5a: Challenge on the sample investigation, desktop", () => {
     await expect(page.getByText("Drafted by rule H-1 (version 1)")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Drafted by rule H-2 (version 1)")).toBeVisible();
     await expect(page.getByRole("region", { name: "Records against" }).first()).toBeVisible();
-    await expect(page.getByText(/You may already have this: HYP-/).first()).toBeVisible();
+    await expect(page.getByText(/You may already have this: HYP\d+/).first()).toBeVisible();
     // The sample author answered the material questions: nothing blocks Submit for review.
     await expect(page.getByRole("note", { name: "Blocking Submit for review" })).toHaveCount(0);
     await shot(page, "b5-challenge");

@@ -29,6 +29,14 @@ async function signIn(page: any, email: string, password: string) {
     .catch(() => undefined);
 }
 
+/** True when the server parks the field mapping studio: under the MVP feature set (backend/app/feature_set.py) Mapping
+ * Studio is hidden and its routes answer 404, so its steps are skipped there and run on the full product. */
+async function mappingStudioParked(page: any): Promise<boolean> {
+  const response = await page.request.get("/api/v1/session/context");
+  expect(response.ok()).toBe(true);
+  return (await response.json()).feature_set === "mvp";
+}
+
 async function openAdminNavigation(page: any) {
   // Wait until the console has rendered; on phones its navigation sits behind a menu button.
   await page
@@ -62,9 +70,10 @@ test.describe("MDARIX browser evidence", () => {
     const consent = page.getByRole("dialog", { name: /privacy/i });
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
+    const parked = await mappingStudioParked(page);
     for (const [route, name, expected] of [
       ["/app/admin", "admin", /platform administration/i],
-      ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i],
+      ...(parked ? [] : ([["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i]] as const)),
       // Business routes are not part of the platform-admin role; the app returns the admin to the console.
       ["/app/decision", "decision", /platform administration/i],
     ] as const) {
@@ -226,9 +235,11 @@ test.describe("MDARIX browser evidence", () => {
 
   test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
-    await page.goto("/app/admin/mapping-studio");
-    await expect(page.getByText(/Mapping Studio/i).first()).toBeVisible();
-    expect(await page.locator("button, input, select").count()).toBeGreaterThan(0);
+    if (!(await mappingStudioParked(page))) {
+      await page.goto("/app/admin/mapping-studio");
+      await expect(page.getByText(/Mapping Studio/i).first()).toBeVisible();
+      expect(await page.locator("button, input, select").count()).toBeGreaterThan(0);
+    }
     await page.goto("/app/investigations");
     await expect(page.getByText(/investigat|evidence|review/i).first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/undefined|null\b/i);

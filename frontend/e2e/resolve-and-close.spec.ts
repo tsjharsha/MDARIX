@@ -26,6 +26,8 @@ async function logRoutineCase(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Log a case" }).first().click();
   const form = page.getByRole("dialog", { name: "Log a case" });
   await form.getByLabel("The reporter's words, as they said them").fill(WORDS);
+  // The nine questions are folded in Log a case (they can wait for the Case check): open them, as a person would.
+  await form.getByText("The nine questions: answer now, or at the Case check").click();
   // Question 2 Yes (a deficiency alleged), every other No: a routine complaint, no harm, no trigger.
   for (let number = 1; number <= 9; number += 1)
     await form
@@ -41,11 +43,10 @@ async function logRoutineCase(page: Page): Promise<string> {
 
 async function signAndEscalate(page: Page, reference: string) {
   const check = page.getByRole("dialog", { name: `Case check · ${reference}` });
-  if (!(await check.isVisible()))
-    await page
-      .getByRole("button", { name: new RegExp(reference) })
-      .first()
-      .click();
+  // Saving opens the check; wait for it (or the case's row) before deciding to open it by hand.
+  const row = page.getByRole("button", { name: new RegExp(reference) }).first();
+  await check.or(row).first().waitFor({ timeout: 60_000 });
+  if (!(await check.isVisible())) await row.click();
   await expect(check).toBeVisible({ timeout: 60_000 });
   await check
     .getByRole("radiogroup", { name: "Your classification" })
@@ -84,11 +85,20 @@ test.describe("B7a: Resolve and close a routine complaint, desktop", () => {
     const screen = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "What happened" }) });
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await screen.getByLabel("Problem code").fill("ALARM_FALSE");
+    await screen.getByLabel(/^Troubleshooting/).fill("Asked the nurse to re-seat the sensor while on the phone.");
     await screen.getByLabel("Correction", { exact: true }).last().fill("Sensor re-seated with the nurse on the phone.");
     await screen.getByLabel("Result").fill("Alarm cleared; monitor in use.");
     await screen.getByLabel("Reason").selectOption({ index: 1 });
+    await screen.getByRole("combobox", { name: "Cause", exact: true }).selectOption({ label: "Use-related" });
     await screen.getByLabel("How").selectOption("PHONE");
     await screen.getByLabel("Note").fill("Told the nurse the cause and the fix.");
+    // ISO 13485 clause 6.2: whoever signs confirms the practice training on what the signature relies on.
+    const read = screen.getByRole("button", { name: /^I have read / });
+    while (await read.count()) {
+      const before = await read.count();
+      await read.first().click();
+      await expect(read).toHaveCount(before - 1, { timeout: 30_000 });
+    }
     await screen.getByLabel("Your password").fill(owner.password);
     await screen.getByLabel("Authenticator code").fill(await freshCode(page, owner));
     const signed = page.waitForResponse(

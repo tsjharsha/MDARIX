@@ -260,7 +260,10 @@ test.describe("deep crawl of every screen", () => {
     const nav = page.locator(`nav[aria-label="${NAV_LABEL.workspace}"]:visible`).first();
     await expect(nav).toBeAttached({ timeout: 20_000 });
     await openNavigation(page);
-    await nav.getByRole("button", { name: /^Investigations/ }).click();
+    // The phone's bottom bar folds some destinations under More (UX3): open it when Investigations is there.
+    const investigations = nav.getByRole("button", { name: /^Investigations/ });
+    if (!(await investigations.isVisible())) await nav.getByRole("button", { name: "More", exact: true }).click();
+    await investigations.click();
     // On the one navigation an investigation opens from its complaint or trend; the list opens each one's cockpit.
     await page.goto("/app/investigations?tab=All+investigations");
     const open = page

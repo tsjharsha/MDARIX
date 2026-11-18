@@ -54,7 +54,8 @@ export const stepButton = (page: Page, name: StepName, status = "") =>
 export const mainButton = (page: Page) =>
   walkthrough(page)
     .getByRole("button")
-    .filter({ hasNotText: /Step \d+: |^Back to |^step \d+, / })
+    // "Check it as a case" (Your data, steps 1 and 2 with no Case) is a side link, not the step's main button.
+    .filter({ hasNotText: /Step \d+: |^Back to |^step \d+, |^Check it as a case$/ })
     .first();
 export const at = (page: Page, path: string) => new URL(path, page.url()).toString();
 
@@ -118,7 +119,7 @@ export async function showYourData(page: Page) {
  * stories (optional)": opened when it is closed (nothing to do on your data, or with the sample removed). */
 export async function unfoldTenSteps(page: Page) {
   const more = page.locator("details.uw-flagship-more");
-  await expect(steps(page).or(more)).toBeVisible({ timeout: 60_000 });
+  await expect(steps(page).or(more).first()).toBeVisible({ timeout: 60_000 });
   if ((await more.count()) && !(await more.evaluate((node) => (node as HTMLDetailsElement).open)))
     await more.locator("summary").click();
 }
@@ -126,9 +127,10 @@ export async function unfoldTenSteps(page: Page) {
 /** Opens Getting started on ``run``, selects the step by its name and presses the step's own main button. */
 export async function openStep(page: Page, name: StepName, run: Run = "sample") {
   await page.goto("/app/getting-started");
+  // W1: on the sample the ten steps are folded under the flagship; Your data is chosen before its steps show.
   if (run === "sample") await unfoldTenSteps(page);
+  else await showYourData(page);
   await expect(steps(page)).toBeVisible({ timeout: 60_000 });
-  if (run === "yours") await showYourData(page);
   await stepButton(page, name).click();
   await mainButton(page).click();
   await settle(page);
@@ -279,6 +281,8 @@ export async function sampleToSigned(page: Page, who: Person, reloadMidway = fal
     // A person closes the browser after the triage and comes back: the story resumes at step 4 from the records.
     await page.goto("/app/getting-started");
     await page.reload();
+    // W1: the ten steps sit in the optional fold under the flagship; open it when it is closed, as a person would.
+    await unfoldTenSteps(page);
     await expect(stepButton(page, "Triage", "Completed")).toBeVisible({ timeout: 60_000 });
     expect(await screenTicks(page)).toEqual([true, true, true, false, false, false, false, false, false, false]);
     await expect(stepButton(page, "Assess reportability")).toHaveAttribute("aria-current", "step");
@@ -366,7 +370,8 @@ export async function prepareAndComplete(page: Page, lose = false, run: Run = "s
     [/impact code/, "consequences"],
     [/conclusions code/, "Device Design"],
   ];
-  for (let left = 6; left > 0; left--) {
+  // FDA asks seven H6 codes (problem, clinical, impact, component, investigation type, findings, conclusions).
+  for (let left = 10; left > 0; left--) {
     const row = give
       .getByRole("listitem")
       .filter({ has: page.getByRole("button", { name: "Choose a code" }) })
@@ -411,7 +416,8 @@ export async function recordSubmission(page: Page, run: Run = "sample") {
   const next = page.getByRole("complementary", { name: "What to do next" });
   const pdf = page.waitForResponse((response) => /\/worksheet\.pdf/.test(response.url()), { timeout: 60_000 });
   const download = page.waitForEvent("download", { timeout: 60_000 });
-  await next.getByRole("button", { name: "Generate the PDF" }).click();
+  // 0.10.96 (A8): the files are made at approval; "Download PDF" replaced the generate step.
+  await next.getByRole("button", { name: "Download PDF", exact: true }).click();
   // A real PDF: served as one, and the file saved is a non-empty PDF.
   const served = await pdf;
   expect(served.status()).toBe(200);

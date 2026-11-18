@@ -7,6 +7,7 @@ import {
   MAIL_DIR,
   PHONE,
   activate,
+  freshCode,
   linkFromMail,
   newPage,
   person,
@@ -151,6 +152,8 @@ test.describe("Your own data through Getting started's ten steps", () => {
     const facts = page.getByRole("region", { name: "Facts the reporting steps need" });
     await expect(facts).toBeVisible({ timeout: 60_000 });
     await facts.getByRole("textbox", { name: /^Incident country/ }).fill("United States");
+    // B6a G10: a change of a reporting fact says why (kept in the audit trail); Save waits for it.
+    await facts.getByRole("textbox", { name: /^Why it changes/ }).fill("The reporter's e-mail named the country.");
     const factSaves: number[] = [];
     page.on("response", (response) => {
       if (response.url().endsWith("/reporting-facts") && response.request().method() === "PUT")
@@ -180,6 +183,14 @@ test.describe("Your own data through Getting started's ten steps", () => {
     await aware.fill((await aware.getAttribute("type")) === "date" ? "2026-11-03" : "2026-11-03T10:00");
     const later = triage.getByRole("textbox", { name: /^Why is it later than the earliest known/ });
     if (await later.count()) await later.fill("The distributor told us on 3 November, two days after the event.");
+    // B6a: a later awareness lengthens every clock, so it is signed with the password.
+    const signature = triage.getByRole("textbox", { name: /^Your password \(signature\)/ });
+    if (await signature.count()) {
+      await signature.fill(owner.password);
+      await triage
+        .getByRole("textbox", { name: /^Code from your authenticator app/ })
+        .fill(await freshCode(page, owner));
+    }
     await saveTriage(triage);
     await ticksInOrder(page, "yours", 3);
     expect((await needsNow()).needs).toEqual([]);
