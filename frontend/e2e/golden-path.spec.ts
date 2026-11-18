@@ -91,6 +91,10 @@ test.describe("demo golden path (read only)", () => {
     test.setTimeout(90_000);
     const problems = watchErrors(page);
     await signIn(page, TRIAGE_EMAIL);
+    // Never a page wider than the screen, on a phone too (the top bar wraps; UX3).
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(
+      0,
+    );
     await openArea(page, "Cases");
     await expect(page.getByRole("heading", { level: 1, name: "What needs you first?" })).toBeVisible({
       timeout: 20_000,

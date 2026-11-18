@@ -465,6 +465,11 @@
   .uw-hybrid .uw-top.ac-header {
     gap: 4px;
     padding: 0 12px;
+    /* Many controls on a narrow phone wrap onto a second row: never a page wider than the screen (UX3; a pilot's
+       top bar overflowed by 118 px on 0f2fbedf). */
+    flex-wrap: wrap;
+    height: auto;
+    padding-block: 6px;
   }
   .uw-hybrid .uw-top .uw-org {
     display: flex;
