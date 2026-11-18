@@ -1,67 +1,12 @@
 import { useEffect, useState } from "react";
 import { BASIS_DISCLAIMER, basisOf } from "../features/shared/standards";
 import { MARKETS } from "./content";
+import { SAMPLE_LABEL } from "./motion";
 
-/* The website's pictures: drawn in HTML and SVG from the free trial's sample story, so they show the real concepts
-   (the product twin, the investigation, the legal clocks, the effectiveness check) without app screenshots that go
-   stale. Every one says it is illustrative and synthetic. HTML where the picture holds words, so it reflows on a
-   phone instead of shrinking its text. */
+/* The website's drawn pictures: the sample's signal chart (drawn on as it scrolls into view, beside the Cases screen)
+   and the markets' legal basis. The app's own screens are in motion.tsx (Shot). */
 
-const Caption = () => <figcaption className="ms-fig-note">Illustrative · synthetic sample data</figcaption>;
-
-/* ----------------------------------------------------------------- The product twin (home page hero) */
-
-// The free trial's sample story (backend/app/trial/sample_data.py): OrbitCare 300 Rev B moved its pressure sensor to a
-// new supplier (change SAMPLE-CHG-014); pressure-alarm complaints rise afterwards. Rev B lots are 003-008.
-const TWIN_NODES = [
-  { key: "complaints", label: "Complaints", value: "Pressure alarms rising", hot: true },
-  { key: "version", label: "Version at the event date", value: "Rev B", hot: true },
-  { key: "markets", label: "Complaints from", value: "United States", hot: false },
-  { key: "component", label: "Component", value: "Pressure sensor", hot: true },
-  { key: "lots", label: "Lots built with it", value: "003–008", hot: true },
-  { key: "supplier", label: "Supplier", value: "Changed in SAMPLE-CHG-014", hot: true },
-] as const;
-
-export function ProductTwin() {
-  return (
-    <figure className="ms-twin" aria-labelledby="twin-title">
-      <svg className="ms-twin-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {[
-          [17, 17],
-          [83, 17],
-          [17, 50],
-          [83, 50],
-          [17, 83],
-          [83, 83],
-        ].map(([x, y], index) => (
-          <line
-            key={index}
-            x1={50}
-            y1={50}
-            x2={x}
-            y2={y}
-            className={TWIN_NODES[index].hot ? "is-hot" : undefined}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </svg>
-      <div className="ms-twin-core">
-        <span id="twin-title">Product Lifecycle Twin</span>
-        <strong>OrbitCare 300</strong>
-        <small>Infusion pump · sample product</small>
-      </div>
-      <ul className="ms-twin-nodes">
-        {TWIN_NODES.map((node) => (
-          <li key={node.key} className={`ms-twin-node is-${node.key}${node.hot ? " is-hot" : ""}`}>
-            <span>{node.label}</span>
-            <strong>{node.value}</strong>
-          </li>
-        ))}
-      </ul>
-      <Caption />
-    </figure>
-  );
-}
+const Caption = () => <figcaption className="ms-fig-note">{SAMPLE_LABEL}</figcaption>;
 
 /* ------------------------------------------------------------------------------------------- 1. Signal */
 
@@ -85,7 +30,7 @@ export function SignalChart() {
   const area = `${line} L${x(WEEKLY.length - 1).toFixed(1)},${y(0)} L${x(0).toFixed(1)},${y(0)} Z`;
   const release = x(RELEASE_WEEK - 1);
   return (
-    <figure className="ms-fig">
+    <figure className="ms-fig ms-fig-chart">
       <svg className="ms-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="signal-chart-title">
         <title id="signal-chart-title">
           Pressure-alarm complaints per week: 4 in the 15 weeks before Rev B is released in week 16, 15 in the 11 weeks
@@ -100,7 +45,7 @@ export function SignalChart() {
         />
         <line className="ms-chart-base" x1={pad.left} x2={width - pad.right} y1={y(0)} y2={y(0)} />
         <path className="ms-chart-area" d={area} />
-        <path className="ms-chart-line" d={line} />
+        <path className="ms-chart-line" d={line} pathLength={1} />
         <line className="ms-chart-marker" x1={release} x2={release} y1={pad.top - 8} y2={y(0)} />
         <text className="ms-chart-note" x={release + 8} y={pad.top - 14}>
           Rev B released
@@ -114,13 +59,13 @@ export function SignalChart() {
       </svg>
       <div className="ms-fig-stats">
         <span>
-          <strong>4</strong> in the 15 weeks before
+          <strong data-count="4">4</strong> in the 15 weeks before
         </span>
         <span className="is-hot">
-          <strong>15</strong> in the 11 weeks after
+          <strong data-count="15">15</strong> in the 11 weeks after
         </span>
         <span className="is-hot">
-          <strong>9.3×</strong> the expected count in the trend check
+          <strong data-count="9.3×">9.3×</strong> the expected count in the trend check
         </span>
       </div>
       <Caption />
@@ -128,134 +73,6 @@ export function SignalChart() {
   );
 }
 
-/* ---------------------------------------------------------------------------------- 2. Product reality */
-
-const REVISIONS = [
-  ["Pressure sensor supplier", "Precision Sensors Ltd", "NovaSense Components (SAMPLE-CHG-014)"],
-  ["Incoming inspection sample", "32 units", "13 units"],
-  ["Finished lots", "001–002", "003–008"],
-] as const;
-
-export function RevisionCompare() {
-  return (
-    <figure className="ms-fig">
-      <table className="ms-compare">
-        <caption>OrbitCare 300: what changed between Rev A and Rev B</caption>
-        <thead>
-          <tr>
-            <th scope="col">
-              <span className="ms-sr">Attribute</span>
-            </th>
-            <th scope="col">Rev A</th>
-            <th scope="col">Rev B</th>
-          </tr>
-        </thead>
-        <tbody>
-          {REVISIONS.map(([what, before, after]) => (
-            <tr key={what}>
-              <th scope="row">{what}</th>
-              <td>{before}</td>
-              <td className="is-changed">{after}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="ms-fig-read">A change is a lead, not a cause: the investigation tests it.</p>
-      <Caption />
-    </figure>
-  );
-}
-
-/* -------------------------------------------------------------------------------------- 3. Investigation */
-
-// The investigation's six steps and the sample case's two hypotheses (sample_decision.py SAMPLE_HYPOTHESES).
-const RAIL = ["Signal", "Product reality", "Evidence", "Possible causes", "Brief", "Decision & action"] as const;
-const CAUSES = [
-  {
-    cause: "NovaSense pressure sensors read high at the upper pressure range",
-    state: "Partially supported",
-    tone: "warn",
-    support: 2,
-    against: 0,
-  },
-  {
-    cause: "Ward pressure-limit settings, not the pump, set off the alarms",
-    state: "Weakly supported",
-    tone: "open",
-    support: 0,
-    against: 2,
-  },
-] as const;
-
-export function InvestigationRail() {
-  return (
-    <figure className="ms-fig">
-      <ol className="ms-rail" aria-label="Investigation steps">
-        {RAIL.map((step, index) => (
-          <li key={step} className={index === 3 ? "is-current" : index < 3 ? "is-done" : undefined}>
-            {step}
-          </li>
-        ))}
-      </ol>
-      <ul className="ms-causes">
-        {CAUSES.map((item) => (
-          <li key={item.cause}>
-            <span className="ms-cause-text">{item.cause}</span>
-            <span className={`ms-pill is-${item.tone}`}>{item.state}</span>
-            <span className="ms-weigh" aria-label={`${item.support} pieces of evidence for, ${item.against} against`}>
-              <span className="is-for" style={{ flexGrow: item.support }} />
-              <span className="is-against" style={{ flexGrow: item.against }} />
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="ms-fig-read">
-        <span className="ms-key is-for" aria-hidden="true" /> Evidence for{" "}
-        <span className="ms-key is-against" aria-hidden="true" /> Evidence against
-      </p>
-      <Caption />
-    </figure>
-  );
-}
-
-/* --------------------------------------------------------------------------- 4. Decision and reports */
-
-// One sample record per market, as the trial stages it (sample_reports.py, sample_assessments.py, sample_intake.py).
-const MARKET_STATES: Record<string, { state: string; tone: string; ref: string }> = {
-  "United States": { state: "Reportable · 3500A accepted", tone: "good", ref: "SAMPLE-RV-09" },
-  "EU and Northern Ireland": { state: "Reportable · 15-day report", tone: "warn", ref: "SAMPLE-RV-07" },
-  "Great Britain": { state: "Not known yet · questions open", tone: "open", ref: "SAMPLE-CALL-03" },
-  Canada: { state: "Not reportable · reason kept", tone: "good", ref: "SAMPLE-RV-07" },
-  India: { state: "Reportable · correction required", tone: "warn", ref: "SAMPLE-RV-10" },
-};
-
-export function MarketDecisions() {
-  return (
-    <figure className="ms-fig">
-      <ul className="ms-markets">
-        {MARKETS.map((market) => (
-          <li key={market.region}>
-            <span>
-              <strong>{market.region}</strong>
-              <small>
-                {[MARKET_STATES[market.region].ref, ...basisOf(market.basis).map((standard) => standard.short)].join(
-                  " · ",
-                )}
-              </small>
-            </span>
-            <span className={`ms-pill is-${MARKET_STATES[market.region].tone}`}>
-              {MARKET_STATES[market.region].state}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="ms-signed">Signed with password and authenticator code · nobody signs their own work</p>
-      <Caption />
-    </figure>
-  );
-}
-
-/** The markets with their legal basis, for the Trust page. */
 export function MarketBasis() {
   return (
     <>
@@ -276,49 +93,6 @@ export function MarketBasis() {
       </div>
       <p className="ms-note">{BASIS_DISCLAIMER}</p>
     </>
-  );
-}
-
-/* ---------------------------------------------------------------------------------------- 5. Did it work */
-
-const OUTCOMES = [
-  ["Effective", "good"],
-  ["Not effective", "bad"],
-  ["Inconclusive", "warn"],
-] as const;
-
-export function EffectivenessCheck() {
-  return (
-    <figure className="ms-fig">
-      <dl className="ms-check">
-        <div>
-          <dt>Action</dt>
-          <dd>SAMPLE-CAPA-02: incoming inspection of NovaSense pressure sensors restored to 32 units per lot</dd>
-        </div>
-        <div>
-          <dt>Criteria, set before the action</dt>
-          <dd>
-            Fewer pressure-alarm complaints per unit in the field on lots built after the fix than on lots 003 and 004
-          </dd>
-        </div>
-        <div>
-          <dt>Measured from</dt>
-          <dd>The first lot built after the fix, not the day the CAPA closed</dd>
-        </div>
-      </dl>
-      <div className="ms-outcomes" role="group" aria-label="The signed result is one of">
-        {OUTCOMES.map(([label, tone]) => (
-          <span key={label} className={`ms-pill is-${tone}`}>
-            {label}
-          </span>
-        ))}
-      </div>
-      <p className="ms-fig-read">
-        The sample signs it Inconclusive: 90 days of synthetic follow-up are too early to tell, and that is not counted
-        as a success.
-      </p>
-      <Caption />
-    </figure>
   );
 }
 

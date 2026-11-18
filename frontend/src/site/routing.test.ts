@@ -117,7 +117,7 @@ describe("website addresses", () => {
     // Every internal link on every page opens a page (and its section) instead of "not found".
     for (const path of INDEXED_PATHS) {
       for (const [, href] of html(path).matchAll(/href="(\/[^"]*)"/g)) {
-        if (/^\/(signin|signup|request-demo|assets|media)/.test(href)) continue;
+        if (/^\/(signin|signup|request-demo|assets|media|site\/app\/)/.test(href)) continue;
         const [address, anchor = ""] = href.split("#");
         const target = resolveSitePath(address, anchor);
         expect(target.page, `${path} -> ${href}`).not.toBe("not-found");
