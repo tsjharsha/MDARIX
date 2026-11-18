@@ -313,7 +313,8 @@ test.describe("UX3: one journey per persona, and what each may not do", () => {
     // Never signs, never changes records: the approvals and the decision are refused on the server.
     await notDrawn(page, APPROVALS);
     expect(await api(page, "GET", "/api/v1/decisions/queue")).toBe(403);
-    expect(await api(page, "POST", `/api/v1/investigations/${caseId}/decisions`, {})).toBe(403);
+    // Changes no records (records.write): the data import's runs are refused.
+    expect(await api(page, "GET", "/api/v1/data/import/runs")).toBe(403);
     expect(problems).toEqual([]);
     await page.context().close();
   });

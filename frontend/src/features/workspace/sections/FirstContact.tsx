@@ -67,12 +67,15 @@ export function FirstContact({
   onOpenTab,
   part = "all",
   startLogging = null,
+  logButton = true,
 }: {
   onOpenTab?: (tab: "Triage") => void;
   /** The new navigation's queues (0.10.68): My work › Queues › Calls to check, or Possible duplicates. */
   part?: "all" | "calls" | "duplicates";
   /** A link's "Log a call" (Complaints' header action): the log opens at once. */
   startLogging?: "CONTACT" | "URGENT" | null;
+  /** False under Cases, whose header's "Log a case" is the page's one log button (UX1, UX3). */
+  logButton?: boolean;
 }) {
   const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(startLogging);
   // B7b: "Make it a case" opens Log a case pre-filled from the e-mail.
@@ -97,9 +100,11 @@ export function FirstContact({
         <div className="uw-entry-actions">
           {canWrite && (
             <>
-              <button type="button" className="ac-primary" onClick={() => setLogging("CONTACT")}>
-                <PhoneCall size={15} aria-hidden="true" /> Log a case
-              </button>
+              {logButton && (
+                <button type="button" className="ac-primary" onClick={() => setLogging("CONTACT")}>
+                  <PhoneCall size={15} aria-hidden="true" /> Log a case
+                </button>
+              )}
               <button type="button" className="ac-secondary" onClick={() => setLogging("URGENT")}>
                 <Siren size={15} aria-hidden="true" /> Urgent: death or serious injury
               </button>

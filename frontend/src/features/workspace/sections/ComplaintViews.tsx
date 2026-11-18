@@ -96,7 +96,9 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       {server && <ComplaintList key={view} eyebrow="" countTitle view={{ name: view, code: server.code }} />}
       {/* The header's "Log a case" is the one log button here (UX1): the triage hero has none of its own. */}
       {view === "To triage" && <Triage onOpenTab={go} logButton={false} />}
-      {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
+      {view === "Calls to check" && (
+        <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} logButton={false} />
+      )}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
       {view === "Past target" && <Backlog initial="past_target" fixed />}
       {view === "Imported backlog" && <ImportedBacklog />}

@@ -250,6 +250,17 @@ describe("Complaints: the Service Desk logs a case, with one log button", () => 
     expect(html.match(/Log a case/g)).toHaveLength(1);
     expect(html).not.toContain("Log a case or an urgent case");
   });
+
+  it("shows one log button on the Service Desk's first view, To log (UX3: UX2 made it the first)", () => {
+    const html = render(
+      <ComplaintViews tab="Calls to check" />,
+      api({ persona: "servicedesk", session: { business_permissions: ["case.log"] } } as never),
+    );
+    // One button (an empty list's sentence may still say "Log a case, or ...").
+    expect(html.match(/Log a case<\/button>/g)).toHaveLength(1);
+    // The urgent intake keeps its own button.
+    expect(html).toContain("Urgent: death or serious injury");
+  });
 });
 
 describe("one overdue badge that says why", () => {

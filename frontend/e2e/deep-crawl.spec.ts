@@ -261,8 +261,13 @@ test.describe("deep crawl of every screen", () => {
     await nav.getByRole("button", { name: /^Investigations/ }).click();
     // On the one navigation an investigation opens from its complaint or trend; the list opens each one's cockpit.
     await page.goto("/app/investigations?tab=All+investigations");
-    const open = page.getByRole("button", { name: /^Open \S+/ }).first();
-    await expect(open.or(page.getByText(/No investigation|Open one from/).first())).toBeVisible({ timeout: 20_000 });
+    const open = page
+      .locator("main")
+      .getByRole("button", { name: /^Open \S+/ })
+      .first();
+    await expect(open.or(page.getByText(/Nothing in this view|No investigation/).first())).toBeVisible({
+      timeout: 20_000,
+    });
     if (await open.count()) {
       await open.click();
       await expect(page.getByRole("navigation", { name: "Investigation steps" })).toBeVisible({ timeout: 20_000 });
