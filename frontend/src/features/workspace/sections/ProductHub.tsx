@@ -251,11 +251,23 @@ function ProductList({ go }: { go: Go }) {
           }
         />
       ) : (
-        <ul className="uw-ph-cards">
-          {shown.map((row) => (
-            <ProductCard key={row.id} row={row} go={go} />
-          ))}
-        </ul>
+        <>
+          <ul className="uw-ph-cards">
+            {shown.map((row) => (
+              <ProductCard key={row.id} row={row} go={go} />
+            ))}
+          </ul>
+          {/* UX1: the cards' sum is not Complaints › All open (24 against 27 on the sample): each card counts its newest
+              version only. Said where the numbers are, with the list that counts every one. */}
+          <p className="uw-hint">
+            Each card counts what is open on the product&apos;s newest version. Open complaints on earlier versions, or
+            with no product recorded, are not on a card: Complaints ›{" "}
+            <button type="button" className="ac-link" onClick={() => open("Complaints", "All open complaints")}>
+              All open complaints
+            </button>{" "}
+            counts every one.
+          </p>
+        </>
       )}
     </Panel>
   );
@@ -300,7 +312,9 @@ function ProductCard({ row, go }: { row: ProductSummary; go: Go }) {
         )}
       </div>
       {counts && (
-        <div className="uw-ph-counts" aria-label={version ? `On ${version}` : "On the product"}>
+        <div className="uw-ph-counts" aria-label={version ? `Open now on ${version}` : "Open now on the product"}>
+          {/* UX1: every count says what it counts: open now, on the newest version. */}
+          <span className="ac-muted uw-ph-on">{version ? `Open now on ${version} (newest version)` : "Open now"}</span>
           {count("complaints", counts.open_complaints, "open complaints")}
           {count("investigations", counts.open_investigations, "open investigations")}
           {count("signals", counts.open_signals, "trends to review", true)}
@@ -592,6 +606,10 @@ function Overview({
                   <h3>{title}</h3>
                   <span className="uw-ph-tile-count">{tile.count}</span>
                 </div>
+                {/* UX1: the tile's count says what it counts (the product cards count open ones only). */}
+                {kind === "complaints" && (
+                  <small className="ac-muted">Every complaint on {version ?? "the product"}, open and closed</small>
+                )}
                 {tile.items.length ? (
                   <ul>
                     {tile.items.map((row: Row) => {

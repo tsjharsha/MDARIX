@@ -6734,6 +6734,21 @@ button.uw-org:hover {
 .uw-home-stat span {
   color: var(--ms-ink-2);
 }
+.uw-home-lead-ic {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--ms-hero-card, rgb(255 255 255 / 8%));
+}
+.uw-ph-counts .uw-ph-on {
+  grid-column: 1 / -1;
+}
+.uw-home-onepage dd ul {
+  margin: 0;
+  padding-left: 18px;
+}
 .uw-home-stat .uw-home-short {
   display: none;
 }
@@ -6743,7 +6758,8 @@ button.uw-org:hover {
   align-items: start;
   gap: 18px;
 }
-.uw-home-side {
+.uw-home-side,
+.uw-home-main {
   display: grid;
   align-content: start;
   gap: 18px;

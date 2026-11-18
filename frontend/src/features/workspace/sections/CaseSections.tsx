@@ -10,7 +10,7 @@ import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
 import { renamed, useIsTrial, useRcaIntelligence, useRcaMethods, useWorkspace } from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
-import { useVisited } from "../oneStory";
+import { AI_PROPOSALS_PART, useVisited } from "../oneStory";
 import {
   CASE_SECTIONS,
   INVESTIGATION_QUESTIONS,
@@ -136,7 +136,7 @@ export function AiProposalsCard({
   const total = waitingObservations.length + waitingHypotheses.length;
   if (!total) return null;
   return (
-    <section className="uw-card uw-card-pad uw-ai-proposals" aria-label="AI proposals">
+    <section className="uw-card uw-card-pad uw-ai-proposals" aria-label="AI proposals" id={partId(AI_PROPOSALS_PART)}>
       <h2>
         <Sparkles size={18} aria-hidden="true" /> AI proposals · {total} waiting for your review
       </h2>
@@ -215,6 +215,22 @@ export function CaseSections({
     { step: "evidence", investigationId: work.investigationId || undefined },
     active === "Evidence" && !!selected,
   );
+  // Flagship step 5 (UX1) counts once the brief, accepted for decision by the sample reviewer, has loaded.
+  useVisited(
+    { step: "brief", investigationId: work.investigationId || undefined },
+    active === "Decisions & actions" && part === "brief" && brief.state === "ready" && !!brief.data?.current,
+  );
+  // A link to another part of this investigation while it is open (the flagship's Next) moves there (UX1): the part
+  // was read only when the page opened, so the link reloaded the page in place.
+  const askedPart = tabParam(requested, "part");
+  const askedSection = tabParts(requested).name;
+  useEffect(() => {
+    if (!askedPart || askedPart === "intelligence") return;
+    if (askedSection && (CASE_SECTIONS as readonly string[]).includes(askedSection))
+      setActive(askedSection as CaseSection);
+    setPart(askedPart);
+    document.getElementById(partId(askedPart))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [askedPart, askedSection]);
   const nextPart = nextCaseStep(steps)?.part;
   const checks = readinessChecks(readiness.data);
   // A part with nothing in it yet folds into one line, "Not started yet: …" (0.10.72, B2); the next step, the part a

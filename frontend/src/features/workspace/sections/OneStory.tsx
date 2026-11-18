@@ -33,13 +33,15 @@ import { flagshipBarParts } from "./FlagshipBar";
 import { REGISTER_LINK, SAMPLE_REGISTER, STEP_REGISTER_PART, registerTab } from "./SampleRegister";
 
 /** W1d (D07): the six views of the sample investigation, named under Getting started's one main button. */
-export const SIX_VIEWS = [
+/** The seven steps' short names, one per step (UX1: six names for seven steps read as a different story). */
+export const STEP_VIEWS = [
+  "Signal",
   "Product reality",
   "Evidence",
-  "AI investigator",
+  "AI investigation",
   "Investigation Brief",
-  "Decision and CAPA",
-  "Effectiveness and impact",
+  "Human decision",
+  "Action and impact",
 ] as const;
 /** W1d (D04): after step 7, the effectiveness check's synthetic follow-up waits for a person's signed result. */
 export const FOLLOW_UP_LINE = "Optional: review the synthetic follow-up and sign the effectiveness result";
@@ -111,32 +113,32 @@ export const STEP_INFO: ReadonlyArray<{ why: string; who: string; evidence: stri
   },
   {
     why: "Every complaint gets a first safety look, an owner and a first action; fast when harm is possible.",
-    who: "Complaint Handler, Quality Leader, Regulatory Leader",
+    who: "Complaint Handler, Quality Leader, Regulatory Reviewer",
     evidence: "A complete triage version",
   },
   {
     why: "Each market decides from the facts, with Unknown kept apart from No.",
-    who: "Regulatory Leader",
+    who: "Regulatory Reviewer",
     evidence: "An assessment of the incident's market saved",
   },
   {
     why: "Reportable or not, why and by when, signed by your own role.",
-    who: "Regulatory Leader",
+    who: "Regulatory Reviewer",
     evidence: "That market's conclusion signed",
   },
   {
     why: "A “reportable” conclusion creates the right form for the incident's country.",
-    who: "Regulatory Leader",
+    who: "Regulatory Reviewer",
     evidence: "The report exists and was opened",
   },
   {
     why: "Every mandatory field filled, then a second person approves.",
-    who: "Regulatory Leader, then Decision Maker",
+    who: "Regulatory Reviewer, then Decision Maker",
     evidence: "Report status Approved",
   },
   {
     why: "MDARIX never submits: you record what you sent.",
-    who: "Regulatory Leader",
+    who: "Regulatory Reviewer",
     evidence: "Submission recorded",
   },
   {
@@ -156,11 +158,11 @@ const STEP_ROLE: Record<number, string> = {
   0: "A Service Desk agent or a Complaint Handler",
   1: "A Service Desk agent, a Complaint Handler or the Quality Leader",
   2: "A Complaint Handler or the Quality Leader",
-  3: "A Regulatory Leader",
-  4: "A Regulatory Leader",
-  5: "A Regulatory Leader",
-  6: "A Regulatory Leader, then a Decision Maker",
-  7: "A Regulatory Leader",
+  3: "A Regulatory Reviewer",
+  4: "A Regulatory Reviewer",
+  5: "A Regulatory Reviewer",
+  6: "A Regulatory Reviewer, then a Decision Maker",
+  7: "A Regulatory Reviewer",
 };
 
 /** "Check it as a case" for a complaint classified in your QMS (spec 4.8): opens a Case check linked to it. */
@@ -798,7 +800,7 @@ export function flagshipCopy(run: FlagshipRun, index: number, aiReady: boolean |
       h: "AI proposes competing explanations; a person reviews them",
       b: aiReady === true ? "Ask AI for competing explanations" : "Review the AI proposals",
     },
-    { h: "The Investigation Brief, checked by a second person", b: "Review the brief" },
+    { h: "The Investigation Brief, checked by a second person", b: "Read the brief" },
     { h: "Your decision, signed with your authenticator", b: "Sign the decision" },
     { h: "Action and impact", b: "Plan the effectiveness check" },
   ][index];
@@ -829,8 +831,8 @@ export const FLAGSHIP_INFO: ReadonlyArray<{ why: string; who: string; evidence: 
   },
   {
     why: "A second person checks the brief before anyone decides: the writer never approves their own brief.",
-    who: "Quality reviewer",
-    evidence: "The brief accepted for decision",
+    who: "Quality reviewer (the sample reviewer), then the Decision Maker reads it",
+    evidence: "The brief, accepted for decision, opened",
   },
   {
     why: "A person decides and signs with password and authenticator code. The server records what the signature means.",
@@ -847,7 +849,8 @@ export const FLAGSHIP_INFO: ReadonlyArray<{ why: string; who: string; evidence: 
 const FLAGSHIP_ICONS: readonly LucideIcon[] = [TrendingUp, Package, ListChecks, Sparkles, FileText, PencilLine, Wrench];
 export const SUMMARY_LINE = "See the decision and its impact on one screen";
 export const FLAGSHIP_BRIEF_LINE =
-  "Written by the sample author before the AI proposal; your accepted proposal is on the case.";
+  "Written by the sample author before the AI proposal and accepted for decision by the sample reviewer, a second " +
+  "person. Read it before you sign: your accepted proposal is on the case.";
 export const RISK_LINE = "Risk file: reassess SAMPLE-RSK-01 and SAMPLE-RSK-02 for the NovaSense pressure sensor";
 // W5: the twin's links from the flagship (no new step): step 2 to the connected view, step 7 to the sensor lot's scope.
 export const connectedLine = (version: string | null) => `See everything connected to ${version ?? "the product"}`;
@@ -1035,10 +1038,10 @@ export function FlagshipView({
             </button>
           </div>
         )}
-        {/* W1d (D07): the six views the investigation walks through, a quiet strip, not buttons. */}
+        {/* W1d (D07): the seven steps the investigation walks through, a quiet strip, not buttons. */}
         {fresh && (
           <ul className="uw-gs-views" aria-label="What you will see">
-            {SIX_VIEWS.map((view) => (
+            {STEP_VIEWS.map((view) => (
               <li key={view}>{view}</li>
             ))}
           </ul>

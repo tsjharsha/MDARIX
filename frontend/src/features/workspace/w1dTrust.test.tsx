@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FOLLOW_UP_LINE, FlagshipView, OneStory, SIX_VIEWS } from "./sections/OneStory";
+import { FOLLOW_UP_LINE, FlagshipView, OneStory, STEP_VIEWS } from "./sections/OneStory";
 import { FlagshipBar } from "./sections/FlagshipBar";
 import { CheckBody } from "./sections/Records";
 import {
@@ -89,15 +89,15 @@ beforeEach(() => {
   reads.data = {};
 });
 
-describe("D07: Getting started names the six views under its one main button", () => {
+describe("D07: Getting started names the seven steps under its one main button", () => {
   it("shows the quiet strip and the register link, and still one main button", () => {
     reads.data[ONE_STORY_PATH] = { sample: null, yours: null, flagship: run() };
     const html = render(<OneStory />);
     expect(primaries(html)).toHaveLength(1);
     expect(html).toContain("Start the sample investigation");
     expect(html).toMatch(/Start the sample investigation.*uw-gs-views/s);
-    for (const view of SIX_VIEWS) expect(html).toContain(`<li>${view}</li>`);
-    expect(SIX_VIEWS).toHaveLength(6);
+    for (const view of STEP_VIEWS) expect(html).toContain(`<li>${view}</li>`);
+    expect(STEP_VIEWS).toHaveLength(7);
     expect(html).toContain(REGISTER_LINK);
   });
 

@@ -77,6 +77,8 @@ export type Review = {
   investigation?: {
     id?: string | null;
     business_id?: string | null;
+    /** The reference people read (SAMPLE-INV-001), UX1. */
+    identifier?: string | null;
     question?: string | null;
     workflow_state?: string | null;
     product?: { id?: string | null; business_id?: string | null; name?: string | null } | null;

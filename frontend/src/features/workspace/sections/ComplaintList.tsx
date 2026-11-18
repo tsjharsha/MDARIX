@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { SearchBox, Table, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
+import { formatDay, timeLeft } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
 import {
@@ -13,7 +13,6 @@ import {
   useWorkspace,
 } from "../workspaceContext";
 import { StatusBadge, countOf, listTitle } from "./common";
-import { DeadlineChip } from "../../../app/chips";
 import { AlertCircle, Triangle } from "lucide-react";
 import { HarmBadge } from "../../shared/hero/HeroVisuals";
 import { ClockPill, CountryCell, OwnerCell, ProductCell, StageCell, listGlance } from "../heroBits";
@@ -438,6 +437,10 @@ type WorkDue = {
   hours_left: number;
 };
 
+/** Why a row is overdue, in one badge (UX1): "Overdue: Reply due from Reporter (2 days overdue)". */
+export const overdueWhy = (item: WorkDue) =>
+  `Overdue: ${(item.title || item.category_label || "Target").replace(/ of \S+$/, "")} (${timeLeft(item)})`;
+
 /** What the new navigation's list shows of a complaint's work, as its page shows it. */
 export type ComplaintWork = {
   owner_name: string | null;
@@ -475,8 +478,17 @@ export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
         const harm = harmOf(row);
         return (
           <span className="uw-urgency">
-            {/* 0.10.90, the hero design: the legal clock as a ring beside its words. */}
-            {nearest ? (
+            {/* UX1: an overdue own target is the one badge, saying why the row is overdue; the legal clock, still
+                running, is a quiet line ("2 days left · Due soon" beside "2 days overdue" read as a contradiction). */}
+            {late ? (
+              <>
+                <span className="ms-chip ms-chip-deadline is-overdue" title={late.title}>
+                  <AlertCircle size={14} aria-hidden="true" /> {overdueWhy(late)}
+                </span>
+                {nearest && <small className="ac-muted">Legal clock: {timeLeft(nearest)}</small>}
+              </>
+            ) : /* 0.10.90, the hero design: the legal clock as a ring beside its words. */
+            nearest ? (
               <ClockPill item={nearest} />
             ) : (
               <span className="ac-muted hx-nodl">
@@ -484,7 +496,6 @@ export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
                 No deadline
               </span>
             )}
-            {late && <DeadlineChip item={late} prefix={late.category_label ?? "Target"} />}
             {harm && <HarmBadge harm={harm.harm === "critical" ? "DEATH" : "SERIOUS_INJURY"} label={harm.label} />}
           </span>
         );

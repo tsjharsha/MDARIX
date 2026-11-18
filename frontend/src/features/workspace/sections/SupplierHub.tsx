@@ -346,7 +346,8 @@ function ComplaintsAndInvestigations({ page, supplier }: { page: Row; supplier: 
   const total = page.counts.complaints;
   return (
     <>
-      <Panel title={`Complaints on versions with its parts · ${total}`} source={complaints}>
+      {/* UX1: the count says what it counts (all time, open and closed), beside the 90-day figure above. */}
+      <Panel title={`Complaints on versions with its parts, all time (open and closed) · ${total}`} source={complaints}>
         {!complaints.data?.length ? (
           <p className="ac-muted">No complaints are recorded on versions that contain these parts.</p>
         ) : (

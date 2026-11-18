@@ -14,7 +14,7 @@ import { StarterNote, WhyAsked } from "../../shared/Basis";
 import { isStarterVersion } from "../../shared/standards";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
 import { Hero, InlineError } from "./boardParts";
-import { EscalateButton } from "./Triage";
+import { EscalateButton, useCanEscalate } from "./Triage";
 import { CaseHeaderView, CasesList } from "./CasesList";
 import { EmailToCheck, type EmailItem } from "./EmailToCheck";
 import {
@@ -963,9 +963,11 @@ function CheckDrawer({
 type CaseFile = { id: string; file_name: string; size: number; created_at: string | null };
 
 /** B7 (G15): files on a Case (photos, logs): virus-scanned, 10 MB each, counted in the organization's file storage. */
-export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean }) {
+/** ``canRead``: the server shows a Case's files to case.log, case.classify and quality.review only; anyone else never
+ * asks (UX1: a view-only person's drawer caused a 403 in the background). */
+export function CaseFiles({ caseId, canAdd, canRead = true }: { caseId: string; canAdd: boolean; canRead?: boolean }) {
   const path = `${INTAKE}/${caseId}/attachments`;
-  const files = useResource<{ items: CaseFile[] }>(path);
+  const files = useResource<{ items: CaseFile[] }>(canRead ? path : null);
   const routine = useRoutinePath();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -986,7 +988,7 @@ export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean 
   };
   const items = files.data?.items ?? [];
   // B7a switched off: files already on the case stay readable; none is added.
-  if (!routine && !items.length) return null;
+  if (!canRead || (!routine && !items.length)) return null;
   return (
     <section className="ca-drawer-section">
       <h3>Files</h3>
@@ -1093,8 +1095,14 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
   const followUp = item.tasks.find((task) => task.type === "FIRST_CONTACT_FOLLOW_UP" && task.open);
   const review = item.signed?.classification === "SERVICE_ONLY" && !item.signed.review_outcome;
   const voided = item.status === "VOIDED";
+  const viewOnly = !canWrite && !canLog && !canReview;
   return (
     <div className="uw-dp">
+      {viewOnly && (
+        <p className="uw-hint" role="note">
+          View only: you can read this case. The service desk and the complaint handlers act on it.
+        </p>
+      )}
       {item.header && <CaseHeaderView header={item.header} status={item.status_label ?? null} />}
       {item.status === "ESCALATED" && item.kind !== "URGENT" && <Escalated item={item} />}
       {!item.flagged && item.kind !== "URGENT" && item.status !== "ESCALATED" && !voided && (
@@ -1147,7 +1155,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
         {adding === "addendum" && <AddendumForm id={item.id} onCancel={() => setAdding(null)} onDone={onChanged} />}
         {adding === "correct" && <CorrectForm item={item} onCancel={() => setAdding(null)} onDone={onChanged} />}
       </section>
-      <CaseFiles caseId={item.id} canAdd={canLog && !voided} />
+      <CaseFiles caseId={item.id} canAdd={canLog && !voided} canRead={canLog || canWrite || canReview} />
       <section className="ca-drawer-section">
         <h3>Times</h3>
         <ul>
@@ -2071,6 +2079,8 @@ function Duplicates({ onChanged }: { onChanged: () => void }) {
 }
 
 export function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }) {
+  // Linking or dismissing needs case.log or complaint.triage (the server's LINKERS): nobody else sees the buttons.
+  const canLink = useCanEscalate();
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const decide = async (decision: "LINKED" | "DISMISSED") => {
@@ -2106,28 +2116,32 @@ export function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () =>
           {earlier.ref}'s: an awareness conflict on the triage list until it is confirmed. <TriageListLink />
         </p>
       )}
-      <label className="ca-field">
-        Why
-        <input value={reason} onChange={(event) => setReason(event.target.value)} />
-      </label>
-      <div className="ca-action-row">
-        <button
-          type="button"
-          className="ac-primary"
-          disabled={reason.trim().length < REASON_MIN}
-          onClick={() => decide("LINKED")}
-        >
-          <Link2 size={14} aria-hidden="true" /> Link into one event
-        </button>
-        <button
-          type="button"
-          className="ac-link"
-          disabled={reason.trim().length < REASON_MIN}
-          onClick={() => decide("DISMISSED")}
-        >
-          Not the same: dismiss
-        </button>
-      </div>
+      {canLink && (
+        <>
+          <label className="ca-field">
+            Why
+            <input value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={reason.trim().length < REASON_MIN}
+              onClick={() => decide("LINKED")}
+            >
+              <Link2 size={14} aria-hidden="true" /> Link into one event
+            </button>
+            <button
+              type="button"
+              className="ac-link"
+              disabled={reason.trim().length < REASON_MIN}
+              onClick={() => decide("DISMISSED")}
+            >
+              Not the same: dismiss
+            </button>
+          </div>
+        </>
+      )}
       <InlineError text={error} />
     </div>
   );
@@ -2144,6 +2158,7 @@ function TriageListLink() {
 }
 
 function LinkRow({ link, onDone }: { link: DuplicateList["links"][number]; onDone: () => void }) {
+  const canLink = useCanEscalate();
   const [undoing, setUndoing] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -2156,6 +2171,7 @@ function LinkRow({ link, onDone }: { link: DuplicateList["links"][number]; onDon
         : ""}
       {link.undo_reason ? ` · undone: ${link.undo_reason}` : ""}
       {link.state === "LINKED" &&
+        canLink &&
         (undoing ? (
           <span className="uw-escalate">
             <input

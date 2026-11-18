@@ -137,8 +137,9 @@ describe("D3.1 an overdue target beside the legal clock", () => {
       },
     };
     const html = renderToStaticMarkup(<>{workColumns({}, () => undefined)[0].render(row)}</>);
-    expect(html).toMatch(/\d+ days left/);
-    expect(html).toMatch(/Reply due: 2 days overdue/);
+    // UX1: one badge says why the row is overdue; the running legal clock is a quiet line.
+    expect(html).toMatch(/Legal clock: \d+ days left/);
+    expect(html).toMatch(/Overdue: .*\(2 days overdue\)/);
   });
 });
 

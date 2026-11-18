@@ -67,8 +67,8 @@ export function ColleagueWelcome({
       <div>
         <strong>{welcomeText(me)}</strong>
         <p>
-          Welcome to MDARIX. You work on the same records as your colleagues. Your next actions are on Home; Getting
-          started follows one complaint from the first call to the signed report, in ten steps.{" "}
+          Welcome to MDARIX. You work on the same records as your colleagues. Your own first piece of work is on Home;
+          Getting started follows one sample investigation from the signal to the action, in seven steps.{" "}
           {onStart && (
             <button type="button" className="ac-link" onClick={onStart}>
               Open Getting started

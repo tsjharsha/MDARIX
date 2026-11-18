@@ -60,7 +60,8 @@ const SHOWS = [
 /** B6a run 3: how many triage items one page shows; the rest are counted and one click away. */
 export const TRIAGE_PAGE = 100;
 
-export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
+/** ``logButton`` false: the page around the triage list has its own "Log a case" (Complaints on the new navigation). */
+export function Triage({ onOpenTab, logButton = true }: { onOpenTab?: (tab: string) => void; logButton?: boolean }) {
   const [show, setShow] = useState<"open" | "done">("open");
   // The item whose panel is open is part of the address (Triage?item=<key>): Back closes it, refresh keeps it.
   const [openKey, setOpenKey] = useTabParam("item");
@@ -115,7 +116,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
         }
         detail="Urgent intakes, flagged calls and records that suggest harm come here first, set-aside import rows included. Regulatory clocks count from awareness, not from when a record reached MDARIX."
       >
-        {onOpenTab && (
+        {onOpenTab && logButton && (
           <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
             Log a case or an urgent case
           </button>
@@ -194,7 +195,8 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
             title={show === "open" ? "Nothing to triage" : "Nothing triaged yet"}
             detail="A flagged call, an urgent intake or a record that suggests harm appears here at once."
             action={
-              onOpenTab && (
+              onOpenTab &&
+              logButton && (
                 <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
                   Log a case or an urgent case
                 </button>
