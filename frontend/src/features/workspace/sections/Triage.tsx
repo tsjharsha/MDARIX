@@ -918,10 +918,19 @@ function InlineFrame({ title, children }: { title: string; onClose: () => void; 
 }
 
 /** The triage record on the complaint's own page (0.10.72, B3): its triage panel, saved there. */
+/** The triage item of a complaint's event: the complaint itself, or the item it is linked into (a Case attached to it
+ * leads the event, so the item is the Case's and the complaint is one of its linked records). */
+export const triageItemOf = (items: TriageList["items"], complaintId: string) =>
+  items.find(
+    (row) =>
+      (row.kind === "COMPLAINT" && row.id === complaintId) ||
+      row.linked?.some((link) => link.kind === "COMPLAINT" && link.id === complaintId),
+  );
+
 export function InlineTriage({ complaintId, onDone }: { complaintId: string; onDone: () => void }) {
   // B6a run 4: only this complaint's event is read (the scoped read), not the whole list.
   const list = useResource<TriageList>(`${TRIAGE}?complaint=${complaintId}`);
-  const item = list.data?.items.find((row) => row.kind === "COMPLAINT" && row.id === complaintId);
+  const item = list.data ? triageItemOf(list.data.items, complaintId) : undefined;
   if (!list.data || !item) return null;
   return <TriageDrawer item={item} people={list.data.people} onClose={() => undefined} onDone={onDone} inline />;
 }
