@@ -76,3 +76,23 @@ def test_the_walkthrough_stays_on_the_complaint_under_way_until_its_last_step():
     # Its last step done, the walkthrough follows the most urgent again.
     record_mark(request, "u1", "yours", "B", "trends", now)
     assert under_way(request, "yours", [first, second]) is None
+
+
+def test_a_finished_walkthrough_is_not_picked_again_while_another_complaint_is_under_way():
+    """UX3: the second upload concluded "not reportable" closed its clock and no mark held it (no Case, so no mark
+    before step 9): the walkthrough went back to the first complaint, finished long before."""
+    from datetime import datetime, timezone
+
+    from backend.app.trial.one_story import not_finished, record_mark
+
+    request = SimpleNamespace(profile={})
+    now = datetime(2026, 11, 4, tzinfo=timezone.utc)
+    first, second = _row("A"), _row("B")
+    assert not_finished(request, "yours", [first, second]) == [first, second]
+    for step in ("form", "records", "trends"):
+        record_mark(request, "u1", "yours", "A", step, now)
+    assert not_finished(request, "yours", [first, second]) == [second]
+    # Every walkthrough finished: the most urgent of all, as before.
+    record_mark(request, "u1", "yours", "B", "trends", now)
+    assert not_finished(request, "yours", [first, second]) == [first, second]
+    assert not_finished(None, "yours", [first]) == [first]

@@ -150,6 +150,16 @@ def under_way(request, run: str, rows: list):
     return kept
 
 
+def not_finished(request, run: str, rows: list) -> list:
+    """The imported complaints whose walkthrough has not reached its last step (Trends), or every one when all have.
+    Concluding a complaint closes its clock: without this the most urgent went back to a complaint whose walkthrough
+    was finished, in the middle of the next one's steps (a Your-data complaint with no Case has no mark before step 9,
+    so ``under_way`` cannot hold it; UX3, e2e/your-data-journey.spec.ts)."""
+    if request is None:
+        return rows
+    return [row for row in rows if not team_marks(request, run, row.id).get("trends")] or rows
+
+
 def subject(data: Session, control_db: Session, tenant_id, run: str, request=None) -> Complaint | None:
     from backend.app.trial.short_story import flagship
 
@@ -157,7 +167,7 @@ def subject(data: Session, control_db: Session, tenant_id, run: str, request=Non
         return flagship(data, tenant_id)
     rows = _imported(data, tenant_id)
     kept = under_way(request, run, rows) if request is not None else None
-    return kept or most_urgent(data, control_db, tenant_id, rows)
+    return kept or most_urgent(data, control_db, tenant_id, not_finished(request, run, rows))
 
 
 def _slot(person: dict, run: str, complaint_id) -> dict:
