@@ -151,6 +151,10 @@ def signals(db, t, product, version) -> list[dict]:
     return [_row(row) for row in rows]
 
 
+# A signed check round's result as people read it (INCONCLUSIVE since W1d: never read as still planned).
+SIGNED_LABELS = {"EFFECTIVE": "Effective", "NOT_EFFECTIVE": "Not effective", "INCONCLUSIVE": "Inconclusive"}
+
+
 def check_state(row) -> dict[str, Any]:
     """A CAPA's effectiveness check as people read it: the latest round's result, else planned (by a check round or
     the CAPA's own check date), else none. A planned check is never shown as effective."""
@@ -159,8 +163,8 @@ def check_state(row) -> dict[str, Any]:
     day = (
         planned_on.date().isoformat() if hasattr(planned_on, "date") else (str(planned_on)[:10] if planned_on else None)
     )
-    if status in ("EFFECTIVE", "NOT_EFFECTIVE"):
-        label = "Effective" if status == "EFFECTIVE" else "Not effective"
+    if status in SIGNED_LABELS:
+        label = SIGNED_LABELS[status]
         signed = row.get("signed_by")
         return {
             "state": status,
