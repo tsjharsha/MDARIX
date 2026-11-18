@@ -290,6 +290,77 @@
   margin: 0 0 4px;
   font-size: var(--ms-fs-20);
 }
+/* W1e: "At a glance", the twin for a quality lead: five linked cards in the story's order, one row at 1280 px. */
+.uw-tw-glance {
+  margin: 0 0 18px;
+}
+.uw-tw-glance-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.uw-tw .uw-tw-glance-head h3 {
+  margin: 0 0 8px;
+}
+.uw-tw-glance-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-tw-glance-steps > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ms-line);
+  border-top: 3px solid var(--ms-teal);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.uw-tw-glance-steps > li.is-flag {
+  border-top-color: var(--ms-warn);
+}
+.uw-tw-glance-steps > li:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  top: 50%;
+  right: -17px;
+  transform: translateY(-50%);
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-16);
+}
+.uw-tw-glance-label {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.uw-tw-glance-steps strong {
+  font-size: var(--ms-fs-16);
+  overflow-wrap: anywhere;
+}
+.uw-tw-glance-steps small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-13);
+  overflow-wrap: anywhere;
+}
+.uw-tw-glance-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  text-align: left;
+}
+.uw-tw-genealogy {
+  margin-top: 12px;
+}
 .uw-tw-banner {
   display: flex;
   align-items: center;

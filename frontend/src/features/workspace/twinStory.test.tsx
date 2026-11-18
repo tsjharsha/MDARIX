@@ -21,9 +21,10 @@ import {
   scopePath,
   shippedText,
   twinPath,
+  twinSummary,
 } from "./productTwin";
 import { ProductHubSection } from "./sections/ProductHub";
-import { ChangeImpactPanel, FieldScopePanel, SourcesView } from "./sections/ProductTwin";
+import { ChangeImpactPanel, FieldScopePanel, SourcesView, TwinSummaryStrip } from "./sections/ProductTwin";
 import { FlagshipView } from "./sections/OneStory";
 import type { FlagshipRun, OneStory as OneStoryData } from "./oneStory";
 import { evidenceStates } from "./intelligence";
@@ -475,5 +476,126 @@ describe("generic system names only", () => {
     expect(shown).not.toMatch(VENDORS);
     expect(shown).toContain("PLM");
     expect(shown).toContain("ERP");
+  });
+});
+
+describe("W1e: the twin at a glance for a quality lead", () => {
+  const GLANCE = {
+    ...TWIN,
+    versions: [
+      { id: "v1", version_identifier: "Rev A" },
+      { id: "v2", version_identifier: "Rev B" },
+    ],
+    changes: [
+      {
+        id: "ch0",
+        change_identifier: "SAMPLE-CHG-009",
+        change_type: "Label change",
+        effective_timestamp: "2026-03-01T00:00:00Z",
+        versions: ["v1"],
+      },
+      {
+        id: "ch1",
+        change_identifier: "SAMPLE-CHG-014",
+        change_type: "Supplier change",
+        effective_timestamp: "2026-08-29T00:00:00Z",
+        versions: ["v2"],
+      },
+    ],
+    investigations: [
+      { id: "i1", investigation_identifier: "SAMPLE-INV-001", business_id: "INV-1", status: "open" },
+      { id: "i0", investigation_identifier: "SAMPLE-INV-000", business_id: "INV-0", status: "closed" },
+    ],
+    capas: [
+      {
+        id: "k1",
+        capa_identifier: "SAMPLE-CAPA-02",
+        check: { state: "PLANNED", label: "Effectiveness check planned for 2027-01-31; not yet recorded" },
+      },
+      { id: "k0", capa_identifier: "SAMPLE-CAPA-01", check: { state: "EFFECTIVE", label: "Effective" } },
+    ],
+  };
+
+  it("reads the change, its versions, the lots with complaints and what needs attention from the twin's rows", () => {
+    const summary = twinSummary(GLANCE);
+    expect(summary.change?.change_identifier).toBe("SAMPLE-CHG-014");
+    expect(summary.changes).toBe(2);
+    expect(summary.versions).toEqual(["Rev B"]);
+    expect(summary.lots).toEqual({ total: 2, withComplaints: ["LOT-003"] });
+    expect(summary.complaints).toEqual({ open: 4, total: 20 });
+    expect(summary.investigations.map((row) => row.id)).toEqual(["i1"]);
+    expect(summary.capas.map((row) => row.id)).toEqual(["k1"]);
+    // A change recorded on the product itself is on every version; no change, no versions invented.
+    expect(twinSummary({ ...GLANCE, changes: [{ id: "x", affects_product: true }] }).versions).toEqual([
+      "Rev A",
+      "Rev B",
+    ]);
+    expect(twinSummary({ ...GLANCE, changes: [] })).toMatchObject({ change: null, versions: [] });
+    // A signed inconclusive check still needs attention; only an effective one does not.
+    const inconclusive = { ...GLANCE.capas[0], check: { state: "INCONCLUSIVE", label: "Inconclusive" } };
+    expect(twinSummary({ ...GLANCE, capas: [inconclusive] }).capas).toHaveLength(1);
+  });
+
+  it("is the first thing on Connected, in the story's order, each with its link, above the folded genealogy", () => {
+    reads.data[twinPath(PRODUCT, "Rev B")] = GLANCE;
+    const html = page("Connected");
+    const plain = text(html).replace(/\s+/g, " ");
+    const order = ["What changed", "Product versions", "Lots", "Complaints", "Needs attention"].map((label) =>
+      html.indexOf(`<span class="uw-tw-glance-label">${label}</span>`),
+    );
+    expect(order.every((at) => at > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(html.indexOf("uw-tw-glance")).toBeLessThan(html.indexOf("The connected records, in order"));
+    expect(html.indexOf("uw-tw-glance")).toBeLessThan(html.indexOf("Lot genealogy: the component lots"));
+    expect(html).toMatch(/<details class="uw-more uw-tw-genealogy">/);
+    for (const line of [
+      "SAMPLE-CHG-014",
+      "Supplier change",
+      "2 changes in all",
+      "Rev B",
+      "1 of 2 lots with complaints",
+      "LOT-003",
+      "4 open of 20",
+      "1 open investigation · 1 CAPA",
+      "SAMPLE-CAPA-02: Effectiveness check planned for 2027-01-31; not yet recorded",
+    ])
+      expect(plain).toContain(line);
+    for (const link of [
+      "See its impact",
+      "Compare the versions",
+      "Trace NS-SL-2417 (Sample)",
+      "Open the complaints",
+      "Open SAMPLE-INV-001",
+      "Open SAMPLE-CAPA-02",
+      "Where do the numbers come from?",
+    ])
+      expect(html).toMatch(
+        new RegExp(`<button type="button" class="ac-link uw-tw-glance-link">${link.replace(/[?()]/g, "\\$&")}`),
+      );
+    expect(plain).not.toContain("SAMPLE-INV-000");
+    expect(plain).not.toContain("Open SAMPLE-CAPA-01");
+    // Still one main button (Trace) and the simulated label stays visible above the strip.
+    expect(primaries(html)).toHaveLength(1);
+    expect(html.indexOf(SIMULATED_LABEL)).toBeLessThan(html.indexOf("uw-tw-glance"));
+  });
+
+  it("says plainly when there is nothing to show, inventing no figure", () => {
+    const html = render(
+      <TwinSummaryStrip
+        data={{ ...TWIN, version: null, lots: [], changes: [], investigations: [], capas: [], trace: null }}
+        at={at}
+      />,
+    );
+    const plain = text(html).replace(/\s+/g, " ");
+    for (const line of [
+      "No change recorded",
+      "None named",
+      "No lots",
+      "Choose a version",
+      "4 open of 20",
+      "Nothing open",
+    ])
+      expect(plain).toContain(line);
+    expect(html).not.toContain("See its impact");
   });
 });

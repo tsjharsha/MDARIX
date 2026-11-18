@@ -22,6 +22,7 @@ import {
   shippedText,
   traceText,
   twinPath,
+  twinSummary,
   type ChainNode,
 } from "../productTwin";
 import type { ImpactList } from "../lotImpact";
@@ -30,6 +31,7 @@ import { countOf } from "./common";
 import { ImportRunReport, RecordOrigin, type ImportRun } from "./ImportReports";
 import { LotImpactCharts } from "./LotImpact";
 import { FlatTable } from "./ProductHub";
+import { REGISTER_LINK, registerTab } from "./SampleRegister";
 
 // The server's rows (backend/app/product360/twin.py): plain records.
 type Row = Record<string, any>;
@@ -78,6 +80,8 @@ export function ConnectedView({ product, version, at }: { product: string; versi
         )}
       </div>
       {data.sources?.simulated && <SimulatedBanner />}
+      <TwinSummaryStrip data={data} at={at} />
+      <h3>The connected records</h3>
       <ol className="uw-tw-chain" aria-label="The connected records, in order">
         {chainNodes(data).map((node) => (
           <li key={node.key}>
@@ -92,8 +96,8 @@ export function ConnectedView({ product, version, at }: { product: string; versi
       {!version ? (
         <p className="ac-muted">{data.limits?.[0]}</p>
       ) : (
-        <>
-          <h3>Component lots in {version}'s lots</h3>
+        <details className="uw-more uw-tw-genealogy">
+          <summary>Lot genealogy: the component lots in {version}'s lots</summary>
           {data.component_lots?.length ? (
             <FlatTable
               caption={`Component lots in ${version}'s lots`}
@@ -122,13 +126,113 @@ export function ConnectedView({ product, version, at }: { product: string; versi
           ) : (
             <p className="ac-muted">No lot genealogy is imported for {version}'s lots.</p>
           )}
-        </>
+        </details>
       )}
       <ul className="uw-tw-limits">
         {(data.limits ?? []).map((line: string) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * W1e: the twin at a glance for a quality lead, at the top of the connected view: what changed → which versions →
+ * which lots → complaints → the investigations and CAPAs that need attention, each with a link to its record. Counts
+ * and names from the connected view's own read; the genealogy, sources and change impact stay below.
+ */
+export function TwinSummaryStrip({ data, at }: { data: Row; at: At }) {
+  const { open, work, notify } = useWorkspace();
+  const summary = twinSummary(data);
+  const { change, lots, complaints, investigations, capas } = summary;
+  const openCase = (row: Row) =>
+    void chooseCase(work, String(row.business_id ?? row.investigation_identifier)).then((found) =>
+      found
+        ? open("Investigations", "Summary")
+        : notify(`${row.investigation_identifier ?? "The investigation"} could not be opened right now.`, "critical"),
+    );
+  const openCapa = (row: Row) => open("Records", `Effectiveness checks?${new URLSearchParams({ capa: row.id })}`);
+  const link = (label: string, onClick: () => void) => (
+    <button type="button" className="ac-link uw-tw-glance-link" onClick={onClick}>
+      {label} <ArrowRight size={13} aria-hidden="true" />
+    </button>
+  );
+  const attention = investigations.length + capas.length;
+  return (
+    <section className="uw-tw-glance" aria-labelledby="uw-tw-glance-title">
+      <div className="uw-tw-glance-head">
+        <h3 id="uw-tw-glance-title">At a glance</h3>
+        {link(REGISTER_LINK, () => open("Getting started", registerTab("change")))}
+      </div>
+      <ol className="uw-tw-glance-steps">
+        <li>
+          <span className="uw-tw-glance-label">What changed</span>
+          <strong>{change ? change.change_identifier : "No change recorded"}</strong>
+          <small>
+            {change
+              ? [change.change_type, formatDay(change.effective_timestamp ?? change.event_timestamp, "")]
+                  .filter(Boolean)
+                  .join(" · ") + (summary.changes > 1 ? ` · ${countOf(summary.changes, "change")} in all` : "")
+              : "On this product's parts"}
+          </small>
+          {change &&
+            link("See its impact", () => at({ view: "Changes", change: change.id, preview: null, scope: null }))}
+        </li>
+        <li>
+          <span className="uw-tw-glance-label">Product versions</span>
+          <strong>{summary.versions.length ? summary.versions.join(", ") : "None named"}</strong>
+          <small>{change ? `Recorded in ${change.change_identifier}` : "No change to trace"}</small>
+          {link("Compare the versions", () => at({ view: "Version story", change: null, scope: null }))}
+        </li>
+        <li className={lots.withComplaints.length ? "is-flag" : undefined}>
+          <span className="uw-tw-glance-label">Lots</span>
+          <strong>
+            {lots.total ? `${lots.withComplaints.length} of ${countOf(lots.total, "lot")} with complaints` : "No lots"}
+          </strong>
+          <small>
+            {lots.withComplaints.join(", ") || (data.version ? "None with complaints" : "Choose a version")}
+          </small>
+          {lots.total > 0 &&
+            link(data.trace ? `Trace ${data.trace.lot}` : "Open the lots", () =>
+              at(data.trace ? { view: "Lots", scope: data.trace.scope } : { view: "Lots" }),
+            )}
+        </li>
+        <li className={complaints.open ? "is-flag" : undefined}>
+          <span className="uw-tw-glance-label">Complaints</span>
+          <strong>
+            {complaints.open} open of {complaints.total}
+          </strong>
+          <small>{data.version ? `On ${data.version.version_identifier}` : "On the product"}</small>
+          {link("Open the complaints", () => at({ view: "Records", list: "complaints" }))}
+        </li>
+        <li className={attention ? "is-flag" : undefined}>
+          <span className="uw-tw-glance-label">Needs attention</span>
+          <strong>
+            {attention
+              ? [
+                  investigations.length && countOf(investigations.length, "open investigation"),
+                  capas.length && countOf(capas.length, "CAPA"),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : "Nothing open"}
+          </strong>
+          {capas[0]?.check?.label && (
+            <small>
+              {capas[0].capa_identifier}: {capas[0].check.label}
+            </small>
+          )}
+          {investigations.slice(0, 2).map((row) => (
+            <span key={row.id}>
+              {link(`Open ${row.investigation_identifier ?? row.business_id}`, () => openCase(row))}
+            </span>
+          ))}
+          {capas.slice(0, 2).map((row) => (
+            <span key={row.id}>{link(`Open ${row.capa_identifier ?? row.business_id}`, () => openCapa(row))}</span>
+          ))}
+        </li>
+      </ol>
     </section>
   );
 }

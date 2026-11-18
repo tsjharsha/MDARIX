@@ -200,3 +200,48 @@ export const connectedTab = (product: string, version: string | null) =>
 /** The address of the sample sensor lot's field-action scope (the flagship's step 7 line). */
 export const sampleScopeTab = (product: string, version: string | null) =>
   hubTab({ tab: "Product 360", product, version, view: "Lots", scope: scopeParam(SAMPLE_SENSOR, SAMPLE_SENSOR_LOT) });
+
+const when = (row: Row) => String(row.effective_timestamp ?? row.event_timestamp ?? "");
+const closed = (status: unknown) => /^(closed|cancel)/i.test(String(status ?? ""));
+const shortLot = (lot: string) => lot.replace(/^.*-(LOT-)/, "$1");
+
+export type TwinSummary = {
+  change: Row | null;
+  changes: number;
+  versions: string[];
+  lots: { total: number; withComplaints: string[] };
+  complaints: { open: number; total: number };
+  investigations: Row[];
+  capas: Row[];
+};
+
+/**
+ * W1e: the twin read as a quality lead reads it, from the connected view's own rows (nothing computed beyond counts):
+ * the latest recorded change, the versions it is recorded on (all of them when it names the product), the version's
+ * lots with complaints, the complaints, and the open investigations and the CAPAs with no effective check yet.
+ */
+export function twinSummary(twin: Row): TwinSummary {
+  const changes: Row[] = twin.changes ?? [];
+  const change = [...changes].sort((a, b) => when(b).localeCompare(when(a)))[0] ?? null;
+  const names = new Map<string, string>(
+    (twin.versions ?? []).map((row: Row) => [String(row.id), row.version_identifier]),
+  );
+  const versions = !change
+    ? []
+    : change.affects_product
+      ? [...names.values()]
+      : (change.versions ?? []).map((id: string) => names.get(String(id))).filter(Boolean);
+  const lots: Row[] = twin.lots ?? [];
+  return {
+    change,
+    changes: changes.length,
+    versions,
+    lots: {
+      total: lots.length,
+      withComplaints: lots.filter((lot) => lot.complaints > 0).map((lot) => shortLot(lot.lot_identifier)),
+    },
+    complaints: { open: twin.complaints?.open ?? 0, total: twin.complaints?.total ?? 0 },
+    investigations: (twin.investigations ?? []).filter((row: Row) => !closed(row.status)),
+    capas: (twin.capas ?? []).filter((row: Row) => row.check?.state !== "EFFECTIVE"),
+  };
+}
