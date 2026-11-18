@@ -157,12 +157,17 @@ async function namedTabLists(page: Page) {
   }
 }
 
-/** The person's Today, signed in, watched for errors and refusals. */
-async function start(browser: Browser, who: Person) {
+/** The person's Today, signed in, watched for errors and refusals. ``counts``: Today shows three counts, and each is
+ * read (a number, never the "…" of a count that did not arrive). */
+async function start(browser: Browser, who: Person, counts = true) {
   const page = await signedIn(browser, DESKTOP, who);
   const problems = watch(page);
   const denied = refused(page);
   await today(page);
+  if (counts)
+    await expect(page.locator(".uw-home-stats .uw-home-num")).toHaveText([/^\d+$/, /^\d+$/, /^\d+$/], {
+      timeout: 60_000,
+    });
   return { page, problems, denied };
 }
 
@@ -292,7 +297,7 @@ test.describe("UX3: one journey per persona, and what each may not do", () => {
 
   test("Product Quality Engineer: Today is the Twin on Rev B; Rev A beside Rev B in one click", async ({ browser }) => {
     test.setTimeout(300_000);
-    const { page, problems, denied } = await start(browser, team.pqe);
+    const { page, problems, denied } = await start(browser, team.pqe, false);
     expect(await railAreas(page)).toEqual(["Today", "Investigations", "Products"]);
     await expect(page.getByRole("heading", { name: /OrbitCare 300.* · Rev B/ }).first()).toBeVisible({
       timeout: 60_000,
@@ -440,7 +445,7 @@ test.describe("UX3: one journey per persona, and what each may not do", () => {
 
   test("Executive (view only): exposure on Today, no action button, writes refused", async ({ browser }) => {
     test.setTimeout(300_000);
-    const { page, problems, denied } = await start(browser, team.executive);
+    const { page, problems, denied } = await start(browser, team.executive, false);
     expect(await railAreas(page)).toEqual(["Today", "Investigations", "Products", "Decisions & Reports"]);
     // Zero clicks: the product exposure is the first screen.
     await expect(page.locator("main")).toContainText(/Product exposure/, { timeout: 60_000 });

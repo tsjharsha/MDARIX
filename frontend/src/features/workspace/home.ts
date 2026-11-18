@@ -59,8 +59,8 @@ export type TodayTile = {
 
 const listTotal = (data: { total?: number } | null) => (typeof data?.total === "number" ? data.total : null);
 const complaintView = (code: string) => `/api/v1/complaints?view=${code}&page=1&page_size=1`;
-const CASES_COUNTS = "/api/v1/intake/cases?view=to_check&q=&page=1&size=1";
-const caseCount = (view: string) => (data: { counts?: Record<string, number> } | null) => data?.counts?.[view] ?? null;
+/** One view of the Cases list, a page of one row: its ``total`` is the view's count (backend/app/intake/cases_list.py). */
+const caseView = (view: string) => `/api/v1/intake/cases?view=${view}&q=&page=1&size=1`;
 
 /**
  * The counts on each persona's Today where they differ from Overdue · Due this week · At risk (UX3, Persona Blueprint
@@ -75,8 +75,8 @@ export const PERSONA_TILES: Readonly<Record<string, readonly TodayTile[]>> = {
       detail: "Cases whose check needs more information from the caller",
       short: "Ask the caller",
       tone: "over",
-      path: CASES_COUNTS,
-      count: caseCount("needs_information"),
+      path: caseView("needs_information"),
+      count: listTotal,
       opens: { section: "Complaints", tab: "Calls to check" },
     },
     {
@@ -95,8 +95,8 @@ export const PERSONA_TILES: Readonly<Record<string, readonly TodayTile[]>> = {
       detail: "Cases that became complaints in the last 30 days, now with the complaint handler",
       short: "Last 30 days",
       tone: "risk",
-      path: CASES_COUNTS,
-      count: caseCount("became_complaints"),
+      path: caseView("became_complaints"),
+      count: listTotal,
       opens: { section: "Complaints", tab: "Calls to check" },
     },
   ],

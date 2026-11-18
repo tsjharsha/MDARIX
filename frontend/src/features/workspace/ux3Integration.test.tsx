@@ -80,16 +80,23 @@ describe("each persona's Today counts its own work (UX3, the blueprint's Today s
       </WorkspaceContext.Provider>,
     );
   it("Service Desk: calls missing facts, possible duplicates, handed over; Log a call", () => {
-    resources.data["/api/v1/intake/cases"] = { counts: { needs_information: 3, became_complaints: 4 } };
+    // Each count is its own view's total (one row a page).
+    resources.data["/api/v1/intake/cases"] = { total: 3, items: [{}] };
     resources.data["/api/v1/intake/duplicates"] = { items: [{}, {}] };
     const html = today("servicedesk");
     for (const [count, title] of [
       ["3", "Calls missing facts"],
       ["2", "Possible duplicates"],
-      ["4", "Handed over"],
+      ["3", "Handed over"],
     ])
       expect(html).toMatch(new RegExp(`<b class="uw-home-num">${count}</b><strong>${title}</strong>`));
     expect(html).toContain("Cases that became complaints in the last 30 days");
+    // Each is read from its own view of the Cases list (never a per-status count the server does not send).
+    expect(PERSONA_TILES.servicedesk.map((tile) => tile.path)).toEqual([
+      "/api/v1/intake/cases?view=needs_information&q=&page=1&size=1",
+      "/api/v1/intake/duplicates",
+      "/api/v1/intake/cases?view=became_complaints&q=&page=1&size=1",
+    ]);
     expect(html).toContain("Log a call");
     expect(html).not.toContain("<strong>At risk</strong>");
   });
