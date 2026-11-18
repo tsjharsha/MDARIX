@@ -9617,6 +9617,9 @@ details.uw-team-change[open] {
 }
 .uw-cockpit-next > button {
   justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
 }
 .uw-case-progress.uw-cockpit-rail {
   margin: 0;
@@ -9660,4 +9663,21 @@ details.uw-team-change[open] {
 }
 .uw-version-compare .ac-eyebrow {
   margin-top: var(--ms-space-3);
+}
+/* The six steps fit the card at 1280 px (each its share, words wrapping), never a sideways scroll. */
+.uw-highlights .uw-cockpit-rail li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.uw-highlights .uw-cockpit-rail li button {
+  padding: 6px 14px 6px 22px;
+  font-size: var(--ms-fs-13);
+}
+@media (max-width: 1100px) {
+  .uw-highlights .uw-cockpit-rail ol {
+    flex-wrap: wrap;
+  }
+  .uw-highlights .uw-cockpit-rail li {
+    flex: 1 1 30%;
+  }
 }
