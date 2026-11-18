@@ -29,9 +29,10 @@ async function signIn(page: any, email: string, password: string) {
     .catch(() => undefined);
 }
 
-/** True when the server parks the field mapping studio: under the MVP feature set (backend/app/feature_set.py) Mapping
- * Studio is hidden and its routes answer 404, so its steps are skipped there and run on the full product. */
-async function mappingStudioParked(page: any): Promise<boolean> {
+/** True under the MVP feature set (backend/app/feature_set.py): the parked areas (Mapping Studio, Data & Integrations,
+ * renewals and reminders) are hidden and their routes answer 404, so their steps are skipped there and run on the full
+ * product. */
+async function mvpParks(page: any): Promise<boolean> {
   const response = await page.request.get("/api/v1/session/context");
   expect(response.ok()).toBe(true);
   return (await response.json()).feature_set === "mvp";
@@ -70,7 +71,7 @@ test.describe("MDARIX browser evidence", () => {
     const consent = page.getByRole("dialog", { name: /privacy/i });
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
-    const parked = await mappingStudioParked(page);
+    const parked = await mvpParks(page);
     for (const [route, name, expected] of [
       ["/app/admin", "admin", /platform administration/i],
       ...(parked ? [] : ([["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i]] as const)),
@@ -183,6 +184,12 @@ test.describe("MDARIX browser evidence", () => {
         "Developer API": "Developer API",
       },
     };
+    // Under the MVP feature set these are parked (src/app/featureSet.ts PARKED_ADMIN_AREAS, PARKED_ADMIN_SECTIONS).
+    if (await mvpParks(page)) {
+      delete areas["Data & Integrations"];
+      for (const parked of ["Renewals", "Reminders"]) delete areas["Plans & Licensing"][parked];
+      for (const parked of ["Tenant cells", "Developer API"]) delete areas.Operations[parked];
+    }
     for (const [domain, sections] of Object.entries(areas)) {
       await openAdminNavigation(page);
       await navigation.getByRole("button", { name: new RegExp(`^${domain}`) }).click();
@@ -235,7 +242,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
-    if (!(await mappingStudioParked(page))) {
+    if (!(await mvpParks(page))) {
       await page.goto("/app/admin/mapping-studio");
       await expect(page.getByText(/Mapping Studio/i).first()).toBeVisible();
       expect(await page.locator("button, input, select").count()).toBeGreaterThan(0);
