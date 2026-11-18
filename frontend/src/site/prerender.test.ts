@@ -49,7 +49,7 @@ describe("the pre-rendered website pages", () => {
   it("covers exactly the pages of the sitemap, the home page in a file of its own", () => {
     expect(sitemapPaths(sitemap)).toEqual(INDEXED_PATHS);
     // 21 pages, then (0.10.45) the questions and answers: their index and six questions, and (0.10.50) a seventh.
-    expect(INDEXED_PATHS).toHaveLength(29);
+    expect(INDEXED_PATHS).toHaveLength(20);
     expect(INDEXED_PATHS.filter((path) => path.startsWith(QUESTIONS_PATH))).toEqual([
       QUESTIONS_PATH,
       ...QUESTION_PATHS,
@@ -57,7 +57,7 @@ describe("the pre-rendered website pages", () => {
     expect(outputFile("/")).toBe(HOME_FILE);
     expect(HOME_FILE).not.toBe("index.html");
     expect(outputFile("/platform")).toBe("platform/index.html");
-    expect(outputFile("/trust/regulations")).toBe("trust/regulations/index.html");
+    expect(outputFile("/questions/show-capa-effectiveness")).toBe("questions/show-capa-effectiveness/index.html");
     expect(outputFile(QUESTION_PATHS[0])).toBe(`${QUESTION_PATHS[0].slice(1)}/index.html`);
     expect(() => outputFile("/../secret")).toThrow();
   });
@@ -105,8 +105,8 @@ describe("the pre-rendered website pages", () => {
     }
     const text = (path: string) => visibleText(pages.find((page) => page.path === path)!.markup);
     expect(text("/")).toContain("Start free trial");
-    expect(text("/platform/investigations")).toContain("hypotheses");
-    expect(text("/trust/regulations")).toContain("ISO 13485");
+    expect(text("/platform")).toContain("Evidence for and against each possible cause");
+    expect(text("/trust")).toContain("21 CFR 803.50");
     // The videos page lists the fourteen videos before videos.json has said which are ready, without "Coming soon".
     expect(text("/videos")).toContain("MDARIX Free Trial, Step by Step");
     expect(text("/videos")).not.toContain("Coming soon");

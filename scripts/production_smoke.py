@@ -51,7 +51,7 @@ def api_docs_served(status: int, body: bytes) -> bool:
 # Website pages behind the front door: each has its own pre-rendered file, with its canonical address and its text
 # in the page (frontend/scripts/prerender.mjs, infrastructure/docker/Caddyfile; WEB-05). The canonical names the
 # production site whatever the host the check runs against.
-WEBSITE_PAGES = ("/", "/platform", "/trust/regulations", "/videos")
+WEBSITE_PAGES = ("/", "/platform", "/trust", "/videos")
 SITE_URL = "https://mdarix.com"  # the website canonical, frontend/src/site/seo.ts SITE_URL
 
 

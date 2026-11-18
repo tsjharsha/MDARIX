@@ -12,7 +12,6 @@
     "lint": "tsc --noEmit --noUnusedLocals -p .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check:scenes": "node scripts/check-scenes.mjs",
     "check:phone": "node scripts/check-phone.mjs"
   },
   "dependencies": {

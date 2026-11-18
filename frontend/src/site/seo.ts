@@ -14,67 +14,22 @@ export const PAGE_META = {
   "/": {
     title: "MDARIX · Post-market surveillance and complaint handling for medical devices",
     description:
-      "Medical device complaint handling, FDA and EU MDR reporting clocks, trend signals, investigations and CAPA in one traceable place. Free 30-day trial.",
+      "Medical device complaint handling to a signed decision and the right MDR report in every market, with product, evidence and CAPA linked. Free 30-day trial.",
   },
   "/platform": {
-    title: "Platform: Product 360, investigations and signed decisions · MDARIX",
+    title: "How MDARIX works: cases, investigations, products and reports · MDARIX",
     description:
-      "Link every complaint to its product, version, lot, component and supplier, weigh evidence and hypotheses, and sign decisions with a full audit trail.",
-  },
-  "/platform/product-360": {
-    title: "Product 360: the product, version and lot behind every complaint · MDARIX",
-    description:
-      "How MDARIX ties each medical device complaint to its product, version, lot, component and supplier, and what the free trial offers today.",
-  },
-  "/platform/investigations": {
-    title: "Complaint investigations with evidence and hypotheses · MDARIX",
-    description:
-      "Investigate medical device complaints in one case: evidence, competing hypotheses and open questions side by side, and Ask MDARIX on your records.",
-  },
-  "/platform/decisions": {
-    title: "Investigation decisions, briefs and failure chains · MDARIX",
-    description:
-      "Failure chains, a versioned decision brief and a decision signed with password and authenticator code, with open questions carried into it.",
-  },
-  "/platform/trust": {
-    title: "Human review, audit trail and AI safeguards · MDARIX",
-    description:
-      "Signed human review and an append-only audit trail today; customer administration in a pilot. AI assurance is planned, after evaluation; AI is off in the trial.",
-  },
-  "/roadmap": {
-    title: "Roadmap: available today, in a pilot, planned · MDARIX",
-    description:
-      "What every MDARIX workspace and the free trial can use today, what comes in a pilot, and what is planned, such as single sign-on.",
-  },
-  "/solutions": {
-    title: "Solutions for medical device quality and regulatory teams · MDARIX",
-    description:
-      "For quality leaders, investigators, regulatory affairs and supplier quality: complaint backlogs, reportability decisions, trend signals and CAPA follow-through.",
-  },
-  "/product-lifecycle": {
-    title: "Medical device lifecycle, design controls and post-market feedback · MDARIX",
-    description:
-      "How design-control records, the risk file and field complaints connect from concept to post-market surveillance, and how MDARIX traces a field problem back.",
+      "Five places, one product story: Today, Cases, Investigations, Products, and Decisions & Reports. What is in the free trial, in a pilot and planned.",
   },
   "/trust": {
-    title: "Trust: human decisions, audit trails and validated AI · MDARIX",
+    title: "Trust: human decisions, audit trail, AI and regulations · MDARIX",
     description:
-      "Investigation decisions signed by people, an audit trail, authenticator MFA, isolated customer data, and AI that cites evidence and stays off until validated.",
-  },
-  "/trust/regulations": {
-    title: "US, EU/NI, GB and India reporting and MedTech standards · MDARIX",
-    description:
-      "MDR reporting windows, ISO 13485, QMSR, ISO 14971, IEC 62304 and Part 11: the evidence MDARIX organizes. MDARIX does not certify compliance.",
-  },
-  "/resources": {
-    title: "Resources on complaint handling and post-market surveillance · MDARIX",
-    description:
-      "Guides and step-by-step videos on medical device complaint handling, MDR reportability, signal detection, investigations and CAPA effectiveness.",
+      "Decisions signed by people, an audit trail, authenticator MFA, isolated customer data, AI that only proposes, and reporting for the US, EU, GB, Canada, India.",
   },
   "/company": {
-    title: "About MDARIX",
+    title: "About MDARIX and how to start",
     description:
-      "MDARIX builds post-market intelligence for medical device makers: complaints, product context, evidence and human review in one traceable place.",
+      "MDARIX is built for small and mid-size medical device makers and exporters. Start with a free trial, then a pilot on your real data.",
   },
   "/videos": {
     title: "Free trial videos: from first complaint to signed CAPA · MDARIX",

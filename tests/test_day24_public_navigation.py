@@ -23,34 +23,19 @@ WORKSPACE_CONTEXT = (WORKSPACE / "workspaceContext.tsx").read_text(encoding="utf
 WORKSPACE_OVERVIEW = (WORKSPACE / "sections" / "Dashboard.tsx").read_text(encoding="utf-8")
 
 
-def test_public_navigation_exposes_required_categories_and_actions():
+def test_public_navigation_exposes_the_pages_and_the_trial():
+    # The refreshed website (Nov 2026): four pages, sign-in and the free trial; the behaviour is covered by the
+    # website's own tests (frontend/src/site/routing.test.ts, home.test.tsx, claims.test.tsx).
     for label in (
-        "Platform & AI",
-        "Solutions",
-        "Product Lifecycle",
-        "Why MDARIX",
-        "Resources",
-        "Plans",
+        '["Product", "/platform"]',
+        '["Trust", "/trust"]',
+        '["Company", "/company"]',
         "Sign in",
-        "Get started",
+        "Start free trial",
     ):
         assert label in SITE
-
-
-def test_current_and_future_capabilities_are_explicitly_distinguished():
-    assert "future?: boolean" in SITE
-    assert "Current capabilities" in SITE
-    assert "Broader lifecycle intelligence" in SITE
-    assert "does not represent available functionality" in SITE
-    assert "Available in R1" not in SITE
-    assert 'status: "R1"' not in SITE
-    assert "R1" not in SITE
-
-
-def test_public_story_preserves_system_of_record_and_human_authority_boundaries():
-    assert "System of Intelligence, not System of Record" in SITE
-    assert "Authorized humans make controlled decisions" in SITE
-    assert "AI does not create the final regulated decision" in SITE
+    assert "Humans decide" in SITE
+    assert "never submits anything to a regulator" in SITE
 
 
 def test_private_application_routes_require_authenticated_session():
@@ -62,9 +47,9 @@ def test_private_application_routes_require_authenticated_session():
     assert "Customer application routes require an authenticated session" in MAIN
 
 
-def test_mega_menu_supports_escape_and_responsive_navigation():
+def test_site_menu_supports_escape_and_responsive_navigation():
     assert 'event.key === "Escape"' in SITE
-    assert "aria-expanded={openMenu === name}" in SITE
+    assert "aria-expanded={mobileOpen}" in SITE
     assert 'aria-controls="public-navigation"' in SITE
 
 

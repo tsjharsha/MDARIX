@@ -1,6 +1,6 @@
 import { ArrowRight, Check } from "lucide-react";
 import { BESIDE_YOUR_QMS, WHAT_MDARIX_ADDS } from "../features/help/besideYourQms";
-import { trialIncludes } from "./legacyContent";
+import { trialIncludes } from "./content";
 import { SITE_URL } from "./seo";
 
 // Questions and answers (/questions and one page per question): what medical device quality and regulatory teams ask
@@ -85,7 +85,7 @@ const QUESTION_LIST = [
     },
     links: [
       ["What is the difference between a complaint signal and a trend?", "/questions/complaint-signal-vs-trend"],
-      ["Regulations and standards", "/trust/regulations"],
+      ["Regulations and standards", "/trust#markets"],
     ],
   },
   {
@@ -130,7 +130,7 @@ const QUESTION_LIST = [
     },
     note: NOT_ADVICE,
     links: [
-      ["Reporting windows for the US, EU/NI, GB and India (MvPI worksheet)", "/trust/regulations"],
+      ["Reporting windows for the US, EU/NI, GB and India (MvPI worksheet)", "/trust#markets"],
       ["How do I trend medical device complaints?", "/questions/how-to-trend-medical-device-complaints"],
     ],
   },
@@ -168,7 +168,7 @@ const QUESTION_LIST = [
     note: NOT_ADVICE,
     links: [
       ["How do I show a CAPA was effective?", "/questions/show-capa-effectiveness"],
-      ["ISO 14971 and the other standards", "/trust/regulations"],
+      ["ISO 14971 and the other standards", "/trust#markets"],
     ],
   },
   {
@@ -208,7 +208,7 @@ const QUESTION_LIST = [
     },
     links: [
       ["How do I trend medical device complaints?", "/questions/how-to-trend-medical-device-complaints"],
-      ["Investigations on the Platform", "/platform/investigations"],
+      ["Investigations on the Platform", "/platform#investigations"],
     ],
   },
   {
@@ -254,7 +254,7 @@ const QUESTION_LIST = [
     },
     links: [
       ["How should post-market data feed the risk file?", "/questions/post-market-data-and-the-risk-file"],
-      ["Signed decisions on the Platform", "/platform/decisions"],
+      ["Signed decisions on the Platform", "/platform#decisions"],
     ],
   },
   {
@@ -408,7 +408,7 @@ function TrialBox() {
 function Breadcrumb({ onQuestion = false }: { onQuestion?: boolean }) {
   return (
     <nav className="ms-breadcrumb" aria-label="Breadcrumb">
-      <a href="/resources">Resources</a>
+      <a href="/">Home</a>
       <span aria-hidden="true">›</span>
       {onQuestion ? <a href={QUESTIONS_PATH}>Questions and answers</a> : <span>Questions and answers</span>}
     </nav>

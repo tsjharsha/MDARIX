@@ -26,14 +26,12 @@ def test_the_story_has_one_chapter_count_everywhere():
     guide = _text("features/help/trialGuide.ts")
     assert re.search(r"export const STORY_CHAPTERS = (\d+);", guide).group(1) == str(len(story.CHAPTERS))
     assert "story.data?.total ?? STORY_CHAPTERS" in _text("features/workspace/sections/GettingStarted.tsx")
-    assert f"quality story in {WORDS[len(story.CHAPTERS)]} chapters" in _text("site/legacyContent.ts")
+    assert f"quality story in {WORDS[len(story.CHAPTERS)]} chapters" in _text("site/content.ts")
 
 
-def test_the_inspection_checks_are_counted_the_same_on_the_website_and_in_the_guide():
+def test_the_inspection_checks_are_counted_the_same_in_the_guide_and_the_quality_loop():
     count = len(readiness.CHECKS)
     assert count == 11
-    site = _text("site/pages.tsx")
-    assert f"{WORDS[count].capitalize()} checks shaped by" in site and f"of {count} inspection checks clear" in site
     assert f"The {WORDS[count]} checks:" in _text("features/help/userGuide.ts")
     # The quality loop names every check, so the website draws as many stations as Readiness has.
     loop = _text("features/workspace/qualityLoop.ts")

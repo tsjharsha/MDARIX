@@ -2,67 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://mdarix.com/</loc>
-    <lastmod>2026-10-22</lastmod>
+    <lastmod>2026-11-18</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://mdarix.com/platform</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/platform/product-360</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/platform/investigations</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/platform/decisions</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/platform/trust</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/roadmap</loc>
-    <lastmod>2026-10-19</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/solutions</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/product-lifecycle</loc>
-    <lastmod>2026-10-18</lastmod>
+    <lastmod>2026-11-18</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://mdarix.com/trust</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/trust/regulations</loc>
-    <lastmod>2026-10-18</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://mdarix.com/resources</loc>
-    <lastmod>2026-10-22</lastmod>
+    <lastmod>2026-11-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.com/company</loc>
-    <lastmod>2026-10-19</lastmod>
+    <lastmod>2026-11-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
