@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-# 1: one "requirement" property per marker; 2: test-level "requirement" vs "requirement_file" (owner decision O24).
-HOOK_VERSION = "2"
+from validation.pack import HOOK_VERSION
+
 ROOT = Path(__file__).resolve().parents[1]
 
 

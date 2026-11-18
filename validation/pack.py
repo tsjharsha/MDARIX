@@ -23,7 +23,10 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from validation import docx_render, xlsx_write
-from validation.pytest_requirements import HOOK_VERSION
+
+# The pytest hook records this; it lives here because the API imports this module and pytest is not installed there.
+# 1: one "requirement" property per marker; 2: test-level "requirement" vs "requirement_file" (owner decision O24).
+HOOK_VERSION = "2"
 
 FIVE = ("NOT RUN", "PASS", "FAIL", "BLOCKED", "REQUIRES HUMAN DECISION")
 DEV_BANNER = "DEVELOPMENT RESULTS, NOT VALIDATION EVIDENCE"
