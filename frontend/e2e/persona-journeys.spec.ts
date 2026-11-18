@@ -21,7 +21,7 @@ import { at, signedUpOwner } from "./support/story";
 /*
  * UX3 (Persona Blueprint wave C): one journey per persona, from the persona's first screen to its main outcome in the
  * blueprint's target clicks, and what each may not do: a hidden area by its address is never drawn and its API refuses
- * the person; a view-only person sees no action button; nobody approves what they wrote (segregation of duties).
+ * the person; a view-only person sees no action button; nobody approves what they edited (segregation of duties).
  *
  * Eleven personas: the nine colleagues a trial owner invites, the trial owner (the customer administrator of a trial)
  * and the Platform Administrator (a fixture account, DAY35_FIXTURE_PASSWORD / E2E_PASSWORD). Clicks are counted from
@@ -408,7 +408,7 @@ test.describe("UX3: one journey per persona, and what each may not do", () => {
     await page.context().close();
   });
 
-  test("Quality Leader: what needs them in one click; never approves a document they wrote", async ({ browser }) => {
+  test("Quality Leader: what needs them in one click; never approves a guide they edited", async ({ browser }) => {
     test.setTimeout(300_000);
     const { page, problems, denied } = await start(browser, team.quality);
     expect(await railAreas(page)).toEqual(["Today", "Cases", "Investigations", "Products", "Decisions & Reports"]);
@@ -418,28 +418,22 @@ test.describe("UX3: one journey per persona, and what each may not do", () => {
     await expect(page).toHaveURL(/\/app\/complaints\?tab=Overdue/, { timeout: 60_000 });
     expect(clicks.count).toBe(1);
     expect(denied).toEqual([]);
-    // Segregation of duties: the author of a regulatory document may not approve it (the server refuses it).
-    const draft = await page.request.post(at(page, "/api/v1/regulatory/draft"), {
-      data: { document_type: "IFU", title: `UX3 segregation check ${RUN}` },
-    });
+    // Segregation of duties: who edits a decision guide version may not approve it while a colleague may (the server
+    // refuses it; the trial's practice approval of one's own work applies only to a person working alone).
+    const guide = "/api/v1/decision-guides/GB";
+    const draft = await page.request.post(at(page, `${guide}/drafts`));
     expect(draft.status(), await draft.text()).toBe(200);
-    const document = (await draft.json()).document ?? (await draft.json());
-    const id = document.id ?? document.document_id;
-    const lock = document.lock_version ?? 1;
-    const review = await page.request.post(at(page, `/api/v1/regulatory/documents/${id}/status`), {
-      data: { status: "IN_REVIEW", expected_lock_version: lock, reason: "Ready for an approver" },
+    const version = (await draft.json()).version;
+    expect((await page.request.post(at(page, `${guide}/versions/${version}/tests`), { data: {} })).status()).toBe(200);
+    const asked = await page.request.post(at(page, `${guide}/versions/${version}/approval-request`), {
+      data: { change_reason: `UX3 segregation-of-duties check ${RUN}: no change` },
     });
-    expect(review.status(), await review.text()).toBe(200);
-    const own = await page.request.post(at(page, `/api/v1/regulatory/documents/${id}/status`), {
-      data: {
-        status: "APPROVED",
-        expected_lock_version: (await review.json()).lock_version ?? lock + 1,
-        reason: "Approving my own document",
-        password: team.quality.password,
-      },
+    expect(asked.status(), await asked.text()).toBe(200);
+    const own = await page.request.post(at(page, `${guide}/versions/${version}/approve`), {
+      data: { password: team.quality.password },
     });
     expect(own.status()).toBe(403);
-    expect((await own.json()).detail.code).toBe("SOD_DENIED");
+    expect((await own.json()).detail.code).toBe("SECOND_PERSON_REQUIRED");
     expect(problems).toEqual([]);
     await page.context().close();
   });
