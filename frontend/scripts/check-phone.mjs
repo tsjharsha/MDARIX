@@ -18,7 +18,7 @@ const shots = shotsAt >= 0 ? args.splice(shotsAt, 2)[1] : null;
 const BASE = (args[0] || "http://127.0.0.1:5177").replace(/\/$/, "");
 const SESSION = process.env.MDARIX_SESSION || "";
 const DATA_CODES = new Set((process.env.MDARIX_DATA_CODES || "").split(",").filter(Boolean));
-const SITE = ["/", "/platform", "/solutions", "/trust", "/resources", "/questions", "/company", "/contact", "/signup"];
+const SITE = ["/", "/platform", "/trust", "/questions", "/company", "/contact", "/signup"];
 const slug = (text) =>
   text
     .replace(/[^A-Za-z0-9]+/g, "-")

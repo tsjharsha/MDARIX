@@ -1,45 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { resolveSitePath } from "../PublicMegaSite";
+import { LEGACY_PAGES, resolveSitePath } from "../PublicMegaSite";
 import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
+import { SITE_PAGES } from "./pages";
+import { INDEXED_PATHS, renderPage, type IndexedPath } from "./prerender";
 
-// The 19 former Platform pages and the page and section that now hold each one.
-const FORMER_PLATFORM_PAGES: Record<string, [string, string]> = {
-  "/platform/product-360": ["/platform/product-360", ""],
-  "/platform/reality-graph": ["/platform/product-360", "reality-graph"],
-  "/platform/product-version": ["/platform/product-360", "product-version"],
-  "/platform/timeline": ["/platform/product-360", "timeline"],
-  "/platform/ask-mdarix": ["/platform/investigations", "ask-mdarix"],
-  "/platform/investigation": ["/platform/investigations", "investigation"],
-  "/platform/evidence": ["/platform/investigations", "evidence"],
-  "/platform/hypotheses": ["/platform/investigations", "hypotheses"],
-  "/platform/challenger": ["/platform/investigations", "challenger"],
-  "/platform/unknowns": ["/platform/investigations", "unknowns"],
-  "/platform/failure-chain": ["/platform/decisions", "failure-chain"],
-  "/platform/counterfactual": ["/platform/decisions", "counterfactual"],
-  "/platform/decision-center": ["/platform/decisions", "decision-center"],
-  "/platform/investigation-brief": ["/platform/decisions", "investigation-brief"],
-  "/platform/ai-assurance": ["/platform/trust", "ai-assurance"],
-  "/platform/ai-provenance": ["/platform/trust", "ai-provenance"],
-  "/platform/human-review": ["/platform/trust", "human-review"],
-  "/platform/audit-trail": ["/platform/trust", "audit-trail"],
-  "/platform/enterprise-administration": ["/platform/trust", "enterprise-administration"],
+// The pages removed in the site refresh (Nov 2026) and the page and section that now hold each one.
+const REMOVED_PAGES: Record<string, [string, string]> = {
+  "/platform/product-360": ["/platform", "products"],
+  "/platform/investigations": ["/platform", "investigations"],
+  "/platform/decisions": ["/platform", "decisions"],
+  "/platform/trust": ["/trust", ""],
+  "/roadmap": ["/platform", "availability"],
+  "/solutions": ["/platform", ""],
+  "/product-lifecycle": ["/platform", "products"],
+  "/trust/regulations": ["/trust", "markets"],
+  "/resources": [QUESTIONS_PATH, ""],
+};
+
+// The 19 former capability pages of the first site, each sent to the section that now covers it.
+const FORMER_CAPABILITY_PAGES: Record<string, [string, string]> = {
+  "/platform/reality-graph": ["/platform", "products"],
+  "/platform/product-version": ["/platform", "products"],
+  "/platform/timeline": ["/platform", "products"],
+  "/platform/ask-mdarix": ["/platform", "investigations"],
+  "/platform/investigation": ["/platform", "investigations"],
+  "/platform/evidence": ["/platform", "investigations"],
+  "/platform/hypotheses": ["/platform", "investigations"],
+  "/platform/challenger": ["/platform", "investigations"],
+  "/platform/unknowns": ["/platform", "investigations"],
+  "/platform/failure-chain": ["/platform", "decisions"],
+  "/platform/counterfactual": ["/platform", "decisions"],
+  "/platform/decision-center": ["/platform", "decisions"],
+  "/platform/investigation-brief": ["/platform", "decisions"],
+  "/platform/ai-assurance": ["/trust", "ai"],
+  "/platform/ai-provenance": ["/trust", "ai"],
+  "/platform/human-review": ["/trust", "principles"],
+  "/platform/audit-trail": ["/trust", "security"],
+  "/platform/enterprise-administration": ["/trust", "security"],
 };
 
 describe("website addresses", () => {
-  it("opens the legal, security and contact pages", () => {
-    for (const path of ["/privacy", "/terms", "/trial-agreement", "/security", "/accessibility", "/contact"])
-      expect(resolveSitePath(path, "")).toEqual({ page: path, hash: "" });
-  });
-
-  it("opens the Platform pages, the roadmap and the regulations", () => {
+  it("opens the four pages, the videos, the legal, security and contact pages", () => {
     for (const path of [
+      "/",
       "/platform",
-      "/platform/product-360",
-      "/platform/investigations",
-      "/platform/decisions",
-      "/platform/trust",
-      "/roadmap",
-      "/trust/regulations",
+      "/trust",
+      "/company",
+      "/videos",
+      "/privacy",
+      "/terms",
+      "/trial-agreement",
+      "/security",
+      "/accessibility",
+      "/contact",
     ])
       expect(resolveSitePath(path, "")).toEqual({ page: path, hash: "" });
   });
@@ -57,43 +70,59 @@ describe("website addresses", () => {
     expect(resolveSitePath("/privacy-policy", "x")).toEqual({ page: "not-found", hash: "" });
   });
 
-  it("sends former pricing pages to the contact page and keeps other former pages working", () => {
-    expect(resolveSitePath("/pricing", "")).toEqual({ page: "/contact", hash: "" });
-    expect(resolveSitePath("/plans/", "")).toEqual({ page: "/contact", hash: "" });
-    expect(resolveSitePath("/ai-trust", "")).toEqual({ page: "/trust", hash: "ai" });
-    expect(resolveSitePath("/", "")).toEqual({ page: "/", hash: "" });
-  });
-
-  it("sends each of the 19 former Platform pages to its section on the page that holds it", () => {
-    expect(Object.keys(FORMER_PLATFORM_PAGES)).toHaveLength(19);
-    for (const [path, [page, hash]] of Object.entries(FORMER_PLATFORM_PAGES)) {
+  it("sends every page removed in the refresh to the section that now holds it", () => {
+    for (const [path, [page, hash]] of Object.entries(REMOVED_PAGES)) {
+      expect(LEGACY_PAGES[path], path).toBeDefined();
+      expect((SITE_PAGES as readonly string[]).includes(path), path).toBe(false);
       expect(resolveSitePath(path, ""), path).toEqual({ page, hash });
       expect(resolveSitePath(`${path}/`, ""), path).toEqual({ page, hash });
     }
   });
 
-  it("sends the former single Platform page's anchors to the page that holds them", () => {
-    expect(resolveSitePath("/platform", "challenger")).toEqual({
-      page: "/platform/investigations",
-      hash: "challenger",
-    });
-    expect(resolveSitePath("/platform", "audit-trail")).toEqual({ page: "/platform/trust", hash: "audit-trail" });
-    // The former group anchors (the old menu and footer) open their page at the top.
-    expect(resolveSitePath("/platform", "product-intelligence")).toEqual({ page: "/platform/product-360", hash: "" });
-    expect(resolveSitePath("/platform", "decision-intelligence")).toEqual({ page: "/platform/decisions", hash: "" });
-    expect(resolveSitePath("/platform", "trust-governance")).toEqual({ page: "/platform/trust", hash: "" });
+  it("keeps the older former addresses working", () => {
+    expect(resolveSitePath("/pricing", "")).toEqual({ page: "/contact", hash: "" });
+    expect(resolveSitePath("/plans/", "")).toEqual({ page: "/contact", hash: "" });
+    expect(resolveSitePath("/ai-trust", "")).toEqual({ page: "/trust", hash: "ai" });
+    expect(resolveSitePath("/why-mdarix", "")).toEqual({ page: "/trust", hash: "principles" });
+    expect(resolveSitePath("/regulations", "")).toEqual({ page: "/trust", hash: "markets" });
+    expect(resolveSitePath("/integrations", "")).toEqual({ page: "/trust", hash: "integrations" });
+    expect(resolveSitePath("/capabilities", "")).toEqual({ page: "/platform", hash: "" });
+  });
+
+  it("sends each former capability page, and the former single page's anchors, to their section", () => {
+    for (const [path, [page, hash]] of Object.entries(FORMER_CAPABILITY_PAGES)) {
+      expect(resolveSitePath(path, ""), path).toEqual({ page, hash });
+      const slug = path.slice("/platform/".length);
+      expect(resolveSitePath("/platform", slug), slug).toEqual({ page, hash });
+    }
+    // A former lifecycle page or anything else under /platform/ opens How it works.
+    expect(resolveSitePath("/platform/strategy", "")).toEqual({ page: "/platform", hash: "" });
     expect(resolveSitePath("/platform", "no-such-section")).toEqual({ page: "/platform", hash: "no-such-section" });
   });
 
-  it("keeps lifecycle addresses on the lifecycle page", () => {
-    expect(resolveSitePath("/platform/strategy", "")).toEqual({ page: "/product-lifecycle", hash: "strategy" });
-    expect(resolveSitePath("/roadmap", "capa")).toEqual({ page: "/product-lifecycle", hash: "capa" });
+  it("sends the moved standards and roadmap anchors to their sections", () => {
+    expect(resolveSitePath("/", "standards")).toEqual({ page: "/trust", hash: "markets" });
+    expect(resolveSitePath("/trust", "trust-standards")).toEqual({ page: "/trust", hash: "markets" });
+    expect(resolveSitePath("/", "scope-title")).toEqual({ page: "/platform", hash: "availability" });
   });
 
-  it("sends the moved standards and roadmap sections to their own pages", () => {
-    expect(resolveSitePath("/", "standards")).toEqual({ page: "/trust/regulations", hash: "" });
-    expect(resolveSitePath("/trust", "trust-standards")).toEqual({ page: "/trust/regulations", hash: "" });
-    expect(resolveSitePath("/regulations", "")).toEqual({ page: "/trust/regulations", hash: "" });
-    expect(resolveSitePath("/", "scope-title")).toEqual({ page: "/roadmap", hash: "" });
+  it("lands every redirect and every link between the pages on a section that exists", () => {
+    const rendered = new Map<string, string>();
+    const html = (page: string) => {
+      if (!rendered.has(page)) rendered.set(page, renderPage(page as IndexedPath));
+      return rendered.get(page)!;
+    };
+    const targets = [...Object.values(REMOVED_PAGES), ...Object.values(FORMER_CAPABILITY_PAGES)];
+    for (const [page, hash] of targets) if (hash) expect(html(page), `${page}#${hash}`).toContain(`id="${hash}"`);
+    // Every internal link on every page opens a page (and its section) instead of "not found".
+    for (const path of INDEXED_PATHS) {
+      for (const [, href] of html(path).matchAll(/href="(\/[^"]*)"/g)) {
+        if (/^\/(signin|signup|request-demo|assets|media)/.test(href)) continue;
+        const [address, anchor = ""] = href.split("#");
+        const target = resolveSitePath(address, anchor);
+        expect(target.page, `${path} -> ${href}`).not.toBe("not-found");
+        if (target.hash) expect(html(target.page), `${path} -> ${href}`).toContain(`id="${target.hash}"`);
+      }
+    }
   });
 });

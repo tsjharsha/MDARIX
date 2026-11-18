@@ -1,585 +1,338 @@
-import { useEffect, useId, useState } from "react";
-import { Reveal } from "./motion";
-import { Enlargeable } from "./enlarge";
+import { useEffect, useState } from "react";
 import { BASIS_DISCLAIMER, basisOf } from "../features/shared/standards";
+import { MARKETS } from "./content";
 
-/* Website visuals drawn from data (SVG): an example investigation in numbers, the customer systems MDARIX reads,
-   the reporting windows and the MedTech standards whose evidence it organizes. Every number here is synthetic and
-   labelled as such. SVG text scales with its viewBox: sizes here are chosen so every label renders at 14.5 px or more
-   at the width the page gives the picture on a 1,440 px screen (site.css sets them). */
+/* The website's pictures: drawn in HTML and SVG from the free trial's sample story, so they show the real concepts
+   (the product twin, the investigation, the legal clocks, the effectiveness check) without app screenshots that go
+   stale. Every one says it is illustrative and synthetic. HTML where the picture holds words, so it reflows on a
+   phone instead of shrinking its text. */
 
-/* ------------------------------------------------------------------------- An investigation in numbers */
+const Caption = () => <figcaption className="ms-fig-note">Illustrative · synthetic sample data</figcaption>;
+
+/* ----------------------------------------------------------------- The product twin (home page hero) */
 
 // The free trial's sample story (backend/app/trial/sample_data.py): OrbitCare 300 Rev B moved its pressure sensor to a
-// new supplier (change CHG-014), released in week 13; pressure-alarm complaints rise afterwards. One synthetic case,
-// INV-031, told the same way on every page: 42 complaints in 26 weeks, 6 in the 13 weeks before Rev B (2 a month) and
-// 36 in the 13 weeks after (12 a month, six times as many); 40 name a lot, 2 do not; lots 003 and 004 hold 30.
-// The Platform scenes (site/scenes) use the same numbers.
+// new supplier (change CHG-014); pressure-alarm complaints rise afterwards.
+const TWIN_NODES = [
+  { key: "complaints", label: "Complaints", value: "Pressure alarms rising", hot: true },
+  { key: "version", label: "Version at the event date", value: "Rev B", hot: true },
+  { key: "markets", label: "Markets", value: "US · EU · GB · CA · IN", hot: false },
+  { key: "component", label: "Component", value: "Pressure sensor", hot: true },
+  { key: "lots", label: "Lots built with it", value: "003–008", hot: true },
+  { key: "supplier", label: "Supplier", value: "Changed in CHG-014", hot: true },
+] as const;
+
+export function ProductTwin() {
+  return (
+    <figure className="ms-twin" aria-labelledby="twin-title">
+      <svg className="ms-twin-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {[
+          [17, 17],
+          [83, 17],
+          [17, 50],
+          [83, 50],
+          [17, 83],
+          [83, 83],
+        ].map(([x, y], index) => (
+          <line
+            key={index}
+            x1={50}
+            y1={50}
+            x2={x}
+            y2={y}
+            className={TWIN_NODES[index].hot ? "is-hot" : undefined}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+      <div className="ms-twin-core">
+        <span id="twin-title">Product Lifecycle Twin</span>
+        <strong>OrbitCare 300</strong>
+        <small>Infusion pump · sample product</small>
+      </div>
+      <ul className="ms-twin-nodes">
+        {TWIN_NODES.map((node) => (
+          <li key={node.key} className={`ms-twin-node is-${node.key}${node.hot ? " is-hot" : ""}`}>
+            <span>{node.label}</span>
+            <strong>{node.value}</strong>
+          </li>
+        ))}
+      </ul>
+      <Caption />
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------- 1. Signal */
+
+// One synthetic case told the same way on every page: 42 complaints in 26 weeks, 6 in the 13 weeks before Rev B
+// (about 2 a month) and 36 in the 13 weeks after (about 12 a month).
 const WEEKLY = [1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 2, 2, 3, 2, 3, 3, 3, 3, 4, 3, 3, 4];
 const RELEASE_WEEK = 13;
-// Complaints per lot; lots built with the new supplier's first sensors are marked.
-const LOTS = [
-  { lot: "Lot 001", count: 2, sensor: false, rev: "Rev A" },
-  { lot: "Lot 002", count: 3, sensor: false, rev: "Rev A" },
-  { lot: "Lot 003", count: 17, sensor: true, rev: "Rev B" },
-  { lot: "Lot 004", count: 13, sensor: true, rev: "Rev B" },
-  { lot: "Lot 005", count: 3, sensor: false, rev: "Rev B" },
-  { lot: "Lot 006", count: 2, sensor: false, rev: "Rev B" },
-];
-/** The example's numbers, for its tests; 2 complaints name no lot (the hero's evidence list says so too). */
-export const EXAMPLE_NUMBERS = { weekly: WEEKLY, releaseWeek: RELEASE_WEEK, lots: LOTS, withoutLot: 2 } as const;
-export function WeeklyChart() {
-  const width = 520;
-  const height = 240;
-  const pad = { left: 34, right: 16, top: 30, bottom: 34 };
-  const max = 5;
+/** The example's numbers, for its tests. */
+export const EXAMPLE_NUMBERS = { weekly: WEEKLY, releaseWeek: RELEASE_WEEK } as const;
+
+export function SignalChart() {
+  const width = 480;
+  const height = 220;
+  const pad = { left: 12, right: 12, top: 40, bottom: 36 };
+  const max = 4.5;
   const x = (index: number) => pad.left + (index / (WEEKLY.length - 1)) * (width - pad.left - pad.right);
   const y = (value: number) => pad.top + (1 - value / max) * (height - pad.top - pad.bottom);
   const line = WEEKLY.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(
     " ",
   );
   const area = `${line} L${x(WEEKLY.length - 1).toFixed(1)},${y(0)} L${x(0).toFixed(1)},${y(0)} Z`;
-  const releaseX = x(RELEASE_WEEK - 1);
+  const release = x(RELEASE_WEEK - 1);
   return (
-    <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-weekly-title">
-      <title id="viz-weekly-title">
-        Weekly complaints: 6 in the 13 weeks before Rev B is released in week 13, 36 in the 13 weeks after (from about 2
-        a month to about 12)
-      </title>
-      {[0, 2, 4].map((tick) => (
-        <g key={tick}>
-          <line className="ms-viz-grid" x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} />
-          <text className="ms-viz-axis" x={pad.left - 8} y={y(tick) + 4} textAnchor="end">
-            {tick}
-          </text>
-        </g>
-      ))}
-      <path className="ms-viz-area" d={area} />
-      <path className="ms-viz-line" d={line} pathLength={1} />
-      <line className="ms-viz-marker" x1={releaseX} x2={releaseX} y1={pad.top - 8} y2={y(0)} />
-      <text className="ms-viz-note" x={releaseX + 6} y={pad.top - 10}>
-        Rev B released · CHG-014
-      </text>
-      {WEEKLY.map((value, index) => (
-        <circle key={index} className="ms-viz-point" cx={x(index)} cy={y(value)} r={7}>
-          <title>{`Week ${index + 1}: ${value} complaints`}</title>
-        </circle>
-      ))}
-      <circle className="ms-viz-end" cx={x(WEEKLY.length - 1)} cy={y(WEEKLY[WEEKLY.length - 1])} r={4} />
-      {[1, 13, 26].map((week, index) => (
-        <text
-          key={week}
-          className="ms-viz-axis"
-          x={x(week - 1)}
-          y={height - 8}
-          textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"}
-        >
-          Week {week}
+    <figure className="ms-fig">
+      <svg className="ms-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="signal-chart-title">
+        <title id="signal-chart-title">
+          Pressure-alarm complaints per week: about 2 a month before Rev B is released in week 13, about 12 a month
+          after
+        </title>
+        <rect
+          className="ms-chart-after"
+          x={release}
+          y={pad.top - 8}
+          width={width - pad.right - release}
+          height={y(0) - pad.top + 8}
+        />
+        <line className="ms-chart-base" x1={pad.left} x2={width - pad.right} y1={y(0)} y2={y(0)} />
+        <path className="ms-chart-area" d={area} />
+        <path className="ms-chart-line" d={line} />
+        <line className="ms-chart-marker" x1={release} x2={release} y1={pad.top - 8} y2={y(0)} />
+        <text className="ms-chart-note" x={release + 8} y={pad.top - 14}>
+          Rev B released
         </text>
-      ))}
-    </svg>
+        <text className="ms-chart-axis" x={pad.left} y={height - 10}>
+          Week 1
+        </text>
+        <text className="ms-chart-axis" x={width - pad.right} y={height - 10} textAnchor="end">
+          Week 26
+        </text>
+      </svg>
+      <div className="ms-fig-stats">
+        <span>
+          <strong>~2</strong> a month before
+        </span>
+        <span className="is-hot">
+          <strong>~12</strong> a month after
+        </span>
+      </div>
+      <Caption />
+    </figure>
   );
 }
 
-export function LotChart() {
-  const width = 520;
-  const rowHeight = 34;
-  const pad = { left: 146, right: 42, top: 8 };
-  const height = pad.top + LOTS.length * rowHeight + 8;
-  const max = 20;
-  const scale = (value: number) => (value / max) * (width - pad.left - pad.right);
-  return (
-    <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-lots-title">
-      <title id="viz-lots-title">
-        Complaints per lot: the two lots built with the new supplier's sensors hold 30 of 42 complaints; 2 complaints
-        name no lot
-      </title>
-      {LOTS.map((item, index) => {
-        const top = pad.top + index * rowHeight;
-        return (
-          <g key={item.lot} className="ms-viz-row" style={{ animationDelay: `${index * 90}ms` }}>
-            <text className="ms-viz-label" x={pad.left - 10} y={top + 22} textAnchor="end">
-              {item.lot} · {item.rev}
-            </text>
-            <rect className="ms-viz-track" x={pad.left} y={top + 8} width={scale(max)} height={18} rx={4} />
-            <rect
-              className={item.sensor ? "ms-viz-bar ms-viz-bar-hot" : "ms-viz-bar"}
-              x={pad.left}
-              y={top + 8}
-              width={scale(item.count)}
-              height={18}
-              rx={4}
-            >
-              <title>{`${item.lot} (${item.rev}): ${item.count} complaints${item.sensor ? ", new supplier's sensors" : ""}`}</title>
-            </rect>
-            <text className="ms-viz-value" x={pad.left + scale(item.count) + 8} y={top + 22}>
-              {item.count}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
+/* ---------------------------------------------------------------------------------- 2. Product reality */
 
-/* ------------------------------------------------------------------------------ Customer systems */
-
-// Typical source systems, by kind: named vendor connectors are not offered yet (they are planned, as the roadmap says).
-const SOURCES = [
-  ["QMS", "Complaints · CAPAs"],
-  ["Document control", "Quality events · documents"],
-  ["PLM", "Items · BOM · changes"],
-  ["ERP", "Batches · plants · vendors"],
-  ["MES", "Production · genealogy"],
-  ["LIMS", "Test results"],
-  ["Risk file", "Risks · FMEA · controls"],
-  ["Supplier portal", "Suppliers · certificates"],
-] as const;
-const OUTCOMES = [
-  ["Product records", "Versions, lots, components, suppliers"],
-  ["Investigations", "Question, evidence, hypotheses"],
-  ["Ask MDARIX", "Answers with their evidence"],
-  ["Decisions", "Signed, traceable, audited"],
+const REVISIONS = [
+  ["Pressure sensor supplier", "Original supplier", "New supplier (CHG-014)"],
+  ["Incoming inspection sample", "32 units", "13 units"],
+  ["Finished lots", "001–002", "003–008"],
 ] as const;
 
-/** The systems-to-MDARIX picture. Drawn twice when enlarged, so its ids are its own (`uid`). */
-function SourceFlowDiagram({ uid }: { uid: string }) {
-  const width = 1000;
-  const rowGap = 50;
-  const top = 30;
-  const center = { x: 500, y: top + ((SOURCES.length - 1) * rowGap) / 2 };
-  const height = top * 2 + (SOURCES.length - 1) * rowGap;
-  const outGap = 78;
-  const outTop = center.y - ((OUTCOMES.length - 1) * outGap) / 2;
+export function RevisionCompare() {
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${uid}-title`}>
-      <title id={`${uid}-title`}>
-        Eight customer systems flow into MDARIX, which serves product records, investigations, Ask MDARIX and decisions
-      </title>
-      {SOURCES.map(([name, detail], index) => {
-        const y = top + index * rowGap;
-        const path = `M232,${y} C360,${y} 360,${center.y} 430,${center.y}`;
-        return (
-          <g key={name}>
-            <path id={`${uid}-in-${index}`} className="ms-flow-path" d={path} />
-            <circle className="ms-flow-dot" r="3.5">
-              <animateMotion dur={`${2.6 + (index % 3) * 0.5}s`} begin={`${index * 0.35}s`} repeatCount="indefinite">
-                <mpath href={`#${uid}-in-${index}`} />
-              </animateMotion>
-            </circle>
-            <rect className="ms-flow-node" x="16" y={y - 21} width="216" height="42" rx="9" />
-            <text className="ms-flow-name" x="28" y={y - 3}>
-              {name}
-            </text>
-            <text className="ms-flow-detail" x="28" y={y + 14}>
-              {detail}
-            </text>
-          </g>
-        );
-      })}
-      {OUTCOMES.map(([name, detail], index) => {
-        const y = outTop + index * outGap;
-        const path = `M570,${center.y} C640,${center.y} 640,${y} 744,${y}`;
-        return (
-          <g key={name}>
-            <path id={`${uid}-out-${index}`} className="ms-flow-path ms-flow-path-out" d={path} />
-            <circle className="ms-flow-dot ms-flow-dot-out" r="3.5">
-              <animateMotion dur="2.4s" begin={`${0.6 + index * 0.4}s`} repeatCount="indefinite">
-                <mpath href={`#${uid}-out-${index}`} />
-              </animateMotion>
-            </circle>
-            <rect className="ms-flow-node ms-flow-node-out" x="744" y={y - 26} width="244" height="52" rx="10" />
-            <text className="ms-flow-name" x="758" y={y - 4}>
-              {name}
-            </text>
-            <text className="ms-flow-detail" x="758" y={y + 15}>
-              {detail}
-            </text>
-          </g>
-        );
-      })}
-      <circle className="ms-flow-pulse" cx="500" cy={center.y} r="78" />
-      <circle className="ms-flow-core" cx="500" cy={center.y} r="70" />
-      <text className="ms-flow-core-title" x="500" y={center.y - 10} textAnchor="middle">
-        MDARIX
-      </text>
-      <text className="ms-flow-core-detail" x="500" y={center.y + 12} textAnchor="middle">
-        checked import
-      </text>
-      <text className="ms-flow-core-detail" x="500" y={center.y + 30} textAnchor="middle">
-        your data only
-      </text>
-    </svg>
-  );
-}
-
-export function SourceFlow() {
-  const uid = `flow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const label = "Eight customer systems flowing into MDARIX; your QMS keeps the complaint record";
-  return (
-    <section className="ms-section" aria-labelledby="source-flow-title">
-      <Reveal className="ms-section-head">
-        <span className="ms-eyebrow">Typical source systems</span>
-        <h2 id="source-flow-title">Your QMS keeps the complaint record. MDARIX connects the story.</h2>
-        <p>
-          Each system keeps its data. Today MDARIX imports CSV exports from them; live connections are built in a pilot.
-          Every record is checked and linked to versions, lots, components, suppliers, risks and evidence.
-        </p>
-      </Reveal>
-      <Reveal className="ms-sysflow">
-        <Enlargeable
-          label={label}
-          enlarged={() => (
-            <div className="ms-enlarged-flow">
-              <SourceFlowDiagram uid={`${uid}-big`} />
-            </div>
-          )}
-        >
-          <SourceFlowDiagram uid={uid} />
-        </Enlargeable>
-        <ul className="ms-flow-list">
-          {SOURCES.map(([name, detail]) => (
-            <li key={name}>
-              <strong>{name}</strong> {detail}
-            </li>
+    <figure className="ms-fig">
+      <table className="ms-compare">
+        <caption>OrbitCare 300: what changed between Rev A and Rev B</caption>
+        <thead>
+          <tr>
+            <th scope="col">
+              <span className="ms-sr">Attribute</span>
+            </th>
+            <th scope="col">Rev A</th>
+            <th scope="col">Rev B</th>
+          </tr>
+        </thead>
+        <tbody>
+          {REVISIONS.map(([what, before, after]) => (
+            <tr key={what}>
+              <th scope="row">{what}</th>
+              <td>{before}</td>
+              <td className="is-changed">{after}</td>
+            </tr>
           ))}
-        </ul>
-      </Reveal>
-    </section>
+        </tbody>
+      </table>
+      <p className="ms-fig-read">A change is a lead, not a cause: the investigation tests it.</p>
+      <Caption />
+    </figure>
   );
 }
 
-/* ---------------------------------------------------------------------------------- Reporting windows */
+/* -------------------------------------------------------------------------------------- 3. Investigation */
 
-// The four markets of Complaints › Reporting windows and the market assessment, each with its basis from the standards catalog
-// (features/shared/standards.json, mirrored from backend/app/standards.py).
-const REPORTING = [
-  { region: "United States", name: "FDA medical device reporting", basis: ["CFR803_50", "CFR803_53"] },
-  { region: "EU and Northern Ireland", name: "EU MDR vigilance", basis: ["MDR_87"] },
-  { region: "Great Britain", name: "UK medical devices vigilance", basis: ["UK_MDR"] },
-  { region: "India", name: "Adverse event reporting (MvPI worksheet)", basis: ["IN_MDR"] },
-];
+const RAIL = ["Signal", "Evidence", "Possible causes", "Brief", "Decision"] as const;
+const CAUSES = [
+  { cause: "New supplier's sensor drifts at low pressure", state: "Supported", tone: "good", support: 4, against: 1 },
+  { cause: "Alarm threshold set too tight in firmware", state: "Weakened", tone: "warn", support: 1, against: 3 },
+  { cause: "Set-up error at the bedside", state: "Open question", tone: "open", support: 1, against: 1 },
+] as const;
 
-export function ReportingWindows() {
+export function InvestigationRail() {
   return (
-    <section className="ms-section" aria-labelledby="reporting-title">
-      <Reveal className="ms-section-head">
-        <span className="ms-eyebrow">Reporting windows</span>
-        <h2 id="reporting-title">US, EU/NI, GB and India reporting.</h2>
-        <p>
-          Each window is counted from the day you became aware, and each reportability decision keeps its reason. People
-          decide what is reportable; MDARIX never submits anything to a regulator.
-        </p>
-      </Reveal>
-      <div className="ms-grid-4">
-        {REPORTING.map((item, index) => (
-          <Reveal key={item.region} delay={index * 70} className="ms-card ms-reporting">
-            <span className="ms-standard-region">{item.region}</span>
-            <strong>{item.name}</strong>
-            <ul>
-              {basisOf(item.basis).map((standard) => (
+    <figure className="ms-fig">
+      <ol className="ms-rail" aria-label="Investigation steps">
+        {RAIL.map((step, index) => (
+          <li key={step} className={index === 2 ? "is-current" : index < 2 ? "is-done" : undefined}>
+            {step}
+          </li>
+        ))}
+      </ol>
+      <ul className="ms-causes">
+        {CAUSES.map((item) => (
+          <li key={item.cause}>
+            <span className="ms-cause-text">{item.cause}</span>
+            <span className={`ms-pill is-${item.tone}`}>{item.state}</span>
+            <span className="ms-weigh" aria-label={`${item.support} pieces of evidence for, ${item.against} against`}>
+              <span className="is-for" style={{ flexGrow: item.support }} />
+              <span className="is-against" style={{ flexGrow: item.against }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="ms-fig-read">
+        <span className="ms-key is-for" aria-hidden="true" /> Evidence for{" "}
+        <span className="ms-key is-against" aria-hidden="true" /> Evidence against
+      </p>
+      <Caption />
+    </figure>
+  );
+}
+
+/* --------------------------------------------------------------------------- 4. Decision and reports */
+
+const MARKET_STATES: Record<string, { state: string; tone: string }> = {
+  "United States": { state: "Reportable · clock running", tone: "warn" },
+  "EU and Northern Ireland": { state: "Not reportable · reason kept", tone: "good" },
+  "Great Britain": { state: "Reportable · clock running", tone: "warn" },
+  Canada: { state: "Not reportable · reason kept", tone: "good" },
+  India: { state: "Not reportable · reason kept", tone: "good" },
+};
+
+export function MarketDecisions() {
+  return (
+    <figure className="ms-fig">
+      <ul className="ms-markets">
+        {MARKETS.map((market) => (
+          <li key={market.region}>
+            <span>
+              <strong>{market.region}</strong>
+              <small>
+                {basisOf(market.basis)
+                  .map((standard) => standard.short)
+                  .join(" · ")}
+              </small>
+            </span>
+            <span className={`ms-pill is-${MARKET_STATES[market.region].tone}`}>
+              {MARKET_STATES[market.region].state}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="ms-signed">Signed with password and authenticator code · nobody signs their own work</p>
+      <Caption />
+    </figure>
+  );
+}
+
+/** The markets with their legal basis, for the Trust page. */
+export function MarketBasis() {
+  return (
+    <>
+      <div className="ms-grid ms-grid-5">
+        {MARKETS.map((market) => (
+          <div key={market.region} className="ms-card">
+            <span className="ms-eyebrow">{market.region}</span>
+            <strong>{market.name}</strong>
+            <ul className="ms-basis">
+              {basisOf(market.basis).map((standard) => (
                 <li key={standard.id}>
                   <b>{standard.short}</b> {standard.title}
                 </li>
               ))}
             </ul>
-          </Reveal>
+          </div>
         ))}
       </div>
-      <p className="ms-viz-caption">
-        Health Canada's reporting windows (SOR/98-282 ss. 59–61) are also offered as a template; Canada has no market
-        assessment or worksheet. {BASIS_DISCLAIMER}
-      </p>
-    </section>
+      <p className="ms-note">{BASIS_DISCLAIMER}</p>
+    </>
   );
 }
 
-/* ------------------------------------------------------------------------------- MedTech standards */
+/* ---------------------------------------------------------------------------------------- 5. Did it work */
 
-const STANDARDS = [
-  {
-    code: "ISO 13485",
-    mark: "13485",
-    region: "International",
-    name: "Medical devices: quality management systems",
-    asks: "Complaint handling (8.2.2), corrective and preventive action (8.5.2, 8.5.3) and controlled records.",
-    helps:
-      "Every complaint is linked to its product version, lot, component and supplier, with the investigation and CAPA beside it.",
-  },
-  {
-    code: "QMSR",
-    mark: "820",
-    region: "United States",
-    name: "FDA 21 CFR 820, in force since 2 February 2026",
-    asks: "ISO 13485 by reference: complaint files, failure investigations and CAPA records the FDA can inspect.",
-    helps:
-      "One investigation record holds the question, the evidence, the competing explanations and the signed decision.",
-  },
-  {
-    code: "ISO 14971",
-    mark: "14971",
-    region: "International",
-    name: "Application of risk management to medical devices",
-    asks: "Production and post-production information must flow back into the risk file.",
-    helps:
-      "Complaints and failure modes are linked to the risks and controls they touch, so field signals reach the risk file.",
-  },
-  {
-    code: "IEC 62304",
-    mark: "62304",
-    region: "International",
-    name: "Medical device software life cycle",
-    asks: "A problem resolution process for software, with traceability to versions and changes.",
-    helps:
-      "Firmware versions are part of each product version, and engineering changes are linked to the complaints that follow.",
-  },
-  {
-    code: "Part 11",
-    mark: "11",
-    region: "United States",
-    name: "FDA 21 CFR 11: electronic records and signatures",
-    asks: "Trustworthy electronic records, signatures with meaning and an audit trail that cannot be altered.",
-    helps:
-      "Signatures need re-authentication and record their meaning and a content fingerprint; the audit trail is append-only.",
-  },
-  {
-    code: "Part 803",
-    mark: "803",
-    region: "United States",
-    name: "FDA 21 CFR 803: medical device reporting",
-    asks: "Timely reports of deaths, serious injuries and malfunctions, from the date of awareness.",
-    helps:
-      "Awareness date, serious injury, death and malfunction flags travel from the complaint system for reportability review.",
-  },
-  {
-    code: "EU MDR",
-    mark: "MDR",
-    region: "European Union",
-    name: "Regulation (EU) 2017/745, Articles 83–92",
-    asks: "Post-market surveillance, vigilance and trend reporting of statistically significant increases (Article 88).",
-    helps: "Trends by version and lot show when and where complaints change, with the records behind every point.",
-  },
-  {
-    code: "IMDRF",
-    mark: "AET",
-    region: "International",
-    name: "Adverse event terminology",
-    asks: "Consistent problem codes so events can be grouped and compared.",
-    helps: "Problem codes are carried from the source system and grouped across products and sites.",
-  },
-];
+const OUTCOMES = [
+  ["Effective", "good"],
+  ["Not effective", "bad"],
+  ["Inconclusive", "warn"],
+] as const;
 
-/** A seal drawn for the page (not any body's logo), carrying the standard's short number. */
-function Emblem({ mark }: { mark: string }) {
+export function EffectivenessCheck() {
   return (
-    <svg className="ms-emblem" viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r="29" className="ms-emblem-ring" />
-      <circle cx="32" cy="32" r="23" className="ms-emblem-core" />
-      <path d="M20 41 L44 41" className="ms-emblem-rule" />
-      <text x="32" y="35" textAnchor="middle" className="ms-emblem-text">
-        {mark}
-      </text>
-    </svg>
-  );
-}
-
-export function StandardsSection({
-  id,
-  title = "Built around the evidence regulators ask for.",
-  copy = "Post-market quality work is defined by a few standards and regulations. MDARIX organizes the evidence they call for. It does not certify compliance: your quality system and its validation stay yours.",
-}: {
-  id?: string;
-  title?: string;
-  copy?: string;
-}) {
-  return (
-    <section className="ms-section" id={id} aria-labelledby={`${id ?? "standards"}-title`}>
-      <Reveal className="ms-section-head">
-        <span className="ms-eyebrow">MedTech standards</span>
-        <h2 id={`${id ?? "standards"}-title`}>{title}</h2>
-        <p>{copy}</p>
-      </Reveal>
-      <div className="ms-standards">
-        {STANDARDS.map((standard, index) => (
-          <Reveal key={standard.code} delay={(index % 4) * 70} className="ms-card ms-standard">
-            <div className="ms-standard-head">
-              <Emblem mark={standard.mark} />
-              <div>
-                <strong>{standard.code}</strong>
-                <span className="ms-standard-region">{standard.region}</span>
-              </div>
-            </div>
-            <p className="ms-standard-name">{standard.name}</p>
-            <dl>
-              <dt>What it asks</dt>
-              <dd>{standard.asks}</dd>
-              <dt>How MDARIX helps</dt>
-              <dd>{standard.helps}</dd>
-            </dl>
-          </Reveal>
+    <figure className="ms-fig">
+      <dl className="ms-check">
+        <div>
+          <dt>Action</dt>
+          <dd>CAPA-02: full incoming inspection of the pressure sensor restored</dd>
+        </div>
+        <div>
+          <dt>Criteria, set before the action</dt>
+          <dd>Pressure-alarm complaints on lots built after the fix fall back to the Rev A rate</dd>
+        </div>
+        <div>
+          <dt>Measured from</dt>
+          <dd>The first lot built after the fix, not the day the CAPA closed</dd>
+        </div>
+      </dl>
+      <div className="ms-outcomes" role="group" aria-label="The signed result is one of">
+        {OUTCOMES.map(([label, tone]) => (
+          <span key={label} className={`ms-pill is-${tone}`}>
+            {label}
+          </span>
         ))}
       </div>
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------------- Lifecycle hero (animated) */
-
-// The device lifecycle as a closed loop: post-market findings feed the next design. MDARIX works in post-market today.
-const LIFECYCLE_LOOP = [
-  { label: ["Concept"], today: false },
-  { label: ["Design", "controls"], today: false },
-  { label: ["Verification &", "validation"], today: false },
-  { label: ["Regulatory", "submission"], today: false },
-  { label: ["Manufacturing"], today: false },
-  { label: ["Distribution"], today: false },
-  { label: ["Post-market", "surveillance"], today: true },
-];
-const LOOP_STANDARDS = ["ISO 13485", "ISO 14971", "IEC 62304", "FDA QMSR", "EU MDR"];
-
-export function LifecycleHero() {
-  const cx = 300;
-  const cy = 230;
-  const radius = 150;
-  const nodes = LIFECYCLE_LOOP.map((stage, index) => {
-    const angle = -Math.PI / 2 + (index / LIFECYCLE_LOOP.length) * 2 * Math.PI;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    return {
-      ...stage,
-      x: cx + radius * cos,
-      y: cy + radius * sin,
-      lx: cx + (radius + 30) * cos,
-      ly: cy + (radius + 30) * sin + (sin > 0.3 ? 14 : sin < -0.3 ? -14 - (stage.label.length - 1) * 15 : 0),
-      anchor: (cos > 0.3 ? "start" : cos < -0.3 ? "end" : "middle") as "start" | "end" | "middle",
-    };
-  });
-  return (
-    <figure className="ms-lc-hero">
-      <svg viewBox="0 0 600 470" role="img" aria-labelledby="lc-hero-title">
-        <title id="lc-hero-title">
-          The medical device lifecycle as a loop, from concept, design controls, verification and validation, regulatory
-          submission, manufacturing and distribution to post-market surveillance, whose findings feed the next design.
-          MDARIX works in post-market surveillance today.
-        </title>
-        <defs>
-          <radialGradient id="lc-glow">
-            <stop offset="0" stopColor="#73d6cb" stopOpacity="0.45" />
-            <stop offset="1" stopColor="#73d6cb" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <circle className="ms-lc-halo" cx={cx} cy={cy} r={110} fill="url(#lc-glow)" />
-        <circle className="ms-lc-track" cx={cx} cy={cy} r={radius} />
-        <circle className="ms-lc-dash" cx={cx} cy={cy} r={radius} />
-        {nodes.map((node, index) => (
-          <line
-            key={`spoke-${index}`}
-            className={node.today ? "ms-lc-spoke ms-lc-spoke-today" : "ms-lc-spoke"}
-            x1={node.x}
-            y1={node.y}
-            x2={cx}
-            y2={cy}
-          />
-        ))}
-        <g className="ms-lc-orbit">
-          <circle className="ms-lc-comet-tail" cx={cx} cy={cy - radius} r={12} />
-          <circle className="ms-lc-comet" cx={cx} cy={cy - radius} r={5} />
-        </g>
-        {/* Infusion pump at the centre: one product reality. */}
-        <g className="ms-lc-device">
-          <circle cx={cx} cy={cy} r={66} className="ms-lc-core" />
-          <g transform="translate(0 -10)">
-            <rect x={cx - 30} y={cy - 38} width={60} height={64} rx={9} className="ms-lc-pump" />
-            <rect x={cx - 21} y={cy - 29} width={42} height={20} rx={3} className="ms-lc-screen" />
-            <polyline
-              className="ms-lc-beat"
-              points={`${cx - 18},${cy - 19} ${cx - 8},${cy - 19} ${cx - 4},${cy - 26} ${cx + 1},${cy - 12} ${cx + 5},${cy - 19} ${cx + 18},${cy - 19}`}
-            />
-            {[-14, 0, 14].map((dx) => (
-              <circle key={dx} cx={cx + dx} cy={cy + 5} r={4} className="ms-lc-key" />
-            ))}
-            <rect x={cx - 16} y={cy + 15} width={32} height={4} rx={2} className="ms-lc-key" />
-            <path d={`M${cx + 30},${cy - 10} q18,6 14,32`} className="ms-lc-line" />
-          </g>
-          <text textAnchor="middle" className="ms-lc-core-label">
-            <tspan x={cx} y={cy + 33}>
-              One product
-            </tspan>
-            <tspan x={cx} y={cy + 45}>
-              reality
-            </tspan>
-          </text>
-        </g>
-        {nodes.map((node, index) => (
-          <g key={node.label.join(" ")} className={node.today ? "ms-lc-node ms-lc-node-today" : "ms-lc-node"}>
-            <circle
-              className="ms-lc-ping"
-              cx={node.x}
-              cy={node.y}
-              r={node.today ? 15 : 11}
-              style={{ animationDelay: `${index * 2}s` }}
-            />
-            <circle className="ms-lc-dot" cx={node.x} cy={node.y} r={node.today ? 11 : 8} />
-            <text className="ms-lc-num" x={node.x} y={node.y + 4} textAnchor="middle">
-              {index + 1}
-            </text>
-            <text className="ms-lc-label" x={node.lx} y={node.ly} textAnchor={node.anchor}>
-              {node.label.map((line, row) => (
-                <tspan key={line} x={node.lx} dy={row ? 15 : 0}>
-                  {line}
-                </tspan>
-              ))}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <figcaption>
-        <span className="ms-lc-key-today">MDARIX today: post-market investigation</span>
-        <span className="ms-lc-key-next">Roadmap: the rest of the loop</span>
-        <span className="ms-lc-standards" aria-label="Standards that govern the lifecycle">
-          {LOOP_STANDARDS.map((code) => (
-            <span key={code}>{code}</span>
-          ))}
-        </span>
-      </figcaption>
+      <p className="ms-fig-read">Too early to tell is said plainly, not counted as a success.</p>
+      <Caption />
     </figure>
   );
 }
 
-/* ------------------------------------------------------------------------- Customer voices */
+/* ----------------------------------------------------------------------------------- Customer voices */
 
 type Voice = { quote: string; attribution: string; rating: number };
 
-/** Quotes trial customers agreed to share, credited as they chose. Shows nothing until one has been published. */
+/** What trial customers said, shared with their permission (approved in platform administration). Shows nothing
+ * until there is at least one approved voice: the website never shows invented quotes. */
 export function CustomerVoices() {
   const [voices, setVoices] = useState<Voice[]>([]);
   useEffect(() => {
     fetch("/api/v1/public/testimonials", { headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : { items: [] }))
-      .then((data) => setVoices(Array.isArray(data?.items) ? data.items.slice(0, 6) : []))
+      .then((data) => setVoices(Array.isArray(data?.items) ? data.items.slice(0, 3) : []))
       .catch(() => setVoices([]));
   }, []);
   if (!voices.length) return null;
   return (
     <section className="ms-section" aria-labelledby="voices-title">
-      <Reveal className="ms-section-head">
+      <div className="ms-head">
         <span className="ms-eyebrow">Customer voices</span>
         <h2 id="voices-title">What MedTech teams say after their trial.</h2>
         <p>In their own words, shared with their permission.</p>
-      </Reveal>
-      <div className="ms-voices">
+      </div>
+      <div className="ms-grid ms-grid-3">
         {voices.map((voice, index) => (
-          <Reveal key={`${voice.attribution}-${index}`} delay={(index % 3) * 80} className="ms-card ms-voice">
-            <span className="ms-voice-mark" aria-hidden="true">
-              &ldquo;
-            </span>
+          <figure key={`${voice.attribution}-${index}`} className="ms-card ms-voice">
             <blockquote>{voice.quote}</blockquote>
             <span className="ms-voice-rating" aria-label={`Rated ${voice.rating} of 5`}>
               {"★".repeat(voice.rating)}
               <span aria-hidden="true">{"★".repeat(5 - voice.rating)}</span>
             </span>
-            <cite>{voice.attribution}</cite>
-          </Reveal>
+            <figcaption>{voice.attribution}</figcaption>
+          </figure>
         ))}
       </div>
     </section>

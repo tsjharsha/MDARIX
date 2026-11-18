@@ -1,26 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
 import { QUESTIONS_PATH, QuestionPage, QuestionsPage, questionAt } from "./site/questions";
 import { applyPageMeta } from "./site/seo";
-import { menuMove, menuPanelId, type MenuFocus } from "./site/menuKeys";
-import { lifecycleStages, platformGroups, platformPageOf, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
-import {
-  CompanyPage,
-  HomePage,
-  LifecyclePage,
-  PlatformGroupPage,
-  PlatformPage,
-  RegulationsPage,
-  ResourcesPage,
-  RoadmapPage,
-  SITE_PAGES,
-  SolutionsPage,
-  TrustPage,
-  type SitePage,
-} from "./site/pages";
+import { CompanyPage, HomePage, PlatformPage, SITE_PAGES, TrustPage, type SitePage } from "./site/pages";
 import {
   ContactPage,
   LEGAL_PAGES,
@@ -36,166 +21,116 @@ import {
 const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/accessibility", "/contact"] as const;
 type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
-// The website was consolidated from ~65 URLs into a few pages. Every old URL lands on the section that now holds its
-// content, so existing links and bookmarks keep working.
+// Former page addresses, and the page and section that now hold their content, so existing links and bookmarks keep
+// working (the web server sends each to the application shell: infrastructure/docker/Caddyfile @shell).
 export const LEGACY_PAGES: Record<string, string> = {
+  // The four Platform pages and the roadmap became sections of "How it works" (site refresh, Nov 2026).
+  "/platform/product-360": "/platform#products",
+  "/platform/investigations": "/platform#investigations",
+  "/platform/decisions": "/platform#decisions",
+  "/platform/trust": "/trust",
+  "/roadmap": "/platform#availability",
+  "/solutions": "/platform",
+  "/product-lifecycle": "/platform#products",
+  "/capabilities": "/platform",
+  "/integrations": "/trust#integrations",
+  // Trust and its regulations page are one page.
+  "/trust/regulations": "/trust#markets",
+  "/regulations": "/trust#markets",
   "/why-mdarix": "/trust#principles",
   "/ai-trust": "/trust#ai",
-  "/integrations": "/trust#integrations",
+  // Resources was a list of the questions and the videos.
+  "/resources": QUESTIONS_PATH,
   // Pricing was removed until plans and billing are offered; its links go to the contact page.
   "/pricing": "/contact",
   "/plans": "/contact",
-  "/capabilities": "/platform",
-  "/regulations": "/trust/regulations",
 };
-// Former anchors whose section moved to a page of its own: the standards (home page and Trust) to Regulations, the
-// roadmap (home page and Platform) to the roadmap page.
+
+// The former capability pages (/platform/challenger) and lifecycle pages (/platform/strategy): the section of the page
+// that now holds the subject. Any other address under /platform/ opens "How it works".
+const PRODUCT = "/platform#products";
+const INVESTIGATIONS = "/platform#investigations";
+const DECISIONS = "/platform#decisions";
+const FORMER_SECTIONS: Record<string, string> = {
+  "reality-graph": PRODUCT,
+  "product-version": PRODUCT,
+  timeline: PRODUCT,
+  "ask-mdarix": INVESTIGATIONS,
+  investigation: INVESTIGATIONS,
+  evidence: INVESTIGATIONS,
+  hypotheses: INVESTIGATIONS,
+  challenger: INVESTIGATIONS,
+  unknowns: INVESTIGATIONS,
+  "failure-chain": DECISIONS,
+  counterfactual: DECISIONS,
+  "decision-center": DECISIONS,
+  "investigation-brief": DECISIONS,
+  "ai-assurance": "/trust#ai",
+  "ai-provenance": "/trust#ai",
+  "human-review": "/trust#principles",
+  "audit-trail": "/trust#security",
+  "enterprise-administration": "/trust#security",
+};
+
+// Former anchors whose section moved: the standards and the roadmap.
 const MOVED_ANCHORS: Record<string, string> = {
-  "/#standards": "/trust/regulations",
-  "/trust#trust-standards": "/trust/regulations",
-  "/#scope-title": "/roadmap",
-  "/platform#scope-title": "/roadmap",
+  "/#standards": "/trust#markets",
+  "/trust#trust-standards": "/trust#markets",
+  "/#scope-title": "/platform#availability",
+  "/platform#scope-title": "/platform#availability",
 };
-const LIFECYCLE_SLUGS = new Set(lifecycleStages.flatMap((stage) => stage.items.map((item) => item.slug)));
-const PLATFORM_SLUGS = new Set(
-  platformGroups.flatMap((group) => group.capabilities.map((capability) => capability.slug)),
-);
+
+const split = (target: string) => {
+  const [page, hash = ""] = target.split("#");
+  return { page: page as Page, hash };
+};
 
 export function resolveSitePath(path: string, hash: string): { page: Page; hash: string } {
   const clean = path.replace(/\/+$/, "") || "/";
   const moved = MOVED_ANCHORS[`${clean}#${hash}`];
-  if (moved) return { page: moved as Page, hash: "" };
-  // The former single Platform page's anchors (/platform#challenger, /platform#decision-intelligence) open the page
-  // that now holds the capability, at its section; a former group anchor opens its page at the top.
-  if (clean === "/platform" && hash) {
-    const target = platformPageOf(hash);
-    if (target) return { page: target.path, hash: target.id === hash ? "" : hash };
-  }
-  // The roadmap was a section of the lifecycle page; its lifecycle anchors (/roadmap#capa) still open there.
-  if (clean === "/roadmap" && (LIFECYCLE_SLUGS.has(hash) || FUTURE_LIFECYCLE.has(hash)))
-    return { page: "/product-lifecycle", hash };
+  if (moved) return split(moved);
+  // The former single Platform page's anchors (/platform#challenger) open the section that now holds them.
+  if (clean === "/platform" && FORMER_SECTIONS[hash]) return split(FORMER_SECTIONS[hash]);
   if ((SITE_PAGES as readonly string[]).includes(clean)) return { page: clean as SitePage, hash };
   if ((INFO_PAGES as readonly string[]).includes(clean)) return { page: clean as Page, hash };
-  if (clean.startsWith("/platform/")) {
-    // A former capability page (/platform/challenger) opens its section on the Platform page that holds it.
-    const slug = clean.slice("/platform/".length);
-    const target = PLATFORM_SLUGS.has(slug) ? platformPageOf(slug) : undefined;
-    if (target) return { page: target.path, hash: slug };
-    if (LIFECYCLE_SLUGS.has(slug) || FUTURE_LIFECYCLE.has(slug)) return { page: "/product-lifecycle", hash: slug };
-    return { page: "/platform", hash: "" };
-  }
   const legacy = LEGACY_PAGES[clean];
   if (legacy) {
-    const [page, anchor] = legacy.split("#");
-    // A legacy page's own anchor (e.g. /why-mdarix#not-qms or /roadmap#capa) wins over the default section.
-    return { page: page as Page, hash: hash || anchor || "" };
+    const target = split(legacy);
+    // A legacy page's own anchor (/why-mdarix#not-qms) is kept only when the new page has no section of its own.
+    return { page: target.page, hash: target.hash || hash };
   }
+  if (clean.startsWith("/platform/")) return split(FORMER_SECTIONS[clean.slice("/platform/".length)] ?? "/platform");
   return { page: "not-found", hash: "" };
 }
 
-type NavMenu = {
-  name: string;
-  title: string;
-  href: string;
-  /** Further pages, listed under Overview. */
-  more?: { label: string; href: string }[];
-  groups: { title?: string; links: { label: string; href: string; note?: string; description?: string }[] }[];
-};
-
-const NAV_MENUS: NavMenu[] = [
-  {
-    name: "Platform",
-    title: "Platform",
-    href: "/platform",
-    // Four pages, each holding its capabilities as sections.
-    groups: platformGroups.map((group) => ({
-      links: [{ label: group.name, href: group.path, description: group.blurb }],
-    })),
-  },
-  {
-    name: "Solutions",
-    title: "Solutions",
-    href: "/solutions",
-    groups: solutionGroups.map((group) => ({
-      title: group.title,
-      links: group.items.map((item) => ({ label: item.label, href: `/solutions#${item.key}` })),
-    })),
-  },
-  {
-    name: "Product Lifecycle",
-    title: "Product Lifecycle",
-    href: "/product-lifecycle",
-    more: [{ label: "Roadmap", href: "/roadmap" }],
-    groups: lifecycleStages.map((stage) => ({
-      title: stage.title,
-      links: stage.items.map((item) => ({
-        label: item.label,
-        href: item.href ?? `/product-lifecycle#${item.slug}`,
-        note: item.future ? "Future" : undefined,
-      })),
-    })),
-  },
-  {
-    name: "Trust",
-    title: "Trust",
-    href: "/trust",
-    groups: [
-      {
-        title: "Why MDARIX",
-        links: [
-          { label: "Not another QMS", href: "/trust#not-qms" },
-          { label: "Evidence before inference", href: "/trust#evidence" },
-          { label: "Humans decide", href: "/trust#humans-decide" },
-        ],
-      },
-      {
-        title: "Trust foundations",
-        links: [
-          { label: "AI trust & assurance", href: "/trust#ai" },
-          { label: "Regulations", href: "/trust/regulations" },
-          { label: "Security & access", href: "/trust#security" },
-          { label: "Integration approach", href: "/trust#integrations" },
-        ],
-      },
-    ],
-  },
-];
+const NAV = [
+  ["Product", "/platform"],
+  ["Trust", "/trust"],
+  ["Questions", QUESTIONS_PATH],
+  ["Company", "/company"],
+] as const;
 
 const FOOTER: Array<{ title: string; links: [string, string][] }> = [
   {
-    title: "Platform",
+    title: "Product",
     links: [
-      ["Overview", "/platform"],
-      ...platformGroups.map((group): [string, string] => [group.name, group.path]),
-      ["Roadmap", "/roadmap"],
+      ["How it works", "/platform"],
+      ["What you get", "/platform#availability"],
+      ["Markets and regulations", "/trust#markets"],
+      ["Trust", "/trust"],
     ],
   },
   {
-    title: "Solutions",
+    title: "Learn",
     links: [
-      ["By challenge", "/solutions#challenges"],
-      ["By role", "/solutions#roles"],
-      ["By investigation", "/solutions#investigations"],
-      ["Product lifecycle", "/product-lifecycle"],
-    ],
-  },
-  {
-    title: "Trust",
-    links: [
-      ["Why MDARIX", "/trust#principles"],
-      ["Regulations", "/trust/regulations"],
-      ["AI trust", "/trust#ai"],
-      ["Security & access", "/trust#security"],
-      ["Integrations", "/trust#integrations"],
+      ["Questions and answers", QUESTIONS_PATH],
+      ["Free trial videos", "/videos"],
     ],
   },
   {
     title: "Company",
     links: [
       ["About MDARIX", "/company"],
-      ["Resources", "/resources"],
-      ["Questions and answers", QUESTIONS_PATH],
-      ["Free trial videos", "/videos"],
       ...(DEMO_REQUESTS_OFFERED ? [["Request a demo", "/request-demo"] as [string, string]] : []),
       ["Contact", "/contact"],
     ],
@@ -212,23 +147,18 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
   },
 ];
 
-/** The menu a page belongs to, so the header marks it: a Platform page under Platform, Regulations under Trust. */
-function isCurrentMenu(name: string, page: Page): boolean {
-  const menu = NAV_MENUS.find((item) => item.name === name);
-  if (!menu) return false;
-  if (menu.href === page || menu.more?.some((link) => link.href === page)) return true;
-  return page.startsWith(`${menu.href}/`);
+/** Whether the header marks a navigation item as the current page: a question under Questions too. */
+function isCurrent(href: string, page: Page): boolean {
+  if (href === QUESTIONS_PATH) return page === QUESTIONS_PATH || Boolean(questionAt(page));
+  return page === href;
 }
 
 export function PublicMegaSite({ path }: { path: string }) {
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [{ page, hash }, setLocation] = useState(() => resolveSitePath(path, window.location.hash.slice(1)));
   const siteInfo = useSiteInfo();
   const firstPage = useRef(true);
   const question = questionAt(page);
-  // The questions and answers are resources: the header marks Resources on them too.
-  const inResources = page === "/resources" || page === QUESTIONS_PATH || Boolean(question);
 
   // Normalize legacy URLs in the address bar (a "not found" address is left as typed), then bring the requested
   // section into view.
@@ -246,183 +176,74 @@ export function PublicMegaSite({ path }: { path: string }) {
 
   useEffect(() => {
     const update = () => setLocation(resolveSitePath(window.location.pathname, window.location.hash.slice(1)));
+    const close = (event: KeyboardEvent) => event.key === "Escape" && setMobileOpen(false);
     window.addEventListener("hashchange", update);
     window.addEventListener("popstate", update);
+    window.addEventListener("keydown", close);
     return () => {
       window.removeEventListener("hashchange", update);
       window.removeEventListener("popstate", update);
+      window.removeEventListener("keydown", close);
     };
   }, []);
 
-  // The header menus' buttons and the open menu's panel, for the keyboard order (WEB-10, site/menuKeys.ts).
-  const menuButtons = useRef<Record<string, HTMLButtonElement | null>>({});
-  const menuPanel = useRef<HTMLDivElement | null>(null);
-  const navigation = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        // Escape from inside an open menu, or from its button, puts the focus back on the button.
-        const opener = openMenu ? menuButtons.current[openMenu] : null;
-        const active = document.activeElement;
-        if (opener && active && (active === opener || menuPanel.current?.contains(active))) opener.focus();
-        setOpenMenu(null);
-        setMobileOpen(false);
-      }
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [openMenu]);
-
-  const closeMenus = () => {
-    setOpenMenu(null);
-    setMobileOpen(false);
-  };
-  const activeMenu = NAV_MENUS.find((menu) => menu.name === openMenu);
-
-  // Tab from an open menu's button goes into the menu; Shift+Tab from its first link back to the button; Tab past its
-  // last link closes it and goes on to the header item after the button. Escape is handled above.
-  const menuLinks = () => Array.from(menuPanel.current?.querySelectorAll<HTMLAnchorElement>("a[href]") ?? []);
-  const moveInMenu = (event: React.KeyboardEvent, focus: MenuFocus) => {
-    if (!openMenu || event.key === "Escape") return;
-    const move = menuMove(event.key, event.shiftKey, focus);
-    const opener = menuButtons.current[openMenu];
-    if (!move || !opener) return;
-    const links = menuLinks();
-    if (move === "first-link") {
-      if (!links.length) return;
-      event.preventDefault();
-      links[0].focus();
-    } else if (move === "button") {
-      event.preventDefault();
-      opener.focus();
-    } else if (move === "close-and-continue") {
-      const items = Array.from(navigation.current?.querySelectorAll<HTMLElement>("button, a[href]") ?? []);
-      const next = items[items.indexOf(opener) + 1];
-      if (!next) return;
-      event.preventDefault();
-      setOpenMenu(null);
-      next.focus();
-    }
-  };
-  const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const links = menuLinks();
-    const index = links.indexOf(document.activeElement as HTMLAnchorElement);
-    if (index >= 0) moveInMenu(event, { at: "link", index, count: links.length });
-  };
+  const close = () => setMobileOpen(false);
 
   return (
-    <div className="mdx-site" onClick={() => openMenu && setOpenMenu(null)}>
+    <div className="mdx-site">
       <a className="ms-skip" href="#main">
         Skip to content
       </a>
-      <header className="ms-header" onClick={(event) => event.stopPropagation()}>
-        <a className="ms-brand" href="/" aria-label="MDARIX home">
-          <span className="ms-logo" aria-hidden="true">
-            M
-          </span>
-          MDARIX
-        </a>
-        <button
-          className="ms-menu-button"
-          aria-expanded={mobileOpen}
-          aria-controls="public-navigation"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => {
-            setMobileOpen(!mobileOpen);
-            setOpenMenu(null);
-          }}
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        <nav id="public-navigation" ref={navigation} className={mobileOpen ? "is-open" : ""} aria-label="Main">
-          {NAV_MENUS.map(({ name }) => (
-            <button
-              key={name}
-              ref={(element) => {
-                menuButtons.current[name] = element;
-              }}
-              type="button"
-              aria-expanded={openMenu === name}
-              aria-controls={openMenu === name ? menuPanelId(name) : undefined}
-              className={isCurrentMenu(name, page) ? "is-current" : ""}
-              onClick={() => setOpenMenu(openMenu === name ? null : name)}
-              onKeyDown={(event) => openMenu === name && moveInMenu(event, { at: "button" })}
-            >
-              {name} <ChevronDown size={14} aria-hidden="true" />
-            </button>
-          ))}
-          <a href="/resources" className={inResources ? "is-current" : ""} onClick={closeMenus}>
-            Resources
+      <header className="ms-header">
+        <div className="ms-header-inner">
+          <a className="ms-brand" href="/" aria-label="MDARIX home">
+            <span className="ms-logo" aria-hidden="true">
+              M
+            </span>
+            MDARIX
           </a>
-          <a href="/company" className={page === "/company" ? "is-current" : ""} onClick={closeMenus}>
-            Company
-          </a>
-          <div className="ms-nav-actions">
-            <a href="/signin">Sign in</a>
-            {DEMO_REQUESTS_OFFERED ? (
-              <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={closeMenus}>
-                Request a demo
-              </a>
-            ) : (
-              <a className="ms-btn ms-btn-primary" href="/signup" onClick={closeMenus}>
-                Start free trial
-              </a>
-            )}
-          </div>
-        </nav>
-        {activeMenu && (
-          <div
-            className="ms-mega"
-            id={menuPanelId(activeMenu.name)}
-            ref={menuPanel}
-            role="region"
-            aria-label={`${activeMenu.title} menu`}
-            onKeyDown={onMenuKeyDown}
+          <button
+            type="button"
+            className="ms-menu-button"
+            aria-expanded={mobileOpen}
+            aria-controls="public-navigation"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen(!mobileOpen)}
           >
-            <div className="ms-mega-intro">
-              <span className="ms-eyebrow">{activeMenu.title}</span>
-              <a className="ms-link" href={activeMenu.href} onClick={closeMenus}>
-                Overview <ArrowRight size={14} aria-hidden="true" />
+            {mobileOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+          </button>
+          <nav id="public-navigation" className={mobileOpen ? "is-open" : ""} aria-label="Main">
+            {NAV.map(([label, href]) => (
+              <a
+                key={href}
+                href={href}
+                className={isCurrent(href, page) ? "is-current" : undefined}
+                aria-current={isCurrent(href, page) ? "page" : undefined}
+                onClick={close}
+              >
+                {label}
               </a>
-              {activeMenu.more?.map((link) => (
-                <a key={link.href} className="ms-link" href={link.href} onClick={closeMenus}>
-                  {link.label} <ArrowRight size={14} aria-hidden="true" />
-                </a>
-              ))}
-            </div>
-            {activeMenu.groups.map((group, index) => (
-              <section key={group.title ?? index}>
-                {group.title && <h2>{group.title}</h2>}
-                {group.links.map((link) =>
-                  link.description ? (
-                    <a key={link.label} className="ms-mega-page" href={link.href} onClick={closeMenus}>
-                      <strong>{link.label}</strong>
-                      <span>{link.description}</span>
-                    </a>
-                  ) : (
-                    <a key={link.label} href={link.href} onClick={closeMenus}>
-                      {link.label}
-                      {link.note && <small>{link.note}</small>}
-                    </a>
-                  ),
-                )}
-              </section>
             ))}
-          </div>
-        )}
+            <span className="ms-nav-actions">
+              <a href="/signin">Sign in</a>
+              {DEMO_REQUESTS_OFFERED ? (
+                <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={close}>
+                  Request a demo
+                </a>
+              ) : (
+                <a className="ms-btn ms-btn-primary" href="/signup" onClick={close}>
+                  Start free trial
+                </a>
+              )}
+            </span>
+          </nav>
+        </div>
       </header>
 
       <main id="main" className="ms-main">
         {page === "/" && <HomePage />}
         {page === "/platform" && <PlatformPage />}
-        {platformGroups.map((group) => page === group.path && <PlatformGroupPage key={group.path} path={group.path} />)}
-        {page === "/roadmap" && <RoadmapPage />}
-        {page === "/trust/regulations" && <RegulationsPage />}
-        {page === "/solutions" && <SolutionsPage />}
-        {page === "/product-lifecycle" && <LifecyclePage />}
         {page === "/trust" && <TrustPage />}
-        {page === "/resources" && <ResourcesPage />}
         {page === "/company" && <CompanyPage />}
         {page === "/videos" && <VideosPage />}
         {page === QUESTIONS_PATH && <QuestionsPage />}
@@ -437,25 +258,20 @@ export function PublicMegaSite({ path }: { path: string }) {
       <footer className="ms-footer">
         <div className="ms-footer-top">
           <div className="ms-footer-brand">
-            <a className="ms-brand ms-brand-light" href="/">
+            <a className="ms-brand" href="/">
               <span className="ms-logo" aria-hidden="true">
                 M
               </span>
               MDARIX
             </a>
-            <p>Evidence-first investigation intelligence for medical-device teams.</p>
-            <div className="ms-cta-row">
-              <a className="ms-btn ms-btn-light" href="/signup">
-                Start free trial
-              </a>
-              <a className="ms-btn ms-btn-ghost-light" href="/signin">
-                Sign in
-              </a>
-            </div>
+            <p>From complaint to a defensible decision, and the right report in every market.</p>
+            <a className="ms-btn ms-btn-primary" href="/signup">
+              Start free trial
+            </a>
           </div>
           {FOOTER.map((column) => (
-            <section key={column.title}>
-              <h3>{column.title}</h3>
+            <section key={column.title} aria-label={column.title}>
+              <h2>{column.title}</h2>
               {column.links.map(([label, href]) => (
                 <a key={label} href={href}>
                   {label}
@@ -475,7 +291,6 @@ export function PublicMegaSite({ path }: { path: string }) {
               </>
             )}
           </span>
-          <span>System of Intelligence, not System of Record · Evidence before inference · Humans decide</span>
           <span className="ms-footer-trademarks">
             Product names mentioned on this site and in MDARIX are trademarks of their owners. MDARIX is not affiliated
             with or endorsed by them.

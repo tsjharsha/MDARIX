@@ -2,8 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import trialAgreement from "../../../legal/trial-agreement.md?raw";
 import { resolveSitePath } from "../PublicMegaSite";
-import { trialIncludes } from "./legacyContent";
-import { ResourcesPage } from "./pages";
+import { trialIncludes } from "./content";
 import { renderPage } from "./prerender";
 import {
   QUESTIONS,
@@ -103,18 +102,19 @@ describe("the questions and answers", () => {
     expect(jsonLd(html)[0].mainEntity[0].acceptedAnswer.text).toBe(question.answer);
   });
 
-  it("are listed on the questions page, the Resources page and in the footer", () => {
+  it("are listed on the questions page and in the footer, and the header marks Questions on each", () => {
     const index = renderToStaticMarkup(<QuestionsPage />);
     expect(index).toContain('<h1 id="questions-title">');
     for (const question of QUESTIONS) expect(index).toContain(`<a href="${question.path}">${question.question}</a>`);
-    const resources = renderToStaticMarkup(<ResourcesPage />);
-    expect(resources).toContain(`href="${QUESTIONS_PATH}"`);
-    for (const question of QUESTIONS) expect(resources).toContain(`href="${question.path}"`);
-    // The footer, on every website page, and the header marks Resources on a question page.
-    for (const path of ["/", "/resources", QUESTIONS_PATH, QUESTION_PATHS[0]] as const)
+    // The footer, on every website page, and the header marks Questions on a question page.
+    for (const path of ["/", "/company", QUESTIONS_PATH, QUESTION_PATHS[0]] as const)
       expect(renderPage(path), path).toContain(`<a href="${QUESTIONS_PATH}">Questions and answers</a>`);
-    expect(renderPage(QUESTION_PATHS[0])).toMatch(/<a href="\/resources" class="is-current">Resources<\/a>/);
-    expect(renderPage("/platform")).not.toMatch(/<a href="\/resources" class="is-current">/);
+    const current = `<a href="${QUESTIONS_PATH}" class="is-current" aria-current="page">Questions</a>`;
+    expect(renderPage(QUESTION_PATHS[0])).toContain(current);
+    expect(renderPage(QUESTIONS_PATH)).toContain(current);
+    expect(renderPage("/platform")).not.toContain(current);
+    // The former Resources page opens the questions.
+    expect(resolveSitePath("/resources", "")).toEqual({ page: QUESTIONS_PATH, hash: "" });
   });
 
   it("keep the website's rules in every word", () => {

@@ -154,7 +154,7 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 			file_server
 		}
 
-		@shell path_regexp shell ^/(app|platform-admin)(/.*)?$|^/platform/.+$|^/(signin|forgot-password|activate-account|reset-password|mfa|request-demo|help/pilot-guide|help/trial-guide|help/user-guide|why-mdarix|ai-trust|integrations|pricing|plans|capabilities|regulations)/?$
+		@shell path_regexp shell ^/(app|platform-admin)(/.*)?$|^/platform/.+$|^/(signin|forgot-password|activate-account|reset-password|mfa|request-demo|help/pilot-guide|help/trial-guide|help/user-guide|why-mdarix|ai-trust|integrations|pricing|plans|capabilities|regulations|roadmap|solutions|product-lifecycle|resources|trust/regulations)/?$
 		handle @shell {
 			rewrite * /index.html
 			file_server

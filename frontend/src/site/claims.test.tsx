@@ -1,18 +1,33 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CompanyPage, HomePage, ResourcesPage, RoadmapPage } from "./pages";
-import { postMarketResources } from "./legacyContent";
+import { CompanyPage, HomePage, PlatformPage, TrustPage } from "./pages";
 import { TRIAL_VIDEOS } from "./videos";
+import { renderPage } from "./prerender";
+import { INDEXED_PATHS } from "./seo";
 
-// What the website says about itself matches what MDARIX does (the final pre-launch review, 0.10.33).
+// What the website says about itself matches what MDARIX does (the final pre-launch review, 0.10.33; site refresh).
 describe("website claims", () => {
-  it("does not say the inspection checks are drawn from 2026 FDA warning letters alone (CMP-09)", () => {
-    const html = renderToStaticMarkup(<HomePage />);
-    expect(html).not.toContain("drawn from 2026 FDA warning letters");
-    // The website names no warning letters at all (owner rule, 0.10.45).
-    expect(html).not.toMatch(/warning letter/i);
-    expect(html).toContain("shaped by what FDA inspections cite");
-    expect(html).toContain("EU, UK and Canadian vigilance rules");
+  it("claims no certification, no price, no customers and no measured results it does not have", () => {
+    for (const path of INDEXED_PATHS) {
+      const html = renderPage(path);
+      // Certification is only ever mentioned to say MDARIX does not claim or hold it (Trust and Security pages).
+      const claims = html.replace(/MDARIX does not (claim|hold)[^.]*\./g, "");
+      expect(claims, path).not.toMatch(/SOC ?2|ISO 27001 certifi|Part 11 compliant|HIPAA compliant|certified/i);
+      expect(html, path).not.toMatch(/[$€£₹]\s?\d|\bUSD\b|\bINR\b|per month|per year/);
+      expect(html, path).not.toMatch(/trusted by|customers? like|\d+% (faster|fewer|less)|ROI/i);
+    }
+    const trust = renderToStaticMarkup(<TrustPage />);
+    expect(trust).toContain("MDARIX is not yet a validated (GxP) system.");
+    expect(trust).toContain("MDARIX does not claim ISO 27001 certification");
+  });
+
+  it("says a person decides and submits, and that AI only proposes", () => {
+    for (const page of [<HomePage key="h" />, <PlatformPage key="p" />, <TrustPage key="t" />]) {
+      const html = renderToStaticMarkup(page);
+      expect(html).not.toMatch(/MDARIX (files|submits) (the|your|every) report/i);
+    }
+    expect(renderToStaticMarkup(<TrustPage />)).toContain("An AI proposal is never a signature.");
+    expect(renderToStaticMarkup(<HomePage />)).toContain("AI may propose; a person reviews.");
   });
 
   it("states the real approval rule for trial requests (CMP-19)", () => {
@@ -33,18 +48,10 @@ describe("website claims", () => {
     // The paid step after the trial is a pilot wherever a customer reads it (UX-09).
     expect(company).toContain("Then a pilot on your real data.");
     expect(company).not.toContain("MVP");
-    const roadmap = renderToStaticMarkup(<RoadmapPage />);
-    // Every pilot already has its own database, so the roadmap plans no database item (owner decision 2026-10-19).
-    expect(roadmap).not.toContain("A dedicated database for each customer");
-    expect(roadmap).not.toContain("own cloud");
-  });
-
-  it("lists the FDA AI guidance under its official title (CMP-23)", () => {
-    const guidance = postMarketResources.find((item) => item.href.includes("artificial-intelligence-enabled"));
-    expect(guidance?.title).toBe(
-      "Artificial Intelligence-Enabled Device Software Functions: Lifecycle Management and Marketing Submission Recommendations (draft guidance)",
-    );
-    expect(renderToStaticMarkup(<ResourcesPage />)).toContain("Lifecycle Management and Marketing Submission");
+    const platform = renderToStaticMarkup(<PlatformPage />);
+    // Every pilot already has its own database, so nothing plans one (owner decision 2026-10-19).
+    expect(platform).toContain("A dedicated database for your organization");
+    expect(platform).not.toContain("own cloud");
   });
 
   it("names no warning letters and no class actions anywhere in the website's source (owner rule, 0.10.47)", async () => {

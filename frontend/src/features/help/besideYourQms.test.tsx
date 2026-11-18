@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import walkthrough from "../../../../docs/user-guide/QUALITY_MANAGER_WORKFLOW_WALKTHROUGH.md?raw";
 import { afterTheTrial } from "../../site/content";
-import { anchorPages, capabilityCopy, pages as pageContent, solutionOverrides } from "../../site/legacyContent";
 import { INDEXED_PATHS, renderPage } from "../../site/prerender";
 import { questionAt } from "../../site/questions";
 import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
@@ -77,10 +76,6 @@ describe("MDARIX works beside your QMS", () => {
         CONNECTION,
         QUESTIONS,
         afterTheTrial,
-        pageContent,
-        capabilityCopy,
-        anchorPages,
-        solutionOverrides,
       }),
       pilotGuide,
     ];
