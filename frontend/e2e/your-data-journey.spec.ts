@@ -105,7 +105,7 @@ test.describe("Your own data through Getting started's ten steps", () => {
     await page.getByRole("textbox", { name: "Colleague's name" }).fill(colleague.name);
     await page.getByRole("textbox", { name: "Work email" }).fill(colleague.email);
     const personas = page.getByRole("group", { name: /^Personas/ });
-    await personas.getByRole("checkbox", { name: /^Regulatory Leader/ }).check();
+    await personas.getByRole("checkbox", { name: /^Regulatory Reviewer/ }).check();
     await personas.getByRole("checkbox", { name: /^Decision Maker/ }).check();
     await page.getByRole("button", { name: "Send the invitation" }).click();
     await expect(page.getByRole("status").filter({ hasText: `Invitation emailed to ${colleague.email}` })).toBeVisible({

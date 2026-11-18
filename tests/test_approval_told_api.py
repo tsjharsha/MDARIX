@@ -81,7 +81,7 @@ def test_who_approves_is_said_before_any_password():
     # Working alone in a trial: one's own practice report, as one's role.
     trial = approvals.standing("You prepared this worksheet", True, [], True, "LEADER", "report")
     assert trial["may_approve"] and trial["same_person"]
-    assert trial["message"] == f"{PRACTICE} report as Leader (Quality Manager)."
+    assert trial["message"] == f"{PRACTICE} report as Quality Leader."
     # In a trial with a colleague who may approve, the colleague does.
     assert not approvals.standing("You prepared it", True, ["Rahul"], True, "LEADER", "report")["may_approve"]
     # An administrator or a role without approval rights is no separation of duties: never.
@@ -112,7 +112,7 @@ def test_the_trial_owner_alone_finishes_rv06(solo):
     asked = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))
     standing = asked["approval"]
     assert standing["may_approve"] and standing["same_person"]
-    assert standing["message"] == f"{PRACTICE} report as Leader (Quality Manager)."
+    assert standing["message"] == f"{PRACTICE} report as Quality Leader."
     # The approval waits in the owner's own My Work, and opens the complaint's reports.
     [task] = _approval_tasks(user, "ReportSnapshot")
     # 0.10.83 (D2.8): in plain words, with the customer's reference.

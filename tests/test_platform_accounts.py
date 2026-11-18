@@ -66,7 +66,7 @@ def test_customer_users_filters_by_tenant_role_and_search(platform, customer):
     ).json()
     assert only_tenant["items"] == [] and only_tenant["total"] == 0
     viewers = platform.get("/api/v1/platform-admin/customer-users", params={"role": "VIEWER", "page_size": 50}).json()
-    assert all(item["role_label"] == "Viewer" for item in viewers["items"])
+    assert all(item["role_label"] == "Executive (view only)" for item in viewers["items"])
     nobody = platform.get("/api/v1/platform-admin/customer-users", params={"q": f"no-such-{uuid.uuid4().hex}"}).json()
     assert nobody["items"] == [] and nobody["total"] == 0
 

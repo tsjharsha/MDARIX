@@ -1308,7 +1308,7 @@ function CommunicationsLink({ complaintId }: { complaintId: string }) {
 
 /**
  * The practice-approval warning without what the line at the Approve button already says (0.10.87): "You may
- * approve your own practice report as Regulatory Leader." (exported for its test).
+ * approve your own practice report as Regulatory Reviewer." (exported for its test).
  * shortcut: trims the server's own sentence; when the server words it differently, it is shown whole.
  */
 export function practiceWarning(message: string | null | undefined): string {

@@ -43,10 +43,8 @@ describe("invitation results", () => {
 
 describe("roles shown to the administrator", () => {
   it("shows the account role's label, never its code", () => {
-    expect(accountRoleText({ role: "APPROVER", role_label: "Authorized Decision Maker" })).toBe(
-      "Authorized Decision Maker",
-    );
-    expect(accountRoleText({ role: "TRIAGE_LEAD" })).toBe("PMS / Signal Triage Lead");
+    expect(accountRoleText({ role: "APPROVER", role_label: "Decision Maker" })).toBe("Decision Maker");
+    expect(accountRoleText({ role: "TRIAGE_LEAD" })).toBe("Complaint Handler");
     expect(accountRoleText({ role: "RISK_REVIEWER", role_label: null })).toBe("Risk Reviewer");
     expect(accountRoleText({})).toBe("—");
   });
@@ -55,10 +53,10 @@ describe("roles shown to the administrator", () => {
 describe("workflow roles", () => {
   const data = {
     user_id: "u1",
-    account_role: { code: "INVESTIGATOR", label: "Quality Investigator" },
+    account_role: { code: "INVESTIGATOR", label: "Investigator" },
     additional_roles: [{ code: "RISK_REVIEWER", label: "Risk Reviewer" }],
     available_roles: [
-      { code: "INVESTIGATOR", label: "Quality Investigator" },
+      { code: "INVESTIGATOR", label: "Investigator" },
       { code: "RISK_REVIEWER", label: "Risk Reviewer" },
       { code: "REGULATORY_REVIEWER", label: "Regulatory Reviewer" },
     ],

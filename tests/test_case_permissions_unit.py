@@ -42,7 +42,7 @@ def test_an_unknown_role_gets_nothing():  # deny by default
 
 
 def test_the_service_desk_role_and_persona():  # spec 6.2
-    assert ROLE_LABELS["SERVICE_DESK"] == "Service Desk Agent"
+    assert ROLE_LABELS["SERVICE_DESK"] == "Service Desk"
     assert permissions_for_role("Service Desk") == permissions_for_role("SERVICE_DESK")
     persona = workspace_persona(persona_for_role("SERVICE_DESK"))
     assert persona.label == "Service Desk" and persona.tabs == ("home", "complaints") and persona.role == "SERVICE_DESK"

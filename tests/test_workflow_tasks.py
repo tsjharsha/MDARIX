@@ -87,7 +87,7 @@ def test_opening_a_case_gives_its_owner_an_accepted_task():
         "label": f"Investigation {case['business_id']}",
     }
     assert task["investigation"]["business_id"] == case["business_id"]
-    assert task["assigned_role"] == "INVESTIGATOR" and task["assigned_role_label"] == "Quality Investigator"
+    assert task["assigned_role"] == "INVESTIGATOR" and task["assigned_role_label"] == "Investigator"
     assert task["actions"]["can_release"] and task["actions"]["can_decline"] and not task["actions"]["can_complete"]
     # Searching finds it by the case number in its title.
     found = lead.get("/api/v1/tasks", params={"view": "assigned", "q": case["business_id"]}).json()
@@ -111,7 +111,7 @@ def test_opening_a_case_gives_its_owner_an_accepted_task():
         "due_soon",
         "overdue",
     }
-    assert {"code": "INVESTIGATOR", "label": "Quality Investigator"} in summary["roles"]
+    assert {"code": "INVESTIGATOR", "label": "Investigator"} in summary["roles"]
     with SessionLocal() as db:
         bind_system(db, "test: task audit")
         actions = {row[0] for row in db.query(AuditEvent.action).filter(AuditEvent.entity_id == uuid.UUID(task["id"]))}

@@ -319,7 +319,7 @@ def test_every_workflow_role_has_a_demo_person(demo):
         assert {"TRIAGE_LEAD", "RISK_REVIEWER", "REGULATORY_REVIEWER"} <= roles
         assert all(email.endswith("@acmecare-demo.invalid") for _, email, _ in DEMO_TEAM)
         team = {item["email"]: item for item in status(db)["team"]}
-        assert team["triage@acmecare-demo.invalid"]["role_label"] == "PMS / Signal Triage Lead"
+        assert team["triage@acmecare-demo.invalid"]["role_label"] == "Complaint Handler"
         assert team["risk@acmecare-demo.invalid"]["name"] == "Rita Risk"
         assert team["regulatory@acmecare-demo.invalid"]["active"] is True
     finally:

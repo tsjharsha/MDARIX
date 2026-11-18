@@ -84,7 +84,7 @@ WORKSPACE_PERSONAS = (
     ),
     WorkspacePersona(
         "regulatory",
-        "Regulatory Leader",
+        "Regulatory Reviewer",
         "Reportability, legal clocks, authority reports",
         "REGULATORY_REVIEWER",
         ("home", "complaints", "trees", "reports", "records"),
@@ -118,7 +118,11 @@ WORKSPACE_PERSONAS = (
         ("home", "complaints", "reports", "records"),
     ),
     WorkspacePersona(
-        "executive", "Executive", "View only: what needs attention", "VIEWER", ("home", "trends", "products", "records")
+        "executive",
+        "Executive (view only)",
+        "What needs attention, in one minute",
+        "VIEWER",
+        ("home", "trends", "products", "records"),
     ),
 )
 WORKSPACE_PERSONAS_BY_CODE = {persona.code: persona for persona in WORKSPACE_PERSONAS}

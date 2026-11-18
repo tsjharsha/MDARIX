@@ -58,9 +58,9 @@ def test_the_new_roles_are_standard_roles_with_labels():
         "APPROVER",
         "LEADER",
     )
-    assert role_label("Approver") == "Authorized Decision Maker"
+    assert role_label("Approver") == "Decision Maker"
     assert role_label("risk reviewer") == "Risk Reviewer"
-    assert role_label("TRIAGE_LEAD") == "PMS / Signal Triage Lead"
+    assert role_label("TRIAGE_LEAD") == "Complaint Handler"
     assert role_label("Customer Admin") == "Customer Administrator"
     assert role_label("Quality Lead") == "Quality Lead"  # a custom role keeps its own name
     assert set(ROLE_LABELS) == CANONICAL_SYSTEM_ROLES

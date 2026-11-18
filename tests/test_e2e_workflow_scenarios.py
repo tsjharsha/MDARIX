@@ -1,7 +1,7 @@
 """Phase 7: the 25 scenarios of the workflow blueprint, end to end through the real HTTP API.
 
 Each scenario drives the API as the people of a small medical-device company would: a Triage Lead, a Quality
-Investigator, a Risk Reviewer, a Regulatory Reviewer, a Quality Reviewer and an Authorized Decision Maker (six
+Investigator, a Risk Reviewer, a Regulatory Reviewer, a Quality Reviewer and an Decision Maker (six
 distinct accounts), plus one person who holds three workflow roles, a colleague investigator, a viewer and a customer
 administrator. A second organization (with a leader who holds every permission) checks that nothing crosses over.
 Both organizations are fresh (on the shared plane) and are deleted at the end.
@@ -1667,7 +1667,7 @@ def test_15_a_signature_needs_re_authentication_and_verifies(org):
     assert signature["status"] == "SIGNED" and signature["signer_name"] == "Decider E2E"
     assert re.fullmatch(r"[0-9a-f]{64}", signature["fingerprint_full"])
     assert signature["signature_meaning"] == (
-        f"I, Decider E2E, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        f"I, Decider E2E, Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
         "and decide: Accept the conclusion"
     )
     assert signed["verification"]["status"] == "VALID"

@@ -487,9 +487,8 @@ def erase_user_personal_data(
 
 ROLE_NOT_ALLOWED = (
     "ROLE_NOT_ALLOWED",
-    "Additional roles must be workflow roles (PMS / Signal Triage Lead, Quality Investigator, Risk Reviewer, "
-    "Regulatory Reviewer, Quality Reviewer, Authorized Decision Maker, Leader), never an administrator role or the "
-    "person's account role",
+    "Additional roles must be workflow roles (Complaint Handler, Investigator, Risk Reviewer, Regulatory Reviewer, "
+    "Quality Reviewer, Decision Maker, Quality Leader), never an administrator role or the person's account role",
 )
 
 
@@ -791,6 +790,7 @@ def list_users(request: Request, db: Session = Depends(get_db)):
 STANDARD_ROLES = frozenset(
     {
         "VIEWER",
+        "SERVICE_DESK",
         "TRIAGE_LEAD",
         "INVESTIGATOR",
         "RISK_REVIEWER",
@@ -820,9 +820,9 @@ def _ensure_known_role(db: Session, tenant_id, role: str) -> None:
             422,
             detail={
                 "code": "ROLE_NOT_RECOGNIZED",
-                "message": "Choose one of the organization's roles (Viewer, PMS / Signal Triage Lead, Quality "
-                "Investigator, Risk Reviewer, Regulatory Reviewer, Quality Reviewer, Authorized Decision Maker, "
-                "Leader (Quality Manager), Customer Administrator, or an active custom role)",
+                "message": "Choose one of the organization's roles (Executive (view only), Service Desk, Complaint "
+                "Handler, Investigator, Risk Reviewer, Regulatory Reviewer, Quality Reviewer, Decision Maker, Quality "
+                "Leader, Customer Administrator, or an active custom role)",
             },
         )
 

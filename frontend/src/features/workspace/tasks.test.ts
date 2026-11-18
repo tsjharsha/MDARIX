@@ -325,7 +325,7 @@ describe("how a task reads", () => {
       secondary: "Risk Reviewer",
     });
     expect(taskAssignee({ assigned_user: null, assigned_role: "INVESTIGATOR" })).toEqual({
-      primary: "Quality Investigator",
+      primary: "Investigator",
       secondary: "Role queue",
     });
     expect(taskAssignee({ assigned_role: "X", assigned_role_label: "Site lead" }).primary).toBe("Site lead");

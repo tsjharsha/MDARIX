@@ -27,17 +27,18 @@ CANONICAL_SYSTEM_ROLES = frozenset(
     }
 )
 
-# What people see for each standard role (the codes above never change).
+# What people see for each standard role (the codes above never change). UX1: one list, the same names as the
+# workspace personas (access_control/personas.py) on the trial's Team, the invite form and "Viewing as".
 ROLE_LABELS: dict[str, str] = {
-    "SERVICE_DESK": "Service Desk Agent",
-    "TRIAGE_LEAD": "PMS / Signal Triage Lead",
-    "INVESTIGATOR": "Quality Investigator",
+    "SERVICE_DESK": "Service Desk",
+    "TRIAGE_LEAD": "Complaint Handler",
+    "INVESTIGATOR": "Investigator",
     "RISK_REVIEWER": "Risk Reviewer",
     "REGULATORY_REVIEWER": "Regulatory Reviewer",
     "REVIEWER": "Quality Reviewer",
-    "APPROVER": "Authorized Decision Maker",
-    "LEADER": "Leader (Quality Manager)",
-    "VIEWER": "Viewer",
+    "APPROVER": "Decision Maker",
+    "LEADER": "Quality Leader",
+    "VIEWER": "Executive (view only)",
     CUSTOMER_ADMIN: "Customer Administrator",
     PLATFORM_ADMIN: "Platform Administrator",
 }
