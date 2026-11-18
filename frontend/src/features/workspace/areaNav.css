@@ -1,0 +1,37 @@
+/* A work area's own small menu (UX2, AreaNav.tsx): its screens as links, flat (G-2), the current one marked. */
+.uw-areanav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+  margin: 0 0 var(--ms-space-3);
+}
+.uw-areanav button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  font-size: var(--ms-fs-14);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.uw-areanav button:hover {
+  border-color: var(--ms-teal-dark);
+}
+.uw-areanav button:focus-visible {
+  outline: 2px solid var(--ms-focus);
+  outline-offset: 2px;
+}
+.uw-areanav button[aria-current="page"] {
+  border-color: var(--ms-teal-dark);
+  background: var(--ms-teal-dark);
+  color: var(--ms-surface);
+}
+.customer-admin-console .uw-areanav.ca-groups button span {
+  display: inline;
+}

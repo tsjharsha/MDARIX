@@ -1,5 +1,5 @@
-// 0.10.87 (owner, 5 Nov 2026): Look ahead and Next steps are tabs for every persona of a free trial, reached until now
-// only from Help. Pilots and paid organizations keep their persona's tabs.
+// 0.10.87 (owner, 5 Nov 2026): Look ahead and Next steps were tabs for every persona of a free trial; since UX2 they are
+// screens of Today (areas.ts, AreaNav). Pilots and paid organizations keep their persona's tabs.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { NavRail, PERSONA_TABS, tabOfSection, trialTabs, visibleTabs } from "./HybridShell";
@@ -8,9 +8,9 @@ import { NEXT_STEPS_HELP } from "../help/trialNextSteps";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 
 const PERSONAS = [
-  ["home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"],
+  ["home", "complaints", "investigations", "products", "decisions"],
   ["home", "complaints"],
-  ["home", "trends", "records"],
+  ["home", "products"],
   ["home"],
 ];
 const ALLOWED = [
@@ -21,36 +21,39 @@ const ALLOWED = [
   "Reports",
   "Investigations",
   "Trends",
+  "Product 360",
 ].concat(["Records", "Team", "Look ahead", "Next steps"]);
 
-describe("Look ahead and Next steps as tabs of a trial", () => {
-  it("follow every persona's tabs in a trial, with Getting started still first", () => {
+// UX2 (Persona Blueprint wave D): Look ahead and Next steps fold into Today, the work area they belong to.
+describe("Look ahead and Next steps in Today (UX2)", () => {
+  it("follow no persona's tabs: a trial's bar is Getting started, then the persona's areas", () => {
     for (const persona of PERSONAS) {
       const tabs = visibleTabs(trialTabs(persona, true), ALLOWED);
-      expect(tabs[0]).toBe("start");
-      expect(tabs.slice(-2)).toEqual(["ahead", "next"]);
-      expect(tabs.slice(1, -2)).toEqual(persona);
+      expect(tabs).toEqual(["start", ...persona]);
     }
-    expect(PERSONA_TABS.ahead).toEqual({ label: "Look ahead", section: "Look ahead" });
-    expect(PERSONA_TABS.next).toEqual({ label: "Next steps", section: "Next steps" });
-    expect(tabOfSection("Look ahead")).toBe("ahead");
-    expect(tabOfSection("Next steps")).toBe("next");
+    expect(PERSONA_TABS.ahead).toBeUndefined();
+    expect(PERSONA_TABS.next).toBeUndefined();
+    expect(tabOfSection("Look ahead")).toBe("home");
+    expect(tabOfSection("Next steps")).toBe("home");
   });
 
   it("are never added to a pilot's or a paid organization's bar", () => {
     for (const persona of PERSONAS) expect(trialTabs(persona, false)).toEqual(persona);
-    // Their screens are trial-only: outside a trial they are not among the allowed sections, so no tab shows.
     expect(visibleTabs(["home", "ahead", "next"], ["My Work"])).toEqual(["home"]);
   });
 
-  it("show as tabs, the open one marked as the current page", () => {
+  it("mark Today as the current page while one of them is open, with no tab of their own", () => {
     const bar = renderToStaticMarkup(
-      <NavRail tabs={visibleTabs(trialTabs(["home"], true), ALLOWED)} current="next" open={vi.fn()} />,
+      <NavRail
+        tabs={visibleTabs(trialTabs(["home"], true), ALLOWED)}
+        current={tabOfSection("Next steps")}
+        open={vi.fn()}
+      />,
     );
-    expect(bar.indexOf(">Getting started<")).toBeLessThan(bar.indexOf(">Home<"));
-    expect(bar.indexOf(">Home<")).toBeLessThan(bar.indexOf(">Look ahead<"));
-    // 0.10.90: on the rail, Next steps pinned at its foot.
-    expect(bar).toMatch(/aria-current="page" title="Next steps">.*?<span class="uw-tab-label">Next steps</);
+    expect(bar.indexOf(">Getting started<")).toBeLessThan(bar.indexOf(">Today<"));
+    expect(bar).toMatch(/aria-current="page" title="Today">/);
+    expect(bar).not.toContain(">Look ahead<");
+    expect(bar).not.toContain(">Next steps<");
     expect(bar).not.toContain("is-extra");
   });
 

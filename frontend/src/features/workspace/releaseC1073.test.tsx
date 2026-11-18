@@ -6,25 +6,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NEW_MENU, routeFor } from "../../app/linkTable";
 import { UserWorkspace } from "./UserWorkspace";
 import { PERSONA_TABS, PersonaSwitch, tabOfSection, visibleTabs } from "./HybridShell";
+import { areaOf } from "./areas";
 import { homeCounts, laneShare, legalClocks, nextActions, personaItems } from "./home";
 import { TeamView, personaConfirmation, type Team, type TeamMember } from "./sections/TrialTeam";
 import type { OversightItem } from "./oversight";
 import type { SessionContext } from "./workspaceContext";
 
 // The approved design's PERSONAS (mdarix-hybrid-mockup.html), as the server sends them (access_control/personas.py).
+// UX2 (Persona Blueprint wave D): the five work areas, each persona only the areas holding its work.
 const OPTIONS = [
-  [
-    "admin",
-    "Admin",
-    ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"],
-  ],
-  ["quality", "Quality Leader", ["home", "complaints", "reports", "investigations", "trends", "products", "records"]],
-  ["regulatory", "Regulatory Leader", ["home", "complaints", "trees", "reports", "records"]],
+  ["admin", "Admin", ["home", "complaints", "investigations", "products", "decisions"]],
+  ["quality", "Quality Leader", ["home", "complaints", "investigations", "products", "decisions"]],
+  ["regulatory", "Regulatory Leader", ["home", "complaints", "decisions"]],
   ["handler", "Complaint Handler", ["home", "complaints"]],
-  ["investigator", "Investigator", ["home", "investigations", "trends", "products"]],
-  ["risk", "Risk Reviewer", ["home", "investigations", "products", "records"]],
-  ["decision", "Decision Maker", ["home", "complaints", "reports", "records"]],
-  ["executive", "Executive", ["home", "trends", "products", "records"]],
+  ["investigator", "Investigator", ["home", "complaints", "investigations", "products"]],
+  ["risk", "Risk Reviewer", ["home", "investigations", "products"]],
+  ["decision", "Decision Maker", ["home", "complaints", "investigations", "decisions"]],
+  ["executive", "Executive", ["home", "investigations", "products", "decisions"]],
 ].map(([code, label, tabs]) => ({
   code: code as string,
   label: label as string,
@@ -65,41 +63,31 @@ describe("the shell and its tab bar", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("maps each tab onto a place of the link table, Home being My work", () => {
-    // 0.10.80: a trial's Getting started comes first, and 0.10.87 its Look ahead and Next steps last, outside the
-    // personas' tabs (release0080.test.tsx, release0087Tabs.test.tsx).
-    expect(Object.values(PERSONA_TABS).map((tab) => tab.section)).toEqual([
-      "Getting started",
-      ...NEW_MENU.main,
-      "Look ahead",
-      "Next steps",
-    ]);
+  it("maps each tab onto a place of the link table, Today being My work", () => {
+    // 0.10.80: a trial's Getting started comes first, outside the personas' tabs (release0080.test.tsx); since UX2
+    // each tab is a work area opening its first screen (areas.ts).
+    expect(Object.values(PERSONA_TABS).map((tab) => tab.section)).toEqual(["Getting started", ...NEW_MENU.main]);
     expect(PERSONA_TABS.home.section).toBe("My Work");
     expect(tabOfSection("Complaint")).toBe("complaints");
     expect(tabOfSection("Settings")).toBeNull();
+    expect(tabOfSection("Trends")).toBe("products");
+    expect(tabOfSection("Reports")).toBe("decisions");
+    expect(tabOfSection("Records")).toBeNull();
   });
 
   it("shows each persona only its destinations, and never a tab the server does not grant", () => {
     const labels = (tabs: string[]) => tabs.map((key) => PERSONA_TABS[key].label);
     for (const option of OPTIONS) expect(visibleTabs(option.tabs, ALL_SECTIONS)).toEqual(option.tabs);
-    expect(labels(visibleTabs(OPTIONS[3].tabs, ALL_SECTIONS))).toEqual(["Home", "Complaints"]);
-    // A section the server's menu does not grant is left out, whatever the persona.
-    expect(visibleTabs(OPTIONS[0].tabs, ["My Work", "Records"])).toEqual(["home", "records"]);
+    expect(labels(visibleTabs(OPTIONS[3].tabs, ALL_SECTIONS))).toEqual(["Today", "Cases"]);
+    // An area none of whose screens the server grants is left out, whatever the persona.
+    expect(visibleTabs(OPTIONS[0].tabs, ["My Work", "Records"])).toEqual(["home"]);
+    // Decisions & Reports shows to someone who may open any of its screens (no signer needs Approvals).
+    expect(visibleTabs(OPTIONS[0].tabs, ["My Work", "Decision trees"])).toEqual(["home", "decisions"]);
   });
 
-  it("gives the trial owner the top bar, Viewing as and Admin's nine tabs, with Home first", () => {
+  it("gives the trial owner the top bar, Viewing as and the five work areas, with Today first", () => {
     const markup = renderToStaticMarkup(<UserWorkspace session={session("admin", false)} initialView="my-work" />);
-    expect(tabLabels(markup)).toEqual([
-      "Home",
-      "Complaints",
-      "Decision trees",
-      "Investigations",
-      "Reports",
-      "Trends",
-      "Products",
-      "Records",
-      "Team",
-    ]);
+    expect(tabLabels(markup)).toEqual(["Today", "Cases", "Investigations", "Products", "Decisions &amp; Reports"]);
     expect(markup).toContain("Viewing as");
     expect(markup).toContain('aria-haspopup="menu"');
     expect(markup).toContain("Search complaints, products, reports");
@@ -111,7 +99,7 @@ describe("the shell and its tab bar", () => {
 
   it("shows a colleague their persona locked, with only its tabs", () => {
     const markup = renderToStaticMarkup(<UserWorkspace session={session("regulatory", true)} initialView="my-work" />);
-    expect(tabLabels(markup)).toEqual(["Home", "Complaints", "Decision trees", "Reports", "Records"]);
+    expect(tabLabels(markup)).toEqual(["Today", "Cases", "Decisions &amp; Reports"]);
     expect(markup).toContain("· set by the trial owner");
     expect(markup).not.toContain('aria-controls="uw-persona-menu"');
     expect(markup).toContain("Legal clocks");
@@ -144,11 +132,14 @@ describe("old addresses on the new shell", () => {
       tab: "Decision guides",
     });
     expect(routeFor("Reports", undefined, "mvp", "classic")).toEqual({ section: "Complaints", tab: "Reports" });
-    // Every classic screen still lands on a tab of the bar or a screen of the avatar's menu.
+    // Every classic screen still lands on a screen of a work area or of the avatar's menu.
     for (const section of ["Readiness", "Dashboard", "Signals", "Evidence", "Decisions", "Trust & Audit"]) {
       const place = routeFor(section, undefined, "mvp", "new");
-      expect([...NEW_MENU.main, ...NEW_MENU.top]).toContain(place.section);
+      expect(areaOf(place.section) ?? (NEW_MENU.top.includes(place.section) ? "avatar" : null), section).toBeTruthy();
     }
+    // The classic Decision center is Decisions & Reports' Approvals; My work's Approvals tab too (UX2).
+    expect(routeFor("Decisions", undefined, "mvp", "new")).toEqual({ section: "Approvals", tab: undefined });
+    expect(routeFor("My Work", "Approvals", "mvp", "new")).toEqual({ section: "Approvals", tab: undefined });
   });
 });
 

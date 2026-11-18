@@ -1,4 +1,6 @@
 import type { AppView } from "./router";
+import { featureSetOf } from "./featureSet";
+import { navigationOf } from "./linkTable";
 
 /*
  * A customer administrator has one account and two places to work: the customer-admin console and, with an
@@ -54,3 +56,9 @@ export function customerAdminDestination(
 
 /** Whether the role may switch into the workspace at all (navigationPolicy decides the views). */
 export const canSwitchToWorkspace = (allowed: readonly AppView[] | null) => !!allowed?.includes("home");
+
+/** Whether customer administration opens inside the workspace's shell (UX2, Persona Blueprint wave D): on the new
+ * navigation, every organization's from ux2navigationnew. Then Avatar › Administration opens it and /app/customer-admin
+ * is the workspace's Administration screen; on the classic fallback the separate console stays. */
+export const adminInWorkspace = (featureSet?: string | null, navigation?: string | null) =>
+  featureSetOf(featureSet) === "mvp" && navigationOf(navigation) === "new";

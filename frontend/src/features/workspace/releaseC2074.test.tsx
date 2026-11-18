@@ -59,13 +59,18 @@ const api = (overrides: Partial<WorkspaceApi> = {}, session: Record<string, unkn
 const render = (node: ReactNode, value: WorkspaceApi = api()) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
 
-/** The approved design's LIST_VIEWS (mdarix-hybrid-mockup.html). */
+/** Cases' five persona views (UX2, Persona Blueprint wave D), filtered by role. */
+const FIVE = ["Calls to check", "To triage", "Waiting for the reporter", "Reportability: decision needed", "Overdue"];
 const MOCKUP_LIST_VIEWS = {
-  admin: ["All open complaints", "Due this week", "Second look", "Reporting", "Waiting for the reporter"],
-  quality: ["All open complaints", "Due this week", "Past target", "Second look"],
-  regulatory: ["Reportability: decision needed", "Authority reports", "Legal clocks this week"],
-  handler: ["To triage", "Calls to check", "Second look", "Waiting for the reporter"],
-  decision: ["Waiting for my approval", "Signed this month"],
+  admin: FIVE,
+  quality: ["To triage", "Waiting for the reporter", "Reportability: decision needed", "Overdue"],
+  regulatory: ["Reportability: decision needed", "Overdue"],
+  servicedesk: ["Calls to check", "Waiting for the reporter"],
+  handler: ["To triage", "Calls to check", "Waiting for the reporter", "Overdue"],
+  investigator: ["Overdue"],
+  risk: ["Overdue"],
+  decision: ["Reportability: decision needed", "Overdue"],
+  executive: ["Overdue"],
 };
 
 describe("list views: one choice, the persona's own first", () => {
@@ -78,8 +83,12 @@ describe("list views: one choice, the persona's own first", () => {
       expect([...mine, ...more].sort()).toEqual([...COMPLAINT_LIST_VIEWS].sort());
       expect(more.some((view) => views.includes(view))).toBe(false);
     }
-    // A persona whose tabs hold no complaint list (it reaches Complaints by a link) gets Admin's.
-    expect(listViewsFor("investigator").mine).toEqual(MOCKUP_LIST_VIEWS.admin);
+    // Only the five, never more than five; a persona the table does not know gets Admin's.
+    expect(Object.values(MOCKUP_LIST_VIEWS).every((views) => views.every((view) => FIVE.includes(view)))).toBe(true);
+    expect(listViewsFor("someone-new").mine).toEqual(FIVE);
+    // Reporting, Authority reports and Investigations left Cases for Decisions & Reports and Investigations.
+    for (const moved of ["Reporting", "Authority reports", "Investigations"])
+      expect(COMPLAINT_LIST_VIEWS).not.toContain(moved);
     // Every view has its own address (the link table), and every server view a code the server knows.
     expect(NEW_PLACES.Complaints.tabs).toEqual([...COMPLAINT_LIST_VIEWS]);
     expect(Object.values(SERVER_VIEWS).map((view) => view.code)).toEqual([
@@ -98,8 +107,10 @@ describe("list views: one choice, the persona's own first", () => {
     const decision = render(<ComplaintViews />, api({ persona: "decision", personaLabel: "Decision Maker" }));
     expect(decision).toContain('<optgroup label="For Decision Maker">');
     expect(decision).toContain('<optgroup label="More views">');
-    expect(decision).toMatch(/<option value="Waiting for my approval" selected="">/);
-    expect(decision).toContain("An authority report sent for approval that you did not prepare");
+    expect(decision).toMatch(/<option value="Reportability: decision needed" selected="">Reportability due</);
+    expect(decision).toContain("A market with no signed conclusion yet");
+    // The other views stay one choice away, under More views.
+    expect(decision).toMatch(/<option value="Waiting for my approval">Waiting for my approval</);
     const handler = render(<ComplaintViews />, api({ persona: "handler", personaLabel: "Complaint Handler" }));
     expect(handler).toMatch(/<option value="To triage" selected="">/);
     // A link to a view opens it, whatever the persona.

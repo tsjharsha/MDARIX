@@ -12,14 +12,13 @@ import { IMPORTED_SOURCE, parseComplaintListTab } from "../complaintList";
 import { inData } from "../home";
 import { listTitle } from "./common";
 import { ImportedBacklog, Triage } from "./Triage";
-import { ReportabilityWatch } from "./ReportabilityWatch";
-import { ReportsSection } from "./ReportsTab";
 import { Communications } from "./Communications";
 import { ComplaintList } from "./ComplaintList";
 import { Backlog, SecondLook } from "./Complaints";
 import { ListViewPicker } from "./Views";
 import { FirstContact } from "./FirstContact";
 import {
+  CASE_VIEW_LABELS,
   COMPLAINT_LIST_VIEWS,
   INVESTIGATION_VIEWS,
   SERVER_VIEWS,
@@ -39,17 +38,11 @@ export const COMPLAINT_VIEWS = NEW_PLACES.Complaints.tabs;
  * action, cards on a phone; stage 7's work queues keep their own screens. "Log a call" and, outside a trial, "Import
  * your data" are actions on the list's header. Each complaint opens its own page.
  */
-/** The views that are another tab's own list, and that tab (0.10.87). */
-const TAB_OF_VIEW: Record<string, string> = { "Authority reports": "reports", Investigations: "investigations" };
-
 export function ComplaintViews({ tab }: { tab?: string }) {
   const [carried] = useState(() => tab);
-  const { open, session, isTrial, persona, personaLabel, personaTabs = [] } = useWorkspace();
-  // A view that is another tab's own list is offered only to a persona without that tab (0.10.87); its link still opens.
-  const own = (name: string) => !personaTabs.includes(TAB_OF_VIEW[name] ?? "");
-  const views = listViewsFor(persona);
-  const mine = views.mine.filter(own);
-  const more = views.more.filter(own);
+  const { open, session, isTrial, persona, personaLabel } = useWorkspace();
+  // Cases' five persona views first, the rest under "More views" (UX2).
+  const { mine, more } = listViewsFor(persona);
   const [view, setView] = useReportedTab<string>(() => offeredTab(tab, COMPLAINT_LIST_VIEWS, mine[0]));
   // The screens these views came from still name their former tabs (Triage's "Open the reporting clock"): the link
   // table opens each one's new home.
@@ -73,6 +66,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
           onChange={setView}
           forLabel={personaLabel ?? undefined}
           detail={server?.detail ?? QUEUE_DETAIL[view]}
+          labels={CASE_VIEW_LABELS}
         />
         {canLog && (
           <button
@@ -102,18 +96,9 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       {view === "Imported backlog" && <ImportedBacklog />}
       {view === "Second look" && <SecondLook initial="open" fixed />}
       {view === "Dismissed" && <SecondLook initial="dismissed" fixed />}
-      {view === "Reporting" && (
-        <>
-          {/* A market assessment's link (part=assess) opens the complaint's assessment; a report's link its reports. */}
-          {(!complaint || tabParam(carried, "part") === "assess") && <ReportabilityWatch onOpenTab={go} />}
-          <ReportsSection complaintId={complaint} />
-        </>
-      )}
-      {/* The Reports tab's own list (0.10.81, navigation M7): one status word per state, one count, no "Start the
-          worksheet" on the new navigation, where a report is created when its conclusion is signed. */}
-      {view === "Authority reports" && <ReportsSection complaintId={complaint} />}
+      {/* Reporting and Authority reports are Decisions & Reports › Reports, Investigations the Investigations list
+          (UX2; linkTable.json opens their former addresses there). */}
       {view === "Communications" && <Communications key={complaint ?? "all"} complaintId={complaint} />}
-      {view === "Investigations" && <InvestigationList />}
       {view === "All complaints" && (
         <ComplaintList
           eyebrow=""
@@ -135,10 +120,7 @@ const QUEUE_DETAIL: Record<string, string> = {
   "Imported backlog":
     "Imported complaints your organization knew of long before the import, with no harm flag: routine triage, with their own target.",
   "Second look": "Records that may be hidden complaints, to confirm or dismiss.",
-  Reporting: "Reportability decisions and authority reports.",
-  "Authority reports": "Every authority report, with its fields, approval and submission.",
   Communications: "Every message and request with reporters and partners.",
-  Investigations: "Every investigation, across products.",
   Dismissed: "Records decided as not complaints, with the reason.",
   "All complaints": "Every complaint, with filters by product, version, lot, problem code, country and status.",
 };

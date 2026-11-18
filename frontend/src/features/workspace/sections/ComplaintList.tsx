@@ -1,3 +1,4 @@
+import { CASE_VIEW_LABELS } from "../listViews";
 import { useState } from "react";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
@@ -108,7 +109,7 @@ export function ComplaintList({
           ? list.data
             ? countOf(list.data.total, "complaint")
             : "Complaints"
-          : listTitle(view?.name ?? "Complaint list", list.data?.total)
+          : listTitle(CASE_VIEW_LABELS[view?.name ?? ""] ?? view?.name ?? "Complaint list", list.data?.total)
       }
       source={list}
     >

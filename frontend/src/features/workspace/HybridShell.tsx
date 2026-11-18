@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Boxes,
+  Building2,
   CalendarClock,
   Check,
   ChevronDown,
   Ellipsis,
   Eye,
   FileText,
+  Gavel,
   House,
   Inbox,
   ListChecks,
@@ -33,6 +35,7 @@ import { signOut } from "../shared/session";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE, complaintListTab } from "./complaintList";
 import { canImportOwnData, type SessionContext, type WorkspaceSection } from "./workspaceContext";
+import { areaOf, areaSections } from "./areas";
 import type { StoryRun } from "./oneStory";
 import { ProgressArc } from "../shared/hero/HeroVisuals";
 
@@ -46,39 +49,36 @@ import { ProgressArc } from "../shared/hero/HeroVisuals";
 /** A persona as the session context sends it (access_control/personas.py WORKSPACE_PERSONAS). */
 export type PersonaOption = { code: string; label: string; sub: string; tabs: string[] };
 
-/** Each tab of the bar: its name and the screen it opens (My work is Home). */
+/** Each tab of the rail: the five work areas (UX2, areas.ts), named as the area, opening its first screen. */
 export const PERSONA_TABS: Record<string, { label: string; section: WorkspaceSection }> = {
-  // A trial's guide, left of Home, for every persona (0.10.80; trialTabs). Never a persona's own tab.
+  // A trial's guide, left of Today, for every persona (0.10.80; trialTabs). Never a persona's own tab.
   start: { label: "Getting started", section: "Getting started" },
-  home: { label: "Home", section: "My Work" },
-  complaints: { label: "Complaints", section: "Complaints" },
-  trees: { label: "Decision trees", section: "Decision trees" },
-  reports: { label: "Reports", section: "Reports" },
+  home: { label: "Today", section: "My Work" },
+  complaints: { label: "Cases", section: "Complaints" },
   investigations: { label: "Investigations", section: "Investigations" },
-  trends: { label: "Trends", section: "Trends" },
-  // Product 360 and Supplier 360 (0.10.94, W1).
+  // Product 360, Supplier 360 and Trends (0.10.94, W1; UX2).
   products: { label: "Products", section: "Product 360" },
-  records: { label: "Records", section: "Records" },
-  team: { label: "Team", section: "Team" },
-  // A trial's previews and its way to a pilot, right of the persona's tabs, for every persona (0.10.87; trialTabs).
-  ahead: { label: "Look ahead", section: "Look ahead" },
-  next: { label: "Next steps", section: "Next steps" },
+  // Approvals, decision trees and authority reports in one place (UX2); opens the first one the person may open.
+  decisions: { label: "Decisions & Reports", section: "Approvals" },
 };
 
-/** The tab a screen belongs to: one complaint's page is the Complaints tab's; Settings or Account none. */
+/** The tab a screen belongs to: its area's (one complaint's page is Cases', Trends is Products'); Getting started its
+ * own; Records, Settings, Team, Account and Administration none (they are in the avatar menu). */
 export const tabOfSection = (section: string): string | null =>
-  section === "Complaint"
-    ? "complaints"
-    : (Object.entries(PERSONA_TABS).find(([, tab]) => tab.section === section)?.[0] ?? null);
+  section === "Getting started" ? "start" : areaOf(section);
 
-/** The persona's tabs the server lets this person open, in the bar's order. */
+/** The persona's tabs the server lets this person open (any screen of the area), in the rail's order. */
 export const visibleTabs = (tabs: readonly string[], allowed: readonly string[]): string[] =>
-  Object.keys(PERSONA_TABS).filter((key) => tabs.includes(key) && allowed.includes(PERSONA_TABS[key].section));
+  Object.keys(PERSONA_TABS).filter(
+    (key) =>
+      tabs.includes(key) &&
+      (key === "start" ? allowed.includes("Getting started") : areaSections(key, allowed).length > 0),
+  );
 
-/** A trial's tabs: Getting started first and Look ahead and Next steps last, whatever the persona (0.10.80, 0.10.87);
- * a pilot's are the persona's. */
+/** A trial's tabs: Getting started first, whatever the persona (0.10.80); Look ahead and Next steps are in Today
+ * (UX2). A pilot's are the persona's. */
 export const trialTabs = (tabs: readonly string[], isTrial: boolean): readonly string[] =>
-  isTrial ? ["start", ...tabs, "ahead", "next"] : tabs;
+  isTrial ? ["start", ...tabs] : tabs;
 
 /** Each persona's mark: two letters on its own colour (the design system's fills under white text). */
 const PERSONA_COLOR: Record<string, string> = {
@@ -457,6 +457,7 @@ export function AvatarMenu({
   showSettings,
   onImport,
   data,
+  canOpen = () => false,
   defaultOpen = false,
 }: {
   session: SessionContext | null;
@@ -464,6 +465,9 @@ export function AvatarMenu({
   open: (section: WorkspaceSection) => void;
   onAdminConsole?: () => void;
   showSettings: boolean;
+  /** Which of the avatar menu's screens this person may open (UX2: Records & trust, Team, Administration, Import
+   * data); none when not given. */
+  canOpen?: (section: WorkspaceSection) => boolean;
   /** "Import your data", for the phone, where the top bar hides it (0.10.79). */
   onImport?: () => void;
   /** "Sample data · Your data", for the phone, where the top bar hides it (0.10.80). */
@@ -541,6 +545,21 @@ export function AvatarMenu({
               ))}
             </div>
           )}
+          {/* Records & trust and administration live here, not in the work areas (UX2): used weekly, not daily. */}
+          {AVATAR_SCREENS.filter(({ section }) => canOpen(section) && (section !== "Import data" || !onImport)).map(
+            ({ section, label, icon: Icon }) => (
+              <button
+                key={section}
+                type="button"
+                role="menuitem"
+                className="uw-pop-option"
+                aria-current={current === section ? "page" : undefined}
+                onClick={() => go(section)}
+              >
+                <Icon size={16} aria-hidden="true" /> <span>{label}</span>
+              </button>
+            ),
+          )}
           {showSettings && (
             <button
               type="button"
@@ -552,7 +571,7 @@ export function AvatarMenu({
               <Settings2 size={16} aria-hidden="true" /> <span>Settings</span>
             </button>
           )}
-          {onAdminConsole && (
+          {onAdminConsole && !canOpen("Administration") && (
             <button
               type="button"
               role="menuitem"
@@ -575,42 +594,51 @@ export function AvatarMenu({
   );
 }
 
+/** The avatar menu's screens (UX2), in order; each shows only to whoever may open it. */
+const AVATAR_SCREENS: ReadonlyArray<{ section: WorkspaceSection; label: string; icon: LucideIcon }> = [
+  { section: "Records", label: "Records & trust", icon: ShieldCheck },
+  { section: "Team", label: "Team", icon: Users },
+  { section: "Administration", label: "Administration", icon: Building2 },
+  { section: "Import data", label: "Import data", icon: Upload },
+];
+
 /** Each destination's icon on the rail and the phone's bar (0.10.90, the hero design). */
 const TAB_ICON: Record<string, LucideIcon> = {
   home: House,
   complaints: Inbox,
-  trees: Network,
-  reports: FileText,
   investigations: SearchCheck,
-  trends: TrendingUp,
   products: Boxes,
-  records: ShieldCheck,
-  team: Users,
-  ahead: CalendarClock,
-  next: Signpost,
+  decisions: Gavel,
+};
+
+/** Screens with an emblem of their own: the avatar menu's, and the second screens of an area (UX2). */
+const SECTION_ICON: Record<string, LucideIcon> = {
+  Settings: Settings2,
+  "My Account": UserRound,
+  "Import your data": Upload,
+  "Import data": Upload,
+  "Share feedback": MessageSquare,
+  Records: ShieldCheck,
+  Team: Users,
+  Administration: Building2,
+  Trends: TrendingUp,
+  "Decision trees": Network,
+  Reports: FileText,
+  "Look ahead": CalendarClock,
+  "Next steps": Signpost,
 };
 
 /** A page's emblem in its head: its destination's icon; Settings, Account, Import your data and feedback their own. */
 export const sectionIcon = (section: string): LucideIcon =>
-  ({ Settings: Settings2, "My Account": UserRound, "Import your data": Upload, "Share feedback": MessageSquare })[
-    section
-  ] ??
-  TAB_ICON[tabOfSection(section) ?? ""] ??
-  House;
+  SECTION_ICON[section] ?? TAB_ICON[tabOfSection(section) ?? ""] ?? House;
 
-/** The rail's groups (the hero design): the work, then the plan; Getting started heads it and Next steps is pinned at
- * its foot. */
-// Investigations before Reports: the work runs from investigation to the report (owner, 17 Nov 2026).
+/** The rail's one group (UX2): the five work areas in the order the work runs; Getting started heads it. */
 export const RAIL_GROUPS: ReadonlyArray<{ label: string; tabs: readonly string[] }> = [
-  {
-    label: "Work",
-    tabs: ["home", "complaints", "trees", "investigations", "reports", "trends", "products", "records"],
-  },
-  { label: "Plan", tabs: ["team", "ahead"] },
+  { label: "Work", tabs: ["home", "complaints", "investigations", "products", "decisions"] },
 ];
 
 /** The phone's bottom bar: these four, where the persona has them; "More" opens the rest. */
-export const PHONE_SLOTS: readonly string[] = ["start", "home", "complaints", "trends"];
+export const PHONE_SLOTS: readonly string[] = ["start", "home", "complaints", "products"];
 
 /** The tabs the rail and the phone's bar show: the persona's, and a screen they do not list (opened from the story or
  * a link) while it is open, marked so (0.10.85; the approved design): the person always sees where they are. */
@@ -625,10 +653,10 @@ export const phoneBar = (tabs: readonly string[]) => ({
   more: tabs.filter((key) => !PHONE_SLOTS.includes(key)),
 });
 
-/** The destinations that have something new for the person (owner, 5 Nov 2026: a dot, never a count): Complaints
- * while a complaint is overdue, Trends while a product is rising against its history. */
+/** The destinations that have something new for the person (owner, 5 Nov 2026: a dot, never a count): Cases while a
+ * complaint is overdue, Products (which holds Trends, UX2) while a product is rising against its history. */
 export const railAlerts = (overdue: number | null | undefined, rising: number | null | undefined) =>
-  new Set([...(overdue ? ["complaints"] : []), ...(rising ? ["trends"] : [])]);
+  new Set([...(overdue ? ["complaints"] : []), ...(rising ? ["products"] : [])]);
 
 /** A destination's dot: a mark beside its name, and the words "New items" for screen readers and as its tooltip. */
 function AlertDot() {
@@ -804,7 +832,6 @@ export function NavRail({
             {group.tabs.map(button)}
           </div>
         ))}
-      {tabs.includes("next") && <div className="uw-navrail-foot">{button("next")}</div>}
     </nav>
   );
 }

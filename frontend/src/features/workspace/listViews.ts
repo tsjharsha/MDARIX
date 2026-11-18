@@ -47,10 +47,7 @@ export const QUEUE_VIEWS = [
   "Past target",
   "Imported backlog",
   "Second look",
-  "Reporting",
-  "Authority reports",
   "Communications",
-  "Investigations",
   "Dismissed",
   "All complaints",
 ] as const;
@@ -58,19 +55,43 @@ export const QUEUE_VIEWS = [
 /** Every complaint list view, in the order "More views" lists them. */
 export const COMPLAINT_LIST_VIEWS: readonly string[] = [...Object.keys(SERVER_VIEWS), ...QUEUE_VIEWS];
 
-/** Each persona's own views, first in the choice (the approved design's LIST_VIEWS). */
+/**
+ * Cases' five persona views (UX2, Persona Blueprint wave D), in the order the work runs. Each keeps its address name
+ * (?tab=Calls to check), so links and bookmarks keep working; the list shows the name in CASE_VIEW_LABELS.
+ * Reporting, Authority reports and Investigations left Cases: the first two are Decisions & Reports › Reports, the
+ * last the Investigations list (linkTable.json newHomes).
+ */
+export const CASE_VIEWS = [
+  "Calls to check",
+  "To triage",
+  "Waiting for the reporter",
+  "Reportability: decision needed",
+  "Overdue",
+] as const;
+
+/** The name each case view shows, where it differs from its address name. */
+export const CASE_VIEW_LABELS: Readonly<Record<string, string>> = {
+  "Calls to check": "To log",
+  "Waiting for the reporter": "Waiting for contact",
+  "Reportability: decision needed": "Reportability due",
+};
+
+/** Each persona's own case views, filtered by role: only the queues that hold its work. */
 export const PERSONA_LIST_VIEWS: Readonly<Record<string, readonly string[]>> = {
-  admin: ["All open complaints", "Due this week", "Second look", "Reporting", "Waiting for the reporter"],
-  quality: ["All open complaints", "Due this week", "Past target", "Second look"],
-  regulatory: ["Reportability: decision needed", "Authority reports", "Legal clocks this week"],
-  handler: ["To triage", "Calls to check", "Second look", "Waiting for the reporter"],
-  decision: ["Waiting for my approval", "Signed this month"],
+  admin: CASE_VIEWS,
+  quality: ["To triage", "Waiting for the reporter", "Reportability: decision needed", "Overdue"],
+  regulatory: ["Reportability: decision needed", "Overdue"],
+  servicedesk: ["Calls to check", "Waiting for the reporter"],
+  handler: ["To triage", "Calls to check", "Waiting for the reporter", "Overdue"],
+  investigator: ["Overdue"],
+  risk: ["Overdue"],
+  decision: ["Reportability: decision needed", "Overdue"],
+  executive: ["Overdue"],
 };
 
 /**
  * The views a persona is offered: its own first, then every other one under "More views" (the persona narrows the
- * first choice, never what the person may open). A persona without its own (one whose tabs hold no complaint list,
- * reaching it by a link) gets Admin's.
+ * first choice, never what the person may open). A persona the table does not know gets Admin's.
  */
 export function listViewsFor(persona: string | undefined): { mine: readonly string[]; more: string[] } {
   const mine = PERSONA_LIST_VIEWS[persona ?? ""] ?? PERSONA_LIST_VIEWS.admin;

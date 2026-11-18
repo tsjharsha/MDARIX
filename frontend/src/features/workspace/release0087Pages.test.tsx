@@ -86,19 +86,19 @@ describe("Home (rows 15-17)", () => {
 describe("Complaints (rows 3, 19, 20)", () => {
   it("has no import button in a trial, no second Complaints eyebrow, and a count for a title", () => {
     resources.data["/api/v1/complaints"] = { total: 12, items: [] };
-    const html = render(<ComplaintViews />);
+    const html = render(<ComplaintViews tab="All open complaints" />);
     expect(html).not.toContain("Import your data");
     expect(html).not.toContain('<p class="ac-eyebrow">Complaints</p>');
     expect(html).toContain("<h2>12 complaints</h2>");
   });
 
-  it("lists another tab's own list as a view only for a persona without that tab", () => {
-    const admin = render(<ComplaintViews />);
-    expect(admin).not.toContain(">Authority reports<");
-    expect(admin).not.toContain(">Investigations<");
-    const handler = render(<ComplaintViews />, api({ persona: "handler", personaTabs: ["home", "complaints"] }));
-    expect(handler).toContain(">Authority reports<");
-    expect(handler).toContain(">Investigations<");
+  it("lists no other area's own list as a view, for any persona (UX2: they have one place each)", () => {
+    for (const persona of ["admin", "handler", "servicedesk"]) {
+      const html = render(<ComplaintViews />, api({ persona, personaTabs: ["home", "complaints"] }));
+      expect(html, persona).not.toContain(">Authority reports<");
+      expect(html, persona).not.toContain(">Investigations<");
+      expect(html, persona).not.toContain(">Reporting<");
+    }
   });
 });
 

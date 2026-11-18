@@ -1,5 +1,5 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations). 0.10.80: a trial's own import is its own page on the new navigation, Import your data (/app/import); Getting started › Your data opens it there, and on the classic navigation /app/import opens Getting started › Your data. 0.10.94 (W1): Work › Products on the new navigation is Product 360 (/app/product-360), with the tabs Product 360 and Supplier 360 (owner, 10 Nov 2026: no clash with Settings › Products); a product opens as Product 360?product=<ref>&version=<ref>, a supplier as Supplier 360?supplier=<ref>; a former Products link opens it there (newHomes, read before the classic parking), and on the classic navigation it opens Readiness, as Products does.",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations). 0.10.80: a trial's own import is its own page on the new navigation, Import your data (/app/import); Getting started › Your data opens it there, and on the classic navigation /app/import opens Getting started › Your data. 0.10.94 (W1): Work › Products on the new navigation is Product 360 (/app/product-360), with the tabs Product 360 and Supplier 360 (owner, 10 Nov 2026: no clash with Settings › Products); a product opens as Product 360?product=<ref>&version=<ref>, a supplier as Supplier 360?supplier=<ref>; a former Products link opens it there (newHomes, read before the classic parking), and on the classic navigation it opens Readiness, as Products does. UX2 (Persona Blueprint wave D, 18 Nov 2026): the new navigation is every organization's (tenants.navigation defaults to new, migration ux2navigationnew). Its rail is five work areas, Today (My work, with Look ahead and Next steps), Cases (Complaints), Investigations, Products (Product 360 and Trends) and Decisions & Reports (Approvals, /app/approvals; Decision trees; Reports); Records, Team, Settings and Administration (customer administration in the same shell, /app/customer-admin) are in the avatar menu. Complaints' views Reporting and Authority reports open Reports, its view Investigations opens Investigations' list, My work's Approvals and the classic Decisions open Approvals.",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
@@ -173,7 +173,9 @@
     "decision-trees": ["Decision trees"],
     "reports": ["Reports"],
     "import": ["Import your data"],
-    "product-360": ["Product 360"]
+    "product-360": ["Product 360"],
+    "approvals": ["Approvals"],
+    "customer-admin": ["Administration"]
   },
   "oldSections": [
     {
@@ -318,7 +320,9 @@
     "Decision trees": "decision-trees",
     "Reports": "reports",
     "Import your data": "import",
-    "Product 360": "product-360"
+    "Product 360": "product-360",
+    "Approvals": "approvals",
+    "Administration": "administration"
   },
   "oldTabs": {
     "Signals": {
@@ -340,8 +344,8 @@
   "newPlaces": {
     "My Work": {
       "path": "/app/my-work",
-      "label": "Home",
-      "tabs": ["Tasks for me", "Approvals", "Evidence requests", "Queues", "Team overview", "My AI conversations"],
+      "label": "Today",
+      "tabs": ["Tasks for me", "Evidence requests", "Queues", "Team overview", "My AI conversations"],
       "views": {
         "Tasks for me": [
           "Assigned to me",
@@ -372,10 +376,7 @@
         "Past target",
         "Imported backlog",
         "Second look",
-        "Reporting",
-        "Authority reports",
         "Communications",
-        "Investigations",
         "Dismissed",
         "All complaints"
       ]
@@ -467,21 +468,31 @@
       "path": "/app/product-360",
       "label": "Products",
       "tabs": ["Product 360", "Supplier 360"]
+    },
+    "Approvals": {
+      "path": "/app/approvals",
+      "tabs": []
+    },
+    "Administration": {
+      "path": "/app/customer-admin",
+      "tabs": [
+        "Dashboard",
+        "Users",
+        "Roles & Access",
+        "Integrations",
+        "Data Mapping",
+        "Plan & Subscription",
+        "Security",
+        "Notifications",
+        "Audit",
+        "Reviews",
+        "Organization"
+      ]
     }
   },
   "newMenu": {
-    "main": [
-      "My Work",
-      "Complaints",
-      "Decision trees",
-      "Reports",
-      "Investigations",
-      "Trends",
-      "Product 360",
-      "Records",
-      "Team"
-    ],
-    "top": ["Settings", "My Account"]
+    "main": ["My Work", "Complaints", "Investigations", "Product 360", "Approvals"],
+    "top": ["Records", "Team", "Settings", "My Account", "Administration"]
   },
   "newRecords": {
     "complaint": {
@@ -594,6 +605,14 @@
     },
     {
       "section": "My Work",
+      "tab": "Approvals",
+      "to": {
+        "section": "Approvals"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "My Work",
       "tab": "Assigned to me",
       "to": {
         "section": "My Work",
@@ -678,6 +697,30 @@
     },
     {
       "section": "Complaints",
+      "tab": "Reporting",
+      "to": {
+        "section": "Reports"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Authority reports",
+      "to": {
+        "section": "Reports"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Investigations",
+      "to": {
+        "section": "Investigations",
+        "tab": "All investigations"
+      }
+    },
+    {
+      "section": "Complaints",
       "tab": "Triage",
       "to": {
         "section": "Complaints",
@@ -722,8 +765,7 @@
       "section": "Complaints",
       "tab": "Reportability",
       "to": {
-        "section": "Complaints",
-        "tab": "Reporting"
+        "section": "Reports"
       },
       "keep": "query",
       "add": {
@@ -734,8 +776,7 @@
       "section": "Complaints",
       "tab": "Reports",
       "to": {
-        "section": "Complaints",
-        "tab": "Reporting"
+        "section": "Reports"
       },
       "keep": "query"
     },
@@ -962,6 +1003,32 @@
         "tab": "Documents"
       },
       "keep": "query"
+    },
+    {
+      "section": "Decisions",
+      "tab": "Decision",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decisions & actions"
+      },
+      "keep": "query",
+      "add": {
+        "part": "decision"
+      }
+    },
+    {
+      "section": "Decisions",
+      "tab": "Verify a signature",
+      "to": {
+        "section": "Records",
+        "tab": "Verify a signature"
+      }
+    },
+    {
+      "section": "Decisions",
+      "to": {
+        "section": "Approvals"
+      }
     }
   ],
   "classicHomes": [
@@ -1051,6 +1118,19 @@
         "tab": "Your data"
       },
       "keep": "query"
+    },
+    {
+      "section": "Approvals",
+      "to": {
+        "section": "My Work",
+        "tab": "Approvals"
+      }
+    },
+    {
+      "section": "Administration",
+      "to": {
+        "section": "My Work"
+      }
     }
   ]
 }

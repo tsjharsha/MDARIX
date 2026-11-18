@@ -25,6 +25,7 @@ import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import { PARKED_CUSTOMER_ADMIN_SECTIONS, featureSetOf } from "../../app/featureSet";
 import "../admin/console/admin-console.css";
 import "./customer-admin.css";
+import "../workspace/areaNav.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
 import { ConfirmDialog, type Confirmation } from "./shared";
 import { Dashboard } from "./sections/Dashboard";
@@ -106,9 +107,44 @@ export function customerAdminSections(featureSet: string | null | undefined): re
   return SECTIONS.filter((name) => !PARKED_CUSTOMER_ADMIN_SECTIONS.includes(name));
 }
 
+/**
+ * The five groups of customer administration (UX2, Persona Blueprint wave D), in place of eleven areas side by side:
+ * each group opens its first section, and a group with more than one section shows them in its own small menu. The
+ * sections, their addresses and their server checks are unchanged.
+ */
+export const ADMIN_GROUPS: ReadonlyArray<{ label: string; icon: typeof Users; sections: readonly Section[] }> = [
+  {
+    label: "Organization",
+    icon: Building2,
+    sections: ["Dashboard", "Organization", "Plan & Subscription", "Notifications"],
+  },
+  { label: "People & access", icon: Users, sections: ["Users", "Roles & Access"] },
+  { label: "Data & connections", icon: Plug, sections: ["Integrations", "Data Mapping"] },
+  { label: "AI & security", icon: ShieldCheck, sections: ["Security"] },
+  { label: "Audit", icon: FileClock, sections: ["Audit", "Reviews"] },
+];
+
+/** The groups this feature set offers, each with only its offered sections; an empty group is left out (under mvp,
+ * Data & connections: its connections and mapping are parked). */
+export const adminGroups = (offered: readonly Section[]) =>
+  ADMIN_GROUPS.map((group) => ({ ...group, sections: group.sections.filter((name) => offered.includes(name)) })).filter(
+    (group) => group.sections.length > 0,
+  );
+
+const groupOf = (section: Section) => ADMIN_GROUPS.find((group) => group.sections.includes(section));
+
+/** The console's own idle sign-out; inside the workspace's shell the workspace runs its own. */
+function ConsoleIdle() {
+  const idle = useIdleSignOut();
+  return <SessionTimeoutWarning session={idle} />;
+}
+
 export function CustomerAdminControlPlane({
   securityContext,
   onOpenWorkspace,
+  embedded = false,
+  initialSection,
+  onSection,
 }: {
   securityContext: TenantContext | null;
   products?: unknown[];
@@ -116,20 +152,25 @@ export function CustomerAdminControlPlane({
   onNavigate?: (view: any) => void;
   /** Switch into the investigation workspace with an Investigator's rights (same account, App.tsx decides). */
   onOpenWorkspace?: () => void;
+  /** Inside the workspace's shell (UX2, Avatar › Administration): no header, side menu or idle timer of its own. */
+  embedded?: boolean;
+  /** The section the address names (embedded: /app/customer-admin?tab=Users). */
+  initialSection?: string;
+  /** Each section opened, for the workspace's address. */
+  onSection?: (section: Section) => void;
 }) {
-  const [location, setLocation] = useState<{ section: Section; tab?: string; key: number }>({
-    section: "Dashboard",
+  const featureSet = securityContext?.feature_set;
+  const sections = useMemo(() => customerAdminSections(featureSet), [featureSet]);
+  const [location, setLocation] = useState<{ section: Section; tab?: string; key: number }>(() => ({
+    section: sections.includes(initialSection as Section) ? (initialSection as Section) : "Dashboard",
     key: 0,
-  });
+  }));
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
-  const idle = useIdleSignOut();
   const heading = useRef<HTMLHeadingElement>(null);
   useFocusOnChange(heading, location.key);
 
-  const featureSet = securityContext?.feature_set;
-  const sections = useMemo(() => customerAdminSections(featureSet), [featureSet]);
   const open = useCallback(
     (section: Section, tab?: string) => {
       // A parked section (an old link, a dashboard tile) opens the dashboard instead.
@@ -146,6 +187,7 @@ export function CustomerAdminControlPlane({
     [sections],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+  useEffect(() => onSection?.(location.section), [location.section]);
 
   // The workspace side navigation (App.tsx) can still request a section by name.
   useEffect(() => {
@@ -161,83 +203,124 @@ export function CustomerAdminControlPlane({
   const api: ConsoleApi = { context: securityContext, open, confirm: setConfirmation, notify };
   const tenantName = securityContext?.current_tenant?.tenant_name ?? "Your organization";
   const { section, tab } = location;
+  const groups = adminGroups(sections);
+  const group = groupOf(section);
+  const within = groups.find((item) => item.label === group?.label)?.sections ?? [];
+  const Body = embedded ? "div" : "main";
+
+  const groupMenu = (
+    <>
+      {groups.map(({ label, icon: Icon, sections: inGroup }) => (
+        <button
+          type="button"
+          key={label}
+          className={group?.label === label ? "selected" : ""}
+          aria-current={group?.label === label ? "page" : undefined}
+          onClick={() => open(inGroup[0])}
+        >
+          <Icon size={18} aria-hidden="true" />
+          <span>
+            <strong>{label}</strong>
+            {!embedded && <small>{inGroup.join(", ")}</small>}
+          </span>
+        </button>
+      ))}
+    </>
+  );
 
   return (
     <ConsoleContext.Provider value={api}>
-      <div className="admin-console customer-admin-console">
-        <header className="ac-header">
-          <a className="app-skip" href="#app-main">
-            Skip to content
-          </a>
-          <button
-            type="button"
-            className="ac-menu-toggle"
-            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((value) => !value)}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <div className="ac-brand">
-            MDARIX <span>Customer administration · {tenantName}</span>
-          </div>
-          <div className="ac-user">
-            <span>
-              <strong>{securityContext?.display_name ?? "Customer Administrator"}</strong>
-              <small>Customer Administrator</small>
-            </span>
-            {onOpenWorkspace && (
-              <button
-                type="button"
-                className="ac-secondary"
-                onClick={onOpenWorkspace}
-                aria-label="Open workspace"
-                title="Work on investigations with an Investigator's rights"
-              >
-                <Briefcase size={16} aria-hidden="true" /> <span className="ac-hide-sm">Open workspace</span>
-              </button>
-            )}
-            <SwitchOrganization />
-            <HelpMenu />
-            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
-              <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
+      <div className={`admin-console customer-admin-console${embedded ? " is-embedded" : ""}`}>
+        {!embedded && (
+          <header className="ac-header">
+            <a className="app-skip" href="#app-main">
+              Skip to content
+            </a>
+            <button
+              type="button"
+              className="ac-menu-toggle"
+              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((value) => !value)}
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-          </div>
-        </header>
-
-        <div className="ac-body">
-          <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Customer administration navigation">
-            <p className="ac-nav-label">{tenantName}</p>
-            {sections.map((name) => {
-              const { icon: Icon, description } = NAV[name];
-              return (
+            <div className="ac-brand">
+              MDARIX <span>Customer administration · {tenantName}</span>
+            </div>
+            <div className="ac-user">
+              <span>
+                <strong>{securityContext?.display_name ?? "Customer Administrator"}</strong>
+                <small>Customer Administrator</small>
+              </span>
+              {onOpenWorkspace && (
                 <button
                   type="button"
-                  key={name}
-                  className={section === name ? "selected" : ""}
-                  aria-current={section === name ? "page" : undefined}
-                  onClick={() => open(name)}
+                  className="ac-secondary"
+                  onClick={onOpenWorkspace}
+                  aria-label="Open workspace"
+                  title="Work on investigations with an Investigator's rights"
                 >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>
-                    <strong>{name}</strong>
-                    <small>{description}</small>
-                  </span>
+                  <Briefcase size={16} aria-hidden="true" /> <span className="ac-hide-sm">Open workspace</span>
                 </button>
-              );
-            })}
-            <p className="ca-nav-scope">
-              Everything here belongs to {tenantName} only. No other organization can see it.
-            </p>
-          </nav>
+              )}
+              <SwitchOrganization />
+              <HelpMenu />
+              <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
+                <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
+              </button>
+            </div>
+          </header>
+        )}
 
-          <main className="ac-main" id="app-main" tabIndex={-1} data-customer-admin-section={section}>
+        <div className="ac-body">
+          {!embedded && (
+            <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Customer administration navigation">
+              <p className="ac-nav-label">{tenantName}</p>
+              {groupMenu}
+              <p className="ca-nav-scope">
+                Everything here belongs to {tenantName} only. No other organization can see it.
+              </p>
+            </nav>
+          )}
+
+          <Body
+            className="ac-main"
+            id={embedded ? undefined : "app-main"}
+            tabIndex={embedded ? undefined : -1}
+            data-customer-admin-section={section}
+          >
+            {embedded && (
+              <nav className="uw-areanav ca-groups" aria-label="Administration areas">
+                {groupMenu}
+              </nav>
+            )}
+            {within.length > 1 && (
+              <nav className="uw-areanav" aria-label={`${group?.label ?? "Administration"} pages`}>
+                {within.map((name) => (
+                  <button
+                    type="button"
+                    key={name}
+                    aria-current={section === name ? "page" : undefined}
+                    onClick={() => open(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </nav>
+            )}
             <div className="ac-page-head">
               <div>
-                <p className="ac-eyebrow">Customer administration</p>
-                <h1 ref={heading} tabIndex={-1}>
-                  {section}
-                </h1>
+                <p className="ac-eyebrow">{embedded ? group?.label : "Customer administration"}</p>
+                {embedded ? (
+                  <h2 ref={heading} tabIndex={-1}>
+                    {section}
+                  </h2>
+                ) : (
+                  <h1 ref={heading} tabIndex={-1}>
+                    {section}
+                  </h1>
+                )}
                 <p>{NAV[section].purpose}</p>
               </div>
             </div>
@@ -268,10 +351,10 @@ export function CustomerAdminControlPlane({
                 </div>
               </SectionErrorBoundary>
             </ColumnScopeProvider>
-          </main>
+          </Body>
         </div>
 
-        <SessionTimeoutWarning session={idle} />
+        {!embedded && <ConsoleIdle />}
         <ConfirmDialog
           request={confirmation}
           onClose={() => setConfirmation(null)}

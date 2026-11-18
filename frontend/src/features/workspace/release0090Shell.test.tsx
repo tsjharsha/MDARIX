@@ -21,16 +21,16 @@ import userWorkspace from "./UserWorkspace.tsx?raw";
 const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
 const shellCss: string = fs.readFileSync(new URL("./heroShell.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
-const ALL = Object.values(PERSONA_TABS).map((tab) => tab.section);
+const ALL = [...Object.values(PERSONA_TABS).map((tab) => tab.section), "Decision trees", "Reports", "Trends"];
 const trial = (persona: string[]) => visibleTabs(trialTabs(persona, true), ALL);
 const labels = (markup: string) =>
   [...markup.matchAll(/<span class="uw-tab-label">([^<]*)<\/span>/g)].map((match) => match[1]);
 
 describe("the rail", () => {
-  it("lists Getting started first, the work, then the plan, and Next steps pinned at the foot", () => {
+  it("lists Getting started first, then the five work areas (UX2)", () => {
     const rail = renderToStaticMarkup(
       <NavRail
-        tabs={trial(Object.keys(PERSONA_TABS).filter((key) => !["start", "ahead", "next"].includes(key)))}
+        tabs={trial(Object.keys(PERSONA_TABS).filter((key) => key !== "start"))}
         current="home"
         open={vi.fn()}
         progress={3}
@@ -38,24 +38,13 @@ describe("the rail", () => {
     );
     expect(rail).toContain('<nav class="uw-navrail" aria-label="Destinations">');
     expect(rail.indexOf("<strong>Getting started</strong>")).toBeLessThan(rail.indexOf(">Work<"));
-    expect(labels(rail)).toEqual([
-      "Home",
-      "Complaints",
-      "Decision trees",
-      "Investigations",
-      "Reports",
-      "Trends",
-      "Products",
-      "Records",
-      "Team",
-      "Look ahead",
-      "Next steps",
-    ]);
-    expect(rail.indexOf(">Work<")).toBeLessThan(rail.indexOf(">Plan<"));
-    expect(rail).toMatch(/class="uw-navrail-foot">.*Next steps/);
+    expect(labels(rail)).toEqual(["Today", "Cases", "Investigations", "Products", "Decisions &amp; Reports"]);
+    // One group; Records, Team and the trial's Look ahead and Next steps are not destinations any more.
+    expect(rail).not.toContain(">Plan<");
+    expect(rail).not.toContain("uw-navrail-foot");
     expect(RAIL_GROUPS.flatMap((group) => group.tabs).sort()).toEqual(
       Object.keys(PERSONA_TABS)
-        .filter((key) => !["start", "next"].includes(key))
+        .filter((key) => key !== "start")
         .sort(),
     );
   });
@@ -77,23 +66,23 @@ describe("the rail", () => {
 
   it("keeps only the persona's destinations, and marks a screen opened from Getting started", () => {
     const rail = renderToStaticMarkup(
-      <NavRail tabs={trial(["home", "complaints"])} current="trends" open={vi.fn()} personaLabel="Handler" />,
+      <NavRail tabs={trial(["home", "complaints"])} current="products" open={vi.fn()} personaLabel="Handler" />,
     );
-    expect(labels(rail)).toEqual(["Home", "Complaints", "Trends", "Look ahead", "Next steps"]);
+    expect(labels(rail)).toEqual(["Today", "Cases", "Products"]);
     expect(rail).toMatch(/class="uw-tab is-extra" aria-current="page" title="Opened from Getting started or a link/);
     expect(rail).toContain("(opened from Getting started; not one of your tabs)");
     // A pilot has no Getting started, Look ahead or Next steps.
     const pilot = renderToStaticMarkup(
-      <NavRail tabs={visibleTabs(trialTabs(["home", "records"], false), ALL)} current="home" open={vi.fn()} />,
+      <NavRail tabs={visibleTabs(trialTabs(["home", "decisions"], false), ALL)} current="home" open={vi.fn()} />,
     );
     expect(pilot).not.toContain("Getting started");
-    expect(labels(pilot)).toEqual(["Home", "Records"]);
+    expect(labels(pilot)).toEqual(["Today", "Decisions &amp; Reports"]);
   });
 
   it("folds to icons, each keeping its name for screen readers and as its tooltip", () => {
     const rail = renderToStaticMarkup(<NavRail tabs={trial(["home"])} current="home" open={vi.fn()} />);
     expect(rail).toContain('aria-label="Collapse the menu" aria-expanded="true"');
-    expect(rail).toMatch(/title="Home"><svg[^>]*aria-hidden="true"/);
+    expect(rail).toMatch(/title="Today"><svg[^>]*aria-hidden="true"/);
     // Icon-only below 1240 px: the names are hidden visually, never removed.
     const narrow = shellCss.slice(shellCss.indexOf("@media (max-width: 1240px)"));
     expect(narrow).toMatch(/\.uw-navrail \.uw-tab-label \{\s*position: absolute;[^}]*clip-path: inset\(50%\)/);
@@ -102,15 +91,15 @@ describe("the rail", () => {
 });
 
 describe("the phone's bottom bar", () => {
-  it("has Getting started, Home, Complaints and Trends, with More for the rest", () => {
-    const tabs = trial(["home", "complaints", "trees", "trends", "records"]);
+  it("has Getting started, Today, Cases and Products, with More for the rest", () => {
+    const tabs = trial(["home", "complaints", "investigations", "products", "decisions"]);
     expect(phoneBar(tabs)).toEqual({
-      slots: ["start", "home", "complaints", "trends"],
-      more: ["trees", "records", "ahead", "next"],
+      slots: ["start", "home", "complaints", "products"],
+      more: ["investigations", "decisions"],
     });
-    const bar = renderToStaticMarkup(<PhoneBar tabs={tabs} current="records" open={vi.fn()} />);
+    const bar = renderToStaticMarkup(<PhoneBar tabs={tabs} current="decisions" open={vi.fn()} />);
     expect(bar).toContain('<nav class="uw-phonebar" aria-label="Destinations">');
-    expect(labels(bar)).toEqual(["Getting started", "Home", "Complaints", "Trends", "More"]);
+    expect(labels(bar)).toEqual(["Getting started", "Today", "Cases", "Products", "More"]);
     // The current screen is behind More: More is marked, and its list is closed until asked for.
     expect(bar).toMatch(/class="uw-tab is-within" aria-expanded="false"/);
     expect(PHONE_SLOTS).toHaveLength(4);
@@ -133,7 +122,7 @@ describe("the phone's bottom bar", () => {
 
 describe("the shell around it", () => {
   it("keeps a screen the persona does not list in view while it is open", () => {
-    expect(shownTabs(["home"], "trends")).toEqual({ tabs: ["home", "trends"], extra: "trends" });
+    expect(shownTabs(["home"], "products")).toEqual({ tabs: ["home", "products"], extra: "products" });
     expect(shownTabs(["home"], "home")).toEqual({ tabs: ["home"], extra: null });
     expect(shownTabs(["home"], null)).toEqual({ tabs: ["home"], extra: null });
   });

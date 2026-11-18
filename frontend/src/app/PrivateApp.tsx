@@ -9,6 +9,7 @@ import { allowedViewsForRole, isCustomerAdminRole, isPlatformAdminRole } from ".
 import { ApiError, requestJson, signInPath } from "./apiClient";
 import { SectionErrorBoundary } from "./ErrorBoundary";
 import {
+  adminInWorkspace,
   canSwitchToWorkspace,
   customerAdminDestination,
   rememberMode,
@@ -138,6 +139,8 @@ type SecurityContext = {
   deployment_role?: string;
   /** full or mvp (backend/app/feature_set.py); under mvp the parked screens are not offered (featureSet.ts). */
   feature_set?: string;
+  /** new or classic (tenants.navigation): on new, customer administration opens inside the workspace (UX2). */
+  navigation?: string;
   memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
   current_tenant?: { tenant_id: string; tenant_name?: string };
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
@@ -167,7 +170,11 @@ export function PrivateApplication() {
         const allowed = allowedViewsForRole(role, value.deployment_role, value.feature_set);
         let target: AppView = current;
         if (isPlatformAdminRole(role) && !allowed?.includes(current)) target = "admin";
-        else if (isCustomerAdminRole(role)) {
+        else if (isCustomerAdminRole(role) && adminInWorkspace(value.feature_set, value.navigation)) {
+          // One shell (UX2): the workspace, with Administration in its avatar menu (/app/customer-admin opens it).
+          target = allowed?.includes(current) ? current : "home";
+          setAdminMode("workspace");
+        } else if (isCustomerAdminRole(role)) {
           const destination = customerAdminDestination(current, rememberedMode(), allowed);
           target = destination.view;
           setAdminMode(destination.mode);
@@ -215,10 +222,12 @@ export function PrivateApplication() {
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
   const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role, securityContext?.feature_set);
+  const inShell = isCustomerAdmin && adminInWorkspace(securityContext?.feature_set, securityContext?.navigation);
 
   useEffect(() => {
     if (isPlatformAdmin && !allowedViews?.includes(activeView)) changeView("admin");
-    if (isCustomerAdmin) {
+    if (inShell && !allowedViews?.includes(activeView)) changeView("home");
+    if (isCustomerAdmin && !inShell) {
       // Back and forward between the console and the workspace follow the address.
       const destination = customerAdminDestination(activeView, adminMode, allowedViews);
       if (destination.mode !== adminMode) setAdminMode(destination.mode);
@@ -271,14 +280,14 @@ export function PrivateApplication() {
 
   // Business users, and a customer administrator who switched into the workspace: the user workspace owns
   // navigation, product context and sign-out.
-  if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && adminMode === "workspace"))
+  if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && (adminMode === "workspace" || inShell)))
     return (
       <>
         <SectionErrorBoundary name="The workspace">
           <UserWorkspace
             session={securityContext}
             initialView={activeView}
-            onAdminConsole={isCustomerAdmin ? () => switchTo("console") : undefined}
+            onAdminConsole={isCustomerAdmin && !inShell ? () => switchTo("console") : undefined}
           />
         </SectionErrorBoundary>
         <ConsentBanner />

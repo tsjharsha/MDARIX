@@ -30,6 +30,7 @@ export type AppView =
   | "reports"
   | "import"
   | "product-360"
+  | "approvals"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -109,6 +110,8 @@ export const APP_ROUTES: Record<AppView, string> = {
   import: "/app/import",
   // Work › Products on the new navigation (0.10.94): Product 360 and Supplier 360.
   "product-360": "/app/product-360",
+  // Decisions & Reports' approvals queue on the one navigation (UX2).
+  approvals: "/app/approvals",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",
