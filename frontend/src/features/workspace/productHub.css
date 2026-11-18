@@ -351,11 +351,9 @@
   font-size: var(--ms-fs-13);
   overflow-wrap: anywhere;
 }
-.uw-tw-glance-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
+.ac-link.uw-tw-glance-link {
+  display: block;
+  margin-top: 4px;
   text-align: left;
 }
 .uw-tw-genealogy {

@@ -562,9 +562,9 @@ describe("W1e: the twin at a glance for a quality lead", () => {
       expect(plain).toContain(line);
     for (const link of [
       "See its impact",
-      "Compare the versions",
+      "Compare versions",
       "Trace NS-SL-2417 (Sample)",
-      "Open the complaints",
+      "See the complaints",
       "Open SAMPLE-INV-001",
       "Open SAMPLE-CAPA-02",
       "Where do the numbers come from?",

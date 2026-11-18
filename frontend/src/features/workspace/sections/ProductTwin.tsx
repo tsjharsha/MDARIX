@@ -155,7 +155,7 @@ export function TwinSummaryStrip({ data, at }: { data: Row; at: At }) {
   const openCapa = (row: Row) => open("Records", `Effectiveness checks?${new URLSearchParams({ capa: row.id })}`);
   const link = (label: string, onClick: () => void) => (
     <button type="button" className="ac-link uw-tw-glance-link" onClick={onClick}>
-      {label} <ArrowRight size={13} aria-hidden="true" />
+      {label}
     </button>
   );
   const attention = investigations.length + capas.length;
@@ -183,7 +183,7 @@ export function TwinSummaryStrip({ data, at }: { data: Row; at: At }) {
           <span className="uw-tw-glance-label">Product versions</span>
           <strong>{summary.versions.length ? summary.versions.join(", ") : "None named"}</strong>
           <small>{change ? `Recorded in ${change.change_identifier}` : "No change to trace"}</small>
-          {link("Compare the versions", () => at({ view: "Version story", change: null, scope: null }))}
+          {link("Compare versions", () => at({ view: "Version story", change: null, scope: null }))}
         </li>
         <li className={lots.withComplaints.length ? "is-flag" : undefined}>
           <span className="uw-tw-glance-label">Lots</span>
@@ -204,7 +204,7 @@ export function TwinSummaryStrip({ data, at }: { data: Row; at: At }) {
             {complaints.open} open of {complaints.total}
           </strong>
           <small>{data.version ? `On ${data.version.version_identifier}` : "On the product"}</small>
-          {link("Open the complaints", () => at({ view: "Records", list: "complaints" }))}
+          {link("See the complaints", () => at({ view: "Records", list: "complaints" }))}
         </li>
         <li className={attention ? "is-flag" : undefined}>
           <span className="uw-tw-glance-label">Needs attention</span>
