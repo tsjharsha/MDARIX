@@ -57,14 +57,18 @@ STEPS = (
 MARKS = ("form", "records", "trends")
 MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
 # The marks each run keeps (W1): the flagship story's are its first three steps (backend/app/trial/flagship.py).
-RUN_MARKS = {"sample": MARKS, "yours": MARKS, "flagship": ("signal", "product", "evidence")}
+RUN_MARKS = {"sample": MARKS, "yours": MARKS, "flagship": ("signal", "product", "evidence", "brief")}
 
 
 def mark_index(run: str, step: str) -> int | None:
     """The step a mark ticks in its run (0-based), or None when the run keeps no such mark."""
     if step not in RUN_MARKS.get(run, ()):
         return None
-    return RUN_MARKS["flagship"].index(step) if run == "flagship" else MARK_STEP[step]
+    if run == "flagship":
+        from backend.app.trial.flagship import MARK_STEPS
+
+        return MARK_STEPS[step]
+    return MARK_STEP[step]
 
 
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.

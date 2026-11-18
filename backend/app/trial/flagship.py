@@ -7,7 +7,8 @@ SAMPLE-INV-001, "Why did pressure-alarm complaints rise after OrbitCare 300 Rev 
 3. evidence: the person opened the case's evidence overview from the story (a mark);
 4. ai: a person reviewed one of the case's AI proposals (an observation or the saved result: an ``ai_output_reviews``
    row; or an AI hypothesis a person judged). Seeding never ticks it: the sample's proposals are unreviewed;
-5. brief: a person accepted the sample author's brief for decision (APPROVED_FOR_DECISION);
+5. brief: the person opened the brief from the story (a mark; UX1: the sample reviewer has accepted it for decision,
+   so it waits for a signature), or a person accepted it for decision (a trial seeded before UX1), or it is decided;
 6. decision: a signed BRIEF decision on the case (its audit event says whether an authenticator code was checked);
 7. action: an effectiveness check is planned on a CAPA of the case (SAMPLE-CAPA-02 by default). The tick stays on
    the planned check (W1 spec); the card then reads planned -> synthetic follow-up (W1d) -> signed result.
@@ -39,7 +40,9 @@ STEPS = (
     ("decision", "Human decision"),
     ("action", "Action and impact"),
 )
-MARKS = ("signal", "product", "evidence")
+MARKS = ("signal", "product", "evidence", "brief")
+# The step each mark ticks (0-based): steps 1 to 3, and step 5 (the brief, UX1).
+MARK_STEPS = {"signal": 0, "product": 1, "evidence": 2, "brief": 4}
 # G-06: the OrbitCare 300 Rev B pressure-alarm rise as the trend check computes it on the sample (its last 30 days
 # against the expected count). The sample's texts that state the rise use this one number; a test checks it against
 # the trend check, so a change to the sample data that moves the trend fails until the texts follow.
@@ -150,6 +153,18 @@ def _decision(data: Session, control_db: Session, tenant_id, case_id) -> tuple[b
     return True, (details or {}).get("mfa_verified")
 
 
+def _sample_accounts(data: Session, tenant_id) -> set[str]:
+    """The ids of the sample's own accounts (author, reviewer, approver), which nobody signs in as."""
+    from backend.app.db.models.foundation import AuthUser
+
+    return {
+        str(user_id)
+        for (user_id,) in data.query(AuthUser.id).filter(
+            AuthUser.tenant_id == tenant_id, AuthUser.username.like("sample-author+%")
+        )
+    }
+
+
 def run_progress(data: Session, control_db: Session, tenant_id, request) -> dict | None:
     from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
     from backend.app.db.models.foundation import (
@@ -196,16 +211,16 @@ def run_progress(data: Session, control_db: Session, tenant_id, request) -> dict
         .first()
     )
     proposals, ai_done = _ai(data, tenant_id, case.id)
-    approved = (
-        data.query(DecisionBriefVersion.id)
-        .filter(
+    # A person's acceptance ticks step 5; the sample reviewer's (UX1) does not: the person reads the brief first.
+    reviewers = {
+        str(ref)
+        for (ref,) in data.query(DecisionBriefVersion.reviewed_by).filter(
             DecisionBriefVersion.tenant_id == tenant_id,
             DecisionBriefVersion.investigation_id == case.id,
             DecisionBriefVersion.status == "APPROVED_FOR_DECISION",
         )
-        .first()
-        is not None
-    )
+    }
+    approved = bool(reviewers - _sample_accounts(data, tenant_id))
     signed, mfa = _decision(data, control_db, tenant_id, case.id)
     capas = (
         data.query(Capa.id, Capa.capa_identifier, Capa.title)
@@ -243,9 +258,9 @@ def run_progress(data: Session, control_db: Session, tenant_id, request) -> dict
     )
     marks = one_story.team_marks(request, RUN, case.id)
     raw = [
-        *(bool(marks.get(step)) for step in MARKS),
+        *(bool(marks.get(step)) for step in MARKS[:3]),
         ai_done,
-        approved or signed,
+        bool(marks.get("brief")) or approved or signed,
         signed,
         bool(planned),
     ]
