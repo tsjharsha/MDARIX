@@ -166,6 +166,13 @@ export async function saveAiSettings(change: AiSettingsChange, reload: () => voi
   }
   reload();
 }
+/** Whether the pilot release gate keeps "Turn AI on" disabled: never for a free trial, whose AI the server lets on
+ * without that gate (it is about the paid provider; trial AI runs on sample data only). */
+export const releaseGateBlocks = (
+  data: Pick<AiSettings, "free_trial" | "release_gate"> | null | undefined,
+  on: boolean,
+) => !on && !data?.free_trial && gateBlocksSwitchOn(data?.release_gate);
+
 // A free trial's AI goes through the trial's own services: named in general words, never by provider.
 const TRIAL_SERVICES = "the free trial AI services";
 
@@ -278,12 +285,12 @@ export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
               type="button"
               className={on ? "ac-secondary" : "ac-primary"}
               onClick={change}
-              disabled={!data || waitsForServices || (!on && gateBlocksSwitchOn(data.release_gate))}
+              disabled={!data || waitsForServices || releaseGateBlocks(data, on)}
             >
               {on ? "Turn AI off" : "Turn AI on"}
             </button>
           </div>
-          {!on && gateBlocksSwitchOn(data?.release_gate) && (
+          {releaseGateBlocks(data, on) && (
             <p className="ac-muted" role="note">
               AI can be turned on once the AI release gate below is met.
             </p>
@@ -305,14 +312,18 @@ export function AiProcessing({ trialOwner = false }: { trialOwner?: boolean }) {
             <li>Changing this setting is recorded in the audit trail with your reason.</li>
           </ul>
           <p className="ac-muted">
-            {data?.models.length
-              ? `Model in use · configured${!trial && data.provider_name ? ` · provider: ${data.provider_name}` : ""}.`
-              : "No AI model is configured on this server, so every answer comes from rules."}
+            {trial
+              ? data?.trial_chain_on
+                ? "The free trial AI services are ready on this server; they answer on the sample data only."
+                : "The free trial AI services are not set up yet, so every answer comes from rules."
+              : data?.models.length
+                ? `Model in use · configured${data.provider_name ? ` · provider: ${data.provider_name}` : ""}.`
+                : "No AI model is configured on this server, so every answer comes from rules."}
           </p>
         </Panel>
       </div>
       <AiFeatures features={data?.features} onSwitch={switchFeature} />
-      {!trialOwner && <AiReleaseGate gate={data?.release_gate} />}
+      {!trialOwner && !trial && <AiReleaseGate gate={data?.release_gate} />}
     </>
   );
 }

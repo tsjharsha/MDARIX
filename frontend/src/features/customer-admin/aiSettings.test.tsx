@@ -9,7 +9,7 @@ import {
   providerLabel,
   withLockVersion,
 } from "./aiSettings";
-import { AiFeatures, saveAiSettings } from "./sections/Security";
+import { AiFeatures, releaseGateBlocks, saveAiSettings } from "./sections/Security";
 import { ConfirmDialog } from "./shared";
 
 describe("AI processing switch", () => {
@@ -150,5 +150,18 @@ describe("a change tied to the settings' version (D3)", () => {
     ).toMatchObject({
       lock_version: 3,
     });
+  });
+});
+
+describe("the pilot release gate and a free trial (0.11.05 release, 18 Nov 2026)", () => {
+  const closed = { enforced: true, ready: false } as never;
+
+  it("does not keep a free trial's Turn AI on disabled: the server skips that gate for trials", () => {
+    expect(releaseGateBlocks({ free_trial: true, release_gate: closed }, false)).toBe(false);
+  });
+
+  it("still blocks a paid organization until the gate is met, and never blocks turning AI off", () => {
+    expect(releaseGateBlocks({ free_trial: false, release_gate: closed }, false)).toBe(true);
+    expect(releaseGateBlocks({ free_trial: false, release_gate: closed }, true)).toBe(false);
   });
 });
