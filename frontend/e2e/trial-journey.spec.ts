@@ -194,6 +194,8 @@ test.describe("free trial journey", () => {
     await expect(page.getByLabel(/^Phone/)).toHaveValue(/^\+91/);
     await page.getByLabel(/^Phone/).fill("+91 98765 43210");
     await page.getByRole("button", { name: "Continue" }).click();
+    // The optional answers sit folded under "Tell us more (optional)" (as support/journey.ts signUp opens them).
+    await page.getByText("Tell us more (optional)").click();
 
     for (const name of [
       "Company size",
