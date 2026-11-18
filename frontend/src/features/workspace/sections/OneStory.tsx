@@ -62,6 +62,7 @@ import {
   stepBlocker,
   stepCount,
   stepPlace,
+  markProblemRun,
   takeMarkProblem,
   useOneStory,
   type FlagshipRun,
@@ -980,7 +981,8 @@ export function FlagshipView({
   const aiReady = useAiReady();
   const [picked, setPicked] = useState<number | null>(null);
   const [problem] = useState(() => takeMarkProblem("flagship"));
-  const [folded, setFolded] = useState(true);
+  // A ten-step step refused: its fold opens, so the walkthrough under it says why.
+  const [folded, setFolded] = useState(() => (markProblemRun() ?? "flagship") === "flagship");
   const [busy, setBusy] = useState(false);
   const done = run.steps.filter((step) => step.done).length;
   const selected = picked ?? Math.min(run.current, FLAGSHIP_STEPS - 1);

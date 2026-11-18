@@ -9,7 +9,15 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ReportPage } from "./sections/ReportsTab";
 import { FinishedRecord } from "./sections/Records";
 import { TrendCheck } from "./sections/TrendCheck";
-import { ONE_STORY_PATH, openStep, takeMarkProblem, visited, type StoryRun, type Visit } from "./oneStory";
+import {
+  ONE_STORY_PATH,
+  markProblemRun,
+  openStep,
+  takeMarkProblem,
+  visited,
+  type StoryRun,
+  type Visit,
+} from "./oneStory";
 import { eventPath } from "./oversight";
 import { REPORTS, type ReportDetail } from "./authorityReports";
 import { rv11 } from "../../test/rv11";
@@ -242,6 +250,9 @@ describe("a loaded screen of another record ticks nothing", () => {
     await openStep(run(8), 8, vi.fn());
     await visited({ step: "records", complaintId: "c-rv11" });
     expect(takeMarkProblem("flagship")).toBeNull();
+    // Getting started opens the ten steps' fold while their refusal waits, then the walkthrough takes it.
+    expect(markProblemRun()).toBe("sample");
     expect(takeMarkProblem()).toContain("Finish step 8 first.");
+    expect(markProblemRun()).toBeNull();
   });
 });

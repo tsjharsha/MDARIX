@@ -195,6 +195,8 @@ export const recordsTab = (ref: string) => `Decision records?${new URLSearchPara
  * that story's problem is taken: the flagship card and the ten-step walkthrough under it are on one page, and the
  * walkthrough's refusal must not be taken (and lost) by the flagship card. */
 let markProblem: { run: string; text: string } | null = null;
+/** The story whose step was refused, while its reason waits to be shown (the problem is not taken). */
+export const markProblemRun = () => markProblem?.run ?? null;
 export const takeMarkProblem = (run?: string) => {
   if (!markProblem || (run !== undefined && markProblem.run !== run)) return null;
   const found = markProblem.text;
