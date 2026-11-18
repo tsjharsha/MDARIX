@@ -54,15 +54,18 @@ describe("the flagship walk-through, by each screen's main button", () => {
       const classic = placeOf({ section: target.section, target });
       const place = routeFor(classic.section, classic.tab, "mvp", "new");
       const { name, query } = tabParts(place.tab);
-      expect(NEW_PLACES[place.section]?.tabs, `${target.section} › ${target.tab}`).toContain(name);
+      // A screen without tabs (Reports, UX2) is opened by its name alone.
+      expect(name ? NEW_PLACES[place.section]?.tabs : [""], `${target.section} › ${target.tab}`).toContain(name);
       // A record the screen opens on: never a list to search.
       if (target.record.kind !== "case") expect(query, target.tab).toContain("c1");
     }
     // "Assess the United States (FDA) market" opens the complaint's assessment, not its list of reports (0.10.68
     // opened Reporting on the reports, with no assessment in sight).
-    expect(routeFor("Complaints", "Reportability?complaint=c1", "mvp", "new").tab).toBe(
-      "Reporting?complaint=c1&part=assess",
-    );
-    expect(source("ComplaintViews")).toContain('tabParam(carried, "part") === "assess"');
+    // UX2: on Decisions & Reports › Reports.
+    expect(routeFor("Complaints", "Reportability?complaint=c1", "mvp", "new")).toEqual({
+      section: "Reports",
+      tab: "?complaint=c1&part=assess",
+    });
+    expect(source("DecisionsArea")).toContain('tabParam(carried, "part") === "assess"');
   });
 });

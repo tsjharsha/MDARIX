@@ -101,7 +101,8 @@ describe("the link table's places are the screens", () => {
       if (section === "Complaint") continue; // /app/complaints/<ref>, below
       const view = viewFromPath(place.path);
       expect(APP_ROUTES[view], section).toBe(place.path);
-      expect(WORKSPACE_VIEWS, section).toContain(view);
+      // Administration is the customer-admin address, which only a customer administrator's workspace opens (UX2).
+      expect(section === "Administration" ? ["customer-admin"] : WORKSPACE_VIEWS, section).toContain(view);
       // The classic and new screens that share a path (/app/my-work) are one section.
       expect(VIEW_TO_SECTION[view]?.[0], section).toBe(section);
     }
@@ -379,28 +380,15 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
     expect(NEW_PLACES["My Work"].views?.["Tasks for me"]).toEqual(TASK_TABS.map((item) => item.tab));
     // The tab bar (0.10.73, Release C part C1): eight destinations, My work as Home; each persona shows some of
     // them. Settings and Account are in the avatar's menu (Help is the Help menu).
-    expect(NEW_MENU.main).toEqual([
-      "My Work",
-      "Complaints",
-      "Decision trees",
-      "Reports",
-      "Investigations",
-      "Trends",
-      "Product 360",
-      "Records",
-      "Team",
-    ]);
-    expect(NEW_MENU.top).toEqual(["Settings", "My Account"]);
+    // UX2: each work area's first screen; Records, Team, Settings, Account and Administration in the avatar menu.
+    expect(NEW_MENU.main).toEqual(["My Work", "Complaints", "Investigations", "Product 360", "Approvals"]);
+    expect(NEW_MENU.top).toEqual(["Records", "Team", "Settings", "My Account", "Administration"]);
     expect(NEW_MENU.main.map((name) => NEW_PLACES[name].label ?? name)).toEqual([
-      "Home",
+      "Today",
       "Complaints",
-      "Decision trees",
-      "Reports",
       "Investigations",
-      "Trends",
       "Products",
-      "Records",
-      "Team",
+      "Approvals",
     ]);
     // My work has fewer tabs than the classic 10.
     expect(NEW_PLACES["My Work"].tabs.length).toBeLessThan(PLACES["My Work"].tabs.length);
@@ -424,9 +412,10 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
   });
 
   it("keeps what a link carries, and names the view a former tab is now", () => {
+    // UX2: a complaint's reports open Decisions & Reports › Reports, the complaint and the report kept.
     expect(routeFor("Complaints", "Reports?complaint=c1&report=r1", "mvp", "new")).toEqual({
-      section: "Complaints",
-      tab: "Reporting?complaint=c1&report=r1",
+      section: "Reports",
+      tab: "?complaint=c1&report=r1",
     });
     expect(routeFor("My Work", "Overdue", "mvp", "new")).toEqual({
       section: "My Work",

@@ -24,7 +24,7 @@ export type NewPlace = {
 };
 export const NEW_PLACES: Readonly<Record<string, NewPlace>> = table.newPlaces;
 
-/** The new navigation's menu: the four main screens, and Settings, Team and Account at the top right. */
+/** The one navigation's menu (UX2): each work area's first screen, and the avatar menu's screens. */
 export const NEW_MENU: { main: readonly string[]; top: readonly string[] } = table.newMenu;
 
 /** The screens of a navigation. */

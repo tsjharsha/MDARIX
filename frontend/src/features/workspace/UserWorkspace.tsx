@@ -97,8 +97,13 @@ import { SettingsSection } from "./sections/Settings";
 import { TeamSection } from "./sections/Team";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { HomeSection } from "./sections/Home";
+import { ApprovalsSection, ReportingSection } from "./sections/DecisionsArea";
+import { PortfolioToday } from "./sections/Portfolio";
+import { AreaNav } from "./AreaNav";
+import { areaEntry } from "./areas";
+import { CustomerAdminControlPlane } from "../customer-admin/CustomerAdminControlPlane";
+import type { TenantContext } from "../customer-admin/context";
 import { DecisionTreesSection } from "./sections/DecisionTrees";
-import { ReportsSection } from "./sections/ReportsTab";
 import {
   AvatarMenu,
   DataChoice,
@@ -322,6 +327,21 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
       "Each product version and each supplier, with every complaint, investigation, trend, CAPA, risk and report linked to it. MDARIX lists what was recorded; it does not infer a cause.",
     context: false,
   },
+  // The one navigation (UX2): Decisions & Reports' approvals, and customer administration in the same shell.
+  Approvals: {
+    icon: Gavel,
+    description: "Decisions waiting for your signature",
+    guide:
+      "Each brief accepted for decision that waits for your signature, critical and overdue first. Open one to read it and sign or return it; you never sign your own work.",
+    context: false,
+  },
+  Administration: {
+    icon: Building2,
+    description: "Your organization, people, data, security, audit",
+    guide:
+      "Set up your organization in five places: the organization, people and access, data and connections, AI and security, and the audit trail. Every change is recorded.",
+    context: false,
+  },
 };
 
 /** The new navigation's menu lines and page purposes (0.10.68), where they differ from the classic ones. */
@@ -371,6 +391,8 @@ export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
   "Next steps": "What comes after the trial?",
   "Look ahead": "What will your partners see?",
   "Product 360": "What is linked to each product and supplier?",
+  Approvals: "What waits for your signature?",
+  Administration: "How is your organization set up?",
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -545,6 +567,11 @@ export function UserWorkspace({
       window.scrollTo({ top: 0 });
     },
     [setLocation, featureSet, navigation],
+  );
+  // A rail destination opens its area's first screen this person may open (UX2, areas.ts).
+  const openArea = useCallback(
+    (name: WorkspaceSection) => open(areaEntry(name, visibleSections)),
+    [open, visibleSections],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
   // A trial's next chapter, opened from the "chapter done" banner: its screen (and its case), else Getting started.
@@ -827,6 +854,7 @@ export function UserWorkspace({
                 open={open}
                 onAdminConsole={onAdminConsole}
                 showSettings={visibleSections.includes("Settings")}
+                canOpen={(name) => visibleSections.includes(name)}
                 onImport={importOwn}
                 data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
@@ -834,7 +862,7 @@ export function UserWorkspace({
             <NavRail
               tabs={tabs}
               current={tabOfSection(section)}
-              open={open}
+              open={openArea}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
               progress={progress}
               progressTotal={progressTotal}
@@ -1026,6 +1054,8 @@ export function UserWorkspace({
               </p>
             ) : (
               <>
+                {/* An area with more than one screen names them first (UX2): Today, Products, Decisions & Reports. */}
+                {fresh && <AreaNav section={section} visible={visibleSections} open={open} />}
                 {/* One complaint's page has its own header (sections/ComplaintPage.tsx); so has Home (0.10.73). */}
                 {pageHeadShown(section, fresh, !!trial?.is_trial, shown ?? tab) && (
                   <div className="ac-page-head">
@@ -1109,7 +1139,14 @@ export function UserWorkspace({
                       {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
                       {section === "My Work" &&
-                        (fresh ? <HomeSection tab={tab} heading={heading} /> : <MyWorkSection tab={tab} />)}
+                        (!fresh ? (
+                          <MyWorkSection tab={tab} />
+                        ) : persona === "executive" ? (
+                          // The Executive's Today is the portfolio (UX2): exposure per product, read-only.
+                          <PortfolioToday heading={heading} />
+                        ) : (
+                          <HomeSection tab={tab} heading={heading} />
+                        ))}
                       {section === "Products" && <ProductsSection tab={tab} />}
                       {section === "Complaints" &&
                         (fresh ? <ComplaintViews tab={tab} /> : <ComplaintsSection tab={tab} />)}
@@ -1131,7 +1168,17 @@ export function UserWorkspace({
                       {section === "Team" && <TeamSection onAdminConsole={onAdminConsole} />}
                       {section === "Complaint" && <ComplaintPage tab={tab} heading={heading} />}
                       {section === "Decision trees" && <DecisionTreesSection />}
-                      {section === "Reports" && <ReportsSection />}
+                      {section === "Reports" && <ReportingSection tab={tab} />}
+                      {/* Drawn only once granted: an old link never sends a read the server would refuse. */}
+                      {section === "Approvals" && visibleSections.includes(section) && <ApprovalsSection />}
+                      {section === "Administration" && visibleSections.includes(section) && (
+                        <CustomerAdminControlPlane
+                          embedded
+                          securityContext={session as TenantContext | null}
+                          initialSection={tabParts(tab).name}
+                          onSection={(name) => reportTab(name, "replace")}
+                        />
+                      )}
                       {section === "Import your data" && <ImportYourDataSection focus={tab} />}
                       {section === "Product 360" && <ProductHubSection tab={tab} heading={heading} />}
                     </div>
@@ -1145,7 +1192,7 @@ export function UserWorkspace({
           <PhoneBar
             tabs={tabs}
             current={tabOfSection(section)}
-            open={open}
+            open={openArea}
             personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
             progress={progress}
             progressTotal={progressTotal}

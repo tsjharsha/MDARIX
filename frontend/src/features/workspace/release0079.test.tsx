@@ -71,13 +71,13 @@ describe("Settings › Products: the Regulatory Leader may change it", () => {
   });
 });
 
-describe("Tenant 360: personas need the new navigation", () => {
-  it("says so beside Navigation", () => {
+describe("Tenant 360: the new navigation is everyone's (UX2)", () => {
+  it("says classic is a fallback for one release beside Navigation", () => {
     const html = renderToStaticMarkup(
       <TenantOverview tenant={{ navigation: "classic", tenant_key: "T1" }} onEdit={() => undefined} />,
     );
     expect(html).toContain("Navigation");
-    expect(html).toContain("“Viewing as” personas need New.");
+    expect(html).toContain("Classic is a fallback for one release only, then retired.");
   });
 });
 

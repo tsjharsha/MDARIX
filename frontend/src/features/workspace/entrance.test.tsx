@@ -92,8 +92,9 @@ describe("the entrance", () => {
   it("reads the step from the place on screen, the report apart from the market assessment", () => {
     const flagship = SCENARIOS.find((item) => item.key === "reportable")!;
     const at = (section: string, tab?: string) => storyStep(flagship, { section, tab });
-    expect(at("Complaints", "Reporting?complaint=c1")).toBe(2);
-    expect(at("Complaints", "Reporting?complaint=c1&report=r1")).toBe(3);
+    // UX2: the assessment and the report are on Decisions & Reports › Reports.
+    expect(at("Reports", "?complaint=c1&part=assess")).toBe(2);
+    expect(at("Reports", "?complaint=c1&report=r1")).toBe(3);
     expect(at("Complaint", "Decisions & actions?ref=SAMPLE-RV-11")).toBe(6);
     expect(at("Records", "Exports")).toBe(-1);
     expect(tabParts("Summary?ref=x").name).toBe("Summary");
@@ -102,7 +103,7 @@ describe("the entrance", () => {
   it("shows the story bar with the step and the way back", () => {
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={api("reportable")}>
-        <StoryBar section="Complaints" tab="Reporting?complaint=c1" />
+        <StoryBar section="Reports" tab="?complaint=c1" />
       </WorkspaceContext.Provider>,
     );
     expect(html).toContain("Step 3 of 7: Assess the US, then India");

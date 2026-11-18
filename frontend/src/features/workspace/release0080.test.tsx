@@ -72,7 +72,7 @@ beforeEach(() => {
 });
 
 describe("1. Getting started in the tab bar", () => {
-  it("is the first tab, left of Home, for every persona of a trial; never in a pilot's bar", () => {
+  it("is the first tab, left of Today, for every persona of a trial; never in a pilot's bar", () => {
     const allowed = ["Getting started", "My Work", "Complaints", "Trends"];
     for (const persona of [["home", "complaints"], ["home", "trends"], ["home"]]) {
       const tabs = visibleTabs(trialTabs(persona, true), allowed);
@@ -86,7 +86,7 @@ describe("1. Getting started in the tab bar", () => {
     expect(tabOfSection("Getting started")).toBe("start");
     // 0.10.90: the rail's head, above Home.
     const bar = renderToStaticMarkup(<NavRail tabs={["start", "home"]} current="start" open={vi.fn()} />);
-    expect(bar.indexOf("Getting started")).toBeLessThan(bar.indexOf("Home"));
+    expect(bar.indexOf("Getting started")).toBeLessThan(bar.indexOf("Today"));
     expect(bar).toMatch(/class="uw-navrail-story" aria-current="page"[^>]*>.*<strong>Getting started<\/strong>/);
   });
 });

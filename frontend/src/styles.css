@@ -10945,6 +10945,24 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   background: var(--ms-mint);
   color: var(--ms-teal-dark);
 }
+/* The pilot requests' status: a choice, not a third row of tabs (UX2). */
+.trial-queue-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  color: var(--ms-ink-2);
+  font-weight: 600;
+}
+.trial-queue-show select {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+}
 .trial-queue-table-wrap {
   overflow-x: auto;
 }

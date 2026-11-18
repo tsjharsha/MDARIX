@@ -47,6 +47,10 @@ export const WORKSPACE_SECTIONS = [
   // Work › Products on the new navigation (0.10.94, W1): Product 360 and Supplier 360, /app/product-360. A new name, so
   // the classic Products screen and its parking stay as they are.
   "Product 360",
+  // The one navigation (UX2, Persona Blueprint wave D): Decisions & Reports' approvals queue, /app/approvals, and
+  // customer administration inside the same shell, /app/customer-admin (customer administrators only).
+  "Approvals",
+  "Administration",
 ] as const;
 
 /** Sections only the new navigation shows. */
@@ -59,6 +63,8 @@ export const NEW_ONLY_SECTIONS: readonly string[] = [
   "Reports",
   "Import your data",
   "Product 360",
+  "Approvals",
+  "Administration",
 ];
 
 /** Sections that exist only in a free-trial workspace. */
@@ -102,6 +108,10 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Import your data": [],
   // Read by every member who reads products and complaints (the server's own check, product360 and supplier routes).
   "Product 360": ["products"],
+  // Whoever may sign a decision or approve a report (SECTION_PERMISSIONS); the queue's own read checks again.
+  Approvals: ["decision-center"],
+  // The server lists "customer-admin" for customer administrators only; every admin route checks the role again.
+  Administration: ["customer-admin"],
 };
 
 export type SessionContext = {
@@ -554,8 +564,10 @@ export function useOpenInvestigation(): ((request: OpenInvestigationRequest) => 
 }
 
 /** Sections that also need a business permission (the server enforces it on every call as well). */
-export const SECTION_PERMISSIONS: Partial<Record<WorkspaceSection, BusinessPermission>> = {
+export const SECTION_PERMISSIONS: Partial<Record<WorkspaceSection, BusinessPermission | BusinessPermission[]>> = {
   "Import data": "records.write",
+  // Any one of these (UX2).
+  Approvals: ["decision.sign", "regulatory.approve"],
 };
 
 /** Whether this person may bring in their own data (0.10.79): the organization imports (not a sample-only trial) and
@@ -578,8 +590,13 @@ export function sectionAllowed(
   if (sampleOnly && section === "Import data") return false;
   const keys = SECTION_MENU_KEYS[section];
   const permission = SECTION_PERMISSIONS[section];
+  const needed = permission === undefined ? [] : Array.isArray(permission) ? permission : [permission];
   // A section that changes data is shown only when the server listed the permission (fail closed).
-  if (permission && !(Array.isArray(businessPermissions) && businessPermissions.includes(permission))) return false;
+  if (
+    needed.length &&
+    !(Array.isArray(businessPermissions) && needed.some((item) => businessPermissions.includes(item)))
+  )
+    return false;
   // Fail closed: without a server-issued menu only My Account is shown. The server still authorizes every call.
   return !keys.length || (!!allowedMenu && keys.some((key) => allowedMenu.includes(key)));
 }

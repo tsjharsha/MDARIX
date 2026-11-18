@@ -69,10 +69,10 @@ describe("2. the complaint list's big count", () => {
 });
 
 describe("3. the rail's alerts: a dot, never a count", () => {
-  const tabs = visibleTabs(trialTabs(["home", "complaints", "trees", "trends", "records"], true), ALL);
+  const tabs = visibleTabs(trialTabs(["home", "complaints", "investigations", "products", "decisions"], true), ALL);
 
   it("marks Complaints while a complaint is overdue and Trends while a product rises", () => {
-    expect([...railAlerts(3, 1)]).toEqual(["complaints", "trends"]);
+    expect([...railAlerts(3, 1)]).toEqual(["complaints", "products"]);
     expect([...railAlerts(0, 0)]).toEqual([]);
     expect([...railAlerts(null, undefined)]).toEqual([]);
   });
@@ -82,8 +82,8 @@ describe("3. the rail's alerts: a dot, never a count", () => {
       <NavRail tabs={tabs} current="home" open={vi.fn()} progress={10} alerts={railAlerts(27, 1)} />,
     );
     const complaints = rail.slice(
-      rail.indexOf('title="Complaints"'),
-      rail.indexOf("</button>", rail.indexOf('title="Complaints"')),
+      rail.indexOf('title="Cases"'),
+      rail.indexOf("</button>", rail.indexOf('title="Cases"')),
     );
     expect(complaints).toContain('<i class="uw-tab-dot" aria-hidden="true" title="New items"></i>');
     expect(complaints).toContain('<span class="sr-only"> · New items</span>');
@@ -94,7 +94,7 @@ describe("3. the rail's alerts: a dot, never a count", () => {
 
   it("puts the dot on More when the destination is behind it on a phone", () => {
     const bar = renderToStaticMarkup(
-      <PhoneBar tabs={tabs} current="home" open={vi.fn()} alerts={new Set(["records"])} />,
+      <PhoneBar tabs={tabs} current="home" open={vi.fn()} alerts={new Set(["decisions"])} />,
     );
     const more = bar.slice(bar.indexOf('aria-expanded="false"'));
     expect(more).toContain("New items");

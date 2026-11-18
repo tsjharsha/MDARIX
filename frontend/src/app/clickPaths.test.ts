@@ -282,16 +282,19 @@ describe("the click paths a–u on the new navigation (stages 7 and 8, B6a, navi
   });
 
   it("starts on the menu's own screens", () => {
-    expect(NEW_MENU.main).toContain("Trends");
+    // UX2: Trends is a screen of the Products area, not a menu line of its own.
+    expect(NEW_MENU.main).toContain("Product 360");
     // Team is a tab of the bar since 0.10.73 (Admin's only); Settings and Account are in the avatar's menu.
-    expect(NEW_MENU.main).toContain("Team");
+    // UX2: Team is in the avatar menu for everyone.
+    expect(NEW_MENU.top).toContain("Team");
   });
 
   it("opens a reportability task on the complaint's market assessment (path b)", () => {
     const task = { task_type: "REPORTABILITY_DECISION", investigation: null, details: { complaint_id: "c1" } } as never;
+    // UX2: reportability lives in Decisions & Reports › Reports, with the complaint's assessment open.
     expect(routeFor(taskDestination(task).section, taskDestination(task).tab, "mvp", "new")).toEqual({
-      section: "Complaints",
-      tab: "Reporting?complaint=c1&part=assess",
+      section: "Reports",
+      tab: "?complaint=c1&part=assess",
     });
   });
 });

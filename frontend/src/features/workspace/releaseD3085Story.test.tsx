@@ -110,14 +110,14 @@ describe("The story always works (owner report on 0.10.84)", () => {
   it("shows the open screen as a tab of its own when the persona's tabs do not list it", () => {
     const bar = renderToStaticMarkup(
       <NavRail
-        tabs={["start", "home", "trends", "records"]}
+        tabs={["start", "home", "products", "decisions"]}
         current="complaints"
         open={vi.fn()}
         personaLabel="Executive"
       />,
     );
     expect(bar).toMatch(
-      /class="uw-tab is-extra" aria-current="page" title="Opened from Getting started or a link: not one of Executive&#x27;s tabs">.*?<span class="uw-tab-label">Complaints</,
+      /class="uw-tab is-extra" aria-current="page" title="Opened from Getting started or a link: not one of Executive&#x27;s tabs">.*?<span class="uw-tab-label">Cases</,
     );
     const listed = renderToStaticMarkup(<NavRail tabs={["start", "home"]} current="home" open={vi.fn()} />);
     expect(listed).not.toContain("is-extra");

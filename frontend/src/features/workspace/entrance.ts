@@ -110,15 +110,15 @@ export const SCENARIOS: readonly Scenario[] = [
       {
         label: "Assess the US, then India",
         button: "Save and sign",
-        section: "Complaints",
-        tab: "Reporting",
+        // Decisions & Reports › Reports since UX2 (Complaints › Reporting before).
+        section: "Reports",
         hasNot: "report",
       },
       {
         label: "Prepare the US 30-day report",
         button: "Ask for approval",
-        section: "Complaints",
-        tab: "Reporting",
+        // Decisions & Reports › Reports since UX2 (Complaints › Reporting before).
+        section: "Reports",
         has: "report",
       },
       { label: "Sign the disposition", button: "Sign", section: "My Work", tab: "Queues" },

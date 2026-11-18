@@ -698,3 +698,19 @@ html:has(.uw-hybrid) {
     margin: 0;
   }
 }
+/* The Executive's Today (UX2, sections/Portfolio.tsx): what each figure counts, under the table. */
+.uw-pf-defs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ms-space-2) var(--ms-space-3);
+  margin: var(--ms-space-3) 0 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-pf-defs dt {
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-pf-defs dd {
+  margin: 0;
+}

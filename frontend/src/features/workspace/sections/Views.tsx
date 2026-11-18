@@ -70,6 +70,7 @@ export function ListViewPicker({
   detail,
   count,
   noun = "record",
+  labels = {},
 }: {
   mine: readonly string[];
   more?: readonly string[];
@@ -83,11 +84,13 @@ export function ListViewPicker({
   count?: number | null;
   /** What the list holds, in the singular ("complaint"). */
   noun?: string;
+  /** A view's shown name where it differs from its address name (Cases' "To log" for "Calls to check", UX2). */
+  labels?: Readonly<Record<string, string>>;
 }) {
   const id = useId();
   const option = (view: string) => (
     <option key={view} value={view}>
-      {view}
+      {labels[view] ?? view}
     </option>
   );
   return (

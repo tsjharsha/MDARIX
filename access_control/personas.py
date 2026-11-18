@@ -52,10 +52,13 @@ def validate_persona_assignments(codes: list[str]) -> list[PersonaDefinition]:
 
 
 # ------------------------------------------------------------------------------- Workspace personas (0.10.73, C1)
-# "Viewing as": which destinations and Home a person sees on the new navigation. A persona is never a permission:
-# signing and every server route follow the person's real role (backend/app/access/permissions.py). An invited
-# colleague's persona is their real role (``role``), set by the trial owner; only the trial owner switches their own
-# view, and their role stays Leader whatever they view as.
+# "Viewing as": which work areas and Home a person sees on the new navigation. Since UX2 (Persona Blueprint wave D) the
+# areas are the five of the one navigation: home (Today), complaints (Cases), investigations, products (Products and
+# Trends) and decisions (Decisions & Reports: approvals, decision trees, authority reports); a persona lists only the
+# areas holding its work. Records & trust, Team, Settings and Administration are in the avatar menu for everyone.
+# A persona is never a permission: signing and every server route follow the person's real role
+# (backend/app/access/permissions.py). An invited colleague's persona is their real role (``role``), set by the trial
+# owner; only the trial owner switches their own view, and their role stays Leader whatever they view as.
 
 
 @dataclass(frozen=True)
@@ -73,21 +76,21 @@ WORKSPACE_PERSONAS = (
         "Admin",
         "Trial owner · sees everything",
         "LEADER",
-        ("home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"),
+        ("home", "complaints", "investigations", "products", "decisions"),
     ),
     WorkspacePersona(
         "quality",
         "Quality Leader",
         "Complaints, investigations, CAPA, trends",
         "LEADER",
-        ("home", "complaints", "reports", "investigations", "trends", "products", "records"),
+        ("home", "complaints", "investigations", "products", "decisions"),
     ),
     WorkspacePersona(
         "regulatory",
         "Regulatory Leader",
         "Reportability, legal clocks, authority reports",
         "REGULATORY_REVIEWER",
-        ("home", "complaints", "trees", "reports", "records"),
+        ("home", "complaints", "decisions"),
     ),
     # B2 (spec 6.2): the Service Desk logs, checks and classifies Cases.
     WorkspacePersona(
@@ -101,24 +104,28 @@ WORKSPACE_PERSONAS = (
         "Investigator",
         "Investigations and the evidence",
         "INVESTIGATOR",
-        ("home", "investigations", "trends", "products"),
+        ("home", "complaints", "investigations", "products"),
     ),
     WorkspacePersona(
         "risk",
         "Risk Reviewer",
         "Risk reviews and the risk file",
         "RISK_REVIEWER",
-        ("home", "investigations", "products", "records"),
+        ("home", "investigations", "products"),
     ),
     WorkspacePersona(
         "decision",
         "Decision Maker",
         "Approvals and signed decisions",
         "APPROVER",
-        ("home", "complaints", "reports", "records"),
+        ("home", "complaints", "investigations", "decisions"),
     ),
     WorkspacePersona(
-        "executive", "Executive", "View only: what needs attention", "VIEWER", ("home", "trends", "products", "records")
+        "executive",
+        "Executive",
+        "View only: what needs attention",
+        "VIEWER",
+        ("home", "investigations", "products", "decisions"),
     ),
 )
 WORKSPACE_PERSONAS_BY_CODE = {persona.code: persona for persona in WORKSPACE_PERSONAS}

@@ -79,9 +79,9 @@ class Tenant(Base):
     legal_hold_reason: Mapped[str | None] = mapped_column(Text)
     legal_hold_set_at = tz()
     legal_hold_set_by: Mapped[str | None] = mapped_column(String(255))
-    # Which navigation the organization's workspace shows: classic (today's menu) or new (stage 7, built behind it).
-    # Set by a platform administrator in Tenant 360 (migration tr11navigation); the session context names it.
-    navigation: Mapped[str] = mapped_column(String(10), nullable=False, server_default="classic")
+    # Which navigation the organization's workspace shows: new (the one navigation, the default since ux2navigationnew)
+    # or classic (a fallback a platform administrator may still set in Tenant 360 for one release, then retired).
+    navigation: Mapped[str] = mapped_column(String(10), nullable=False, server_default="new")
     # An evaluation on the sample only (an event or judge trial, 0.10.71, tr12): every import route refuses it and the
     # screens offer "Discuss a pilot" instead of an upload. Set by a platform administrator in Tenant 360.
     sample_only: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
