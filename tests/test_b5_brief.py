@@ -115,8 +115,11 @@ def test_an_unanswered_material_question_blocks_submit_until_answered(trial):
     base = f"/api/v1/investigations/{trial['case_id']}"
     refused = user.post(f"{base}/decision-brief/submit")
     assert refused.status_code == 409, refused.text
+    # The challenge questions block; the sample's requested risk review (UX1) may block beside them.
     blocking = [item["key"] for item in refused.json()["detail"]["blocking"]]
-    assert sorted(blocking) == sorted(f"challenge:{key}" for key in answers)
+    assert sorted(key for key in blocking if key.startswith("challenge:")) == sorted(
+        f"challenge:{key}" for key in answers
+    )
     for key in answers:
         answered = user.post(f"{base}/challenge/questions/answer", json={"key": key, "text": "An answer long enough."})
         assert answered.status_code == 200, answered.text

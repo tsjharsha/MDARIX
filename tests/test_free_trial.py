@@ -971,7 +971,8 @@ def test_one_trial_user_reviews_the_sample_brief_and_may_sign_its_decision():
         case_id = case.id
         brief = db.query(DecisionBriefVersion).filter(DecisionBriefVersion.investigation_id == case_id).one()
         author = db.get(AuthUser, uuid.UUID(brief.submitted_by))
-        assert brief.status == "READY_FOR_REVIEW" and brief.created_by == brief.submitted_by
+        # UX1: accepted for decision by the sample reviewer, a second sample person (segregation of duties).
+        assert brief.status == "APPROVED_FOR_DECISION" and brief.created_by == brief.submitted_by
         assert author.display_name == SAMPLE_AUTHOR_NAME and author.status == "DISABLED"
         # Staged once: approving again or refreshing leaves it.
         assert stage_sample_decision(db, tenant_id)["created"] is False
@@ -984,13 +985,6 @@ def test_one_trial_user_reviews_the_sample_brief_and_may_sign_its_decision():
         member["display_name"] != SAMPLE_AUTHOR_NAME for member in user.get("/api/v1/trial/team").json()["members"]
     )
 
-    base = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
-    started = user.post(f"{base}/start-review", json={})
-    assert started.status_code == 200, started.text
-    accepted = user.post(
-        f"{base}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence and scope hold."}
-    )
-    assert accepted.status_code == 200, accepted.text
     screen = user.get(f"/api/v1/investigations/{case_id}/decision")
     assert screen.status_code == 200, screen.text
     actions = screen.json()["actions"]
@@ -1674,12 +1668,7 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
     owners = {str(row["id"]): row.get("owner_name") for row in cases}
     assert owners.get(str(case_id)) == "MDARIX sample author"
 
-    brief = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
-    assert user.post(f"{brief}/start-review", json={}).status_code == 200
-    accepted = user.post(
-        f"{brief}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence and scope hold."}
-    )
-    assert accepted.status_code == 200, accepted.text
+    # UX1: the sample reviewer accepted the brief for decision; the person signs it.
     screen = user.get(f"/api/v1/investigations/{case_id}/decision").json()
     view = screen["brief"]
     assert view["leading_hypothesis"] and len(view["alternative_hypotheses"]) == 1

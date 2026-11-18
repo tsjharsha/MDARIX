@@ -52,6 +52,14 @@ US_NONE = dict(
 )
 
 
+def _on_classic_navigation(tenant_id) -> None:
+    from backend.app.db.models.foundation import Tenant
+
+    with SessionLocal() as db:
+        db.get(Tenant, tenant_id).navigation = "classic"
+        db.commit()
+
+
 def _on_free_trial(tenant_id) -> None:
     """Put an organization on the Free Trial plan: its training records are practice acknowledgements."""
     from backend.app.trial.service import _free_trial_plan
@@ -87,6 +95,9 @@ def org():
 
     tenant_id = _organization("MA")
     _on_free_trial(tenant_id)
+    # The filing path under test is the classic navigation's (on the new one, the default since UX2, a reportable
+    # conclusion opens the market's report worksheet and its submission record settles it instead).
+    _on_classic_navigation(tenant_id)
     other_id = _organization("MB")
     clients = {
         "regulatory": _client(tenant_id, "REGULATORY_REVIEWER", "Rita Regulatory"),

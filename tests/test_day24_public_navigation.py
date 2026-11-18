@@ -69,10 +69,10 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
-    # Signed-in business users (and a customer administrator who switched into it) land on the user workspace,
-    # which opens on a live Dashboard.
+    # Signed-in business users (and a customer administrator who switched into it, or whose administration opens in
+    # the same shell since UX2) land on the user workspace.
     assert compact(
-        'if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && adminMode === "workspace"))'
+        'if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && (adminMode === "workspace" || inShell)))'
     ) in compact(MAIN)
     assert "<UserWorkspace" in MAIN
     # The workflow story is the navigation itself, in order: product -> signal -> case -> evidence -> decision -> trust.

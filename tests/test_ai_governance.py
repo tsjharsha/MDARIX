@@ -157,9 +157,9 @@ def test_the_signed_record_locks_the_ai_used_and_later_changes_do_not_move_it(tr
         for row in _intel(user, case_id, "hypotheses")
         if row["origin"] == "HUMAN" and "NovaSense" in row["statement"]
     )
-    base = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
-    _ok(user.post(f"{base}/start-review", json={}))
-    brief = _ok(user.post(f"{base}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence holds."}))
+    # UX1: the sample reviewer accepted the brief for decision (staged with the trial); the person signs it.
+    brief = _ok(user.get(f"/api/v1/investigations/{case_id}/decision"))["brief"]
+    assert brief["status"] == "APPROVED_FOR_DECISION"
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
     started = _ok(user.post("/api/v1/auth/mfa/enroll"))
     _ok(user.post("/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(started["secret"])}))

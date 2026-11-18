@@ -40,7 +40,6 @@ def test_admin_dashboard_loads_all_control_plane_domains():
         "/api/v1/admin/identity/users",
         "/api/v1/admin/identity/roles",
         "/api/v1/admin/identity/permission-sets",
-        "/api/v1/admin/identity/persona-assignments",
         "/api/v1/admin/governance/entitlements",
         "/api/v1/admin/configuration/connectors",
         "/api/v1/admin/configuration/mappings",
@@ -49,7 +48,9 @@ def test_admin_dashboard_loads_all_control_plane_domains():
     for endpoint in live_reads:
         assert endpoint in LIVE_ADMIN_UI
         assert endpoint.removeprefix("/api/v1") in ROUTER
-    # Backend-only today (no reachable UI reads them yet; memberships were read only by the removed older screen).
+    # Backend-only today (no reachable UI reads them yet; memberships were read only by the removed older screen; UX1
+    # removed the misleading Personas panel, the only screen that read persona assignments).
+    assert "/admin/identity/persona-assignments" in ROUTER
     assert "/admin/governance/policies" in ROUTER
     assert "/admin/identity/memberships" in ROUTER
 
