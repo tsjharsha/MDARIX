@@ -1322,7 +1322,11 @@ function Escalated({ item }: { item: IntakeItem }) {
   const ref = item.complaint_ref ?? item.reference;
   const banner = useRef<HTMLElement>(null);
   // Signing leaves the drawer scrolled to its foot: bring the success message into view (review G-04).
-  useEffect(() => banner.current?.scrollIntoView?.({ block: "nearest" }), []);
+  // A block body: current Chrome's scrollIntoView returns a Promise, and an effect that returns one crashes the
+  // page when the drawer closes ("Open the complaint").
+  useEffect(() => {
+    banner.current?.scrollIntoView?.({ block: "nearest" });
+  }, []);
   return (
     <section ref={banner} className="ca-drawer-section uw-escalated" role="status" aria-label="Escalated">
       <h3>
