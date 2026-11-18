@@ -1,0 +1,18 @@
+# Reviewed exceptions for the frontend npm audit (ci.yml "frontend" job, through scripts/npm_audit_gate.py). npm audit
+# has no ignore list of its own. Each HIGH or CRITICAL advisory listed here has no fixed release yet and was reviewed as
+# not reaching MDARIX's users. Every other high or critical advisory fails the audit.
+#
+# An entry stops applying on its expires date: the audit then fails until the advisory is reviewed again (renew the
+# date with a fresh reason, or remove the entry once a fixed release is installed).
+
+[[exception]]
+id = "GHSA-fc5q-39xc-vjpf"
+package = "picomatch"
+reason = """picomatch ReDoS through single-branch repeated extglobs; affects <=4.0.7 and 4.0.7 is the newest release, \
+so there is no fix to install. picomatch is pulled in only by the build and test tools vite 8.3.5 (directly and through \
+tinyglobby/fdir) and vitest. vite and @vitejs/plugin-react sit in "dependencies", which is why the --omit=dev audit \
+reports it too, but they run only at build time: the web image copies just the built dist/ into Caddy \
+(Dockerfile.web), no app code imports picomatch, and the glob patterns it matches come from our own config, never \
+from users."""
+reviewed_by = "Srinivas (owner), 18 Nov 2026"
+expires = 2026-12-31
