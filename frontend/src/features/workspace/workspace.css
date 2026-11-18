@@ -9625,10 +9625,14 @@ details.uw-team-change[open] {
 .uw-cockpit-rail ol {
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
-.uw-cockpit-rail li button[aria-current="step"] {
-  border-color: var(--ms-navy);
-  border-top-color: var(--ms-navy);
-  background: var(--ms-navy-fill);
+/* The step shown: navy, its words in the surface colour (the teal one is where the work is). */
+.uw-highlights .uw-cockpit-rail li button[aria-current="step"] {
+  background: var(--ms-navy);
+  color: var(--ms-surface);
+}
+.uw-highlights .uw-cockpit-rail li button[aria-current="step"] small,
+.uw-highlights .uw-cockpit-rail li button[aria-current="step"] strong::before {
+  color: inherit;
 }
 .uw-cockpit-rail li.state-read button {
   border-top-style: dashed;
