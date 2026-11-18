@@ -41,6 +41,207 @@ export const DUE_WEEK_VIEW = "Due this week";
 export const OVERDUE_PATH = "/api/v1/complaints?view=overdue&page=1&page_size=1";
 export const OVERDUE_VIEW = "Overdue";
 
+/** One count on a persona's Today: what it counts (its definition), where it is read and the records it opens. */
+export type TodayTile = {
+  key: string;
+  title: string;
+  /** The definition, under the number. */
+  detail: string;
+  /** The tile's one line on a phone. */
+  short: string;
+  tone: "over" | "soon" | "risk";
+  path: string;
+  /** Follows the Sample · Your data switch (the complaint list's own views do). */
+  sourced?: boolean;
+  count: (data: any) => number | null;
+  opens: { section: string; tab?: string };
+};
+
+const listTotal = (data: { total?: number } | null) => (typeof data?.total === "number" ? data.total : null);
+const complaintView = (code: string) => `/api/v1/complaints?view=${code}&page=1&page_size=1`;
+const CASES_COUNTS = "/api/v1/intake/cases?view=to_check&q=&page=1&size=1";
+const caseCount = (view: string) => (data: { counts?: Record<string, number> } | null) => data?.counts?.[view] ?? null;
+
+/**
+ * The counts on each persona's Today where they differ from Overdue · Due this week · At risk (UX3, Persona Blueprint
+ * wave C sketches): each the total of the list it opens, read from that list, with its definition. Personas not listed
+ * keep the three shared ones.
+ */
+export const PERSONA_TILES: Readonly<Record<string, readonly TodayTile[]>> = {
+  servicedesk: [
+    {
+      key: "missing",
+      title: "Calls missing facts",
+      detail: "Cases whose check needs more information from the caller",
+      short: "Ask the caller",
+      tone: "over",
+      path: CASES_COUNTS,
+      count: caseCount("needs_information"),
+      opens: { section: "Complaints", tab: "Calls to check" },
+    },
+    {
+      key: "duplicates",
+      title: "Possible duplicates",
+      detail: "Calls that may be the same event as another, to link or keep apart",
+      short: "Link or keep apart",
+      tone: "soon",
+      path: "/api/v1/intake/duplicates",
+      count: (data: { items?: unknown[] } | null) => (Array.isArray(data?.items) ? data.items.length : null),
+      opens: { section: "Complaints", tab: "Calls to check" },
+    },
+    {
+      key: "handed",
+      title: "Handed over",
+      detail: "Cases that became complaints in the last 30 days, now with the complaint handler",
+      short: "Last 30 days",
+      tone: "risk",
+      path: CASES_COUNTS,
+      count: caseCount("became_complaints"),
+      opens: { section: "Complaints", tab: "Calls to check" },
+    },
+  ],
+  handler: [
+    {
+      key: "triage",
+      title: "To triage",
+      detail: "Complaints whose triage is not done yet, most urgent first",
+      short: "Most urgent first",
+      tone: "over",
+      path: "/api/v1/triage?show=open&limit=1",
+      count: (data: { summary?: { open?: number } } | null) => data?.summary?.open ?? null,
+      opens: { section: "Complaints", tab: "To triage" },
+    },
+    {
+      key: "waiting",
+      title: "Waiting for contact",
+      detail: "Complaints with a question still open with the reporter or a partner",
+      short: "Reporter or partner",
+      tone: "soon",
+      path: complaintView("waiting-reporter"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Waiting for the reporter" },
+    },
+    {
+      key: "reportability",
+      title: "Reportability due",
+      detail: "Complaints with a market that has no signed reportability conclusion yet",
+      short: "No conclusion yet",
+      tone: "risk",
+      path: complaintView("reportability"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Reportability: decision needed" },
+    },
+  ],
+  regulatory: [
+    {
+      key: "legal",
+      title: "Legal clocks this week",
+      detail: "Complaints with a reporting deadline in the next seven days, or already past",
+      short: "Next 7 days",
+      tone: "over",
+      path: complaintView("legal-week"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Legal clocks this week" },
+    },
+    {
+      key: "reportability",
+      title: "Reportability due",
+      detail: "Complaints with a market that has no signed reportability conclusion yet",
+      short: "No conclusion yet",
+      tone: "soon",
+      path: complaintView("reportability"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Reportability: decision needed" },
+    },
+    {
+      key: "approval",
+      title: "Reports awaiting approval",
+      detail: "Authority reports sent for approval that you did not prepare",
+      short: "Yours to approve",
+      tone: "risk",
+      path: complaintView("my-approval"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Waiting for my approval" },
+    },
+  ],
+  decision: [
+    {
+      key: "sign",
+      title: "Waiting for your signature",
+      detail: "Investigation briefs accepted for decision, waiting for a signature",
+      short: "Accepted for decision",
+      tone: "over",
+      path: "/api/v1/decisions/queue?page=1&page_size=1",
+      count: listTotal,
+      opens: { section: "Approvals" },
+    },
+    {
+      key: "approval",
+      title: "Reports awaiting approval",
+      detail: "Authority reports sent for approval that you did not prepare",
+      short: "Yours to approve",
+      tone: "soon",
+      path: complaintView("my-approval"),
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: "Waiting for my approval" },
+    },
+    {
+      key: "overdue",
+      title: "Overdue",
+      detail: "Complaints past a deadline or target",
+      short: "Act on these first",
+      tone: "risk",
+      path: OVERDUE_PATH,
+      sourced: true,
+      count: listTotal,
+      opens: { section: "Complaints", tab: OVERDUE_VIEW },
+    },
+  ],
+  risk: [
+    {
+      key: "requested",
+      title: "Risk reviews requested",
+      detail: "Risk reviews requested from the risk reviewers and not yet taken",
+      short: "Start one",
+      tone: "over",
+      path: "/api/v1/case-reviews?type=RISK&box=queue&page=1&page_size=1",
+      count: (data: { total?: number; items?: unknown[] } | null) =>
+        typeof data?.total === "number" ? data.total : Array.isArray(data?.items) ? data.items.length : null,
+      opens: { section: "Investigations" },
+    },
+    {
+      key: "mine",
+      title: "Your risk reviews in progress",
+      detail: "Risk reviews you started and have not recorded yet",
+      short: "Finish them",
+      tone: "soon",
+      path: "/api/v1/case-reviews?type=RISK&box=mine&status=IN_PROGRESS&page=1&page_size=1",
+      count: (data: { total?: number; items?: unknown[] } | null) =>
+        typeof data?.total === "number" ? data.total : Array.isArray(data?.items) ? data.items.length : null,
+      opens: { section: "Investigations" },
+    },
+    {
+      key: "rising",
+      title: "Versions rising",
+      detail: "Product versions whose complaints rise against their history: new evidence on existing risks",
+      short: "Check the risk file",
+      tone: "risk",
+      path: "/api/v1/triage/trends?group=version",
+      count: (data: { items?: Array<{ result?: string }> } | null) =>
+        Array.isArray(data?.items)
+          ? data.items.filter((row) => row.result === "SIGNIFICANT" || row.result === "ELEVATED").length
+          : null,
+      opens: { section: "Trends", tab: "Trend check" },
+    },
+  ],
+};
+
 /** The items a persona's Home is about. */
 export function personaItems(items: readonly OversightItem[], persona: string): OversightItem[] {
   const categories = PERSONA_CATEGORIES[persona] ?? null;

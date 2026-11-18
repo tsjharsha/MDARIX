@@ -28,6 +28,8 @@ import {
   OVERDUE_PATH,
   OVERDUE_VIEW,
   PERSONA_GREETING,
+  PERSONA_TILES,
+  type TodayTile,
   greeting,
   inData,
   isLegalDeadline,
@@ -85,6 +87,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
   };
   const dueWeek = useResource<{ total: number }>(withSource(DUE_WEEK_PATH, dataSource));
   const reading = oversight.state === "loading";
+  const tiles = PERSONA_TILES[persona] ?? null;
   return (
     <div className="uw-home">
       <header className="uw-home-head">
@@ -116,49 +119,56 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           <PersonaLead clock={nearestClock ? () => go(nearestClock) : undefined} />
         ) : null}
 
-        {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
+        {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. A persona with
+            its own counts (UX3, the blueprint's Today sketches) shows those, each the total of the list it opens. */}
         <section className="uw-home-stats" aria-label="What needs attention">
-          <Stat
-            tone="over"
-            value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
-            onOpen={() => open("Complaints", OVERDUE_VIEW)}
-            title="Overdue"
-            short={overdue.data?.total ? "Act on these first" : "Nothing late"}
-            // Never an all-clear before the data has arrived (0.10.81, U-07).
-            detail={
-              overdue.state === "loading"
-                ? "Loading…"
-                : overdue.data?.total
-                  ? "Complaints past a deadline or target: act on these first"
-                  : "Nothing past its time"
-            }
-          />
-          <Stat
-            tone="soon"
-            value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
-            onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
-            title="Due this week"
-            short="Next 7 days"
-            detail={
-              dueWeek.state === "loading" ? "Loading…" : "Complaints with a deadline or target in the next 7 days"
-            }
-          />
-          <Stat
-            tone="risk"
-            value={trends.state === "loading" ? null : rising.length}
-            // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
-            onOpen={() => open("Trends", "Trend check")}
-            title="At risk"
-            short={rising.length ? "A product rising" : "Nothing rising"}
-            detail={
-              trends.state === "loading"
-                ? "Loading…"
-                : rising.length
-                  ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
-                    "Products rising against their history"
-                  : "No product rising against its history"
-            }
-          />
+          {tiles ? (
+            tiles.map((tile) => <TileStat key={tile.key} tile={tile} />)
+          ) : (
+            <>
+              <Stat
+                tone="over"
+                value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
+                onOpen={() => open("Complaints", OVERDUE_VIEW)}
+                title="Overdue"
+                short={overdue.data?.total ? "Act on these first" : "Nothing late"}
+                // Never an all-clear before the data has arrived (0.10.81, U-07).
+                detail={
+                  overdue.state === "loading"
+                    ? "Loading…"
+                    : overdue.data?.total
+                      ? "Complaints past a deadline or target: act on these first"
+                      : "Nothing past its time"
+                }
+              />
+              <Stat
+                tone="soon"
+                value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
+                onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
+                title="Due this week"
+                short="Next 7 days"
+                detail={
+                  dueWeek.state === "loading" ? "Loading…" : "Complaints with a deadline or target in the next 7 days"
+                }
+              />
+              <Stat
+                tone="risk"
+                value={trends.state === "loading" ? null : rising.length}
+                // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
+                onOpen={() => open("Trends", "Trend check")}
+                title="At risk"
+                short={rising.length ? "A product rising" : "Nothing rising"}
+                detail={
+                  trends.state === "loading"
+                    ? "Loading…"
+                    : rising.length
+                      ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
+                        "Products rising against their history"
+                      : "No product rising against its history"
+                }
+              />
+            </>
+          )}
         </section>
       </MonitorBand>
 
@@ -275,6 +285,23 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
       </div>
       <MyWorkMore tab={tab} />
     </div>
+  );
+}
+
+/** A persona's own count (UX3): read from the list it opens, with its definition; "…" until read, never a guess. */
+function TileStat({ tile }: { tile: TodayTile }) {
+  const { open, dataSource } = useWorkspace();
+  const read = useResource<unknown>(tile.sourced ? withSource(tile.path, dataSource) : tile.path);
+  const value = read.state === "loading" ? null : tile.count(read.data);
+  return (
+    <Stat
+      tone={tile.tone}
+      value={value}
+      onOpen={() => open(tile.opens.section as WorkspaceSection, tile.opens.tab)}
+      title={tile.title}
+      short={tile.short}
+      detail={read.state === "loading" ? "Loading…" : tile.detail}
+    />
   );
 }
 
