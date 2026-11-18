@@ -30,7 +30,7 @@ import { at, signedUpOwner } from "./support/story";
  * Run like persona-work.spec.ts: scripts/journey_api.py with E2E_MAIL_DIR, MDARIX_REQUIRE_MFA_ROLES including APPROVER
  * and LEADER (the Platform Administrator signs in without an authenticator, or with E2E_PLATFORM_ADMIN_TOTP_KEY's),
  * and MDARIX_APP_URL the dev server's address. UX_SHOTS names a folder for each persona's Today and the investigation
- * cockpit at 1280x720 and 1440x900.
+ * cockpit at 1280x720, 1440x900 and 1920x1080.
  */
 
 const RUN = randomBytes(3).toString("hex");
@@ -111,6 +111,7 @@ async function capture(page: Page, name: string, focus?: string) {
   const gotIt = page.getByRole("button", { name: "Got it" });
   if (await gotIt.isVisible().catch(() => false)) await gotIt.click();
   for (const [width, height] of [
+    [1920, 1080],
     [1440, 900],
     [1280, 720],
   ]) {
