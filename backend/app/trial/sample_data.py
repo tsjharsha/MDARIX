@@ -37,6 +37,12 @@ from backend.app.db.models.foundation import (
 from backend.app.trial.flagship import SIGNAL_TEXT  # noqa: E402 (G-06: one number for the OrbitCare rise)
 from backend.app.trial.sample_source import SAMPLE_SOURCE  # noqa: E402 (one definition; re-exported)
 
+# SAMPLE-EV-003's text (trial/old_sample_text.py upgrades the texts older trials hold to this one).
+TREND_SUMMARY = (
+    f"Pressure-alarm complaints on Rev B are at {SIGNAL_TEXT} (its last 30 days against the "
+    "expected count), with most from lots 003 and 004."
+)
+
 # (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
 # OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints
 # (_STORY_COMPLAINTS) and the routine ones (sample_dispositions.py, whose VentraLink events are older than 30 days),
@@ -520,8 +526,7 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                 ),
                 (
                     "Complaint trend summary",
-                    f"Pressure-alarm complaints on Rev B are at {SIGNAL_TEXT} (its last 30 days against the "
-                    "expected count), with most from lots 003 and 004.",
+                    TREND_SUMMARY,
                     "Quantifies the signal. It does not by itself establish the cause.",
                 ),
             ),

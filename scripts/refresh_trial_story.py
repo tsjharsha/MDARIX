@@ -48,7 +48,9 @@ FDA-valid SAMPLE-RV-09 US report with its eMDR file (backend/app/trial/sample_0_
 signed Canada example where the sample answers predate it and the recorded AI proposals on SAMPLE-INV-001 where its
 decision is not signed (backend/app/trial/sample_assessments.py, sample_ai.py), W5's simulated PLM, ERP and
 eQMS source runs behind OrbitCare 300 (backend/app/trial/sample_sources.py; no record added), W1d's synthetic
-follow-up of SAMPLE-CAPA-02 unless its check is signed (backend/app/trial/sample_follow_up.py), and 0.10.97's
+follow-up of SAMPLE-CAPA-02 unless its check is signed (backend/app/trial/sample_follow_up.py), W1e's
+today's text of SAMPLE-EV-003 where it still holds a trend text written before G-06, re-embedded (backend/app/trial/
+old_sample_text.py; a text a person edited is left alone), and 0.10.97's
 reply to SAMPLE-RT-03's reporter in the communications log, so the customer-told check is met on day 0
 (backend/app/trial/sample_0_10_97.py; the signed disposition is never edited), and, in every trial
 with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_deadlines.py: every market's starter
@@ -146,7 +148,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     )
     from backend.app.trial.sample_ai import stage_sample_ai
     from backend.app.trial.sample_sources import has_sample_sources, stage_sample_sources
-    from backend.app.trial import sample_follow_up
+    from backend.app.trial import old_sample_text, sample_follow_up
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
     from backend.app.trial.sample_words import reword_sample
 
@@ -245,6 +247,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             sources_missing = not has_sample_sources(session, tenant_id)
             # W1d (D04): SAMPLE-CAPA-02's synthetic follow-up, unless its effectiveness check is signed already.
             follow_up_owed = sample_follow_up.refresh(session, tenant_id, apply=False)
+            # W1e: SAMPLE-EV-003 still holding a trend text written before G-06 (the AI gate reads it as edited).
+            old_text_owed = old_sample_text.refresh(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -277,6 +281,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or ai_missing
                 or sources_missing
                 or follow_up_owed
+                or old_text_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -333,6 +338,11 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the recorded AI proposals on SAMPLE-INV-001 (W1)"] if ai_missing else []),
                     *(["the simulated sources (W5)"] if sources_missing else []),
                     *(["SAMPLE-CAPA-02's synthetic follow-up (W1d)"] if follow_up_owed else []),
+                    *(
+                        [f"today's text on {old_text_owed} sample evidence record(s) (SAMPLE-EV-003's trend, W1e)"]
+                        if old_text_owed
+                        else []
+                    ),
                 ]
                 results.append(
                     {
@@ -414,6 +424,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["sources"] = stage_sample_sources(session, tenant_id, now)
             if follow_up_owed:
                 added["follow_up"] = sample_follow_up.refresh(session, tenant_id, apply=True, now=now)
+            if old_text_owed:
+                added["old_text_upgraded"] = old_sample_text.refresh(session, tenant_id, apply=True)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
@@ -428,6 +440,13 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             session.commit()
             # The sample's signals now, rather than at the scheduler's next run (logged, never fatal).
             seed_demo_signals(session, tenant_id)
+            if old_text_owed:
+                # The upgraded chunks' embeddings now, rather than at the indexing job's next run (never fatal).
+                try:
+                    old_sample_text.reindex(session, tenant_id)
+                except Exception as exc:
+                    session.rollback()
+                    print(f"{tenant_key}: search index left to the indexing job ({type(exc).__name__})")
             results.append({"tenant": tenant_key, "name": name, "result": f"added {added}"})
     return results
 
