@@ -182,8 +182,18 @@ export async function keyboardWalk(page: Page, where: string, presses = 40) {
       return { id, visible: rect.width > 0 && rect.height > 0, outline };
     });
     if (leftAt) {
-      // Focus left the page: fine only if this Tab came back to the page's first control.
-      if (focus.id !== first) problems.push(`focus fell to the page after ${leftAt} Tab presses`);
+      // Focus left the page: fine only if this Tab came back to the page's first control, or to the document's first
+      // (the skip link and the top bar come before the rail the walk's first click lands in, UX3).
+      const documentFirst = await page.evaluate(() => {
+        const element = document.querySelector<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select, textarea, summary, [tabindex]:not([tabindex="-1"])',
+        );
+        return element
+          ? `${element.tagName}:${element.getAttribute("aria-label") ?? element.textContent?.trim().slice(0, 40)}`
+          : null;
+      });
+      if (focus.id !== first && focus.id !== documentFirst)
+        problems.push(`focus fell to the page after ${leftAt} Tab presses`);
       leftAt = 0;
       if (i >= presses) break;
     }

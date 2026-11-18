@@ -135,13 +135,19 @@ async function ownerPage(browser: Browser, before?: (page: Page) => void): Promi
   return page;
 }
 
+/** The one navigation (UX2): Getting started heads the rail; the work areas follow (Complaints is Cases). */
+const RAIL: Record<string, { button: string; heading: string }> = {
+  "Getting started": { button: "Getting started", heading: "Getting started" },
+  Complaints: { button: "Cases", heading: "What needs you first?" },
+};
+
 async function openSection(page: Page, name: string) {
-  const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+  const navigation = page.getByRole("navigation", { name: "Destinations" }).first();
   await expect(navigation).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
   if (await toggle.isVisible()) await toggle.click();
-  await navigation.getByRole("button", { name: new RegExp(`^${name}`) }).click();
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible({ timeout: 20_000 });
+  await navigation.getByRole("button", { name: new RegExp(`^${RAIL[name].button}`) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: RAIL[name].heading })).toBeVisible({ timeout: 20_000 });
 }
 
 const panel = (page: Page, title: string) =>
@@ -282,11 +288,11 @@ test.describe("free trial journey", () => {
     await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
     await acknowledgePrivacy(page);
 
-    // The five-screen MVP: a trial never shows the parked sections.
-    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    // The one navigation (UX2): Getting started, then the five work areas; never the parked sections.
+    const navigation = page.getByRole("navigation", { name: "Destinations" }).first();
     await expect(navigation).toBeAttached({ timeout: 20_000 });
     await expect(navigation.getByRole("button", { name: /^Getting started/ })).toBeAttached();
-    for (const parked of ["Dashboard", "Products", "Evidence", "Decisions", "Intelligence", "Trust & Audit"])
+    for (const parked of ["Dashboard", "Evidence", "Intelligence", "Trust & Audit"])
       await expect(
         navigation.getByRole("button", { name: new RegExp(`^${parked.replace("&", "\\&")}\\b`) }),
       ).toHaveCount(0);
@@ -415,11 +421,8 @@ test.describe("free trial journey", () => {
     });
     const problems = watchErrors(page);
     await openSection(page, "Complaints");
-    // Complaints opens on Triage (before every queue, 0.10.57); the second look is its own tab.
-    await page
-      .getByRole("tablist", { name: "Complaint sections" })
-      .getByRole("tab", { name: /^Second look/ })
-      .click();
+    // Cases offers the persona's views first; the second look is one of More views (UX2).
+    await page.getByLabel("List view").selectOption("Second look");
     await expect.poll(() => storyReads.done > 0 && storyReads.pending === 0, { timeout: 30_000 }).toBe(true);
     await page
       .getByRole("button", { name: /: it is a complaint$/ })
@@ -468,7 +471,11 @@ test.describe("free trial journey", () => {
       timeout: 20_000,
     });
 
-    await page.getByRole("tab", { name: "Decision", exact: true }).click();
+    // The cockpit's last step (UX3).
+    await page
+      .getByRole("navigation", { name: "Investigation steps" })
+      .getByRole("button", { name: /Decision & action/ })
+      .click();
     const decide = panel(page, "Decide");
     await expect(decide).toBeVisible({ timeout: 20_000 });
     await decide.getByRole("group", { name: "Outcome" }).getByRole("radio").first().check();

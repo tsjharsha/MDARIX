@@ -239,8 +239,12 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/customer-admin");
     await expect(page.locator("body")).not.toContainText("Checking your session");
-    await expect(page.locator("body")).toContainText(/customer administration/i);
-    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+    // UX2: administration opens inside the workspace, in five groups, with the work areas' rail beside it.
+    await expect(page.getByRole("heading", { level: 1, name: "How is your organization set up?" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole("navigation", { name: "Administration areas" })).toBeAttached();
+    await expect(page.getByRole("navigation", { name: "Destinations" }).first()).toBeAttached();
     const sidewaysOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -391,8 +395,8 @@ test.describe("MDARIX browser evidence", () => {
   test("an ended session sends the person to sign-in and back to the same page", async ({ page }) => {
     test.setTimeout(90_000);
     await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
-    await page.goto("/app/signals");
-    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    await page.goto("/app/investigations");
+    const navigation = page.getByRole("navigation", { name: "Destinations" }).first();
     await expect(navigation).toBeAttached({ timeout: 20_000 });
     // The session ends on the server's side, as after a sign-out elsewhere or the idle timeout. Only dropping the
     // browser's cookie is not enough: a session check still in flight re-issues it (GET /auth/session renews the
@@ -408,17 +412,19 @@ test.describe("MDARIX browser evidence", () => {
       const toggle = page.getByRole("button", { name: "Open navigation" });
       if (await toggle.isVisible().catch(() => false)) await toggle.click().catch(() => {});
       await navigation
-        .getByRole("button", { name: /^Investigations/ })
+        .getByRole("button", { name: /^Today/ })
         .click({ timeout: 10_000 })
         .catch(() => {});
     }
-    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Fsignals/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Finvestigations/, { timeout: 20_000 });
     await expect(page.getByRole("status")).toContainText(/session has ended/i);
     await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
     await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
-    await expect(page).toHaveURL(/\/app\/signals$/, { timeout: 20_000 });
-    await expect(page.getByRole("heading", { level: 1, name: "Signals" })).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveURL(/\/app\/investigations$/, { timeout: 20_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test("Help menu: Report a problem opens a form that reaches the MDARIX team", async ({ page }) => {
@@ -445,24 +451,26 @@ test.describe("MDARIX browser evidence", () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test("a customer administrator opens the workspace and sees Import data", async ({ page }, testInfo) => {
+  test("a customer administrator opens Import data from the avatar menu", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/customer-admin");
-    await page.getByRole("button", { name: "Open workspace" }).click();
-    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
-    await expect(navigation).toBeAttached({ timeout: 20_000 });
-    const toggle = page.getByRole("button", { name: "Open navigation" });
-    if (await toggle.isVisible()) await toggle.click();
-    await navigation.getByRole("button", { name: /^Import data/ }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Import data" })).toBeFocused();
+    // UX2: one shell; Import data and Administration sit in the avatar menu.
+    await expect(page.getByRole("navigation", { name: "Destinations" }).first()).toBeAttached({ timeout: 20_000 });
+    await page.getByRole("button", { name: /account menu/ }).click();
+    await page
+      .getByRole("menu", { name: "Account" })
+      .getByRole("menuitem", { name: /^Import data/ })
+      .click();
+    await expect(page.getByRole("heading", { level: 1, name: "Import data" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Upload a CSV file" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByLabel("Dates in the file")).toBeVisible();
     await expect(page.getByRole("link", { name: /download products\.csv/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-import-data.png`, fullPage: true });
-    // And back to the console from the workspace.
-    await page.getByRole("button", { name: "Admin console" }).click();
-    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+    // And back to administration, in the same shell.
+    await page.getByRole("button", { name: /account menu/ }).click();
+    await page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Administration" }).click();
+    await expect(page.getByRole("navigation", { name: "Administration areas" })).toBeAttached({ timeout: 20_000 });
   });
 
   test("the platform admin console has no sideways scrolling", async ({ page }) => {

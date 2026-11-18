@@ -468,6 +468,8 @@
   }
   .uw-hybrid .uw-top .uw-org {
     display: flex;
+    /* Its logo keeps its size: shrunk to nothing it still took the keyboard's focus, unseen (UX3). */
+    flex: none;
     padding: 0;
     border: 0;
     background: none;

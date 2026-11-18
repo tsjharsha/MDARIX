@@ -85,10 +85,12 @@ async function signIn(page: Page, persona: any) {
     .catch(() => undefined);
 }
 
+// The one navigation (UX2): the workspace's rail is "Destinations"; a customer administrator's administration opens
+// in the same shell, in five groups ("Administration areas").
 const NAV_LABEL: Record<string, string> = {
   platform: "Administrator navigation",
-  customer: "Customer administration navigation",
-  workspace: "Workspace navigation",
+  customer: "Administration areas",
+  workspace: "Destinations",
 };
 const HOME: Record<string, string> = { platform: "/app/admin", customer: "/app/customer-admin", workspace: "/app" };
 
@@ -145,7 +147,7 @@ async function openNavigation(page: Page) {
 }
 
 async function crawl(page: Page, persona: any) {
-  const nav = page.getByRole("navigation", { name: NAV_LABEL[persona.console] });
+  const nav = page.getByRole("navigation", { name: NAV_LABEL[persona.console] }).first();
   await expect(nav).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
   const items = await nav.locator("button").count();
@@ -229,8 +231,11 @@ test.describe("deep crawl of every screen", () => {
     await page.goto("/app/customer-admin");
     const nav = page.getByRole("navigation", { name: NAV_LABEL.customer });
     await expect(nav).toBeAttached({ timeout: 20_000 });
-    await openNavigation(page);
-    await nav.getByRole("button", { name: /^Users/ }).click();
+    await nav.getByRole("button", { name: "People & access" }).click();
+    await page
+      .getByRole("navigation", { name: "People & access pages" })
+      .getByRole("button", { name: "Users" })
+      .click();
     await page.getByRole("tab", { name: "Invite" }).click();
     const email = `ui-invite-${Date.now()}@example.invalid`;
     await page.getByLabel("First name").fill("Ui");
@@ -244,25 +249,24 @@ test.describe("deep crawl of every screen", () => {
     await expect(page.locator("main").getByText(email)).toBeVisible({ timeout: 15_000 });
   });
 
-  test("flow: an Investigator opens an investigation through the form", async ({ page }) => {
+  test("flow: an Investigator opens an investigation from the list, on its cockpit", async ({ page }) => {
     const investigator = config.personas.find((p: any) => p.name === config.flows?.open_case_as);
     expect(investigator, "An Investigator persona is required for the open-investigation flow.").toBeTruthy();
     watch(page, investigator.name, () => "open-investigation flow");
     await signIn(page, investigator);
     await page.goto("/app");
-    const nav = page.getByRole("navigation", { name: NAV_LABEL.workspace });
+    const nav = page.getByRole("navigation", { name: NAV_LABEL.workspace }).first();
     await expect(nav).toBeAttached({ timeout: 20_000 });
     await openNavigation(page);
     await nav.getByRole("button", { name: /^Investigations/ }).click();
-    await page.getByRole("button", { name: /open an investigation/i }).click();
-    await page
-      .getByLabel(/question this investigation must answer/i)
-      .fill("Why do occlusion alarms rise after release A?");
-    const firstComplaint = page.locator("fieldset input[type=checkbox]").first();
-    if (await firstComplaint.count()) await firstComplaint.check();
-    await page.getByRole("button", { name: /^open investigation$/i }).click();
-    await expect(page.locator("body")).toContainText(/opened and assigned to you/i, { timeout: 20_000 });
-    await expect(page.getByRole("tab", { name: "Workspace", selected: true })).toBeVisible();
+    // On the one navigation an investigation opens from its complaint or trend; the list opens each one's cockpit.
+    await page.goto("/app/investigations?tab=All+investigations");
+    const open = page.getByRole("button", { name: /^Open \S+/ }).first();
+    await expect(open.or(page.getByText(/No investigation|Open one from/).first())).toBeVisible({ timeout: 20_000 });
+    if (await open.count()) {
+      await open.click();
+      await expect(page.getByRole("navigation", { name: "Investigation steps" })).toBeVisible({ timeout: 20_000 });
+    }
   });
 
   test.afterEach(() => save());

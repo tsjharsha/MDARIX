@@ -206,15 +206,13 @@ test.describe("UX1: every persona's own work on Home, desktop", () => {
     const problems = watch(page);
     const denied = refused(page);
     await home(page);
-    await expect(page.getByRole("button", { name: "See product exposure" })).toBeVisible({ timeout: 60_000 });
+    // UX2/UX3: the Executive's Today is the product exposure itself (zero clicks), read-only.
+    await expect(page.locator("main")).toContainText(/Product exposure/, { timeout: 60_000 });
+    await expect(page.locator("main")).toContainText("OrbitCare 300");
     await expect(
       page.getByRole("button", { name: /Continue the story|Sign|Log a|Start the|Review and sign/ }),
     ).toHaveCount(0);
     await shot(page, "ux1-executive-home");
-    await page.getByRole("button", { name: "See product exposure" }).click();
-    await settle(page);
-    await expect(page.getByText(/Open now on Rev B/).first()).toBeVisible({ timeout: 60_000 });
-    await shot(page, "ux1-executive-products");
     await page.goto("/app/records");
     await settle(page);
     expect(denied).toEqual([]);

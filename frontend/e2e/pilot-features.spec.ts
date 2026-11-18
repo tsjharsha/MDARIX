@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /*
- * The pilot features built on real data: Risk & Traceability and Reports (investigator), and the legal-hold panel on
- * a tenant page (platform administrator). Each screen must open without page errors, server errors or a panel that
+ * The pilot features built on real data, on the one navigation (UX2, UX3): the risk file input and Reports under
+ * Records & trust (investigator), and the legal-hold panel on a tenant page (platform administrator). Each screen must open without page errors, server errors or a panel that
  * reports a failure, whether the organization has records or not. Runs on the desktop and mobile projects.
  */
 // Credentials come from the environment (same accounts as browser-evidence.spec.ts); nothing is committed.
@@ -36,13 +36,13 @@ function watchErrors(page: Page) {
   return problems;
 }
 
-async function openSection(page: Page, name: string) {
-  const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
-  await expect(navigation).toBeAttached({ timeout: 20_000 });
-  const toggle = page.getByRole("button", { name: "Open navigation" });
-  if (await toggle.isVisible()) await toggle.click();
-  await navigation.getByRole("button", { name: new RegExp(`^${name}`) }).click();
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible({ timeout: 20_000 });
+/** Opens Records & trust from the avatar menu (UX2: records are used weekly, not daily; not a work area). */
+async function openRecords(page: Page) {
+  await page.getByRole("button", { name: /account menu/ }).click();
+  await page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Records & trust" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Records an inspector can trust" })).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 async function expectNoFailedPanel(page: Page) {
@@ -52,28 +52,22 @@ async function expectNoFailedPanel(page: Page) {
 }
 
 test.describe("pilot features", () => {
-  test("investigator opens Risk & Traceability and Reports", async ({ page }, testInfo) => {
+  test("investigator opens the risk file input and the reports under Records & trust", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const problems = watchErrors(page);
     await signIn(page, INVESTIGATOR_EMAIL);
-    await openSection(page, "Intelligence");
+    await openRecords(page);
+    const sections = page.getByRole("tablist", { name: "Record sections" });
 
-    const register = page.waitForResponse((response) => response.url().includes("/api/v1/risk/register"));
-    await page.getByRole("tab", { name: "Risk & traceability" }).click();
-    expect((await register).status()).toBe(200);
-    // Either the register (with the not-captured notice) or the empty state that leads to Import data.
-    await expect(page.getByRole("heading", { name: "Risk register" })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/No risks recorded yet|Not captured in your data/).first()).toBeVisible({
-      timeout: 20_000,
-    });
-    const trace = page.waitForResponse((response) => response.url().includes("/api/v1/risk/traceability"));
-    await page.getByRole("tab", { name: "Traceability", exact: true }).click();
-    expect((await trace).status()).toBe(200);
-    await expect(page.getByText(/Complete chains|No risks recorded yet/).first()).toBeVisible({ timeout: 20_000 });
+    const risk = page.waitForResponse((response) => response.url().includes("/api/v1/post-market/risk-file"));
+    await sections.getByRole("tab", { name: "Risk file input" }).click();
+    expect((await risk).status()).toBe(200);
+    // Either the risk file input by product or its empty state.
+    await expect(page.getByText(/Risk file input by product|No risks|risk/i).first()).toBeVisible({ timeout: 20_000 });
     await expectNoFailedPanel(page);
     await page.screenshot({ path: `artifacts/pilot-${testInfo.project.name}-risk.png`, fullPage: true });
 
-    await page.getByRole("tab", { name: "Reports", exact: true }).click();
+    await sections.getByRole("tab", { name: "Documents", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Reports", exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("table", { name: "Reports" })).toContainText("Complaint Trend Report", {
       timeout: 20_000,

@@ -1,11 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /*
- * The demo golden path, read only: the AcmeCare demo workspace's case (ACD-INV-401 by default, seeded by
- * backend/app/demo_golden_path/) walked through the screens its people use. The triage lead opens the signal inbox;
- * the investigator opens the case from a link and reads every case tab (Scope, Intelligence, Reviews, Decision Brief,
- * Decision), its evidence, and its Trust & Audit timeline and replay. Nothing is changed: no button that writes is
- * pressed. Every screen must load without page errors, server errors or a panel that reports a failure.
+ * The demo golden path, read only, on the one navigation (UX2, UX3): the AcmeCare demo workspace's case (ACD-INV-401
+ * by default, seeded by backend/app/demo_golden_path/) walked through the screens its people use. The triage lead
+ * opens Cases' triage queue; the investigator opens the case from a link and reads every step of the investigation
+ * cockpit (Signal's scope, Evidence, Possible causes, Brief's reviews and Decision Brief, Decision & action's decision)
+ * and its record's timeline. Nothing is changed: no button that writes is pressed. Every screen must load without page
+ * errors, server errors or a panel that reports a failure.
  *
  * Runs only against a loaded demo workspace: set E2E_DEMO_PASSWORD (the demo team's password; nothing is committed).
  * E2E_DEMO_TRIAGE_EMAIL, E2E_DEMO_INVESTIGATOR_EMAIL and E2E_DEMO_CASE override the demo team's defaults.
@@ -41,44 +42,13 @@ function watchErrors(page: Page) {
   return problems;
 }
 
-async function openSection(page: Page, name: string) {
-  const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
-  await expect(navigation).toBeAttached({ timeout: 20_000 });
+/** Opens a work area from the rail (the phone opens the menu first). */
+async function openArea(page: Page, name: string) {
+  const rail = page.getByRole("navigation", { name: "Destinations" }).first();
+  await expect(rail).toBeAttached({ timeout: 20_000 });
   const toggle = page.getByRole("button", { name: "Open navigation" });
   if (await toggle.isVisible()) await toggle.click();
-  await navigation.getByRole("button", { name: new RegExp(`^${escape(name)}`) }).click();
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible({ timeout: 20_000 });
-}
-
-function escape(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Open a tab of a tab list (a count may follow its name) and wait for the API answer it reads when ``api`` is given.
- * Returns the tab panel.
- */
-async function openTab(page: Page, list: string, name: string, api?: RegExp) {
-  const tablist = page.getByRole("tablist", { name: list });
-  await expect(tablist).toBeVisible({ timeout: 20_000 });
-  const tab = tablist.getByRole("tab", { name: new RegExp(`^${escape(name)}( \\d+)?$`) });
-  const answer = api
-    ? page.waitForResponse((response) => api.test(response.url()) && response.request().method() === "GET", {
-        timeout: 20_000,
-      })
-    : null;
-  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-  if (answer) {
-    const response = await answer.catch(() => null);
-    // A tab already loaded earlier may answer from what it holds; an answer that came must be a success.
-    if (response) expect(response.status(), response.url()).toBeLessThan(400);
-  }
-  // The panel this tab list controls (a case tab may hold tab lists of its own).
-  const panel = page.locator(`[id="${await tab.getAttribute("aria-controls")}"]`);
-  await expect(panel).toBeVisible({ timeout: 20_000 });
-  await expectNoFailedPanel(page);
-  return panel;
+  await rail.getByRole("button", { name: new RegExp(`^${name}`) }).click();
 }
 
 async function expectNoFailedPanel(page: Page) {
@@ -87,95 +57,99 @@ async function expectNoFailedPanel(page: Page) {
   await expect(main.getByText("Unavailable", { exact: true })).toHaveCount(0);
 }
 
+/** Opens a step of the investigation cockpit and waits for the API answer it reads when ``api`` is given. */
+async function openStep(page: Page, name: string, api?: RegExp) {
+  const steps = page.getByRole("navigation", { name: "Investigation steps" });
+  await expect(steps).toBeVisible({ timeout: 20_000 });
+  const answer = api
+    ? page.waitForResponse((response) => api.test(response.url()) && response.request().method() === "GET", {
+        timeout: 20_000,
+      })
+    : null;
+  await steps.getByRole("button", { name: new RegExp(name) }).click();
+  await expect(steps.getByRole("button", { name: new RegExp(name) })).toHaveAttribute("aria-current", "step");
+  if (answer) {
+    const response = await answer.catch(() => null);
+    if (response) expect(response.status(), response.url()).toBeLessThan(400);
+  }
+  const body = page.getByRole("region", { name: `Investigation step: ${name}` });
+  await expect(body).toBeVisible({ timeout: 20_000 });
+  await expectNoFailedPanel(page);
+  return body;
+}
+
 /** Open the demo case from a link, as a colleague's message or a task would. */
-async function openCase(page: Page, view = "investigations") {
-  await page.goto(`/app/${view}?case=${encodeURIComponent(DEMO_CASE)}`);
-  await expect(page.getByRole("navigation", { name: "Workspace navigation" })).toBeAttached({ timeout: 20_000 });
+async function openCase(page: Page) {
+  await page.goto(`/app/investigations?case=${encodeURIComponent(DEMO_CASE)}`);
+  await expect(page.getByRole("navigation", { name: "Destinations" }).first()).toBeAttached({ timeout: 20_000 });
   await expect(page.locator("main")).not.toContainText(`${DEMO_CASE} was not found`, { timeout: 20_000 });
 }
 
 test.describe("demo golden path (read only)", () => {
-  test("the triage lead sees the signal inbox", async ({ page }, testInfo) => {
+  test("the triage lead sees the complaints to triage", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const problems = watchErrors(page);
     await signIn(page, TRIAGE_EMAIL);
-    const signals = page.waitForResponse((response) => /\/api\/v1\/triage\/signals(\?|$)/.test(response.url()), {
+    await openArea(page, "Cases");
+    await expect(page.getByRole("heading", { level: 1, name: "What needs you first?" })).toBeVisible({
       timeout: 20_000,
     });
-    await openSection(page, "Signals");
-    expect((await signals).status()).toBe(200);
-    await openTab(page, "Signal sections", "Signal inbox");
-    const inbox = page.getByRole("table", { name: "Signal inbox" });
-    await expect(inbox).toBeVisible({ timeout: 20_000 });
-    await expect(inbox.getByRole("row").nth(1)).toBeVisible({ timeout: 20_000 });
-    await expect(inbox).toContainText(/SIG\d+/);
+    // The triage lead's own views come first, To triage at the top.
+    const choice = page.getByLabel("List view");
+    await expect(choice).toHaveValue("To triage", { timeout: 20_000 });
     await expectNoFailedPanel(page);
-    await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-signals.png`, fullPage: true });
+    await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-triage.png`, fullPage: true });
     expect(problems).toEqual([]);
   });
 
-  test("the investigator reads every tab of the case and its evidence", async ({ page }, testInfo) => {
+  test("the investigator reads every step of the case and its evidence", async ({ page }, testInfo) => {
     test.setTimeout(150_000);
     const problems = watchErrors(page);
     await signIn(page, INVESTIGATOR_EMAIL);
     await openCase(page);
-    await expect(page.getByRole("heading", { level: 1, name: "Investigations" })).toBeVisible({ timeout: 20_000 });
-    const list = "Investigation sections";
+    await expect(page.getByRole("heading", { level: 1, name: "Why is it happening?" })).toBeVisible({
+      timeout: 20_000,
+    });
 
-    const scope = await openTab(page, list, "Scope", /\/api\/v1\/investigations\/[^/]+\/scope(\?|$)/);
-    await expect(scope).toContainText(/What this investigation covers · version \d+/, { timeout: 20_000 });
+    const signal = await openStep(page, "Signal", /\/api\/v1\/investigations\/[^/]+\/scope(\?|$)/);
+    await expect(signal).toContainText(/What this investigation covers · version \d+/, { timeout: 20_000 });
 
-    const intelligence = await openTab(page, list, "Intelligence", /\/api\/v1\/investigations\/[^/]+\/intelligence\//);
-    await expect(intelligence).toContainText(/hypothes/i, { timeout: 20_000 });
+    const evidence = await openStep(page, "Evidence");
+    await evidence.getByText("The evidence records").click();
+    await expect(evidence).toContainText(/EVD\d+/, { timeout: 20_000 });
 
-    const reviews = await openTab(page, list, "Reviews", /\/api\/v1\/investigations\/[^/]+\/reviews/);
-    await expect(reviews).toContainText("Risk review", { timeout: 20_000 });
-    await expect(reviews).toContainText("Regulatory review", { timeout: 20_000 });
+    const causes = await openStep(page, "Possible causes", /\/api\/v1\/investigations\/[^/]+\/intelligence\//);
+    await expect(causes).toContainText(/hypothes/i, { timeout: 20_000 });
 
-    const brief = await openTab(page, list, "Decision Brief", /\/api\/v1\/investigations\/[^/]+\/decision-brief/);
+    const brief = await openStep(page, "Brief", /\/api\/v1\/investigations\/[^/]+\/decision-brief/);
+    const quiet = brief.getByRole("button", { name: "Show" });
+    if (await quiet.count()) await quiet.click();
+    await expect(brief).toContainText("Risk review", { timeout: 20_000 });
+    await expect(brief).toContainText("Regulatory review", { timeout: 20_000 });
     await expect(brief).toContainText(/Decision Brief · version 2/, { timeout: 20_000 });
 
-    const decision = await openTab(page, list, "Decision", /\/api\/v1\/investigations\/[^/]+\/decision(\?|$)/);
+    const decision = await openStep(page, "Decision & action", /\/api\/v1\/investigations\/[^/]+\/decision/);
     await expect(decision).toContainText(/Accept with conditions/i, { timeout: 20_000 });
     await expect(decision).toContainText(/CAPA/i);
     await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-decision.png`, fullPage: true });
-
-    const inventory = page.waitForResponse((response) => /\/evidence-inventory(\?|$)/.test(response.url()), {
-      timeout: 20_000,
-    });
-    await openSection(page, "Evidence");
-    await openTab(page, "Evidence sections", "Investigation evidence");
-    expect((await inventory).status()).toBe(200);
-    await expect(page.locator("main")).toContainText(/EVD\d+/, { timeout: 20_000 });
-    await expectNoFailedPanel(page);
     expect(problems).toEqual([]);
   });
 
-  test("the investigator reads the case's Trust & Audit timeline and replay", async ({ page }, testInfo) => {
+  test("the investigator reads the case's record and timeline", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     const problems = watchErrors(page);
     await signIn(page, INVESTIGATOR_EMAIL);
     await openCase(page);
-    await openSection(page, "Trust & Audit");
-    const list = "Trust and audit sections";
-
-    const timeline = await openTab(
-      page,
-      list,
-      "Investigation timeline",
-      /\/api\/v1\/investigations\/[^/]+\/trust\/timeline/,
-    );
-    await expect(timeline).toContainText(/Investigation timeline · \d+/, { timeout: 20_000 });
+    const decision = await openStep(page, "Decision & action");
+    const timeline = page.waitForResponse((response) => /\/trust\/timeline/.test(response.url()), { timeout: 20_000 });
+    await decision.getByText("The record: download, history and trust details").click();
+    expect((await timeline).status()).toBe(200);
+    await expect(decision).toContainText(/Investigation timeline · \d+/, { timeout: 20_000 });
     const events = page.getByRole("list", { name: "Investigation events" });
     await expect(events).toBeVisible({ timeout: 20_000 });
     expect(await events.getByRole("listitem").count()).toBeGreaterThan(5);
     await expect(events).toContainText(/SIG\d+|signal/i);
     await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-timeline.png`, fullPage: true });
-
-    const replay = await openTab(page, list, "Replay", /\/api\/v1\/investigations\/[^/]+\/trust\/replay/);
-    await expect(replay).toContainText("Replay the investigation at a moment", { timeout: 20_000 });
-    await expect(replay).toContainText("Snapshot taken at signing", { timeout: 20_000 });
-    await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-replay.png`, fullPage: true });
     expect(problems).toEqual([]);
   });
 });
