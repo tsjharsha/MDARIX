@@ -103,9 +103,9 @@ describe("3. the rail's alerts: a dot, never a count", () => {
 
 describe("4. the keyboard walk kept", () => {
   it("tells the end of a page from focus lost in the middle of it", () => {
-    expect(journey).toContain(
-      "if (focus.id !== first) problems.push(`focus fell to the page after ${leftAt} Tab presses`);",
-    );
+    // UX3: a wrap may also land on the document's first control (the skip link, before the rail).
+    expect(journey).toContain("if (focus.id !== first && focus.id !== documentFirst)");
+    expect(journey).toContain("problems.push(`focus fell to the page after ${leftAt} Tab presses`);");
   });
 });
 
