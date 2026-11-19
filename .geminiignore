@@ -1,0 +1,12 @@
+# Files Gemini must never read, in addition to .gitignore. Secrets and local-only material.
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.migrate.example
+!.env.test.example
+*.age
+/staging-secrets/
+/graphify-out/
+/.mdarix-object-storage/
+/.model-cache/
