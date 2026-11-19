@@ -32,11 +32,36 @@ const step = (name: RegExp) => async (page: Page) => {
   await settle(page);
 };
 
+/** Today with its data read: the three figures are numbers and no panel still says it is loading or reading. */
+async function todayRead(page: Page) {
+  await expect(page.locator(".uw-home-stats .uw-home-num")).toHaveText([/^\d+$/, /^\d+$/, /^\d+$/], {
+    timeout: 60_000,
+  });
+  await expect(page.locator("main")).not.toContainText(/Loading…|Reading (the|what)/, { timeout: 60_000 });
+}
+
+/** The page's own hero band: its height (0 when the page has none; 1 px when it is kept for screen readers only). */
+const bandHeight = (page: Page) =>
+  page.evaluate(() => document.querySelector(".ac-main > .ac-page-head")?.getBoundingClientRect().height ?? 0);
+
 const SCREENS: Screen[] = [
-  { name: "today", path: "/app/my-work", balanced: true },
+  { name: "today", path: "/app/my-work", balanced: true, then: todayRead },
   { name: "cases", path: "/app/complaints", balanced: true },
   { name: "cases-to-triage", path: "/app/complaints?tab=To+triage" },
   { name: "cases-reporting", path: "/app/complaints?tab=Reporting" },
+  {
+    // The list of investigations, as a person reaches it from an open one ("Where you are" > Investigations).
+    name: "investigations",
+    path: "/app/investigations?case=SAMPLE-INV-001",
+    balanced: true,
+    then: async (page) => {
+      await page
+        .getByRole("navigation", { name: "Where you are" })
+        .getByRole("button", { name: "Investigations" })
+        .click();
+      await settle(page);
+    },
+  },
   { name: "cockpit-signal", path: "/app/investigations?case=SAMPLE-INV-001", balanced: true },
   { name: "cockpit-product", path: "/app/investigations?case=SAMPLE-INV-001", then: step(/Product reality/) },
   { name: "cockpit-evidence", path: "/app/investigations?case=SAMPLE-INV-001", then: step(/Evidence/) },
@@ -73,7 +98,8 @@ async function layout(page: Page) {
     let right = -Infinity;
     for (const child of Array.from(main.children)) {
       const box = child.getBoundingClientRect();
-      if (box.width === 0 || box.height === 0 || getComputedStyle(child).position === "fixed") continue;
+      // Not drawn, fixed, or kept for screen readers only (1 px).
+      if (box.width <= 1 || box.height <= 1 || getComputedStyle(child).position === "fixed") continue;
       left = Math.min(left, box.left);
       right = Math.max(right, box.right);
     }
@@ -104,6 +130,8 @@ async function open(page: Page, screen: Screen) {
 async function capture(page: Page, name: string) {
   if (!SHOTS) return;
   mkdirSync(SHOTS, { recursive: true });
+  // The blocks have risen in (320 ms, staggered to 200 ms) before the picture is taken.
+  await page.waitForTimeout(700);
   const { width, height } = page.viewportSize()!;
   await page.screenshot({ path: path.join(SHOTS, `${TAG}${name}-${width}x${height}.png`) });
 }
@@ -115,7 +143,10 @@ test.describe("The application on wide screens", () => {
 
   test("each main screen fills a 1920 screen with balanced gutters and never scrolls sideways", async ({ browser }) => {
     // The check: Today, Cases and the cockpit; with UX_SHOTS, every main screen (a tour of about 25 minutes).
-    const screens = SHOTS ? SCREENS : SCREENS.filter((one) => one.balanced);
+    // UX_SCREENS (comma-separated name prefixes, e.g. "today,cockpit-") narrows the tour to those screens.
+    const only = (process.env.UX_SCREENS ?? "").split(",").filter(Boolean);
+    const toured = only.length ? SCREENS.filter((one) => only.some((name) => one.name.startsWith(name))) : SCREENS;
+    const screens = SHOTS ? toured : SCREENS.filter((one) => one.balanced);
     test.setTimeout(SHOTS ? 2_400_000 : 600_000);
     const page = await signedUpOwner(browser, owner, `Wide Layout ${RUN.toUpperCase()}`, WIDE);
     for (const screen of screens) {
@@ -125,6 +156,11 @@ test.describe("The application on wide screens", () => {
         await capture(page, screen.name);
         const box = await layout(page);
         expect(box, `${screen.name} has a work canvas`).not.toBeNull();
+        // One hero per screen: an open investigation's own dark header, never the page's band above it as well.
+        if (screen.name.startsWith("cockpit-"))
+          expect.soft(await bandHeight(page), `${screen.name}: the page band is hidden`).toBeLessThanOrEqual(1);
+        if (screen.name === "investigations")
+          expect.soft(await bandHeight(page), "the investigations list keeps its band").toBeGreaterThan(40);
         expect.soft(box!.sideways, `${screen.name} at ${size.width} scrolls sideways`).toBeLessThanOrEqual(0);
         if (screen.balanced && size.width === WIDE.width) {
           // Centred: the gutters differ by no more than 32 px, and the canvas uses the room (at least 1360 px).
@@ -137,7 +173,7 @@ test.describe("The application on wide screens", () => {
     }
     // The phone: the same screens, nothing wider than the screen.
     await page.setViewportSize(PHONE);
-    for (const screen of SCREENS.filter((one) => one.balanced)) {
+    for (const screen of (SHOTS ? toured : SCREENS).filter((one) => one.balanced)) {
       await open(page, screen);
       await capture(page, screen.name);
       const box = await layout(page);

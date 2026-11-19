@@ -8,6 +8,7 @@ import { CountUp } from "./UserWorkspace";
 
 const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
 const css: string = fs.readFileSync(new URL("./appLook.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const caseHeader: string = fs.readFileSync(new URL("./sections/CaseHeader.tsx", import.meta.url), "utf8");
 const tokens: string = fs.readFileSync(new URL("../../tokens.css", import.meta.url), "utf8");
 const appSet = tokens.slice(tokens.indexOf(':root:not([data-theme="dark"]):has(.uw-hybrid) {'));
 const colour = (name: string) => new RegExp(`--ms-${name}:\\s*(#[0-9a-f]{6})`, "i").exec(appSet)![1];
@@ -50,6 +51,17 @@ describe("the application's palette", () => {
     }
     // The hero band's teal end: the band's muted text (on-dark-muted) stays readable there.
     expect(contrast("#c5d3df", "#0b5560")).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("one hero per screen", () => {
+  it("hides the page band from sight while an investigation's own header is on screen, never from screen readers", () => {
+    expect(caseHeader).toContain(
+      'className="uw-card uw-highlights uw-inv-head" aria-label="The investigation at a glance"',
+    );
+    const rule = /\.uw-hybrid \.ac-main:has\(\.uw-inv-head\) > \.ac-page-head \{([^}]*)\}/.exec(css);
+    expect(rule?.[1]).toContain("clip-path: inset(50%)");
+    expect(rule?.[1]).not.toMatch(/display: none|visibility: hidden/);
   });
 });
 

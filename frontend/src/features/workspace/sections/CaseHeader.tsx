@@ -389,7 +389,7 @@ function CaseHighlights({
     lotNames.length > 3 ? `${lotNames.length} lots` : lotsText(lotNames as string[]).replace(/ and /g, " · ");
   // What blocks the decision is the cockpit strip's (UX3).
   return (
-    <header className="uw-card uw-highlights" aria-label="The investigation at a glance">
+    <header className="uw-card uw-highlights uw-inv-head" aria-label="The investigation at a glance">
       <div className="uw-hl-top">
         <div className="uw-hl-title">
           {/* The question is the investigation's name; its reference is the customer's own (0.10.85, D3.9, D3.12). */}
