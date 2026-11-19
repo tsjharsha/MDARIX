@@ -5,6 +5,9 @@ import { DEMO_REQUESTS_OFFERED } from "./offer";
 import { AVAILABILITY, WORK_AREAS, trialIncludes } from "./content";
 import { EXAMPLE_NUMBERS } from "./visuals";
 
+// The screens shipped with the website (public/site/app).
+const SHIPPED = Object.keys(import.meta.glob("/public/site/app/*.webp"));
+
 const text = (html: string) =>
   html
     .replace(/<[^>]+>/g, " ")
@@ -28,13 +31,13 @@ describe("website home", () => {
 
   it("tells the product story in five steps, each leading to the place in MDARIX that does it", () => {
     const html = renderToStaticMarkup(<HomePage />);
-    const steps = [...html.matchAll(/<li id="([a-z]+)" class="ms-story-step"/g)].map((match) => match[1]);
+    const steps = [...html.matchAll(/<li id="([a-z]+)" class="ms-story-step[^"]*"/g)].map((match) => match[1]);
     expect(steps).toEqual(["signal", "product", "investigation", "decision", "effectiveness"]);
     expect(html).toContain("Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?");
     for (const area of ["Cases", "Products", "Investigations", "Decisions &amp; Reports"])
       expect(html).toContain(`In MDARIX: ${area}`);
-    // Every picture says it is illustrative.
-    expect(html.match(/Illustrative · synthetic sample data/g)?.length).toBe(6);
+    // Every picture says it is illustrative: the hero's screen and story graphic, five screens and the drawn trend.
+    expect(html.match(/Illustrative · synthetic sample data/g)?.length).toBe(8);
   });
 
   it("names the five markets and says people submit every report", () => {
@@ -51,12 +54,48 @@ describe("website home", () => {
     expect(html).not.toMatch(/request a demo|book a demo/i);
   });
 
-  it("shows no photos and no screenshots, only drawn illustrations", () => {
+  it("shows the app's own screens from the sample data: described, sized, and only the hero's loaded first", () => {
     for (const page of [<HomePage key="home" />, <PlatformPage key="platform" />]) {
-      const html = renderToStaticMarkup(page);
-      expect(html).not.toContain("<img");
-      expect(html).not.toContain(".webp");
+      const images = [...renderToStaticMarkup(page).matchAll(/<img [^>]*>/g)].map((match) => match[0]);
+      expect(images.length).toBeGreaterThanOrEqual(5);
+      for (const image of images) {
+        const src = image.match(/src="([^"]+)"/)?.[1] ?? "";
+        expect(src).toMatch(/^\/site\/app\/[a-z]+\.webp$/);
+        expect(SHIPPED, src).toContain(`/public${src}`);
+        expect(image).toMatch(/alt="MDARIX [^"]+"/);
+        expect(image).toContain('width="1600"');
+        expect(image).toContain('height="1000"');
+      }
+      // No photos: every image is a screen of MDARIX.
+      expect(images.every((image) => image.includes("/site/app/"))).toBe(true);
     }
+    const home = [...renderToStaticMarkup(<HomePage />).matchAll(/<img [^>]*>/g)].map((match) => match[0]);
+    expect(home[0]).toContain('fetchPriority="high"');
+    expect(home[0]).toContain('loading="eager"');
+    for (const image of home.slice(1)) expect(image).toContain('loading="lazy"');
+  });
+
+  it("states what is true at a glance, naming the standards as context and not as badges", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    const facts = text(
+      html.slice(html.indexOf('class="ms-facts"'), html.indexOf("</section>", html.indexOf("ms-facts"))),
+    );
+    for (const fact of ["5 markets", "6-step investigation", "A person signs", "Sample data in minutes"])
+      expect(facts).toContain(fact);
+    for (const standard of ["21 CFR 803", "EU MDR Art. 87", "UK MDR 2002", "SOR/98-282", "India MDR 2017"])
+      expect(facts).toContain(standard);
+    expect(facts).not.toMatch(/certified|compliant|approved by/i);
+  });
+
+  it("tells the hero's story graphic in words: signal, version, evidence, a person's signature", () => {
+    const words = text(renderToStaticMarkup(<HomePage />));
+    for (const step of [
+      "Signal 15 pressure-alarm complaints after Rev B, 4 before",
+      "Product version Rev B: new sensor supplier, SAMPLE-CHG-014",
+      "Evidence For and against, side by side",
+      "Decision Signed by a person, never by AI",
+    ])
+      expect(words).toContain(step);
   });
 
   it("tells one story whose numbers add up", () => {
@@ -68,25 +107,18 @@ describe("website home", () => {
   });
 
   it("shows the trial sample's own records, not invented ones", () => {
-    const words = text(renderToStaticMarkup(<HomePage />));
-    // backend/app/trial: sample_data.py, sample_decision.py, sample_reports.py, sample_assessments.py, flagship.py.
+    // The screens' descriptions and the drawn trend: backend/app/trial (sample_data.py, flagship.py).
+    const html = renderToStaticMarkup(<HomePage />).replace(/&#x27;/g, "'");
     for (const fact of [
-      "Changed in SAMPLE-CHG-014",
       "Precision Sensors Ltd",
-      "NovaSense Components (SAMPLE-CHG-014)",
-      "32 units",
-      "13 units",
-      "003–008",
+      "NovaSense Components in SAMPLE-CHG-014",
+      "SAMPLE-INV-001",
+      "SAMPLE-CAPA-02",
+      "signed inconclusive",
       "9.3×",
-      "Partially supported",
-      "Weakly supported",
-      "SAMPLE-RV-09",
-      "SAMPLE-RV-10",
-      "SAMPLE-CAPA-02: incoming inspection of NovaSense pressure sensors restored to 32 units per lot",
-      "Inconclusive",
     ])
-      expect(words).toContain(fact);
-    expect(words).not.toMatch(/a month (before|after)|drifts at low pressure|firmware/);
+      expect(html).toContain(fact);
+    expect(html).not.toMatch(/a month (before|after)|drifts at low pressure|firmware/);
   });
 });
 

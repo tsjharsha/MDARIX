@@ -1,17 +1,22 @@
 import type { ReactNode } from "react";
-import { ArrowRight, BadgeCheck, Check, Lock, ScrollText, ShieldCheck, UserCheck, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Globe2,
+  ListChecks,
+  Lock,
+  PenLine,
+  ScrollText,
+  ShieldCheck,
+  Timer,
+  UserCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { AVAILABILITY, WORK_AREAS, afterTheTrial, trialIncludes } from "./content";
 import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
-import {
-  CustomerVoices,
-  EffectivenessCheck,
-  InvestigationRail,
-  MarketBasis,
-  MarketDecisions,
-  ProductTwin,
-  RevisionCompare,
-  SignalChart,
-} from "./visuals";
+import { CustomerVoices, MarketBasis, SignalChart } from "./visuals";
+import { HeroStory, Shot } from "./motion";
 import { BESIDE_YOUR_QMS } from "../features/help/besideYourQms";
 
 // The website's own pages besides the questions, the videos and the legal pages. Four pages: what MDARIX does (home),
@@ -31,7 +36,7 @@ export type SitePage = (typeof SITE_PAGES)[number];
 
 function Head({ eyebrow, title, copy, id }: { eyebrow: string; title: string; copy?: ReactNode; id: string }) {
   return (
-    <div className="ms-head">
+    <div className="ms-head ms-reveal">
       <span className="ms-eyebrow">{eyebrow}</span>
       <h2 id={id}>{title}</h2>
       {copy && <p>{copy}</p>}
@@ -51,7 +56,7 @@ function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <section className="ms-page-hero">
+    <section className="ms-page-hero ms-dark">
       <span className="ms-eyebrow">{eyebrow}</span>
       <h1>{title}</h1>
       <p>{copy}</p>
@@ -75,7 +80,7 @@ function Checks({ items }: { items: readonly string[] }) {
 
 function Cards({ items, columns = 3 }: { items: readonly (readonly [string, string])[]; columns?: 2 | 3 | 4 }) {
   return (
-    <div className={`ms-grid ms-grid-${columns}`}>
+    <div className={`ms-grid ms-grid-${columns} ms-reveal`}>
       {items.map(([title, text]) => (
         <div key={title} className="ms-card">
           <strong>{title}</strong>
@@ -88,7 +93,7 @@ function Cards({ items, columns = 3 }: { items: readonly (readonly [string, stri
 
 function IconCards({ items }: { items: readonly (readonly [LucideIcon, string, string])[] }) {
   return (
-    <div className={`ms-grid ms-grid-${items.length === 3 ? 3 : 4}`}>
+    <div className={`ms-grid ms-grid-${items.length === 3 ? 3 : 4} ms-reveal`}>
       {items.map(([Icon, title, text]) => (
         <div key={title} className="ms-card">
           <span className="ms-icon">
@@ -138,7 +143,8 @@ const TRUST_POINTS = [
 
 /* ------------------------------------------------------------------------------------------------ Home */
 
-// The story of one sample product (OrbitCare 300) in five steps, each with the work area that does it.
+// The story of one sample product (OrbitCare 300) in five steps, each with the work area that does it and the app's own
+// screen for it, captured from a free trial's sample data (public/site/app, at 2x).
 const STORY = [
   {
     id: "signal",
@@ -146,7 +152,8 @@ const STORY = [
     title: "Catch the signal on the version that caused it.",
     text: "Complaints are counted per product version against their own history, so a rise after a change shows up before anyone spots it in a spreadsheet. Closed “no fault found” complaints get a second look.",
     area: ["Cases", "/platform#cases"],
-    visual: <SignalChart />,
+    shot: "signal",
+    alt: "MDARIX Cases: the OrbitCare 300 pressure-alarm trend, rising after Rev B, from the trial's sample data",
   },
   {
     id: "product",
@@ -154,7 +161,8 @@ const STORY = [
     title: "See the product behind the complaint.",
     text: "Every complaint sits on the version in the field on the event date, with its components, suppliers, lots and markets. What changed between versions is one click away, and so is every lot that shares a suspect part.",
     area: ["Products", "/platform#products"],
-    visual: <RevisionCompare />,
+    shot: "product",
+    alt: "MDARIX Products: OrbitCare 300 Rev B compared with Rev A; the pressure sensor supplier changed from Precision Sensors Ltd to NovaSense Components in SAMPLE-CHG-014",
   },
   {
     id: "investigation",
@@ -162,7 +170,8 @@ const STORY = [
     title: "Weigh every possible cause against the evidence.",
     text: "Quality, regulatory, product and supplier quality review the same evidence. Each possible cause shows what supports it, what contradicts it and what is still unknown. AI may propose; a person reviews.",
     area: ["Investigations", "/platform#investigations"],
-    visual: <InvestigationRail />,
+    shot: "investigation",
+    alt: "MDARIX Investigations: SAMPLE-INV-001, with what is known, unknown, contradicted and missing",
   },
   {
     id: "decision",
@@ -170,7 +179,8 @@ const STORY = [
     title: "Sign the decision. Get the right report ready for every market.",
     text: "Reportability is assessed for the US, EU and Northern Ireland, Great Britain, Canada and India, each against its legal clock and with its reason kept. People submit every report; MDARIX never does.",
     area: ["Decisions & Reports", "/platform#decisions"],
-    visual: <MarketDecisions />,
+    shot: "decision",
+    alt: "MDARIX Decisions: the sample investigation's decision, signed by a person with password and authenticator code",
   },
   {
     id: "effectiveness",
@@ -178,14 +188,25 @@ const STORY = [
     title: "Prove the action worked, or say it is too early.",
     text: "The CAPA's effectiveness check is planned before the action, measured from the right date and signed: effective, not effective or inconclusive. Field data that touches the risk file is sent there.",
     area: ["Decisions & Reports", "/platform#decisions"],
-    visual: <EffectivenessCheck />,
+    shot: "effectiveness",
+    alt: "MDARIX effectiveness check for SAMPLE-CAPA-02: the synthetic follow-up after the fix, signed inconclusive",
   },
+] as const;
+
+const shotOf = (name: string) => `/site/app/${name}.webp`;
+
+// What is true today, at a glance: the facts strip under the home hero.
+const FACTS = [
+  [Globe2, "5 markets", "United States, EU and Northern Ireland, Great Britain, Canada and India"],
+  [ListChecks, "6-step investigation", "From the signal to the decision and the action"],
+  [PenLine, "A person signs", "Every decision, with password and authenticator code"],
+  [Timer, "Sample data in minutes", "A private trial workspace, no demo call"],
 ] as const;
 
 export function HomePage() {
   return (
     <>
-      <section className="ms-hero" aria-labelledby="hero-title">
+      <section className="ms-hero ms-dark" aria-labelledby="hero-title">
         <div className="ms-hero-copy">
           <span className="ms-eyebrow">Post-market surveillance for medical devices</span>
           <h1 id="hero-title">
@@ -209,10 +230,36 @@ export function HomePage() {
             <li>Authorized people decide and sign</li>
           </ul>
         </div>
-        <ProductTwin />
+        <div className="ms-hero-visual">
+          <Shot
+            src={shotOf("hero")}
+            alt="MDARIX Today: the sample investigation of OrbitCare 300 pressure-alarm complaints, the overdue and due work, and the legal clock per market, from the free trial's sample data"
+            address="mdarix.com/app"
+            priority
+          />
+          <HeroStory />
+        </div>
       </section>
 
-      <section className="ms-section" aria-labelledby="story-title">
+      <section className="ms-facts" aria-label="MDARIX at a glance">
+        <ul>
+          {FACTS.map(([Icon, title, text]) => (
+            <li key={title}>
+              <span className="ms-icon">
+                <Icon size={20} aria-hidden="true" />
+              </span>
+              <strong>{title}</strong>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+        <p>
+          Reportability is assessed against each market&rsquo;s own rules: 21 CFR 803 in the US, EU MDR Art. 87 in the
+          EU and Northern Ireland, UK MDR 2002 in Great Britain, SOR/98-282 in Canada and India MDR 2017 in India.
+        </p>
+      </section>
+
+      <section className="ms-section ms-band" aria-labelledby="story-title">
         <Head
           eyebrow="One product, start to finish"
           id="story-title"
@@ -221,7 +268,7 @@ export function HomePage() {
         />
         <ol className="ms-story">
           {STORY.map((step, index) => (
-            <li key={step.id} id={step.id} className="ms-story-step">
+            <li key={step.id} id={step.id} className="ms-story-step ms-reveal">
               <div className="ms-story-copy">
                 <span className="ms-step">
                   <span aria-hidden="true">0{index + 1}</span> {step.eyebrow}
@@ -232,13 +279,16 @@ export function HomePage() {
                   In MDARIX: {step.area[0]} <ArrowRight size={14} aria-hidden="true" />
                 </a>
               </div>
-              {step.visual}
+              <div className="ms-story-visual">
+                <Shot src={shotOf(step.shot)} alt={step.alt} address="mdarix.com/app" />
+                {step.id === "signal" && <SignalChart />}
+              </div>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className="ms-section ms-band" aria-labelledby="beside-title">
+      <section className="ms-section ms-band ms-dark" aria-labelledby="beside-title">
         <Head eyebrow="Beside your QMS" id="beside-title" title="Built for regulated teams." copy={BESIDE_YOUR_QMS} />
         <IconCards items={TRUST_POINTS} />
         <p className="ms-more">
@@ -256,10 +306,13 @@ export function HomePage() {
 
 /* ------------------------------------------------------------------------------------- How it works */
 
-const AREA_VISUALS: Partial<Record<(typeof WORK_AREAS)[number]["id"], ReactNode>> = {
-  investigations: <InvestigationRail />,
-  products: <RevisionCompare />,
-  decisions: <MarketDecisions />,
+// Each work area's own screen, from a free trial's sample data.
+const AREA_SHOTS: Record<(typeof WORK_AREAS)[number]["id"], [string, string]> = {
+  today: ["hero", "MDARIX Today: the person's own work first, from the trial's sample data"],
+  cases: ["signal", "MDARIX Cases: the OrbitCare 300 pressure-alarm trend, rising after Rev B"],
+  investigations: ["investigation", "MDARIX Investigations: SAMPLE-INV-001, what is known and what is not"],
+  products: ["product", "MDARIX Products: OrbitCare 300 Rev B compared with Rev A"],
+  decisions: ["decision", "MDARIX Decisions: the decision signed by a person with password and authenticator code"],
 };
 
 export function PlatformPage() {
@@ -291,25 +344,12 @@ export function PlatformPage() {
             <Head eyebrow={`0${index + 1} · ${area.name}`} id={area.id} title={area.line} />
             <Checks items={area.points} />
           </div>
-          {AREA_VISUALS[area.id] ??
-            (area.id === "today" ? (
-              <figure className="ms-fig">
-                <ul className="ms-today">
-                  <li>
-                    <span className="ms-pill is-bad">Due today</span> Triage within 24 hours · SAMPLE-RV-11
-                  </li>
-                  <li>
-                    <span className="ms-pill is-warn">Clock running</span> US reportability decision · SAMPLE-RV-06
-                  </li>
-                  <li>
-                    <span className="ms-pill is-good">Next</span> Read the investigation brief · SAMPLE-INV-001
-                  </li>
-                </ul>
-                <figcaption className="ms-fig-note">Illustrative · synthetic sample data</figcaption>
-              </figure>
-            ) : (
-              <SignalChart />
-            ))}
+          <Shot
+            className="ms-reveal"
+            src={shotOf(AREA_SHOTS[area.id][0])}
+            alt={AREA_SHOTS[area.id][1]}
+            address="mdarix.com/app"
+          />
         </section>
       ))}
 
@@ -399,7 +439,7 @@ export function TrustPage() {
         />
       </section>
 
-      <section className="ms-section ms-band" aria-labelledby="ai">
+      <section className="ms-section ms-band ms-dark" aria-labelledby="ai">
         <Head eyebrow="AI" id="ai" title="AI that proposes, cites and steps back." />
         <Checks
           items={[

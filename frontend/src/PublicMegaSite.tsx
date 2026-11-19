@@ -5,6 +5,7 @@ import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
 import { QUESTIONS_PATH, QuestionPage, QuestionsPage, questionAt } from "./site/questions";
 import { applyPageMeta } from "./site/seo";
+import { useReveal } from "./site/motion";
 import { CompanyPage, HomePage, PlatformPage, SITE_PAGES, TrustPage, type SitePage } from "./site/pages";
 import {
   ContactPage,
@@ -159,6 +160,7 @@ export function PublicMegaSite({ path }: { path: string }) {
   const siteInfo = useSiteInfo();
   const firstPage = useRef(true);
   const question = questionAt(page);
+  useReveal(page);
 
   // Normalize legacy URLs in the address bar (a "not found" address is left as typed), then bring the requested
   // section into view.
