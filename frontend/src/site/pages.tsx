@@ -153,7 +153,7 @@ const STORY = [
     text: "Complaints are counted per product version against their own history, so a rise after a change shows up before anyone spots it in a spreadsheet. Closed “no fault found” complaints get a second look.",
     area: ["Cases", "/platform#cases"],
     shot: "signal",
-    alt: "MDARIX Cases: the OrbitCare 300 pressure-alarm trend, rising after Rev B, from the trial's sample data",
+    alt: "MDARIX trend check: OrbitCare 300 Rev B, 9 pressure-alarm complaints in 30 days against 1.0 expected, from the trial's sample data",
   },
   {
     id: "product",
@@ -309,7 +309,7 @@ export function HomePage() {
 // Each work area's own screen, from a free trial's sample data.
 const AREA_SHOTS: Record<(typeof WORK_AREAS)[number]["id"], [string, string]> = {
   today: ["hero", "MDARIX Today: the person's own work first, from the trial's sample data"],
-  cases: ["signal", "MDARIX Cases: the OrbitCare 300 pressure-alarm trend, rising after Rev B"],
+  cases: ["signal", "MDARIX trend check: OrbitCare 300 Rev B rising against its own history"],
   investigations: ["investigation", "MDARIX Investigations: SAMPLE-INV-001, what is known and what is not"],
   products: ["product", "MDARIX Products: OrbitCare 300 Rev B compared with Rev A"],
   decisions: ["decision", "MDARIX Decisions: the decision signed by a person with password and authenticator code"],
