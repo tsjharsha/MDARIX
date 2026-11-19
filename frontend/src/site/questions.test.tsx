@@ -54,6 +54,20 @@ describe("the questions and answers", () => {
     expect(resolveSitePath("/questions/no-such-question", "")).toEqual({ page: "not-found", hash: "" });
   });
 
+  it("open with the dark page band of the other site pages: breadcrumb, eyebrow and the H1 inside it", () => {
+    const pages = [
+      renderToStaticMarkup(<QuestionsPage />),
+      ...QUESTIONS.map((q) => renderToStaticMarkup(<QuestionPage question={q} />)),
+    ];
+    for (const html of pages) {
+      const hero = html.match(/^<section class="ms-page-hero ms-dark">([\s\S]*?)<\/section>/);
+      expect(hero, html.slice(0, 120)).not.toBeNull();
+      expect(hero![1]).toMatch(/^<nav class="ms-breadcrumb" aria-label="Breadcrumb">/);
+      expect(hero![1]).toContain('<span class="ms-eyebrow">Questions and answers</span>');
+      expect(hero![1]).toMatch(/<h1 id="questions?-title">/);
+    }
+  });
+
   it("put a direct answer of two or three sentences first, under the question as the only H1", () => {
     for (const question of QUESTIONS) {
       const html = renderToStaticMarkup(<QuestionPage question={question} />);

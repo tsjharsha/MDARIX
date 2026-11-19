@@ -1,6 +1,7 @@
 import { ArrowRight, Check } from "lucide-react";
 import { BESIDE_YOUR_QMS, WHAT_MDARIX_ADDS } from "../features/help/besideYourQms";
 import { trialIncludes } from "./content";
+import { PageHero } from "./hero";
 import { SITE_URL } from "./seo";
 
 // Questions and answers (/questions and one page per question): what medical device quality and regulatory teams ask
@@ -417,93 +418,100 @@ function Breadcrumb({ onQuestion = false }: { onQuestion?: boolean }) {
 
 export function QuestionsPage() {
   return (
-    <article className="ms-section ms-legal ms-questions" aria-labelledby="questions-title">
-      <Breadcrumb />
-      <span className="ms-eyebrow">Questions and answers</span>
-      <h1 id="questions-title">Questions about complaint trending, reporting and CAPA</h1>
-      <p className="ms-legal-lead">
-        Direct answers to questions medical device quality and regulatory teams ask about trending complaints,
-        reportability, the risk file and CAPA, each with what MDARIX does about it. General information, not legal or
-        regulatory advice.
-      </p>
-      <ol className="ms-question-list">
-        {QUESTIONS.map((item) => (
-          <li key={item.path}>
-            <h2>
-              <a href={item.path}>{item.question}</a>
-            </h2>
-            <p>{item.summary}</p>
-          </li>
-        ))}
-      </ol>
-      <TrialBox />
-      <JsonLd data={questionsJsonLd()} />
-    </article>
+    <>
+      <PageHero
+        crumbs={<Breadcrumb />}
+        eyebrow="Questions and answers"
+        id="questions-title"
+        title="Questions about complaint trending, reporting and CAPA"
+        copy="Direct answers to questions medical device quality and regulatory teams ask about trending complaints, reportability, the risk file and CAPA, each with what MDARIX does about it. General information, not legal or regulatory advice."
+      />
+      <article className="ms-section ms-legal ms-questions" aria-labelledby="questions-title">
+        <ol className="ms-question-list">
+          {QUESTIONS.map((item) => (
+            <li key={item.path}>
+              <h2>
+                <a href={item.path}>{item.question}</a>
+              </h2>
+              <p>{item.summary}</p>
+            </li>
+          ))}
+        </ol>
+        <TrialBox />
+        <JsonLd data={questionsJsonLd()} />
+      </article>
+    </>
   );
 }
 
 export function QuestionPage({ question }: { question: Question }) {
   const others = QUESTIONS.filter((item) => item.path !== question.path);
   return (
-    <article className="ms-section ms-legal ms-question" aria-labelledby="question-title">
-      <Breadcrumb onQuestion />
-      <span className="ms-eyebrow">Questions and answers</span>
-      <h1 id="question-title">{question.question}</h1>
-      <section className="ms-answer" aria-label="The short answer">
-        <strong>The short answer</strong>
-        <p>{question.answer}</p>
-      </section>
-      {question.note && <p className="ms-legal-note">{question.note}</p>}
-      <div className="ms-legal-body">
-        {question.sections.map((section) => (
-          <section key={section.title}>
-            <h2>{section.title}</h2>
-            {section.paragraphs?.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-            {section.points && (
-              <ul>
-                {section.points.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-        <section className="ms-question-mdarix">
-          <h2>{question.mdarix.title}</h2>
-          <ul className="ms-check-list">
-            {question.mdarix.points.map((point) => (
-              <li key={point}>
-                <Check size={16} aria-hidden="true" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
+    <>
+      <PageHero
+        crumbs={<Breadcrumb onQuestion />}
+        eyebrow="Questions and answers"
+        id="question-title"
+        title={question.question}
+        copy={question.summary}
+      />
+      <article className="ms-section ms-legal ms-question" aria-labelledby="question-title">
+        <section className="ms-answer" aria-label="The short answer">
+          <strong>The short answer</strong>
+          <p>{question.answer}</p>
         </section>
-      </div>
-      <TrialBox />
-      <nav className="ms-question-more" aria-label="Read further">
-        <h2>Read further</h2>
-        <ul>
-          {question.links.map(([label, href]) => (
-            <li key={href}>
-              <a href={href}>{label}</a>
-            </li>
+        {question.note && <p className="ms-legal-note">{question.note}</p>}
+        <div className="ms-legal-body">
+          {question.sections.map((section) => (
+            <section key={section.title}>
+              <h2>{section.title}</h2>
+              {section.paragraphs?.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+              {section.points && (
+                <ul>
+                  {section.points.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
           ))}
-          {others
-            .filter((item) => !question.links.some(([, href]) => href === item.path))
-            .map((item) => (
-              <li key={item.path}>
-                <a href={item.path}>{item.question}</a>
+          <section className="ms-question-mdarix">
+            <h2>{question.mdarix.title}</h2>
+            <ul className="ms-check-list">
+              {question.mdarix.points.map((point) => (
+                <li key={point}>
+                  <Check size={16} aria-hidden="true" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+        <TrialBox />
+        <nav className="ms-question-more" aria-label="Read further">
+          <h2>Read further</h2>
+          <ul>
+            {question.links.map(([label, href]) => (
+              <li key={href}>
+                <a href={href}>{label}</a>
               </li>
             ))}
-        </ul>
-        <a className="ms-link" href={QUESTIONS_PATH}>
-          All questions <ArrowRight size={14} aria-hidden="true" />
-        </a>
-      </nav>
-      <JsonLd data={questionJsonLd(question)} />
-    </article>
+            {others
+              .filter((item) => !question.links.some(([, href]) => href === item.path))
+              .map((item) => (
+                <li key={item.path}>
+                  <a href={item.path}>{item.question}</a>
+                </li>
+              ))}
+          </ul>
+          <a className="ms-link" href={QUESTIONS_PATH}>
+            All questions <ArrowRight size={14} aria-hidden="true" />
+          </a>
+        </nav>
+        <JsonLd data={questionJsonLd(question)} />
+      </article>
+    </>
   );
 }

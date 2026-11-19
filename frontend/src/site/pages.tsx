@@ -17,6 +17,7 @@ import { AVAILABILITY, WORK_AREAS, afterTheTrial, trialIncludes } from "./conten
 import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 import { CustomerVoices, MarketBasis, SignalChart } from "./visuals";
 import { HeroStory, Shot } from "./motion";
+import { PageHero } from "./hero";
 import { BESIDE_YOUR_QMS } from "../features/help/besideYourQms";
 
 // The website's own pages besides the questions, the videos and the legal pages. Four pages: what MDARIX does (home),
@@ -41,27 +42,6 @@ function Head({ eyebrow, title, copy, id }: { eyebrow: string; title: string; co
       <h2 id={id}>{title}</h2>
       {copy && <p>{copy}</p>}
     </div>
-  );
-}
-
-function PageHero({
-  eyebrow,
-  title,
-  copy,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  copy: string;
-  children?: ReactNode;
-}) {
-  return (
-    <section className="ms-page-hero ms-dark">
-      <span className="ms-eyebrow">{eyebrow}</span>
-      <h1>{title}</h1>
-      <p>{copy}</p>
-      {children}
-    </section>
   );
 }
 

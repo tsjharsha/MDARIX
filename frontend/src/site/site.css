@@ -1872,6 +1872,14 @@
 .ms-legal .ms-breadcrumb a {
   color: var(--site-brand);
 }
+/* On the dark page band (Questions and answers): light text, the bright brand link. */
+.ms-dark .ms-breadcrumb {
+  margin-bottom: 22px;
+  color: var(--site-on-dark-2);
+}
+.ms-dark .ms-breadcrumb a {
+  color: var(--site-brand-hi);
+}
 .ms-answer {
   display: grid;
   gap: 8px;
