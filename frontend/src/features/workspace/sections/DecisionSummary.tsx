@@ -292,9 +292,11 @@ export function DecisionSummaryView({
                   ? "Signed effective"
                   : worked?.state === "NOT_EFFECTIVE"
                     ? "Signed not effective"
-                    : worked?.state === "TOO_EARLY"
-                      ? "Too early"
-                      : "No check planned"
+                    : worked?.state === "INCONCLUSIVE"
+                      ? "Signed inconclusive"
+                      : worked?.state === "TOO_EARLY"
+                        ? "Too early"
+                        : "No check planned"
               }
             />
           </p>

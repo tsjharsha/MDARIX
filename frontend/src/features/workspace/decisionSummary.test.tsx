@@ -220,6 +220,20 @@ describe("Decision and impact summary", () => {
     expect(html).not.toContain("Asha Rao");
   });
 
+  it("a check signed inconclusive reads so, never as no check planned (W1d INCONCLUSIVE)", () => {
+    reads.data[decisionSummaryPath("inv-4")] = {
+      ...SIGNED,
+      worked: {
+        state: "INCONCLUSIVE",
+        text: "SAMPLE-CAPA-02: signed inconclusive (round 1).",
+        on: null,
+      },
+    } satisfies DecisionSummary;
+    const html = render(<DecisionSummaryView investigationId="inv-4" />);
+    expect(html).toContain("Signed inconclusive");
+    expect(html).not.toContain("No check planned");
+  });
+
   it("shows nothing before a decision is signed", () => {
     reads.data[decisionSummaryPath("inv-3")] = { investigation: SIGNED.investigation, decision: null };
     expect(render(<DecisionSummaryView investigationId="inv-3" />)).toBe("");
