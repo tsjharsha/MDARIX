@@ -427,7 +427,7 @@
   grid-template-columns: minmax(0, 4.6fr) minmax(0, 7fr);
   align-items: center;
   gap: 72px;
-  padding-block: 96px 136px;
+  padding-block: 96px 104px;
 }
 .ms-hero h1 {
   margin-top: 20px;
@@ -472,11 +472,13 @@
   order: -1;
   text-align: right;
 }
+/* The story card sits under the screenshot, overlapping only the frame's bottom edge (20 px), never the screen's text:
+   absolutely placed over the frame it covered the screenshot and clipped its words (0.11.07 review). */
 .ms-hero-visual > .ms-flow {
-  position: absolute;
-  left: -56px;
-  bottom: -96px;
+  position: relative;
+  z-index: 1;
   width: min(600px, 88%);
+  margin: -20px 0 0 -56px;
 }
 .ms-page-hero {
   padding-block: 88px 80px;
@@ -1507,7 +1509,7 @@
     gap: 56px;
   }
   .ms-hero-visual > .ms-flow {
-    left: -24px;
+    margin-left: -24px;
   }
   .ms-story-visual > .ms-fig-chart {
     left: -20px;
@@ -1546,11 +1548,8 @@
     transform: none;
   }
   .ms-hero-visual > .ms-flow {
-    position: relative;
-    left: auto;
-    bottom: auto;
     width: auto;
-    margin: -48px 24px 0;
+    margin: -20px 24px 0;
   }
 }
 @media (max-width: 960px) {
