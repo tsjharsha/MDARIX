@@ -10,7 +10,9 @@ files, the `dc` and `ro` shorthands, backup and off-site copy, rollback rules) i
 **One database change: migration `ux2navigationnew`** (expand-only data update). It sets `tenants.navigation` to
 `new` for every organization still on `classic` and prints how many it moved (6 on 19 Nov: Confidential, Galarix,
 MDARIX Platform, MDARIX Validation Org, two Orbit Medical Devices organizations). The owner approved moving all
-organizations on 18 Nov. Downgrade to `tr33inconclusive` puts them back on `classic`.
+organizations on 18 Nov. Downgrade to `tr33inconclusive` only puts the column's default back to `classic`
+(new organizations start on classic again); it does not move existing organizations back, because which ones were on
+classic is not recorded. Set an organization back in Tenant 360 if needed.
 
 ## Checklist
 
