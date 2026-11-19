@@ -57,3 +57,26 @@ describe("security page (CMP-10)", () => {
     expect(html).toContain("Imported CSV and Excel files are read as data only and are not stored");
   });
 });
+
+describe("the legal and trust pages' look (0.11.08)", () => {
+  it("open with the dark page band of the other site pages, the page's only H1 inside it", () => {
+    const view = (path: "/privacy" | "/terms" | "/trial-agreement") =>
+      renderToStaticMarkup(
+        <LegalDocumentView path={path} state={{ status: "LOADING" }} contact={null} onRetry={() => undefined} />,
+      );
+    const pages: [string, string][] = [
+      [view("/privacy"), "Privacy policy"],
+      [view("/terms"), "Terms of service"],
+      [view("/trial-agreement"), "Free trial agreement"],
+      [renderToStaticMarkup(<SecurityPage />), "Security at MDARIX"],
+      [renderToStaticMarkup(<AccessibilityPage />), "Accessibility statement"],
+    ];
+    for (const [html, title] of pages) {
+      const hero = html.match(/^<section class="ms-page-hero ms-dark">([\s\S]*?)<\/section>/);
+      expect(hero, title).not.toBeNull();
+      expect(hero![1], title).toMatch(new RegExp(`<h1 id="[a-z-]+-title">${title}</h1>`));
+      expect(hero![1], title).toMatch(/<p>.{30,}<\/p>/);
+      expect(html.match(/<h1[\s>]/g), title).toHaveLength(1);
+    }
+  });
+});

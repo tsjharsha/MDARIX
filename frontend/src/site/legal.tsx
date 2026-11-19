@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Mail, MapPin } from "lucide-react";
 import { Markdown } from "./markdown";
+import { PageHero } from "./hero";
+import { PAGE_META } from "./seo";
 import { DEMO_REQUESTS_OFFERED } from "./offer";
 
 /*
@@ -224,69 +226,71 @@ export function LegalDocumentView({
   // When the request failed the server's addresses may be unknown too: the ones the published texts give.
   const writeTo = contact ?? PUBLISHED_CONTACT.privacy;
   return (
-    <article className="ms-section ms-legal" aria-labelledby="legal-title">
-      <span className="ms-eyebrow">Legal</span>
-      <h1 id="legal-title">{title}</h1>
-      {state.status === "LOADING" && (
-        <>
-          <p className="ms-legal-note">Loading the current text…</p>
-          {/* The text is served live (MDARIX_LEGAL_DIR) and so is not part of the pre-rendered page (WEB-05). */}
-          <noscript>
-            <p className="ms-legal-note">
-              This page loads the current text of the {title.toLowerCase()} with JavaScript. Without it, write to{" "}
-              <EmailLink address={writeTo} /> and we will send you the text.
-            </p>
-          </noscript>
-        </>
-      )}
-      {state.status === "ERROR" && (
-        <div className="ms-legal-notice ms-legal-error" role="alert">
-          <strong>The {title.toLowerCase()} could not be loaded</strong>
-          <span>
-            This is a problem reaching MDARIX, not a change to the document. Please try again, or write to{" "}
-            <EmailLink address={writeTo} /> and we will send you the text.
-          </span>
-          <span className="ms-cta-row">
-            <button type="button" className="ms-btn ms-btn-primary" onClick={onRetry}>
-              Try again
-            </button>
-            <a className="ms-btn ms-btn-outline" href={`mailto:${writeTo}?subject=${encodeURIComponent(title)}`}>
-              Email us for the text
-            </a>
-          </span>
-        </div>
-      )}
-      {state.status === "PENDING" && (
-        <>
-          <div className="ms-legal-notice" role="status">
-            <strong>Information page — formal legal text pending approval</strong>
+    <>
+      <PageHero eyebrow="Legal" id="legal-title" title={title} copy={PAGE_META[path].description} />
+      <article className="ms-section ms-legal" aria-labelledby="legal-title">
+        {state.status === "LOADING" && (
+          <>
+            <p className="ms-legal-note">Loading the current text…</p>
+            {/* The text is served live (MDARIX_LEGAL_DIR) and so is not part of the pre-rendered page (WEB-05). */}
+            <noscript>
+              <p className="ms-legal-note">
+                This page loads the current text of the {title.toLowerCase()} with JavaScript. Without it, write to{" "}
+                <EmailLink address={writeTo} /> and we will send you the text.
+              </p>
+            </noscript>
+          </>
+        )}
+        {state.status === "ERROR" && (
+          <div className="ms-legal-notice ms-legal-error" role="alert">
+            <strong>The {title.toLowerCase()} could not be loaded</strong>
             <span>
-              This summary is provided for product orientation only and is not a substitute for the approved agreement.
+              This is a problem reaching MDARIX, not a change to the document. Please try again, or write to{" "}
+              <EmailLink address={writeTo} /> and we will send you the text.
+            </span>
+            <span className="ms-cta-row">
+              <button type="button" className="ms-btn ms-btn-primary" onClick={onRetry}>
+                Try again
+              </button>
+              <a className="ms-btn ms-btn-outline" href={`mailto:${writeTo}?subject=${encodeURIComponent(title)}`}>
+                Email us for the text
+              </a>
             </span>
           </div>
-          <p className="ms-legal-lead">{LEGAL_SUMMARIES[path].intro}</p>
-          <div className="ms-legal-body ms-legal-summary">
-            {LEGAL_SUMMARIES[path].sections.map((section) => (
-              <section key={section.title}>
-                <h2>{section.title}</h2>
-                <p>{section.body}</p>
-              </section>
-            ))}
+        )}
+        {state.status === "PENDING" && (
+          <>
+            <div className="ms-legal-notice" role="status">
+              <strong>Information page — formal legal text pending approval</strong>
+              <span>
+                This summary is provided for product orientation only and is not a substitute for the approved
+                agreement.
+              </span>
+            </div>
+            <p className="ms-legal-lead">{LEGAL_SUMMARIES[path].intro}</p>
+            <div className="ms-legal-body ms-legal-summary">
+              {LEGAL_SUMMARIES[path].sections.map((section) => (
+                <section key={section.title}>
+                  <h2>{section.title}</h2>
+                  <p>{section.body}</p>
+                </section>
+              ))}
+            </div>
+            {contact && (
+              <p className="ms-legal-note">
+                Questions about the formal document: <EmailLink address={contact} />.
+              </p>
+            )}
+          </>
+        )}
+        {state.status === "READY" && state.markdown && (
+          <div className="ms-legal-body">
+            <Markdown source={state.markdown} />
           </div>
-          {contact && (
-            <p className="ms-legal-note">
-              Questions about the formal document: <EmailLink address={contact} />.
-            </p>
-          )}
-        </>
-      )}
-      {state.status === "READY" && state.markdown && (
-        <div className="ms-legal-body">
-          <Markdown source={state.markdown} />
-        </div>
-      )}
-      <LegalLinks current={path} />
-    </article>
+        )}
+        <LegalLinks current={path} />
+      </article>
+    </>
   );
 }
 
@@ -352,40 +356,41 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
 export function SecurityPage() {
   const info = useSiteInfo();
   return (
-    <article className="ms-section ms-legal" aria-labelledby="security-title">
-      <span className="ms-eyebrow">Trust</span>
-      <h1 id="security-title">Security at MDARIX</h1>
-      <p className="ms-legal-lead">
-        How MDARIX protects the quality, complaint and supplier records you investigate. MDARIX does not hold ISO 27001
-        or SOC 2 certification yet and is not a validated (GxP) system; we are glad to answer security questionnaires
-        for a pilot.
-      </p>
-      <div className="ms-legal-body">
-        {SECURITY_SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h2>{section.title}</h2>
-            <ul>
-              {section.points.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
+    <>
+      <PageHero
+        eyebrow="Trust"
+        id="security-title"
+        title="Security at MDARIX"
+        copy="How MDARIX protects the quality, complaint and supplier records you investigate. MDARIX does not hold ISO 27001 or SOC 2 certification yet and is not a validated (GxP) system; we are glad to answer security questionnaires for a pilot."
+      />
+      <article className="ms-section ms-legal" aria-labelledby="security-title">
+        <div className="ms-legal-body">
+          {SECURITY_SECTIONS.map((section) => (
+            <section key={section.title}>
+              <h2>{section.title}</h2>
+              <ul>
+                {section.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
+          <section>
+            <h2>Reporting a security issue</h2>
+            <p>
+              {info?.support_email ? (
+                <>
+                  Please email <EmailLink address={info.support_email} /> with the details.
+                </>
+              ) : (
+                "Please use the contact page to reach us with the details."
+              )}
+            </p>
           </section>
-        ))}
-        <section>
-          <h2>Reporting a security issue</h2>
-          <p>
-            {info?.support_email ? (
-              <>
-                Please email <EmailLink address={info.support_email} /> with the details.
-              </>
-            ) : (
-              "Please use the contact page to reach us with the details."
-            )}
-          </p>
-        </section>
-      </div>
-      <LegalLinks current="/security" />
-    </article>
+        </div>
+        <LegalLinks current="/security" />
+      </article>
+    </>
   );
 }
 
@@ -412,43 +417,45 @@ export function AccessibilityPage() {
   const info = useSiteInfo();
   const address = info?.support_email ?? PUBLISHED_CONTACT.support;
   return (
-    <article className="ms-section ms-legal" aria-labelledby="accessibility-title">
-      <span className="ms-eyebrow">Legal</span>
-      <h1 id="accessibility-title">Accessibility statement</h1>
-      <p className="ms-legal-lead">
-        We want everyone to be able to use the MDARIX website and the MDARIX application. We use the Web Content
-        Accessibility Guidelines (WCAG) 2.2, level AA, as our guide. MDARIX has not been audited against them and we do
-        not claim that it conforms.
-      </p>
-      <div className="ms-legal-body">
-        <p>Last updated: {ACCESSIBILITY_UPDATED}</p>
-        <section>
-          <h2>What we have done</h2>
-          <ul>
-            {ACCESSIBILITY_DONE.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </section>
-        <section>
-          <h2>Known gaps</h2>
-          <p>We know of these problems and are working on them:</p>
-          <ul>
-            {ACCESSIBILITY_GAPS.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </section>
-        <section>
-          <h2>Tell us about a problem</h2>
-          <p>
-            If something on the website or in the application is hard to use, or you need information in another format,
-            email <EmailLink address={address} />. Say which page you were on and what happened, and we will reply.
-          </p>
-        </section>
-      </div>
-      <LegalLinks current="/accessibility" />
-    </article>
+    <>
+      <PageHero
+        eyebrow="Legal"
+        id="accessibility-title"
+        title="Accessibility statement"
+        copy="We want everyone to be able to use the MDARIX website and the MDARIX application. We use the Web Content Accessibility Guidelines (WCAG) 2.2, level AA, as our guide. MDARIX has not been audited against them and we do not claim that it conforms."
+      />
+      <article className="ms-section ms-legal" aria-labelledby="accessibility-title">
+        <div className="ms-legal-body">
+          <p>Last updated: {ACCESSIBILITY_UPDATED}</p>
+          <section>
+            <h2>What we have done</h2>
+            <ul>
+              {ACCESSIBILITY_DONE.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h2>Known gaps</h2>
+            <p>We know of these problems and are working on them:</p>
+            <ul>
+              {ACCESSIBILITY_GAPS.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h2>Tell us about a problem</h2>
+            <p>
+              If something on the website or in the application is hard to use, or you need information in another
+              format, email <EmailLink address={address} />. Say which page you were on and what happened, and we will
+              reply.
+            </p>
+          </section>
+        </div>
+        <LegalLinks current="/accessibility" />
+      </article>
+    </>
   );
 }
 
