@@ -8,30 +8,37 @@
   initial-value: 1;
 }
 .mdx-site {
-  --site-navy: #1e3350;
-  --site-subtle: #f4f7fb;
-  --site-line: #dce3ec;
-  --site-mint: #e3f4f6;
-  --site-ink: #0a1a2f;
-  --site-brand: #0b7a85;
-  --site-brand-hi: #22b8c4;
-  --site-signal: #38bdf8;
-  --site-for: #10b981;
-  --site-against: #e11d48;
+  /* Clinical Signal: green-black grounds, a lime brand, mint and amber marks; never blue. */
+  --site-navy: #dfeae4;
+  --site-ground: #08120f;
+  --site-subtle: #0b1713;
+  --site-line: rgba(255, 255, 255, 0.1);
+  --site-mint: #16302a;
+  --site-ink: #eef3ec;
+  --site-deep: #061210;
+  --site-brand: #c8f25a;
+  --site-brand-hi: #d7fa7f;
+  --site-on-brand: #10170a;
+  --site-signal: #ffb84d;
+  --site-for: #3ee6a8;
+  --site-against: #ff6a55;
   --site-on-dark: #ffffff;
-  --site-on-dark-2: #c3d2e0;
-  --site-on-dark-3: #9fb3c6;
+  --site-on-dark-2: #c9dbd1;
+  --site-on-dark-3: #a3b8ad;
   --site-dark-line: rgba(255, 255, 255, 0.12);
-  --site-hero: linear-gradient(135deg, #0a1a2f 0%, #0f2e4a 55%, #0b5560 100%);
-  --site-shadow: 0 1px 2px rgba(10, 26, 47, 0.05), 0 12px 32px -18px rgba(10, 26, 47, 0.28);
-  --site-shadow-lift: 0 2px 4px rgba(10, 26, 47, 0.06), 0 24px 48px -22px rgba(10, 26, 47, 0.35);
-  --site-shadow-shot: 0 2px 6px rgba(10, 26, 47, 0.08), 0 48px 96px -40px rgba(5, 15, 35, 0.6);
+  --site-hero:
+    radial-gradient(1100px 620px at 88% -15%, rgba(200, 242, 90, 0.16), transparent 60%),
+    radial-gradient(900px 520px at -5% 110%, rgba(62, 230, 168, 0.12), transparent 55%),
+    linear-gradient(135deg, #061210 0%, #0a1a15 55%, #0d211b 100%);
+  --site-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -18px rgba(0, 0, 0, 0.6);
+  --site-shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -22px rgba(0, 0, 0, 0.7);
+  --site-shadow-shot: 0 2px 6px rgba(0, 0, 0, 0.3), 0 48px 96px -40px rgba(0, 0, 0, 0.8);
   --site-max: 1360px;
   --site-gutter: 40px;
   --site-section: 96px;
   --site-accent: var(--site-brand);
   min-height: 100vh;
-  background: var(--ms-surface);
+  background: var(--site-ground);
   color: var(--site-ink);
   font-family: var(--ms-font);
   font-size: clamp(16px, 0.9rem + 0.2vw, 17px);
@@ -94,7 +101,7 @@
   padding: 10px 16px;
   border-radius: 8px;
   background: var(--ms-white);
-  color: var(--site-ink) !important;
+  color: var(--site-on-brand) !important;
 }
 .ms-skip:focus {
   top: 12px;
@@ -124,7 +131,7 @@
   padding-inline: max(var(--site-gutter), calc((100% - var(--site-max)) / 2));
 }
 .ms-band {
-  background: linear-gradient(180deg, #eef3f9 0%, var(--site-subtle) 240px);
+  background: linear-gradient(180deg, #0d1a16 0%, var(--site-subtle) 240px);
 }
 .ms-dark {
   position: relative;
@@ -153,7 +160,7 @@
   right: -260px;
   top: -320px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(34, 184, 196, 0.28), transparent);
+  background: radial-gradient(closest-side, rgba(200, 242, 90, 0.28), transparent);
   animation: ms-glow 14s ease-in-out infinite alternate;
 }
 @keyframes ms-glow {
@@ -264,11 +271,11 @@
 }
 .ms-btn-primary {
   background: var(--site-brand);
-  color: var(--ms-white) !important;
-  box-shadow: 0 10px 24px -12px rgba(11, 122, 133, 0.8);
+  color: var(--site-on-brand) !important;
+  box-shadow: 0 10px 24px -12px rgba(200, 242, 90, 0.8);
 }
 .ms-btn-primary:hover {
-  background: var(--site-ink);
+  background: var(--site-brand-hi);
 }
 .ms-btn-quiet,
 .ms-btn-outline {
@@ -280,18 +287,18 @@
 .ms-btn-outline:hover {
   border-color: var(--site-ink);
 }
-/* On the navy: the bright teal carries the main action, with navy text (AA). */
+/* On the dark bands: the bright lime carries the main action, with dark text (AA). */
 .ms-dark .ms-btn-primary,
 .ms-cta .ms-btn-primary,
 .ms-footer .ms-btn-primary {
   background: var(--site-brand-hi);
-  color: var(--site-ink) !important;
-  box-shadow: 0 12px 32px -12px rgba(34, 184, 196, 0.7);
+  color: var(--site-on-brand) !important;
+  box-shadow: 0 12px 32px -12px rgba(200, 242, 90, 0.7);
 }
 .ms-dark .ms-btn-primary:hover,
 .ms-cta .ms-btn-primary:hover,
 .ms-footer .ms-btn-primary:hover {
-  background: #5fd3db;
+  background: #e4fca6;
 }
 .ms-dark .ms-btn-quiet,
 .ms-cta .ms-btn-quiet {
@@ -328,7 +335,7 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(10, 26, 47, 0.94);
+  background: rgba(6, 14, 11, 0.86);
   backdrop-filter: blur(12px) saturate(1.4);
   border-bottom: 1px solid var(--site-dark-line);
   color: var(--site-on-dark);
@@ -355,9 +362,9 @@
   height: 34px;
   border-radius: 9px;
   background: linear-gradient(135deg, var(--site-brand-hi), var(--site-brand));
-  color: var(--ms-white);
+  color: var(--site-on-brand);
   font-size: var(--ms-fs-16);
-  box-shadow: 0 6px 16px -6px rgba(34, 184, 196, 0.7);
+  box-shadow: 0 6px 16px -6px rgba(200, 242, 90, 0.7);
 }
 #public-navigation {
   display: flex;
@@ -401,11 +408,11 @@
   padding: 8px 18px;
   font-size: var(--ms-fs-14);
   background: var(--site-brand-hi);
-  color: var(--site-ink) !important;
+  color: var(--site-on-brand) !important;
   box-shadow: none;
 }
 .ms-nav-actions .ms-btn:hover {
-  background: #5fd3db;
+  background: #e4fca6;
 }
 .ms-menu-button {
   display: none;
@@ -432,7 +439,16 @@
 .ms-hero h1 {
   margin-top: 20px;
   font-size: clamp(38px, 1.2rem + 2.5vw, 56px);
-  color: var(--ms-white);
+  background: linear-gradient(
+    100deg,
+    var(--ms-white) 0%,
+    var(--ms-white) 48%,
+    var(--site-brand) 78%,
+    var(--site-for) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .ms-hero-copy > p {
   margin-top: 24px;
@@ -508,7 +524,7 @@
 }
 .ms-page-hero .ms-btn-primary {
   background: var(--site-brand-hi);
-  color: var(--site-ink) !important;
+  color: var(--site-on-brand) !important;
 }
 .ms-subnav {
   display: flex;
@@ -669,7 +685,7 @@
   backdrop-filter: blur(4px);
 }
 .ms-dark .ms-card:hover {
-  border-color: rgba(34, 184, 196, 0.5);
+  border-color: rgba(200, 242, 90, 0.5);
   background: rgba(255, 255, 255, 0.08);
 }
 .ms-dark .ms-card > p {
@@ -681,14 +697,14 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #e3f4f6, #d3eef1);
+  background: linear-gradient(135deg, rgba(200, 242, 90, 0.16), rgba(62, 230, 168, 0.1));
   color: var(--site-brand);
-  box-shadow: inset 0 0 0 1px rgba(11, 122, 133, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(200, 242, 90, 0.12);
 }
 .ms-dark .ms-icon {
-  background: rgba(34, 184, 196, 0.14);
+  background: rgba(200, 242, 90, 0.14);
   color: var(--site-brand-hi);
-  box-shadow: inset 0 0 0 1px rgba(34, 184, 196, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(200, 242, 90, 0.3);
 }
 .ms-checks,
 .ms-check-list {
@@ -759,7 +775,7 @@
   height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--site-brand-hi), var(--site-brand));
-  color: var(--ms-white);
+  color: var(--site-on-brand);
   font-weight: 700;
 }
 .ms-steps strong {
@@ -818,7 +834,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: var(--site-ink);
+  background: var(--site-deep);
   color: var(--site-brand-hi);
   font-family: var(--ms-font-mono);
   font-size: var(--ms-fs-14);
@@ -858,7 +874,7 @@
   border-radius: 14px;
   background: var(--ms-surface);
   box-shadow:
-    0 0 0 1px rgba(10, 26, 47, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.1),
     var(--site-shadow-shot);
   transition:
     transform 0.35s ease-out,
@@ -871,7 +887,7 @@
 .ms-dark .ms-shot-frame {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 0 80px -20px rgba(34, 184, 196, 0.45),
+    0 0 80px -20px rgba(200, 242, 90, 0.45),
     0 60px 100px -40px rgba(0, 0, 0, 0.7);
 }
 .ms-shot-bar {
@@ -881,13 +897,13 @@
   height: 36px;
   padding-inline: 14px;
   border-bottom: 1px solid var(--site-line);
-  background: linear-gradient(#f8fafc, #eef2f7);
+  background: linear-gradient(#16241f, #111d19);
 }
 .ms-shot-bar span {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #d5dce6;
+  background: #2c3d36;
 }
 .ms-shot-bar em {
   flex: 0 1 320px;
@@ -895,7 +911,7 @@
   padding: 3px 12px;
   overflow: hidden;
   border-radius: 7px;
-  background: var(--ms-white);
+  background: rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 0 0 1px var(--site-line);
   color: var(--ms-muted);
   font-size: var(--ms-fs-12);
@@ -922,7 +938,7 @@
   padding: 20px 22px 16px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 18px;
-  background: rgba(12, 30, 52, 0.82);
+  background: rgba(8, 20, 16, 0.82);
   backdrop-filter: blur(14px) saturate(1.3);
   box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.65);
   color: var(--ms-white);
@@ -991,8 +1007,8 @@
   border-radius: 50%;
   background: var(--ms-white);
   box-shadow:
-    0 0 0 4px rgba(56, 189, 248, 0.3),
-    0 0 18px 4px rgba(56, 189, 248, 0.8);
+    0 0 0 4px rgba(62, 230, 168, 0.3),
+    0 0 18px 4px rgba(62, 230, 168, 0.8);
   opacity: 0;
   animation: ms-pulse 8s cubic-bezier(0.45, 0, 0.3, 1) infinite;
 }
@@ -1047,15 +1063,15 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--site-brand-hi) calc(var(--on) * 100%), #1b3150);
-  color: color-mix(in srgb, var(--site-ink) calc(var(--on) * 100%), #8fa3b8);
-  box-shadow: 0 0 calc(var(--on) * 22px) rgba(34, 184, 196, 0.55);
+  background: color-mix(in srgb, var(--site-brand-hi) calc(var(--on) * 100%), #16302a);
+  color: color-mix(in srgb, var(--site-on-brand) calc(var(--on) * 100%), #97ada3);
+  box-shadow: 0 0 calc(var(--on) * 22px) rgba(200, 242, 90, 0.55);
 }
 .ms-flow-step.is-signal .ms-flow-icon {
-  background: color-mix(in srgb, var(--site-signal) calc(var(--on) * 100%), #1b3150);
+  background: color-mix(in srgb, var(--site-signal) calc(var(--on) * 100%), #16302a);
 }
 .ms-flow-step.is-signed .ms-flow-icon {
-  background: color-mix(in srgb, var(--site-for) calc(var(--on) * 100%), #1b3150);
+  background: color-mix(in srgb, var(--site-for) calc(var(--on) * 100%), #16302a);
 }
 .ms-flow-step strong {
   margin-top: 4px;
@@ -1300,7 +1316,7 @@
   width: 700px;
   height: 700px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(34, 184, 196, 0.3), transparent);
+  background: radial-gradient(closest-side, rgba(200, 242, 90, 0.3), transparent);
 }
 .ms-cta h2 {
   font-size: clamp(30px, 1.2rem + 1.5vw, 44px);
@@ -1325,7 +1341,7 @@
   color: var(--ms-white);
 }
 .ms-cta-trial .ms-checks svg {
-  background: rgba(34, 184, 196, 0.18);
+  background: rgba(200, 242, 90, 0.18);
   color: var(--site-brand-hi);
 }
 
@@ -1433,7 +1449,7 @@
 /* ---------------------------------------------------------------------------------------------- Footer */
 
 .ms-footer {
-  background: #07131f;
+  background: #040a08;
   color: var(--site-on-dark-2);
   font-size: var(--ms-fs-14);
 }
@@ -1496,10 +1512,191 @@
 
 /* Legal, question, contact and "not found" pages: a quiet tinted top instead of a flat white page. */
 .ms-main:has(> .ms-legal) {
-  background: linear-gradient(180deg, #e8f0f7 0%, var(--site-subtle) 320px, var(--ms-surface) 760px);
+  background: linear-gradient(180deg, #0d211b 0%, var(--site-subtle) 320px, var(--ms-surface) 760px);
 }
 .ms-main > .ms-legal {
   max-width: calc(860px + 2 * var(--site-gutter));
+}
+
+/* ------------------------------------------------------------------------------------- The signal picture */
+/* The hero's moving picture (signalHero.tsx): complaints in, linked to their records, each market's clock, a signature. */
+.ms-signal-hero {
+  position: relative;
+  margin: 0;
+  animation: ms-signal-in 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.ms-signal-hero svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.ms-signal-hero figcaption {
+  margin-top: 6px;
+  color: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+@keyframes ms-signal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+.ms-signal-hero .sh-stop-glow {
+  stop-color: var(--ms-glow);
+}
+.ms-signal-hero .sh-stop-mint {
+  stop-color: var(--ms-teal-bright);
+}
+.ms-signal-hero .sh-stop-halo {
+  stop-color: color-mix(in srgb, var(--ms-glow) 16%, transparent);
+}
+.ms-signal-hero .sh-stop-none {
+  stop-color: transparent;
+}
+.ms-signal-hero .sh-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-white) 8%, transparent);
+}
+.ms-signal-hero .sh-ring-dash {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-glow) 30%, transparent);
+  stroke-dasharray: 2 10;
+}
+.ms-signal-hero .sh-spark {
+  fill: var(--ms-glow);
+  filter: drop-shadow(0 0 6px var(--ms-glow));
+}
+.ms-signal-hero .sh-wire {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-teal-bright) 32%, transparent);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-wire-in {
+  stroke: color-mix(in srgb, var(--ms-glow) 30%, transparent);
+  stroke-dasharray: 4 6;
+  animation: sh-flow 1.4s linear infinite;
+}
+.ms-signal-hero .sh-wire-down {
+  stroke-dasharray: 3 5;
+  animation: sh-flow 1.4s linear infinite;
+}
+@keyframes sh-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.ms-signal-hero .sh-chip {
+  fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+  stroke: color-mix(in srgb, var(--ms-white) 16%, transparent);
+}
+.ms-signal-hero .sh-dot-in {
+  fill: var(--ms-crit-mark);
+  filter: drop-shadow(0 0 6px var(--ms-crit-mark));
+}
+.ms-signal-hero .sh-pulse-in {
+  fill: var(--ms-glow);
+  filter: drop-shadow(0 0 8px var(--ms-glow));
+}
+.ms-signal-hero .sh-pulse-out {
+  fill: var(--ms-teal-bright);
+  filter: drop-shadow(0 0 8px var(--ms-teal-bright));
+}
+.ms-signal-hero .sh-spoke {
+  stroke: color-mix(in srgb, var(--ms-glow) 26%, transparent);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-node {
+  fill: var(--ms-hero);
+  stroke: var(--ms-glow);
+  stroke-width: 2;
+}
+.ms-signal-hero .sh-label {
+  fill: var(--ms-white);
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+}
+.ms-signal-hero .sh-label-sm {
+  fill: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.04em;
+}
+.ms-signal-hero .sh-market {
+  font-size: var(--ms-fs-12);
+  font-weight: 700;
+}
+.ms-signal-hero .sh-caption {
+  fill: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.14em;
+}
+.ms-signal-hero .sh-clock-track {
+  fill: color-mix(in srgb, var(--ms-white) 4%, transparent);
+  stroke: color-mix(in srgb, var(--ms-white) 12%, transparent);
+  stroke-width: 4;
+}
+.ms-signal-hero .sh-clock {
+  fill: none;
+  stroke: var(--ms-warn-mark);
+  stroke-linecap: round;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ms-glow) 60%, transparent));
+}
+.ms-signal-hero .sh-core-glow {
+  fill: var(--ms-glow);
+}
+.ms-signal-hero .sh-core-inner {
+  fill: var(--ms-hero);
+}
+.ms-signal-hero .sh-ecg {
+  fill: none;
+  stroke: var(--ms-glow);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 6px var(--ms-glow));
+}
+.ms-signal-hero .sh-seal-pill {
+  fill: color-mix(in srgb, var(--ms-glow) 14%, transparent);
+  stroke: var(--ms-glow);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-check {
+  fill: none;
+  stroke: var(--ms-glow);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+.ms-signal-hero .sh-seal-text {
+  font-size: var(--ms-fs-14);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-signal-hero,
+  .ms-hero-play,
+  .ms-signal-hero .sh-wire-in,
+  .ms-signal-hero .sh-wire-down {
+    animation: none;
+  }
+}
+
+/* The app's own screen and the story card, in a dark band right under the hero. */
+.ms-main > .ms-hero-inside {
+  padding-block: 8px 96px;
+}
+.ms-hero-inside .ms-hero-visual {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+.ms-hero-inside .ms-hero-visual > .ms-shot {
+  transform: perspective(2400px) rotateX(4deg);
+  transform-origin: center top;
+}
+.ms-hero-inside .ms-hero-visual > .ms-flow {
+  margin-inline: auto;
 }
 
 /* ------------------------------------------------------------------------------------------ Responsive */
@@ -1572,7 +1769,7 @@
     gap: 2px;
     padding: 12px var(--site-gutter) 20px;
     border-bottom: 1px solid var(--site-dark-line);
-    background: var(--site-ink);
+    background: var(--site-deep);
     box-shadow: 0 24px 32px -24px rgba(0, 0, 0, 0.6);
   }
   #public-navigation.is-open > a {
@@ -2026,7 +2223,7 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: var(--ms-radius-md);
-  background: var(--site-ink);
+  background: var(--site-deep);
 }
 .ms-video-soon {
   display: grid;

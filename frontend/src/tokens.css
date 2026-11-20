@@ -132,60 +132,60 @@
   --ms-radius: 16px;
   --ms-radius-xl: 20px;
   --ms-radius-pill: 999px;
-  --ms-shadow-1: 0 1px 2px rgba(12, 21, 37, 0.05), 0 10px 28px -14px rgba(12, 21, 37, 0.22);
-  --ms-shadow-2: 0 12px 32px rgba(12, 21, 37, 0.16);
-  --ms-shadow-hero: 0 30px 60px -30px rgba(5, 15, 35, 0.55);
+  --ms-shadow-1: 0 1px 2px rgba(5, 12, 10, 0.06), 0 10px 28px -14px rgba(5, 12, 10, 0.26);
+  --ms-shadow-2: 0 12px 32px rgba(5, 12, 10, 0.18);
+  --ms-shadow-hero: 0 30px 60px -30px rgba(2, 8, 6, 0.6);
 
   /* Neutrals. */
   --ms-surface: #ffffff;
-  --ms-subtle: #f5f7fb;
-  --ms-ground: #edf1f6;
-  --ms-line: #dbe2eb;
-  --ms-line-strong: #c2ccd9;
-  --ms-line-control: #7b8b99;
-  --ms-muted: #56647b;
-  --ms-ink-2: #39475c;
-  --ms-ink: #0c1525;
-  --ms-navy: #183249;
+  --ms-subtle: #f4f8f5;
+  --ms-ground: #eaf1ec;
+  --ms-line: #d6e3db;
+  --ms-line-strong: #bdd0c4;
+  --ms-line-control: #6f8a7d;
+  --ms-muted: #4f6259;
+  --ms-ink-2: #33473e;
+  --ms-ink: #0b1712;
+  --ms-navy: #14372c;
   /* The navy as a ground (the classic app bar, a navy panel); --ms-navy is also a text colour, light in the dark theme. */
-  --ms-navy-fill: #183249;
-  --ms-navy-deep: #0f2233;
+  --ms-navy-fill: #14372c;
+  --ms-navy-deep: #0b2219;
   /* White that stays white in both themes: text and marks on the always-dark rail, band and fixed-colour fills. */
   --ms-white: #ffffff;
   /* A person's initials: white on a fixed blue-teal, in both themes. */
-  --ms-avatar-1: #1b5f86;
-  --ms-avatar-2: #0b5f63;
-  --ms-on-dark-muted: #c5d3df;
+  --ms-avatar-1: #1f6b55;
+  --ms-avatar-2: #5c6b14;
+  --ms-on-dark-muted: #c9dbd1;
 
   /* Teal: the action colour. */
-  --ms-teal: #087680;
-  --ms-teal-dark: #06625f;
-  --ms-teal-bright: #73d6cb;
-  --ms-teal-mark: #0e9ea6;
-  --ms-mint: #e0f3f3;
-  --ms-mint-line: #b9dcd8;
-  --ms-focus: #0e9ea6;
+  --ms-teal: #0b7a5c;
+  --ms-teal-dark: #08604a;
+  --ms-teal-bright: #6ff0bf;
+  --ms-teal-mark: #11a37a;
+  --ms-mint: #e1f5ec;
+  --ms-mint-line: #b4dcc9;
+  --ms-focus: #11a37a;
 
   /* States: text, ground, line and mark of each. */
-  --ms-crit: #b42318;
-  --ms-crit-bg: #fdecec;
-  --ms-crit-line: #f0b8b3;
-  --ms-crit-mark: #e5484d;
+  --ms-crit: #b4281c;
+  --ms-crit-bg: #fdece9;
+  --ms-crit-line: #f1bab2;
+  --ms-crit-mark: #e5533f;
   --ms-warn: #8a5300;
   --ms-warn-fill: #b07400;
   --ms-warn-bg: #fff2d4;
   --ms-warn-line: #ecc979;
   --ms-warn-mark: #e89b0c;
-  --ms-good: #16734a;
-  --ms-good-bg: #e2f4eb;
-  --ms-good-line: #a9d8bc;
-  --ms-good-mark: #27a567;
-  --ms-info: #2a5f8a;
-  --ms-info-bg: #e8f1f8;
-  --ms-info-line: #b5cde3;
-  --ms-ai: #64558b;
-  --ms-ai-bg: #efedf6;
-  --ms-ai-line: #cfc8e3;
+  --ms-good: #13734e;
+  --ms-good-bg: #e1f5ec;
+  --ms-good-line: #a9d8c2;
+  --ms-good-mark: #22a774;
+  --ms-info: #1f6a63;
+  --ms-info-bg: #e3f3f0;
+  --ms-info-line: #b3dbd5;
+  --ms-ai: #76530f;
+  --ms-ai-bg: #f8f0dc;
+  --ms-ai-line: #e6d3a6;
   /* Harm (death, serious injury, malfunction): its own hue. */
   --ms-harm: #b0154a;
   --ms-harm-bg: #fce7ef;
@@ -193,34 +193,34 @@
   --ms-harm-track: #ead7df;
 
   /* The rail and the monitor band: dark in both themes. */
-  --ms-rail: #08101d;
-  --ms-rail-2: #0f1a2c;
-  --ms-rail-fg: #d2dcea;
-  --ms-rail-muted: #8d9cb3;
-  --ms-hero: #0a1427;
-  --ms-hero-2: #0f203c;
-  --ms-hero-fg: #eef3fb;
-  --ms-hero-muted: #a6b6cc;
-  --ms-hero-line: rgba(140, 175, 220, 0.1);
-  --ms-hero-line-2: rgba(140, 175, 220, 0.05);
-  --ms-hero-card: rgba(255, 255, 255, 0.05);
-  --ms-hero-card-line: rgba(160, 190, 230, 0.17);
-  --ms-glow: #3fe0d6;
-  --ms-glow-ink: #032423;
-  --ms-art: rgba(196, 220, 250, 0.62);
-  --ms-art-soft: rgba(196, 220, 250, 0.16);
+  --ms-rail: #050c0a;
+  --ms-rail-2: #0c1915;
+  --ms-rail-fg: #dbe8e1;
+  --ms-rail-muted: #94ab9f;
+  --ms-hero: #061210;
+  --ms-hero-2: #0d211b;
+  --ms-hero-fg: #f0f5ee;
+  --ms-hero-muted: #a9bdb3;
+  --ms-hero-line: rgba(200, 242, 90, 0.09);
+  --ms-hero-line-2: rgba(200, 242, 90, 0.045);
+  --ms-hero-card: rgba(214, 255, 233, 0.05);
+  --ms-hero-card-line: rgba(214, 255, 233, 0.16);
+  --ms-glow: #c8f25a;
+  --ms-glow-ink: #10170a;
+  --ms-art: rgba(214, 255, 233, 0.62);
+  --ms-art-soft: rgba(214, 255, 233, 0.16);
   /* Status marks on the dark band. */
-  --ms-h-crit: #ff6b63;
-  --ms-h-warn: #f6b443;
-  --ms-h-good: #45cf8d;
+  --ms-h-crit: #ff7a66;
+  --ms-h-warn: #ffc15a;
+  --ms-h-good: #6ff0bf;
   /* Lot series on the dark band and the trend chart. */
-  --ms-lot-1: #8f1d14;
-  --ms-lot-2: #c8322a;
-  --ms-lot-3: #ef8a83;
+  --ms-lot-1: #8f2a1d;
+  --ms-lot-2: #d2412f;
+  --ms-lot-3: #f28c7d;
 
   /* Charts: the series colour (4.6:1 on white) and its hover. */
-  --ms-series: #2a78d6;
-  --ms-series-dark: #1c5cab;
+  --ms-series: #0b7a5c;
+  --ms-series-dark: #08604a;
 }
 
 /*
@@ -231,81 +231,81 @@
  */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ms-surface: #0f1a2d;
-  --ms-subtle: #15233b;
-  --ms-ground: #04080f;
-  --ms-line: #26375a;
-  --ms-line-strong: #344a72;
-  --ms-line-control: #6a80a3;
-  --ms-muted: #95a3b9;
-  --ms-ink-2: #b5c2d5;
-  --ms-ink: #e8eef7;
-  --ms-navy: #dbe6f3;
-  --ms-navy-fill: #13203a;
-  --ms-navy-deep: #0a1322;
-  --ms-teal: #45d9d0;
-  --ms-teal-dark: #45d9d0;
-  --ms-teal-bright: #73d6cb;
-  --ms-teal-mark: #45d9d0;
-  --ms-mint: #153141;
-  --ms-mint-line: #1f5a5c;
-  --ms-focus: #45d9d0;
-  --ms-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 32px -16px rgba(0, 0, 0, 0.7);
-  --ms-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.55);
-  --ms-rail: #0a1322;
-  --ms-rail-2: #13203a;
-  --ms-hero: #0b1932;
-  --ms-hero-2: #12264c;
-  --ms-crit: #ff8f88;
-  --ms-crit-bg: #2e2332;
-  --ms-crit-line: #6b3a40;
-  --ms-crit-mark: #ff5c54;
-  --ms-warn: #f7c35c;
-  --ms-warn-fill: #d9a03a;
-  --ms-warn-bg: #2d2e2f;
-  --ms-warn-line: #6a5228;
-  --ms-warn-mark: #f2a93b;
-  --ms-good: #61d49e;
-  --ms-good-bg: #163139;
-  --ms-good-line: #2b5e4b;
-  --ms-good-mark: #3cc184;
-  --ms-info: #8fbdf0;
-  --ms-info-bg: #172a46;
-  --ms-info-line: #2f4d78;
-  --ms-ai: #c2b3ef;
-  --ms-ai-bg: #231f3d;
-  --ms-ai-line: #463d6e;
-  --ms-harm: #ff8aab;
-  --ms-harm-bg: #2f2238;
-  --ms-harm-mark: #f2507f;
-  --ms-harm-track: #3a2633;
-  --ms-lot-1: #b8322b;
-  --ms-lot-2: #ff6b63;
-  --ms-lot-3: #ffb0aa;
-  --ms-series: #6aa8f0;
-  --ms-series-dark: #9cc6f5;
+  --ms-surface: #0f1c18;
+  --ms-subtle: #14251f;
+  --ms-ground: #060d0b;
+  --ms-line: #21372f;
+  --ms-line-strong: #2e4a40;
+  --ms-line-control: #6c9384;
+  --ms-muted: #97ada3;
+  --ms-ink-2: #bfd0c7;
+  --ms-ink: #eef3ec;
+  --ms-navy: #dfeae4;
+  --ms-navy-fill: #12241e;
+  --ms-navy-deep: #0a1612;
+  --ms-teal: #c8f25a;
+  --ms-teal-dark: #c8f25a;
+  --ms-teal-bright: #6ff0bf;
+  --ms-teal-mark: #c8f25a;
+  --ms-mint: #16302a;
+  --ms-mint-line: #2a5a4b;
+  --ms-focus: #c8f25a;
+  --ms-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 14px 32px -16px rgba(0, 0, 0, 0.75);
+  --ms-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --ms-rail: #050c0a;
+  --ms-rail-2: #0c1915;
+  --ms-hero: #061210;
+  --ms-hero-2: #0d211b;
+  --ms-crit: #ff8f7e;
+  --ms-crit-bg: #2c1b18;
+  --ms-crit-line: #6b3a33;
+  --ms-crit-mark: #ff6a55;
+  --ms-warn: #ffc970;
+  --ms-warn-fill: #ffb84d;
+  --ms-warn-bg: #2a2416;
+  --ms-warn-line: #6a5528;
+  --ms-warn-mark: #ffb84d;
+  --ms-good: #6ff0bf;
+  --ms-good-bg: #11302a;
+  --ms-good-line: #2a5e4e;
+  --ms-good-mark: #3ee6a8;
+  --ms-info: #8fe3d8;
+  --ms-info-bg: #112c2a;
+  --ms-info-line: #2a5853;
+  --ms-ai: #ead79e;
+  --ms-ai-bg: #2a2617;
+  --ms-ai-line: #5f5430;
+  --ms-harm: #ff93b4;
+  --ms-harm-bg: #2c1b23;
+  --ms-harm-mark: #f25a88;
+  --ms-harm-track: #3a2630;
+  --ms-lot-1: #c23a2a;
+  --ms-lot-2: #ff6a55;
+  --ms-lot-3: #ffb3a8;
+  --ms-series: #c8f25a;
+  --ms-series-dark: #e2ff96;
 }
 
 /*
- * The application's palette (0.11.07, visual direction of 19 Nov 2026): ink navy, brand teal (#0b7a85, 5.1:1 on white,
- * 4.7:1 on the ground) and a cool page ground, while the application's shell (.uw-hybrid) is on screen in the light
+ * The application's palette (Clinical Signal, over the 0.11.07 direction): green-black ink, brand green (#0b7a5c, 5.4:1 on
+ * white) and a fresh page ground, while the application's shell (.uw-hybrid) is on screen in the light
  * theme. The website and the classic navigation keep the set above; the dark theme keeps its own.
  */
 :root:not([data-theme="dark"]):has(.uw-hybrid) {
-  --ms-ground: #f4f7fb;
-  --ms-subtle: #f7f9fc;
-  --ms-line: #dce3ec;
-  --ms-teal: #0b7a85;
-  --ms-teal-dark: #086570;
-  --ms-mint: #e8f6f7;
-  --ms-focus: #0b7a85;
-  --ms-navy: #0a1a2f;
-  --ms-rail: #0a1a2f;
-  --ms-rail-2: #1e3350;
-  --ms-hero: #0a1a2f;
-  --ms-hero-2: #0f2e4a;
-  --ms-glow: #22b8c4;
+  --ms-ground: #eaf1ec;
+  --ms-subtle: #f4f8f5;
+  --ms-line: #d5e0d9;
+  --ms-teal: #0b7a5c;
+  --ms-teal-dark: #08604a;
+  --ms-mint: #e3f3ea;
+  --ms-focus: #0b7a5c;
+  --ms-navy: #14372c;
+  --ms-rail: #050c0a;
+  --ms-rail-2: #0c1915;
+  --ms-hero: #061210;
+  --ms-hero-2: #0d211b;
+  --ms-glow: #c8f25a;
   --ms-h-good: #10b981;
-  --ms-series: #0b7a85;
-  --ms-series-dark: #086570;
+  --ms-series: #0b7a5c;
+  --ms-series-dark: #08604a;
 }

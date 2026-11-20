@@ -1,8 +1,8 @@
-// 0.10.91: light and dark. The person's choice (Light, Dark or System), kept in this browser and never failing on a
-// browser without storage; the top bar's menu; and only the new navigation's shell switching the theme on.
+// Light and dark. The product opens dark (Clinical Signal); the person's choice (Light, Dark or System), kept in this
+// browser and never failing on a browser without storage; the top bar's menu; and only the shell switching it.
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ThemeMenu, effectiveTheme, readTheme, saveTheme } from "./theme";
+import { DEFAULT_THEME, ThemeMenu, effectiveTheme, readTheme, saveTheme } from "./theme";
 import type { SessionContext } from "./workspaceContext";
 import userWorkspace from "./UserWorkspace.tsx?raw";
 
@@ -20,25 +20,28 @@ const memory = () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the person's theme", () => {
-  it("follows the system by default, and the choice once made", () => {
+  it("follows the system when System is chosen, and the choice once made", () => {
     expect(effectiveTheme("system", true)).toBe("dark");
     expect(effectiveTheme("system", false)).toBe("light");
     expect(effectiveTheme("dark", false)).toBe("dark");
     expect(effectiveTheme("light", true)).toBe("light");
   });
 
-  it("is kept per person in this browser; System keeps nothing", () => {
+  it("is dark until a person chooses, then kept per person in this browser; the default keeps nothing", () => {
     const storage = memory();
     vi.stubGlobal("window", { localStorage: storage });
+    expect(DEFAULT_THEME).toBe("dark");
+    expect(readTheme(session)).toBe("dark");
+    saveTheme(session, "light");
+    expect(storage.kept.get("mdarix.theme.u1")).toBe("light");
+    expect(readTheme(session)).toBe("light");
+    expect(readTheme({ user_id: "u2" } as SessionContext)).toBe("dark");
+    saveTheme(session, "system");
     expect(readTheme(session)).toBe("system");
     saveTheme(session, "dark");
-    expect(storage.kept.get("mdarix.theme.u1")).toBe("dark");
-    expect(readTheme(session)).toBe("dark");
-    expect(readTheme({ user_id: "u2" } as SessionContext)).toBe("system");
-    saveTheme(session, "system");
     expect(storage.kept.has("mdarix.theme.u1")).toBe(false);
     storage.setItem("mdarix.theme.u1", "purple");
-    expect(readTheme(session)).toBe("system");
+    expect(readTheme(session)).toBe("dark");
   });
 
   it("never fails where the browser refuses storage", () => {
@@ -46,8 +49,8 @@ describe("the person's theme", () => {
       throw new Error("denied");
     };
     vi.stubGlobal("window", { localStorage: { getItem: refused, setItem: refused, removeItem: refused } });
-    expect(readTheme(session)).toBe("system");
-    expect(() => saveTheme(session, "dark")).not.toThrow();
+    expect(readTheme(session)).toBe("dark");
+    expect(() => saveTheme(session, "light")).not.toThrow();
   });
 });
 

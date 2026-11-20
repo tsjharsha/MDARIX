@@ -5,6 +5,9 @@ import { DEMO_REQUESTS_OFFERED } from "./offer";
 import { AVAILABILITY, WORK_AREAS, trialIncludes } from "./content";
 import { EXAMPLE_NUMBERS } from "./visuals";
 
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+const siteCss: string = fs.readFileSync(new URL("./site.css", import.meta.url), "utf8");
+
 // The screens shipped with the website (public/site/app).
 const SHIPPED = Object.keys(import.meta.glob("/public/site/app/*.webp"));
 
@@ -15,6 +18,35 @@ const text = (html: string) =>
     .replace(/\s+/g, " ");
 
 describe("website home", () => {
+  it("opens on one moving picture of what MDARIX does, with the app's own screen right under it", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    const hero = html.slice(0, html.indexOf("</section>"));
+    expect(hero).toMatch(/<svg[^>]*role="img"[^>]*aria-label="Complaint signals flow into MDARIX/);
+    for (const step of ["Complaint", "Product", "Lot", "Supplier", "Evidence", "Signed by a person"])
+      expect(hero).toContain(`>${step}</text>`);
+    // The real screen and its story card follow in the next band, still the first image the page loads.
+    expect(hero).not.toContain("<img");
+    const inside = html.slice(html.indexOf('aria-label="Inside MDARIX"'));
+    expect(inside.indexOf("<img")).toBeLessThan(inside.indexOf("</section>"));
+  });
+
+  it("paints the website in Clinical Signal: green-black grounds and a lime brand, never the old navy or cyan", () => {
+    const palette = siteCss.slice(siteCss.indexOf(".mdx-site {"), siteCss.indexOf("}", siteCss.indexOf(".mdx-site {")));
+    expect(palette).toContain("--site-brand: #c8f25a;");
+    expect(palette).toContain("--site-on-brand: #10170a;");
+    for (const old of [
+      "#0a1a2f",
+      "#0f2e4a",
+      "#1e3350",
+      "#0b7a85",
+      "#22b8c4",
+      "#38bdf8",
+      "34, 184, 196",
+      "56, 189, 248",
+    ])
+      expect(siteCss, old).not.toContain(old);
+  });
+
   it("says in one hero line what MDARIX is for, with one primary and one secondary action", () => {
     const html = renderToStaticMarkup(<HomePage />);
     // The approved positioning (11 Nov 2026): a defensible decision and the right report, on time, in every market.

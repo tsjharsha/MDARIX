@@ -17,6 +17,7 @@ import { AVAILABILITY, WORK_AREAS, afterTheTrial, trialIncludes } from "./conten
 import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 import { CustomerVoices, MarketBasis, SignalChart } from "./visuals";
 import { HeroStory, Shot } from "./motion";
+import { SignalHero } from "./signalHero";
 import { PageHero } from "./hero";
 import { BESIDE_YOUR_QMS } from "../features/help/besideYourQms";
 
@@ -210,6 +211,10 @@ export function HomePage() {
             <li>Authorized people decide and sign</li>
           </ul>
         </div>
+        <SignalHero />
+      </section>
+
+      <section className="ms-dark ms-hero-inside" aria-label="Inside MDARIX">
         <div className="ms-hero-visual">
           <Shot
             src={shotOf("hero")}

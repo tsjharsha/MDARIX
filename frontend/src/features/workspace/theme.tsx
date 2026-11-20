@@ -3,30 +3,34 @@ import { Check, Monitor, Moon, Sun } from "lucide-react";
 import type { SessionContext } from "./workspaceContext";
 
 /*
- * Light and dark (0.10.91, the hero design's two themes): each person chooses Light, Dark or System (the default:
- * the device's setting), kept in this browser. Only the new navigation's shell applies it, by setting data-theme on
- * <html> while it is on screen (tokens.css holds both sets), so the website and the classic navigation stay light.
+ * Light and dark. The Clinical Signal redesign opens the whole product dark: index.html ships data-theme="dark", so
+ * the website, sign-in and the classic navigation are dark from the first paint. Each person may choose Light, Dark or
+ * System in the new navigation's top bar (kept in this browser); its shell applies that choice while it is on screen
+ * and restores the product's dark default when it leaves. This module is the only one that sets data-theme.
  */
 
 export type ThemeChoice = "light" | "dark" | "system";
 export type Theme = "light" | "dark";
 
+/** The product's look when nobody has chosen: Clinical Signal dark. */
+export const DEFAULT_THEME: Theme = "dark";
+
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 const themeKey = (session: SessionContext | null | undefined) => `mdarix.theme.${session?.user_id ?? ""}`;
 
-/** The person's choice in this browser; System when none is kept, or storage cannot be read. */
+/** The person's choice in this browser; the dark default when none is kept, or storage cannot be read. */
 export function readTheme(session: SessionContext | null | undefined): ThemeChoice {
   try {
     const kept = window.localStorage.getItem(themeKey(session));
-    return kept === "light" || kept === "dark" ? kept : "system";
+    return kept === "light" || kept === "dark" || kept === "system" ? kept : DEFAULT_THEME;
   } catch {
-    return "system";
+    return DEFAULT_THEME;
   }
 }
 
 export function saveTheme(session: SessionContext | null | undefined, choice: ThemeChoice) {
   try {
-    if (choice === "system") window.localStorage.removeItem(themeKey(session));
+    if (choice === DEFAULT_THEME) window.localStorage.removeItem(themeKey(session));
     else window.localStorage.setItem(themeKey(session), choice);
   } catch {
     // No storage in this browser: the choice holds until the page is reloaded.
@@ -62,7 +66,7 @@ export function useTheme(session: SessionContext | null | undefined, on: boolean
     const root = document.documentElement;
     root.dataset.theme = theme;
     return () => {
-      delete root.dataset.theme;
+      root.dataset.theme = DEFAULT_THEME;
     };
   }, [on, theme]);
   const choose = (next: ThemeChoice) => {

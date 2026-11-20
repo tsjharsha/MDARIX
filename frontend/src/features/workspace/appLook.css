@@ -2,7 +2,7 @@
  * The application's look for 0.11.07 (owner, 19 Nov 2026: "a lot of space on the right side"; "the application should
  * look very good"; whif-demo/ux-review/visual-direction-0.11.07.md). Scoped to the application's shell (.uw-hybrid):
  * the website and the classic navigation keep tokens.css as it is.
- *   1. One palette: ink navy, brand teal, a cool page ground (light theme only; the dark theme keeps its own set).
+ *   1. One palette: green-black ink, a lime brand, a fresh page ground (light theme only; the dark theme keeps its own set).
  *   2. The work canvas uses the room: fluid to 1680 px, centred beside the rail, balanced gutters.
  *   3. The rail tells the story: Today > Cases > Investigations > Products > Decisions & Reports, joined by a line.
  *   4. Each page opens on a compact ink-to-teal hero band.
@@ -11,9 +11,9 @@
 
 /* 1. The palette: tokens.css, "The application's palette (0.11.07)". */
 .uw-hybrid {
-  --uw-brand-400: #22b8c4;
-  --uw-signal-400: #38bdf8;
-  --uw-hero-band: linear-gradient(135deg, #0a1a2f 0%, #0f2e4a 55%, #0b5560 100%);
+  --uw-brand-400: #c8f25a;
+  --uw-signal-400: #3ee6a8;
+  --uw-hero-band: linear-gradient(135deg, #061210 0%, #0d211b 55%, #1f3a14 100%);
 }
 
 /* 2. The work canvas: fluid to 1680 px and centred in the room beside the rail, so a 1920 screen has no empty band on
@@ -126,7 +126,7 @@
 }
 .uw-navrail .uw-navrail-group > .uw-tab[aria-current="page"] > svg {
   border-color: transparent;
-  background: linear-gradient(135deg, var(--uw-brand-400), #0b7a85);
+  background: linear-gradient(135deg, var(--uw-brand-400), #3ee6a8);
   box-shadow: 0 0 0 4px rgb(34 184 196 / 18%);
   color: var(--ms-white);
 }

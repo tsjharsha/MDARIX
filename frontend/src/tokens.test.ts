@@ -88,8 +88,8 @@ describe("design tokens meet WCAG 2.1 AA", () => {
     expect(failing(pairs(CONTROLS, ["surface", "subtle", "ground", "mint"]), 3)).toEqual([]);
   });
 
-  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1; 0.10.90 the hero design's, darker still)", () => {
-    expect(token("muted")).toBe("#56647b");
+  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1; the Clinical Signal redesign's, darker still)", () => {
+    expect(token("muted")).toBe("#4f6259");
     expect(contrast(token("muted"), "#ffffff")).toBeGreaterThan(contrast("#5c6d7c", "#ffffff"));
   });
 
@@ -107,7 +107,7 @@ describe("the dark theme (0.10.91)", () => {
     .filter((path) => /\.(tsx?|css|html)$/.test(path) && !path.endsWith(".test.ts") && !path.endsWith(".test.tsx"));
 
   it("gives each text 4.5:1 or more on each dark ground, each state's text on its own ground", () => {
-    expect(darkCss).toContain("--ms-surface: #0f1a2d");
+    expect(darkCss).toContain("--ms-surface: #0f1c18"); // Clinical Signal: a green-black, no navy
     const text = ["ink", "ink-2", "muted", "navy", "teal", "teal-dark", "crit", "warn", "good", "info", "ai", "harm"];
     expect(failing(pairs(text, ["surface", "subtle", "ground"]), 4.5, darkCss)).toEqual([]);
     const own: Array<[string, string]> = [
@@ -149,8 +149,9 @@ describe("the dark theme (0.10.91)", () => {
     );
   });
 
-  it("is switched on only by the new navigation's shell: no colour-scheme query, one module sets data-theme", () => {
-    // The website and the classic navigation stay light: the system's setting is read in theme.tsx, not in CSS.
+  it("opens the whole product dark, and only one module ever switches it: no colour-scheme query in CSS", () => {
+    // Clinical Signal: index.html ships data-theme="dark"; the person's Light/Dark/System choice is applied by theme.tsx.
+    expect(read("../index.html")).toContain('<html lang="en" data-theme="dark">');
     expect(css).not.toMatch(/@media[^{]*prefers-color-scheme/);
     const setters = sources.filter(
       (path) => /data-theme|dataset\.theme/.test(read(`./${path}`)) && !["tokens.css"].includes(path),
