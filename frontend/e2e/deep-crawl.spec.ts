@@ -61,6 +61,9 @@ function watch(page: Page, persona: string, where: () => string) {
 }
 
 async function signIn(page: Page, persona: any) {
+  // The privacy notice is acknowledged up front: as a fixed bar it can cover the lower buttons of a form, and it
+  // mounts later than the old 2.5 s wait on a slow dev server. The notice itself is covered by the browser evidence.
+  await page.addInitScript(() => localStorage.setItem("mdarix-compliance-consent", "accepted"));
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(persona.email);
   // The personas file committed for CI holds no password; the run supplies it (E2E_PASSWORD).

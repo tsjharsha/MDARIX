@@ -247,11 +247,19 @@ describe("the reports screens", () => {
       starter_mark: "Starter text",
       practice_label: null,
     } satisfies ReportList;
-    const html = render(<Reports />);
-    expect(html).toContain("Second-person approval");
-    expect(html).toContain("Start the worksheet");
-    expect(html).toMatch(/Deadline [^<]*2026 · \d+ days? (left|overdue)/);
-    expect(render(<Reports />, [])).not.toContain("Start the worksheet</button>");
+    // Day counts are made in the browser from due_on, so today is pinned to six days before it (only Date is faked);
+    // with the real clock this test broke once 7 Nov 2026 had passed.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 1, 12));
+    try {
+      const html = render(<Reports />);
+      expect(html).toContain("Second-person approval");
+      expect(html).toContain("Start the worksheet");
+      expect(html).toContain("Deadline 7 Nov 2026 · 6 days left");
+      expect(render(<Reports />, [])).not.toContain("Start the worksheet</button>");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows every field with its status, patient fields for the authority's route, and the approval refusal rule", () => {

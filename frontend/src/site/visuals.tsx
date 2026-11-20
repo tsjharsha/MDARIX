@@ -464,8 +464,8 @@ export function LifecycleHero() {
         </title>
         <defs>
           <radialGradient id="lc-glow">
-            <stop offset="0" stopColor="#73d6cb" stopOpacity="0.45" />
-            <stop offset="1" stopColor="#73d6cb" stopOpacity="0" />
+            <stop offset="0" stopColor="var(--ms-glow)" stopOpacity="0.45" />
+            <stop offset="1" stopColor="var(--ms-glow)" stopOpacity="0" />
           </radialGradient>
         </defs>
         <circle className="ms-lc-halo" cx={cx} cy={cy} r={110} fill="url(#lc-glow)" />

@@ -321,7 +321,7 @@ textarea {
 }
 
 .side-nav {
-  background: linear-gradient(180deg, var(--ms-ink) 0%, var(--ms-navy-deep) 100%);
+  background: linear-gradient(180deg, var(--ms-rail-2) 0%, var(--ms-rail) 100%);
   color: var(--ms-white);
   padding: 20px 16px;
   border-right: 1px solid var(--ms-navy-fill);
@@ -704,7 +704,9 @@ h3 {
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.65fr);
   gap: 36px;
   padding: 42px;
-  background: linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-teal-dark) 100%);
+  background:
+    radial-gradient(700px 360px at 100% 0%, color-mix(in srgb, var(--ms-glow) 16%, transparent), transparent 60%),
+    linear-gradient(135deg, var(--ms-hero) 0%, var(--ms-hero-2) 100%);
   color: var(--ms-white);
   border-radius: var(--ms-radius);
   box-shadow: var(--ms-shadow-2);
@@ -756,7 +758,7 @@ h3 {
 .app-story-hero .primary-action.secondary {
   background: transparent;
   border-color: var(--ms-mint-line);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .story-context {
   align-self: center;
@@ -789,7 +791,7 @@ h3 {
 .story-context > div span {
   font-size: var(--ms-fs-20);
   font-weight: 700;
-  color: var(--ms-surface);
+  color: var(--ms-white);
   margin-right: 4px;
 }
 .story-context > div span + span {
@@ -4640,7 +4642,7 @@ th {
 .public-shell .public-header {
   min-height: 84px;
   padding: 0 max(28px, calc((100vw - 1240px) / 2));
-  background: rgba(255, 255, 255, 0.94);
+  background: color-mix(in srgb, var(--ms-ground) 78%, transparent);
   border-color: var(--ms-line);
   backdrop-filter: blur(18px);
 }
@@ -4814,7 +4816,7 @@ th {
 .public-shell .public-footer {
   margin-top: 84px;
   padding: 48px max(28px, calc((100vw - 1180px) / 2));
-  background: var(--ms-ink);
+  background: var(--ms-navy-deep);
   color: var(--ms-on-dark-muted);
   border: 0;
 }
@@ -5989,10 +5991,10 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   align-items: center;
   gap: 7px;
   padding: 9px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid color-mix(in srgb, var(--ms-white) 35%, transparent);
   border-radius: var(--ms-radius-sm);
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--ms-surface);
+  background: color-mix(in srgb, var(--ms-white) 9%, transparent);
+  color: var(--ms-white);
   font: inherit;
   font-size: var(--ms-fs-12);
   font-weight: 700;
@@ -6424,7 +6426,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .consent-actions .secondary-action {
   background: transparent;
-  color: var(--ms-surface);
+  color: var(--ms-white);
   border: 1px solid var(--ms-line-control);
   border-radius: var(--ms-radius-md);
   padding: 9px 13px;
@@ -6598,7 +6600,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   padding: 22px;
   border: 1px solid var(--ms-mint-line);
   border-radius: var(--ms-radius);
-  background: color-mix(in srgb, var(--ms-white) 72%, transparent);
+  background: color-mix(in srgb, var(--ms-surface) 72%, transparent);
   color: var(--ms-teal-dark);
 }
 .platform-admin-hero-status strong {
@@ -10118,8 +10120,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   inset: 0;
   z-index: -2;
   background: url("/site/medtech-product-360-device.webp") center / cover no-repeat;
-  opacity: 0.18;
-  filter: saturate(0.6);
+  opacity: 0.07;
+  filter: grayscale(1);
 }
 .auth-page::after {
   content: "";
@@ -10127,7 +10129,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(60% 70% at 85% 40%, color-mix(in srgb, var(--ms-white) 80%, transparent), transparent 70%),
+    radial-gradient(55% 60% at 85% 30%, color-mix(in srgb, var(--ms-glow) 12%, transparent), transparent 70%),
+    radial-gradient(45% 50% at 5% 90%, color-mix(in srgb, var(--ms-good-mark) 9%, transparent), transparent 65%),
     linear-gradient(
       115deg,
       color-mix(in srgb, var(--ms-ground) 95%, transparent) 0%,
@@ -10233,7 +10236,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   width: 100%;
   padding: 36px;
   gap: 14px;
-  background: color-mix(in srgb, var(--ms-white) 92%, transparent);
+  background: color-mix(in srgb, var(--ms-surface) 88%, transparent);
   backdrop-filter: blur(6px);
   border: 1px solid var(--auth-line);
   border-top: 4px solid var(--auth-teal);
@@ -10419,14 +10422,14 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--ms-teal-bright);
 }
 .auth-page.is-signup .auth-aside h2 {
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .auth-page.is-signup .auth-aside li > span {
   background: color-mix(in srgb, var(--ms-white) 8%, transparent);
   color: var(--ms-teal-bright);
 }
 .auth-page.is-signup .auth-aside strong {
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .auth-page.is-signup .auth-aside p {
   color: var(--ms-on-dark-muted);

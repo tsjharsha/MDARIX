@@ -9,6 +9,10 @@ import { EXAMPLE_NUMBERS } from "./visuals";
 import { InvestigationAnimation } from "./motion";
 import { SCENES } from "./scenes";
 
+// Read with Node: Vitest stubs CSS imports, even with ?raw.
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+const scenesCss: string = fs.readFileSync(new URL("./scenes/scenes.css", import.meta.url), "utf8");
+
 describe("website home", () => {
   it("draws the quality loop in story order with illustrative values", () => {
     expect(SITE_LOOP.map((station) => station.key)).toEqual(LOOP_ORDER.map((step) => step.code));
@@ -67,6 +71,39 @@ describe("website home", () => {
       });
     }
     expect(items.find((item) => item.slug === "recall")?.future).toBe(true);
+  });
+});
+
+describe("the hero", () => {
+  const hero = () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    return html.slice(html.indexOf('class="ms-hero"'), html.indexOf('id="quality-loop"'));
+  };
+
+  it("draws what MDARIX does as one labelled picture, with the investigation kept in the worked example", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    expect(hero()).toMatch(/<svg[^>]*role="img"[^>]*aria-label="Complaint signals flow into MDARIX/);
+    for (const step of ["Complaint", "Product", "Lot", "Supplier", "Evidence", "Signed by a person"]) {
+      expect(hero()).toContain(`>${step}</text>`);
+    }
+    expect(hero()).not.toContain("Investigation · OrbitCare 300 pressure alarms");
+    expect(html.indexOf("Investigation · OrbitCare 300 pressure alarms")).toBeGreaterThan(
+      html.indexOf('id="example-title"'),
+    );
+  });
+
+  it("asks for one thing: the free trial, with one way to look first", () => {
+    const buttons = hero().match(/class="ms-btn [^"]*"[^>]*href="[^"]*"/g) ?? [];
+    expect(buttons.map((button) => button.match(/href="([^"]*)"/)![1])).toEqual(["/signup", "/platform"]);
+    expect(hero()).toContain('href="/videos"');
+  });
+
+  it("keeps the always-dark scenes on colours that stay readable in both themes", () => {
+    const start = scenesCss.indexOf(".sc-dark {");
+    const dark = scenesCss.slice(start, scenesCss.indexOf("}", start));
+    // Surface, mint and the line tokens turn dark in the dark theme: text drawn with them disappears.
+    expect(dark).not.toMatch(/var\(--ms-(surface|mint|warn-line|warn-bg|crit-bg|navy)\)/);
+    expect(dark).toContain("--sc-ink: var(--ms-white);");
   });
 });
 

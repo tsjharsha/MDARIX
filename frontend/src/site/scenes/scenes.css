@@ -32,26 +32,36 @@
   background: var(--sc-stage);
   overflow: hidden;
 }
+/* Always dark, in both themes: only theme-stable tokens (white, glow, hero grounds, the bright marks). */
 .sc-dark {
-  --sc-ink: var(--ms-surface);
-  --sc-ink-2: rgb(255 255 255 / 78%);
-  --sc-muted: rgb(255 255 255 / 72%);
-  --sc-line: rgb(255 255 255 / 16%);
-  --sc-panel: rgb(255 255 255 / 7%);
-  --sc-solid: var(--ms-navy-deep);
-  --sc-teal: var(--ms-teal-bright);
-  --sc-teal-2: var(--ms-info-line);
-  --sc-amber: var(--ms-warn-line);
-  --sc-teal-ink: var(--ms-teal-bright);
-  --sc-amber-ink: var(--ms-warn-bg);
-  --sc-red-ink: var(--ms-crit-bg);
+  --sc-ink: var(--ms-white);
+  --sc-ink-2: color-mix(in srgb, var(--ms-white) 78%, transparent);
+  --sc-muted: var(--ms-on-dark-muted);
+  --sc-line: color-mix(in srgb, var(--ms-white) 16%, transparent);
+  --sc-panel: color-mix(in srgb, var(--ms-white) 7%, transparent);
+  --sc-solid: var(--ms-hero);
+  --sc-teal: var(--ms-glow);
+  --sc-teal-2: var(--ms-teal-bright);
+  --sc-glow: var(--ms-glow);
+  --sc-amber: var(--ms-warn-mark);
+  --sc-red: var(--ms-crit-mark);
+  --sc-green: var(--ms-teal-bright);
+  --sc-blue: var(--ms-teal-bright);
+  --sc-teal-ink: var(--ms-glow);
+  --sc-amber-ink: var(--ms-warn-mark);
+  --sc-red-ink: var(--ms-crit-mark);
   --sc-blue-ink: var(--ms-on-dark-muted);
   --sc-green-ink: var(--ms-teal-bright);
   --sc-stage:
-    radial-gradient(520px 260px at 12% 0%, rgb(29 106 106 / 75%) 0%, transparent 62%),
-    radial-gradient(420px 240px at 95% 100%, rgb(201 133 0 / 16%) 0%, transparent 60%),
-    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 100% 26px,
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 26px 100%, var(--ms-navy-deep);
+    radial-gradient(520px 260px at 12% 0%, color-mix(in srgb, var(--ms-glow) 16%, transparent) 0%, transparent 62%),
+    radial-gradient(
+      420px 240px at 95% 100%,
+      color-mix(in srgb, var(--ms-teal-bright) 12%, transparent) 0%,
+      transparent 60%
+    ),
+    linear-gradient(color-mix(in srgb, var(--ms-white) 3.5%, transparent) 1px, transparent 1px) 0 0 / 100% 26px,
+    linear-gradient(90deg, color-mix(in srgb, var(--ms-white) 3.5%, transparent) 1px, transparent 1px) 0 0 / 26px 100%,
+    var(--ms-hero);
 }
 .sc svg {
   width: 100%;
