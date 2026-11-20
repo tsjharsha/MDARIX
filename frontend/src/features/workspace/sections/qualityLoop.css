@@ -11,8 +11,9 @@
   overflow: hidden;
   border-radius: var(--ms-radius);
   background:
-    radial-gradient(circle at 62% 38%, rgba(8, 123, 120, 0.45), transparent 55%),
-    linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-navy-fill) 60%, var(--ms-navy-fill) 100%);
+    radial-gradient(circle at 62% 38%, color-mix(in srgb, var(--ms-glow) 16%, transparent), transparent 55%),
+    radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--ms-teal-bright) 12%, transparent), transparent 50%),
+    linear-gradient(135deg, var(--ms-hero) 0%, var(--ms-hero-2) 100%);
   color: var(--ms-mint);
 }
 .ql-copy {

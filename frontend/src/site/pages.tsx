@@ -40,6 +40,7 @@ import {
   type PlatformPath,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
+import { SignalHero } from "./signalHero";
 import { DesignPhases } from "./designPhases";
 import { QUESTIONS, QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 import {
@@ -362,13 +363,13 @@ export function HomePage() {
                   Request a demo
                 </a>
               )}
-              <a className="ms-btn ms-btn-ghost-light" href="/videos">
-                Watch the videos
-              </a>
               <a className="ms-btn ms-btn-ghost-light" href="/platform">
-                Explore the platform
+                See how it works
               </a>
             </div>
+            <a className="ms-hero-video" href="/videos">
+              <span className="ms-hero-play" aria-hidden="true" /> Watch the two-minute videos
+            </a>
             <ul className="ms-hero-points">
               <li>
                 <Check size={15} aria-hidden="true" /> Works beside your QMS or complaint software
@@ -381,7 +382,7 @@ export function HomePage() {
               </li>
             </ul>
           </div>
-          <InvestigationAnimation />
+          <SignalHero />
         </div>
       </section>
 
@@ -434,6 +435,9 @@ export function HomePage() {
             </p>
           </Reveal>
         </div>
+        <Reveal className="ms-example-demo">
+          <InvestigationAnimation />
+        </Reveal>
         <div className="ms-example-team">
           <Reveal className="ms-example-visual">
             <Photo

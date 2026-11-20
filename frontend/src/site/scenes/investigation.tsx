@@ -366,7 +366,7 @@ function AskCited({ label }: { label: string }) {
           </text>
         </g>
         <circle cx={37} cy={287} r={9} fill="var(--sc-amber)" className="sc-pulse" />
-        <text x={37} y={291} textAnchor="middle" style={px(12)} fontWeight={800} fill="#10202f">
+        <text x={37} y={291} textAnchor="middle" style={px(12)} fontWeight={800} fill="var(--sc-solid)">
           !
         </text>
         <g className="sc-fade" style={at(0, "2.5s")}>

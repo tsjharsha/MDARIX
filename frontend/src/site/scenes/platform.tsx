@@ -55,7 +55,7 @@ function ProductRealityGraph({ label }: { label: string }) {
       <g transform={`translate(${cx} ${cy})`}>
         <circle r={46} className="sc-ping" fill="none" stroke="var(--sc-teal)" strokeWidth={2} />
         <g className="sc-pop">
-          <circle r={46} fill="#13344a" stroke="var(--sc-teal)" strokeWidth={3} />
+          <circle r={46} fill="var(--sc-solid)" stroke="var(--sc-teal)" strokeWidth={3} />
           <rect x={-17} y={-24} width={34} height={30} rx={6} fill="none" stroke="var(--sc-teal)" strokeWidth={2.5} />
           <path d="M -11 -10 l 5 0 l 3 -6 l 4 12 l 3 -6 l 7 0" fill="none" stroke="var(--sc-teal)" strokeWidth={2} />
           <text textAnchor="middle" y={24} style={{ fontSize: fs(10) }} fontWeight={800} fill="var(--sc-teal)">

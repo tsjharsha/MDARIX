@@ -776,7 +776,7 @@ function HumanReviewBoundary({ label }: { label: string }) {
               fill="color-mix(in srgb, var(--sc-teal) 16%, transparent)"
               stroke="var(--sc-teal)"
             />
-            <Tick x={28} y={32} r={13} mark="#0f2233" />
+            <Tick x={28} y={32} r={13} mark="var(--sc-solid)" />
             <text x={52} y={28} style={{ fontSize: fs(14) }} fontWeight={800}>
               Signed · 15:20
             </text>

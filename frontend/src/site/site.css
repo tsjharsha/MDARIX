@@ -27,14 +27,17 @@
 .mdx-site::before {
   z-index: -2;
   background: url("/site/medtech-product-360-device.webp") center / cover no-repeat;
-  opacity: 0.18;
-  filter: saturate(0.6);
+  opacity: 0.06;
+  filter: grayscale(1);
 }
 .mdx-site::after {
   z-index: -1;
   background:
-    radial-gradient(60% 70% at 85% 40%, #ffffffcc, transparent 70%),
-    linear-gradient(115deg, #f3f6faf2 0%, #f3f6fab3 45%, #eef5f5cc 100%);
+    radial-gradient(55% 45% at 88% -5%, color-mix(in srgb, var(--ms-glow) 12%, transparent), transparent 65%),
+    radial-gradient(45% 40% at -5% 20%, color-mix(in srgb, var(--ms-good-mark) 9%, transparent), transparent 60%),
+    linear-gradient(color-mix(in srgb, var(--ms-white) 2.5%, transparent) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, color-mix(in srgb, var(--ms-white) 2.5%, transparent) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(180deg, color-mix(in srgb, var(--ms-ground) 92%, transparent), var(--ms-ground));
 }
 .mdx-site *,
 .mdx-site *::before,
@@ -88,8 +91,8 @@
   z-index: 100;
   padding: 8px 14px;
   border-radius: var(--ms-radius-md);
-  background: var(--ms-navy);
-  color: var(--ms-surface) !important;
+  background: var(--ms-navy-fill);
+  color: var(--ms-white) !important;
   transform: translateY(calc(-100% - 24px));
 }
 .ms-skip:focus {
@@ -138,7 +141,7 @@
 .ms-btn-primary {
   background: var(--ms-teal);
   color: var(--ms-surface) !important;
-  box-shadow: var(--ms-shadow-2);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-glow) 22%, transparent);
 }
 .ms-btn-primary:hover {
   background: var(--ms-teal-dark);
@@ -152,12 +155,16 @@
   border-color: var(--ms-teal);
 }
 .ms-btn-light {
-  background: var(--ms-surface);
-  color: var(--ms-navy) !important;
+  background: var(--ms-glow);
+  color: var(--ms-glow-ink) !important;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ms-glow) 22%, transparent);
+}
+.ms-btn-light:hover {
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ms-glow) 34%, transparent);
 }
 .ms-btn-ghost-light {
-  border-color: rgb(255 255 255 / 35%);
-  color: var(--ms-surface) !important;
+  border-color: color-mix(in srgb, var(--ms-white) 28%, transparent);
+  color: var(--ms-white) !important;
 }
 .ms-btn-ghost-light:hover {
   background: rgb(255 255 255 / 8%);
@@ -208,9 +215,9 @@
   gap: 28px;
   height: 72px;
   padding: 0 max(24px, calc((100vw - 1280px) / 2));
-  border-bottom: 1px solid rgb(221 229 236 / 80%);
-  background: rgb(255 255 255 / 88%);
-  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-ground) 72%, transparent);
+  backdrop-filter: saturate(160%) blur(16px);
 }
 .ms-brand {
   display: inline-flex;
@@ -227,12 +234,12 @@
   width: 34px;
   height: 34px;
   border-radius: var(--ms-radius-md);
-  background: linear-gradient(135deg, var(--ms-teal), var(--ms-navy));
+  background: linear-gradient(135deg, var(--ms-teal), var(--ms-teal-bright));
   color: var(--ms-surface);
   font-size: var(--ms-fs-16);
 }
 .ms-brand-light {
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .ms-header nav {
   display: flex;
@@ -353,16 +360,21 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(1100px 600px at 85% -10%, var(--ms-ink-2) 0%, transparent 60%),
-    radial-gradient(900px 500px at 0% 110%, var(--ms-teal-dark) 0%, transparent 55%), var(--ms-navy-deep);
-  color: var(--ms-surface);
+    radial-gradient(1100px 620px at 88% -15%, color-mix(in srgb, var(--ms-glow) 16%, transparent) 0%, transparent 60%),
+    radial-gradient(
+      900px 520px at -5% 110%,
+      color-mix(in srgb, var(--ms-good-mark) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--ms-hero);
+  color: var(--ms-white);
 }
 .ms-hero-backdrop {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgb(255 255 255 / 5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 5%) 1px, transparent 1px);
+    linear-gradient(var(--ms-hero-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ms-hero-line) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse at 70% 40%, var(--ms-ink) 0%, transparent 70%);
   animation: ms-grid-drift 30s linear infinite;
@@ -415,11 +427,227 @@
   color: var(--ms-teal-bright);
 }
 
+/* The hero's signal picture: complaints in, links, legal clocks out, a person signs (signalHero.tsx). */
+.ms-hero-video {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--ms-on-dark-muted) !important;
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ms-hero-video:hover {
+  color: var(--ms-white) !important;
+}
+.ms-hero-play {
+  position: relative;
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--ms-glow) 55%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ms-glow) 45%, transparent);
+  animation: ms-play-ping 2.4s ease-out infinite;
+}
+.ms-hero-play::after {
+  content: "";
+  margin: auto;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--ms-glow);
+  transform: translateX(1px);
+}
+@keyframes ms-play-ping {
+  to {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+.ms-hero h1 {
+  background: linear-gradient(
+    100deg,
+    var(--ms-white) 0%,
+    var(--ms-white) 45%,
+    var(--ms-glow) 75%,
+    var(--ms-teal-bright) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.ms-signal-hero {
+  position: relative;
+  margin: 0;
+  animation: ms-signal-in 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.ms-signal-hero svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.ms-signal-hero figcaption {
+  margin-top: 6px;
+  color: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+@keyframes ms-signal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+.ms-signal-hero .sh-stop-glow {
+  stop-color: var(--ms-glow);
+}
+.ms-signal-hero .sh-stop-mint {
+  stop-color: var(--ms-teal-bright);
+}
+.ms-signal-hero .sh-stop-halo {
+  stop-color: color-mix(in srgb, var(--ms-glow) 16%, transparent);
+}
+.ms-signal-hero .sh-stop-none {
+  stop-color: transparent;
+}
+.ms-signal-hero .sh-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-white) 8%, transparent);
+}
+.ms-signal-hero .sh-ring-dash {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-glow) 30%, transparent);
+  stroke-dasharray: 2 10;
+}
+.ms-signal-hero .sh-spark {
+  fill: var(--ms-glow);
+  filter: drop-shadow(0 0 6px var(--ms-glow));
+}
+.ms-signal-hero .sh-wire {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ms-teal-bright) 32%, transparent);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-wire-in {
+  stroke: color-mix(in srgb, var(--ms-glow) 30%, transparent);
+  stroke-dasharray: 4 6;
+  animation: sh-flow 1.4s linear infinite;
+}
+.ms-signal-hero .sh-wire-down {
+  stroke-dasharray: 3 5;
+  animation: sh-flow 1.4s linear infinite;
+}
+@keyframes sh-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.ms-signal-hero .sh-chip {
+  fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+  stroke: color-mix(in srgb, var(--ms-white) 16%, transparent);
+}
+.ms-signal-hero .sh-dot-in {
+  fill: var(--ms-crit-mark);
+  filter: drop-shadow(0 0 6px var(--ms-crit-mark));
+}
+.ms-signal-hero .sh-pulse-in {
+  fill: var(--ms-glow);
+  filter: drop-shadow(0 0 8px var(--ms-glow));
+}
+.ms-signal-hero .sh-pulse-out {
+  fill: var(--ms-teal-bright);
+  filter: drop-shadow(0 0 8px var(--ms-teal-bright));
+}
+.ms-signal-hero .sh-spoke {
+  stroke: color-mix(in srgb, var(--ms-glow) 26%, transparent);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-node {
+  fill: var(--ms-hero);
+  stroke: var(--ms-glow);
+  stroke-width: 2;
+}
+.ms-signal-hero .sh-label {
+  fill: var(--ms-white);
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+}
+.ms-signal-hero .sh-label-sm {
+  fill: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.04em;
+}
+.ms-signal-hero .sh-market {
+  font-size: var(--ms-fs-12);
+  font-weight: 700;
+}
+.ms-signal-hero .sh-caption {
+  fill: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.14em;
+}
+.ms-signal-hero .sh-clock-track {
+  fill: color-mix(in srgb, var(--ms-white) 4%, transparent);
+  stroke: color-mix(in srgb, var(--ms-white) 12%, transparent);
+  stroke-width: 4;
+}
+.ms-signal-hero .sh-clock {
+  fill: none;
+  stroke: var(--ms-warn-mark);
+  stroke-linecap: round;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ms-glow) 60%, transparent));
+}
+.ms-signal-hero .sh-core-glow {
+  fill: var(--ms-glow);
+}
+.ms-signal-hero .sh-core-inner {
+  fill: var(--ms-hero);
+}
+.ms-signal-hero .sh-ecg {
+  fill: none;
+  stroke: var(--ms-glow);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 6px var(--ms-glow));
+}
+.ms-signal-hero .sh-seal-pill {
+  fill: color-mix(in srgb, var(--ms-glow) 14%, transparent);
+  stroke: var(--ms-glow);
+  stroke-width: 1.5;
+}
+.ms-signal-hero .sh-check {
+  fill: none;
+  stroke: var(--ms-glow);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+.ms-signal-hero .sh-seal-text {
+  font-size: var(--ms-fs-14);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-signal-hero,
+  .ms-hero-play,
+  .ms-signal-hero .sh-wire-in,
+  .ms-signal-hero .sh-wire-down {
+    animation: none;
+  }
+}
+.ms-example-demo {
+  max-width: 920px;
+  margin: 0 auto 40px;
+}
+
 /* Animated investigation (illustrative) */
 .ms-demo {
   border: 1px solid rgb(255 255 255 / 14%);
   border-radius: var(--ms-radius);
-  background: rgb(255 255 255 / 97%);
+  background: color-mix(in srgb, var(--ms-surface) 94%, transparent);
   box-shadow: var(--ms-shadow-2);
   color: var(--ms-ink);
   overflow: hidden;
@@ -711,7 +939,7 @@
   padding: 10px 24px;
   border-top: 1px solid var(--ms-line);
   border-bottom: 1px solid var(--ms-line);
-  background: rgb(243 246 250 / 92%);
+  background: color-mix(in srgb, var(--ms-subtle) 92%, transparent);
   backdrop-filter: blur(10px);
   overflow-x: auto;
 }
@@ -742,7 +970,7 @@
   max-width: none;
   padding-left: max(24px, calc((100vw - var(--ms-max)) / 2));
   padding-right: max(24px, calc((100vw - var(--ms-max)) / 2));
-  background: rgb(255 255 255 / 45%);
+  background: color-mix(in srgb, var(--ms-surface) 38%, transparent);
 }
 .ms-section-head {
   max-width: 760px;
@@ -844,10 +1072,15 @@
   padding: 34px;
   border-radius: var(--ms-radius-pill);
   background:
-    radial-gradient(640px 280px at 12% 0%, rgb(29 106 106 / 75%) 0%, transparent 62%),
-    radial-gradient(520px 260px at 92% 100%, rgb(201 133 0 / 16%) 0%, transparent 60%), var(--ms-navy-deep);
+    radial-gradient(640px 280px at 12% 0%, color-mix(in srgb, var(--ms-glow) 20%, transparent) 0%, transparent 62%),
+    radial-gradient(
+      520px 260px at 92% 100%,
+      color-mix(in srgb, var(--ms-teal-bright) 12%, transparent) 0%,
+      transparent 60%
+    ),
+    var(--ms-navy-deep);
   box-shadow: var(--ms-shadow-2);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   overflow: hidden;
 }
 .ms-roadmap-head {
@@ -869,7 +1102,7 @@
   text-align: center;
 }
 .ms-roadmap-stop strong {
-  color: var(--ms-surface);
+  color: var(--ms-white);
   font-size: var(--ms-fs-16);
   line-height: 1.25;
 }
@@ -1403,8 +1636,8 @@
 .ms-featured {
   padding: 40px;
   border-radius: var(--ms-radius);
-  background: linear-gradient(135deg, var(--ms-navy), var(--ms-navy));
-  color: var(--ms-surface);
+  background: linear-gradient(135deg, var(--ms-hero-2), var(--ms-hero));
+  color: var(--ms-white);
 }
 .ms-featured .ms-eyebrow {
   color: var(--ms-teal-bright);
@@ -1423,7 +1656,7 @@
 .ms-featured .ms-flow span {
   border-color: rgb(255 255 255 / 18%);
   background: rgb(255 255 255 / 8%);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .ms-featured .ms-flow li {
   color: var(--ms-muted);
@@ -1639,8 +1872,10 @@
 /* Call to action band */
 .ms-cta-band {
   padding: 88px 24px;
-  background: radial-gradient(700px 300px at 15% 0%, var(--ms-teal-dark) 0%, transparent 60%), var(--ms-navy);
-  color: var(--ms-surface);
+  background:
+    radial-gradient(700px 300px at 15% 0%, color-mix(in srgb, var(--ms-glow) 18%, transparent) 0%, transparent 60%),
+    var(--ms-hero);
+  color: var(--ms-white);
   text-align: center;
 }
 .ms-cta-band > div {
@@ -1690,7 +1925,7 @@
 }
 .ms-footer h3 {
   margin: 0 0 14px;
-  color: var(--ms-surface);
+  color: var(--ms-white);
   font-size: var(--ms-fs-14);
 }
 .ms-footer section a {
@@ -1700,7 +1935,7 @@
   font-size: var(--ms-fs-14);
 }
 .ms-footer section a:hover {
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .ms-footer-bottom {
   display: flex;
@@ -2328,17 +2563,19 @@
   font-size: var(--ms-fs-12);
 }
 .ms-flow-core {
-  fill: var(--ms-navy);
+  fill: var(--ms-hero);
+  stroke: var(--ms-glow);
+  stroke-width: 2;
 }
 .ms-flow-pulse {
-  fill: var(--ms-teal-bright);
+  fill: var(--ms-glow);
   opacity: 0.25;
   transform-box: fill-box;
   transform-origin: center;
   animation: ms-flow-breathe 3.2s ease-in-out infinite;
 }
 .ms-flow-core-title {
-  fill: var(--ms-surface);
+  fill: var(--ms-white);
   font-size: var(--ms-fs-16);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -2645,7 +2882,7 @@
   align-items: center;
   gap: 8px 18px;
   margin-top: 10px;
-  color: var(--ms-mint);
+  color: var(--ms-on-dark-muted);
   font-size: var(--ms-fs-14);
 }
 .ms-lc-key-today,
@@ -2677,7 +2914,7 @@
   border: 1px solid rgba(115, 214, 203, 0.45);
   border-radius: var(--ms-radius-pill);
   background: rgba(115, 214, 203, 0.1);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   font-size: var(--ms-fs-12);
   font-weight: 600;
 }
@@ -2742,13 +2979,17 @@
   padding: 30px 26px 26px;
   border-radius: var(--ms-radius-pill);
   background:
-    radial-gradient(700px 300px at 10% 0%, rgb(29 106 106 / 70%) 0%, transparent 62%),
-    radial-gradient(520px 280px at 95% 100%, rgb(201 133 0 / 18%) 0%, transparent 60%),
+    radial-gradient(700px 300px at 10% 0%, color-mix(in srgb, var(--ms-glow) 18%, transparent) 0%, transparent 62%),
+    radial-gradient(
+      520px 280px at 95% 100%,
+      color-mix(in srgb, var(--ms-teal-bright) 14%, transparent) 0%,
+      transparent 60%
+    ),
     linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 100% 28px,
     linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 28px 100%,
     var(--ms-navy-deep);
   box-shadow: var(--ms-shadow-2);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   overflow: hidden;
 }
 .ms-dp-body {
@@ -3353,7 +3594,7 @@
   padding: 10px 14px;
   border-left: 3px solid var(--ms-teal);
   border-radius: 0 var(--ms-radius-md) var(--ms-radius-md) 0;
-  background: rgb(255 255 255 / 70%);
+  background: color-mix(in srgb, var(--ms-surface) 70%, transparent);
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
 }
@@ -3487,7 +3728,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--ms-mint);
+  color: var(--ms-on-dark-muted);
   font-size: var(--ms-fs-14);
 }
 .ms-cta-trial li {
@@ -3542,7 +3783,7 @@
   padding: 7px 12px;
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-radius-pill);
-  background: rgb(255 255 255 / 94%);
+  background: color-mix(in srgb, var(--ms-surface) 94%, transparent);
   color: var(--ms-navy);
   font: inherit;
   font-size: var(--ms-fs-14);
