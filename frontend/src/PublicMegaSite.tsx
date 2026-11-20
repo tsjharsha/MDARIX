@@ -19,6 +19,8 @@ import {
 } from "./site/legal";
 
 // Pages outside the main navigation: legal documents, security and contact. Anything else is "not found".
+// MDARIX Vigilance Command: the Google ADK + Gemini companion that drafts each case into MDARIX for a person to sign.
+export const VIGILANCE_URL = "https://vigilance-658894168566.asia-south1.run.app/";
 const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/accessibility", "/contact"] as const;
 type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
@@ -228,6 +230,9 @@ export function PublicMegaSite({ path }: { path: string }) {
             ))}
             <span className="ms-nav-actions">
               <a href="/signin">Sign in</a>
+              <a className="ms-btn ms-btn-quiet ms-nav-vigilance" href={VIGILANCE_URL}>
+                Vigilance AI
+              </a>
               {DEMO_REQUESTS_OFFERED ? (
                 <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={close}>
                   Request a demo

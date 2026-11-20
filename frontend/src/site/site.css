@@ -2247,3 +2247,15 @@
 .ms-capability-head .ms-check-list {
   margin-top: 0;
 }
+
+/* The Vigilance AI link beside Sign in: a quiet pill, the lime trial button stays the main action. */
+.ms-nav-actions .ms-nav-vigilance {
+  border: 1px solid rgba(200, 242, 90, 0.45);
+  background: transparent;
+  color: var(--site-brand) !important;
+  box-shadow: none;
+}
+.ms-nav-actions .ms-nav-vigilance:hover {
+  border-color: var(--site-brand);
+  background: rgba(200, 242, 90, 0.08);
+}
